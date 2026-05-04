@@ -1,0 +1,287 @@
+/**
+ * K8s-style manifest envelope, scoped to the cms group of the mantle universe.
+ *
+ *   apiVersion: cms.mantle.aotter.net/v1
+ *   kind: <Kind>
+ *   metadata: { name }
+ *   spec: { ... kind-specific ... }
+ *
+ * Sibling group `analytics.mantle.aotter.net/v1` lives in the parallel mantle (OLAP)
+ * project and is parsed there — the two systems share lineage and mantle.ai
+ * domain but not parsers.
+ *
+ * v0.1 grammar lock — see `docs/design-atoms.md` and ADR-0001
+ * § "Future grammar discipline". DRAFT keys (policies, recursive views,
+ * temporal predicates, quotas, projection triggers, mcp / cron / queue
+ * Trigger source kinds) are intentionally absent from this file. They
+ * land alongside their design pass; until then, the parser warns on
+ * their use.
+ *
+ * v0.1.x extensions — see ADR-0001 § "What's DRAFT". `handler.kind: builtin`
+ * and `Trigger.source.kind: lifecycle` are reserved as v0.1.x-committed
+ * (will land before v0.2 once the lifecycle / editorial design pass
+ * settles); the parser rejects them today with a fine-grained code so
+ * authors who reach for them get a clear "not in v0.1.0 yet" message
+ * rather than the generic DRAFT_KEY_USED.
+ */
+
+export const API_VERSION = "cms.mantle.aotter.net/v1" as const;
+export type ApiVersion = typeof API_VERSION;
+
+/** Loose JSON Schema shape — we don't constrain it at the type level.
+ *  Manifest authoring stays JSON Schema; runtime validators translate
+ *  to zod (Workers-CSP-safe). Cross-collection refs use the custom
+ *  keyword `x-mantle-ref: <collectionName>` on string-typed fields holding
+ *  foreign-key IDs; `x-mcp-hint` is a free-form widget-intent hint. */
+export type JsonSchema = {
+  readonly type?: string | readonly string[];
+  readonly properties?: Readonly<Record<string, JsonSchema>>;
+  readonly required?: readonly string[];
+  readonly items?: JsonSchema;
+  readonly enum?: readonly unknown[];
+  readonly format?: string;
+  readonly pattern?: string;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly minItems?: number;
+  readonly maxItems?: number;
+  readonly nullable?: boolean;
+  readonly default?: unknown;
+  readonly additionalProperties?: boolean | JsonSchema;
+  readonly description?: string;
+  /** Custom: cross-collection reference target. */
+  readonly "x-mantle-ref"?: string;
+  /** Custom: hint for MCP tool / agent prompt context. */
+  readonly "x-mcp-hint"?: string;
+  readonly [key: string]: unknown;
+};
+
+export const MANTLE_REF_KEYWORD = "x-mantle-ref" as const;
+export const MCP_HINT_KEYWORD = "x-mcp-hint" as const;
+export const MANTLE_BIND_KEYWORD = "x-mantle-bind" as const;
+
+/**
+ * Four declarative atoms. Each maps 1-to-1 to a Postgres primitive — see
+ * ADR-0001 / `docs/design-atoms.md` § TL;DR for the mapping. `Procedure`
+ * is the only kind with a code seam (handler ref to consumer's TS file).
+ */
+export type ManifestKind = "Schema" | "View" | "Procedure" | "Trigger";
+
+export interface ManifestMetadata {
+  /** Resource identifier, e.g. `posts`. Required. Globally unique within
+   *  `(kind, deployment)`. */
+  readonly name: string;
+  /** Free-form labels for filtering / discovery. Reserved; not used today. */
+  readonly labels?: Readonly<Record<string, string>>;
+}
+
+interface ManifestEnvelope<K extends ManifestKind, S> {
+  readonly apiVersion: ApiVersion;
+  readonly kind: K;
+  readonly metadata: ManifestMetadata;
+  readonly spec: S;
+}
+
+/* ─── Schema ─── */
+
+export type SchemaManifest = ManifestEnvelope<"Schema", SchemaManifestSpec>;
+
+export interface SchemaManifestSpec {
+  /** Human-readable label for the admin UI. Required at v0.1.x —
+   *  the SPA renders this in the sidebar and elsewhere instead of
+   *  the bare `metadata.name`. AI authors MUST populate it in the
+   *  user's primary language (the install-time chosen locale), since
+   *  end-admin users may not even read English. See ADR-0010 and
+   *  the authoring contract § Schema authoring. */
+  readonly title: string;
+  readonly description?: string;
+  /** JSON Schema Draft 2020-12 describing per-entry data. May carry the
+   *  v0.1 property extensions: `x-mantle-bind`, `x-mantle-ref`, `x-mcp-hint`. */
+  readonly schema: JsonSchema;
+  /** JSON Forms uiSchema. Optional. */
+  readonly uiSchema?: Record<string, unknown>;
+  /** Composite unique-index declarations, e.g. `[[slug, locale]]`. */
+  readonly uniqueIndexes?: ReadonlyArray<ReadonlyArray<string>>;
+  /** Whether entries in this collection carry a per-row locale. Default
+   *  `false`. When `true`, `data.locale` MUST be present and ∈ site
+   *  `locales`; when `false`, `data.locale` MUST be absent. See
+   *  ADR-0010. Mutually constrained with `translates`. */
+  readonly localized?: boolean;
+  /** Parent/child translation pattern: this Schema is the translatable
+   *  companion to a non-localized parent Schema, joined by a shared
+   *  field. Implies `localized: true`. See ADR-0010. */
+  readonly translates?: TranslatesBinding;
+  /** Editorial workflow opt-in. Default `'simple'` (draft → published →
+   *  archived, no approval queue). The v0.1.0 boot validator currently
+   *  rejects `'editorial'` with a clear "v0.1.x" message; starters use
+   *  `'simple'` only. The parser accepts both values structurally so
+   *  the schema stays stable across the v0.1 → v0.1.x bump. */
+  readonly lifecycle?: LifecycleMode;
+}
+
+export interface TranslatesBinding {
+  /** Name of the parent Schema this translation table joins to. Must
+   *  resolve to a declared Schema; the parent itself MUST NOT be
+   *  `localized: true` (it carries the non-translatable facts). */
+  readonly parent: string;
+  /** Field present in both parent's and this Schema's
+   *  `spec.schema.properties` and used as the join key. Conventionally
+   *  `slug` for content, but any stable identifier works. */
+  readonly on: string;
+}
+
+export type LifecycleMode = "simple" | "editorial";
+
+/* ─── View ─── */
+
+export type ViewManifest = ManifestEnvelope<"View", ViewManifestSpec>;
+
+export interface ViewManifestSpec {
+  /** Source Schema name (bare; no namespace). */
+  readonly from: string;
+  /** Filter AST. v0.1 grammar: eq | and | or only. */
+  readonly filter?: FilterAst;
+  /** Projection. */
+  readonly fields?: readonly string[];
+  /** Order. */
+  readonly orderBy?: ReadonlyArray<{ readonly field: string; readonly direction?: "asc" | "desc" }>;
+  /** Hard cap on returned rows. */
+  readonly limit?: number;
+}
+
+/** v0.1 filter AST. Anything beyond eq/and/or is DRAFT (`contains`, `not`,
+ *  `in`, `like`, `recursive`, `gatedBy`, `join.aggregate`). */
+export type FilterAst = FilterEq | FilterAnd | FilterOr;
+export interface FilterEq {
+  readonly eq: { readonly field: string; readonly value: unknown };
+}
+export interface FilterAnd {
+  readonly and: readonly FilterAst[];
+}
+export interface FilterOr {
+  readonly or: readonly FilterAst[];
+}
+
+/* ─── Procedure ─── */
+
+export type ProcedureManifest = ManifestEnvelope<"Procedure", ProcedureManifestSpec>;
+
+export interface ProcedureManifestSpec {
+  /** Auth gate. v0.1: `requires.auth.all` only; predicate vocabulary
+   *  closed to `ctx.user` and `{ ctx.staff: [<role>, ...] }`. DRAFT:
+   *  `requires.auth.any`, `owns:`, `withinMinutes:`, `contains:`,
+   *  `requires.window`, `requires.quota`. See ADR-0002. */
+  readonly requires?: {
+    readonly auth?: { readonly all: readonly AuthPredicate[] };
+  };
+  /** JSON Schema for the request body. */
+  readonly input: JsonSchema;
+  /** JSON Schema for the response body. */
+  readonly output: JsonSchema;
+  /** Handler binding. v0.1.0 ships `kind: "ref"` only (consumer registers
+   *  via `sdk.registerHandler(ref, fn)` at boot). `kind: "builtin"`
+   *  (5-op CRUD shortcut over the storage adapter) is v0.1.x-committed
+   *  but not yet implemented; the parser rejects it today with
+   *  HANDLER_BUILTIN_NOT_IN_V010. See ADR-0001 § "What's DRAFT". */
+  readonly handler: HandlerBinding;
+}
+
+export type HandlerBinding = HandlerRefBinding | HandlerBuiltinBinding;
+export interface HandlerRefBinding {
+  readonly kind: "ref";
+  /** Opaque registration key (NOT a path). The consumer's project calls
+   *  `sdk.registerHandler("<ref>", fn)` at boot to bind a function. */
+  readonly ref: string;
+}
+
+/** v0.1.x-committed builtin op vocabulary — see ADR-0001 § "What's DRAFT".
+ *  Reserved for the lifecycle / editorial design pass; not implemented
+ *  in v0.1.0. New entries require an explicit grammar-revise round. */
+export const BUILTIN_OPS = ["create", "update", "upsert", "delete", "archive"] as const;
+export type BuiltinOp = (typeof BUILTIN_OPS)[number];
+
+export interface HandlerBuiltinBinding {
+  readonly kind: "builtin";
+  /** Storage op. */
+  readonly op: BuiltinOp;
+  /** Target Schema name (`Schema.metadata.name`). The op writes to
+   *  this collection. */
+  readonly schema: string;
+}
+
+/** v0.1 closed predicate vocabulary. `ctx.user` is a bare string;
+ *  `ctx.staff` carries a role list as an object with the literal key. */
+export type AuthPredicate = CtxUserPredicate | CtxStaffPredicate;
+export type CtxUserPredicate = "ctx.user";
+export interface CtxStaffPredicate {
+  readonly "ctx.staff": readonly string[];
+}
+
+/* ─── Trigger ─── */
+
+export type TriggerManifest = ManifestEnvelope<"Trigger", TriggerManifestSpec>;
+
+export interface TriggerManifestSpec {
+  readonly source: TriggerSource;
+  /** The Procedure invoked when this Trigger fires. */
+  readonly target: { readonly procedure: string };
+}
+
+/** v0.1.0 ships `http` only. `lifecycle` is v0.1.x-committed (reserved
+ *  for the editorial / hooks design pass, see ADR-0001 § "What's DRAFT")
+ *  and currently rejected by the parser with code LIFECYCLE_NOT_IN_V010.
+ *  The genuinely speculative source kinds (`mcp`, `cron`, `queue`) are
+ *  rejected with the generic DRAFT_KEY_USED. */
+export type TriggerSource = HttpTriggerSource | LifecycleTriggerSource;
+
+export interface HttpTriggerSource {
+  readonly kind: "http";
+  readonly method: HttpMethod;
+  /** OpenAPI `{param}` syntax. Path params auto-bind to identically-named
+   *  fields on the target Procedure's `input`. No optional segments. */
+  readonly path: string;
+}
+
+/** v0.1.x-committed lifecycle hook vocabulary. The 6 SQL-92 hooks
+ *  (before/after × create/update/delete) plus the editorial publish
+ *  boundary (before/after publish). Not implemented in v0.1.0. New
+ *  entries require an explicit grammar-revise round. */
+export const LIFECYCLE_HOOKS = [
+  "before_create",
+  "after_create",
+  "before_update",
+  "after_update",
+  "before_delete",
+  "after_delete",
+  "before_publish",
+  "after_publish",
+] as const;
+export type LifecycleHook = (typeof LIFECYCLE_HOOKS)[number];
+
+export type HookErrorPolicy = "abort" | "continue";
+
+export interface LifecycleTriggerSource {
+  readonly kind: "lifecycle";
+  /** Schema this Trigger watches (`Schema.metadata.name`). */
+  readonly schema: string;
+  /** Hooks bound by this Trigger. Non-empty. */
+  readonly on: readonly LifecycleHook[];
+  /** Override the per-phase default. before_* defaults to "abort";
+   *  after_* defaults to "continue". */
+  readonly errorPolicy?: HookErrorPolicy;
+}
+
+/** v0.1 HTTP methods that may carry a body. GET is intentionally absent
+ *  — read endpoints are Views, not Procedures. */
+export type HttpMethod = "POST" | "PUT" | "PATCH" | "DELETE";
+
+/* ─── Union ─── */
+
+export type Manifest = SchemaManifest | ViewManifest | ProcedureManifest | TriggerManifest;
+
+/** v0.1 closed enum for `x-mantle-bind` Schema-property values. New entries
+ *  require an explicit grammar-revise round (see ADR-0002). */
+export const MANTLE_BIND_VALUES = ["ctx.user", "ctx.staff", "now"] as const;
+export type MantleBindValue = (typeof MANTLE_BIND_VALUES)[number];

@@ -13,6 +13,9 @@
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "mantle": "./dist/cli/index.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -21,8 +24,17 @@
   },
   "files": ["dist", "README.md"],
   "scripts": {
-    "build": "echo 'TODO: implement in commit 3'",
-    "typecheck": "echo 'TODO: implement in commit 3'",
-    "test": "echo 'TODO: implement in commit 3'"
+    "build": "tsc -b tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "yaml": "^2.6.0",
+    "zod": "^4.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.5"
   }
 }
