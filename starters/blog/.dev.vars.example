@@ -1,0 +1,5 @@
+# Local-only vars wrangler dev reads. NOT deployed.
+# StubOAuthVerifier requires this flag so dev tokens (Bearer dev-<id>)
+# are accepted. Production wires the real DCR-compliant verifier — DO
+# NOT set MANTLE_ALLOW_STUB_OAUTH on production deploys.
+MANTLE_ALLOW_STUB_OAUTH=1

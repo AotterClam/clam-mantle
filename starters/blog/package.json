@@ -1,0 +1,27 @@
+{
+  "name": "@aotter/starter-blog",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reference starter for mantle v0.1.0. Localized posts (translates demo) + contact form (builtin + lifecycle hooks). Runs on wrangler dev with local D1 + KV.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "seed": "tsx seed/seed.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@aotter/mantle-spec": "workspace:*",
+    "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-cloudflare": "workspace:*",
+    "hono": "^4.6.20",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^20",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.103.2"
+  }
+}
