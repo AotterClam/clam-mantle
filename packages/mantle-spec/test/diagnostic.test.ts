@@ -197,6 +197,18 @@ describe("parseWireDiagnostic", () => {
       parseWireDiagnostic('{"code":"X","message":"m","path":"/","phase":"runtime","severity":"meh"}'),
     ).toBeNull();
   });
+
+  it("returns null on JSON primitives (does not crash on null/array/number/string)", () => {
+    // Regression: typeof null === "object" but null["code"] throws.
+    // Covers HTTP error bodies that come back as a bare null / array /
+    // number; the function must tolerate any JSON.parse-able input.
+    expect(parseWireDiagnostic("null")).toBeNull();
+    expect(parseWireDiagnostic("[]")).toBeNull();
+    expect(parseWireDiagnostic('["code","X"]')).toBeNull();
+    expect(parseWireDiagnostic("42")).toBeNull();
+    expect(parseWireDiagnostic('"a string"')).toBeNull();
+    expect(parseWireDiagnostic("true")).toBeNull();
+  });
 });
 
 describe("readJsonPointer", () => {

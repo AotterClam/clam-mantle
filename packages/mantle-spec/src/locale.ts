@@ -14,10 +14,15 @@
  * parsing, `site_config.locales` writes, content-ops `data.locale`
  * validation, public router URL segments, boot-time site-config check.
  *
- * 2-letter ISO 639 language + optional 2-letter ISO 3166 region only.
- * Day-1 doesn't need scripts (`zh-Hant`) or 3-letter codes — extend
- * here if it ever does (the regexes below are the only place the
- * restriction lives).
+ * 2- or 3-letter ISO 639 language (covers `en`, `ja`, plus 3-letter
+ * codes like `fil`, `haw`) + optional 2-letter ISO 3166 region. No
+ * script subtag (`zh-Hant`), no variants (`de-1996`). Extend the
+ * regexes below — they are the only place the restriction lives.
+ *
+ * Note: `URL_LOCALE` is stricter than `LANG` (2-letter only) because
+ * 3-letter languages don't appear in published URL paths today. If
+ * you accept a 3-letter site locale, audit URL_LOCALE consumers
+ * before flipping it.
  */
 
 const LANG = /^[a-z]{2,3}$/;

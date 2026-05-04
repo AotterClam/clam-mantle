@@ -17,7 +17,9 @@ export class InvalidSiteDefaultsError extends Error {
     super(
       `Invalid BCP 47 locale tag(s) in CmsConfig.siteDefaults.locales: ` +
         invalidLocales.map((s) => `'${s}'`).join(", ") +
-        `. Use canonical form like 'en' or 'zh-TW' (case matters). ` +
+        `. Use BCP 47 form like 'en' or 'zh-TW' — the canonicalizer ` +
+        `accepts mixed case ('zh-tw' / 'ZH_TW'), but the structure must ` +
+        `be a 2/3-letter language plus optional 2-letter region. ` +
         `See ADR-0010 / cms-spec's canonicalizeLocaleList.`,
     );
     this.name = "InvalidSiteDefaultsError";
