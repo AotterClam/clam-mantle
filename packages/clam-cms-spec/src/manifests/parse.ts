@@ -40,10 +40,16 @@ import {
  */
 
 /**
- * Backwards-compat throwable carrier. Internal-only; the public API
- * is `parseManifests` returning `{ manifests, diagnostics }`. Held so
- * cross-schema validators that previously caught a typed error can be
- * ported incrementally.
+ * Throwable carrier used by the envelope-shape validators below
+ * (`validateEnvelope`, kind-specific `validate*Spec`). Each throw
+ * carries a JSON Pointer + diagnostic code; the top-level
+ * `parseManifests` catches the throw and converts it to a Diagnostic
+ * for the public `{ manifests, diagnostics }` return shape.
+ *
+ * The class is exported (and re-exported via the package barrel) so
+ * the CLI's per-file try/catch (`cli/validate.ts`) can narrow on the
+ * type and surface `docIndex` / `pointer` in human-readable output.
+ * Treat it as part of the package's stable wire shape.
  */
 export class ManifestParseError extends Error {
   constructor(
@@ -713,6 +719,13 @@ function validateTriggerSpec(m: TriggerManifest, idx: number): TriggerManifest {
   return m;
 }
 
+/**
+ * Bucketize a flat `Manifest[]` (parser output) into typed per-kind
+ * arrays. Lives in `parse.ts` rather than its own module because every
+ * caller pairs it with `parseManifests` — they're the parser-output
+ * pipeline. Cross-manifest validators (`check.ts`, `cross-schema.ts`)
+ * and the runtime dispatcher are the only consumers.
+ */
 export function partitionManifests(manifests: ReadonlyArray<Manifest>): {
   schemas: SchemaManifest[];
   views: ViewManifest[];

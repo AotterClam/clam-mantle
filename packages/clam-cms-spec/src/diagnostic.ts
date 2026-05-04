@@ -149,7 +149,14 @@ export function makeDiagnostic(
 }
 
 /** Phase-stamping helpers — equivalent to `makeDiagnostic({...input, phase})`
- *  but read cleaner at call sites. */
+ *  but read cleaner at call sites.
+ *
+ *  `testDiagnostic` ships with no spec-side caller today — the test
+ *  harness referenced in ADR-0007 (`@aotterclam/clam-cms-spec/testing`)
+ *  is the planned consumer; `phase: "test"` is part of the public
+ *  Diagnostic contract per ADR-0008 regardless of whether spec emits
+ *  it directly. Don't drop the helper or the phase value before the
+ *  harness lands. */
 export const validateDiagnostic = (input: PhaselessInput): Diagnostic => makeDiagnostic({ ...input, phase: "validate" });
 export const testDiagnostic = (input: PhaselessInput): Diagnostic => makeDiagnostic({ ...input, phase: "test" });
 export const bootDiagnostic = (input: PhaselessInput): Diagnostic => makeDiagnostic({ ...input, phase: "boot" });
@@ -223,12 +230,17 @@ export function redactForWire(d: Diagnostic): Diagnostic {
  */
 export function parseWireDiagnostic(text: string): Diagnostic | null {
   if (!text) return null;
-  let parsed: Record<string, unknown>;
+  let raw: unknown;
   try {
-    parsed = JSON.parse(text) as Record<string, unknown>;
+    raw = JSON.parse(text);
   } catch {
     return null;
   }
+  // JSON primitives (`null`, numbers, strings, booleans, arrays) are not
+  // Diagnostic-shaped. typeof null === 'object' but null["code"] throws
+  // a TypeError, so the guard must reject null explicitly.
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const parsed = raw as Record<string, unknown>;
   if (typeof parsed["code"] !== "string") return null;
   if (typeof parsed["message"] !== "string") return null;
   if (typeof parsed["path"] !== "string") return null;

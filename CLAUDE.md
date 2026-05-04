@@ -50,14 +50,25 @@ This is the lens for every architectural decision in this codebase.
   - A new file lives in `src/<X>/` where `<X>` is the manifest atom or
     runtime concept it OPERATES ON (`manifests/`, `schema/`, `entry/`,
     `site/`, `cli/`).
-  - Cross-cutting vocabulary — types or helpers consumed by ≥3
-    siblings, today `diagnostic`, `locale`, `json-schema-zod` — sits at
-    `src/` root.
+  - Cross-cutting primitives sit at `src/` root. Today these are
+    `diagnostic.ts` (consumed by 5 siblings — manifests, schema, cli,
+    site, entry/state-machine), `locale.ts` (consumed by manifests +
+    site today; entry-time locale validation lands in commit 4 →
+    third), and `json-schema-zod.ts` (Workers-CSP-safe runtime
+    validator — used today only by `schema/validator.ts` but is the
+    documented entry point for Procedure I/O validation in
+    `clam-cms-runtime`; held at root because it's a v0.1 capability
+    boundary, not a Schema-internal helper). New root-level files
+    need to either pass the ≥3-sibling test today OR be a documented
+    capability boundary anchored by an ADR-lite paragraph.
   - No `domain/` / `application/` / `infrastructure/` layers; folders
     mirror the v0.1 grammar's closed noun set.
-  - Every folder has ≥2 implementation files; one barrel `index.ts`
-    per folder; contract files named topically (`grammar.ts`) not
-    generically (`types.ts`).
+  - Every folder has ≥2 implementation files (a single types-only
+    file like `entry/types.ts` or `site/types.ts` paired with one
+    impl satisfies this); one barrel `index.ts` per folder; closed-
+    grammar contract files named topically (`grammar.ts`) — the
+    `types.ts` name is acceptable for pure type-bucket files that
+    aren't a single named contract.
   - `cli/` may import any concept folder; concept folders MUST NOT
     import from `cli/`.
   - Adding a new top-level folder OR a new root-level file requires an

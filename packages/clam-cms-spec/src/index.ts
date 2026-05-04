@@ -6,11 +6,17 @@
  * Imported by `clam-cms-runtime` (which adds dispatcher / entry-writer
  * / view executor on top) and by `clam-cms-spec`'s own CLI bin.
  *
- * The five categorical exports below mirror the `src/` directory tree
- * — `manifests/` for the 4-atom grammar, `schema/` for Schema-internal
- * helpers (DDL emit, entry-data validation), `entry/` for the entry
- * row + lifecycle state machine, plus the diagnostic shape and the
- * locale + JSON-Schema → zod converters.
+ * Public surface, by category:
+ *  - root cross-cutters: `diagnostic` (Diagnostic shape + codes),
+ *    `locale` (BCP 47 helpers), `json-schema-zod` (Workers-CSP-safe
+ *    runtime validator)
+ *  - `manifests/` — the 4-atom grammar (Schema/View/Procedure/Trigger)
+ *    plus parse / cross-schema check / diagnose helpers / Loop-1 check
+ *  - `schema/` — Schema-internal helpers (DDL emit, entry-data
+ *    validator, by-name loader)
+ *  - `entry/` — entry row + lifecycle state machine
+ *  - `site/` — site-level declarative contract (SiteConfig +
+ *    SiteDefaults seed validator); sibling to manifests, not a 5th atom
  */
 export * from "./diagnostic.js";
 export * from "./locale.js";
