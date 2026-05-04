@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { ContentState, IllegalTransitionError } from "../src/domain/model/index.js";
 import {
   canTransition,
-  ContentState,
   getLifecycleStatuses,
-  IllegalTransitionError,
   type LifecycleSchemaLike,
   publishRequiresApproval,
   resolveLifecycle,
-} from "../src/entry/index.js";
+} from "../src/domain/service/LifecycleStateMachine.js";
 
 const simpleSchema: LifecycleSchemaLike = { spec: {} };
 const explicitSimpleSchema: LifecycleSchemaLike = { spec: { lifecycle: "simple" } };

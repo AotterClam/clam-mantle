@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
-  canonicalizeLocaleList,
-  fromUrlLocale,
   InvalidLocaleError,
   LOCALE_SHAPED_SEGMENT,
+  URL_LOCALE,
+  URL_SEGMENT,
+} from "../src/domain/model/Locale.js";
+import {
+  canonicalizeLocaleList,
+  fromUrlLocale,
   safeCanonicalLocale,
   toCanonicalLocale,
   toUrlLocale,
-  URL_LOCALE,
-  URL_SEGMENT,
-} from "../src/locale.js";
+} from "../src/domain/service/LocaleCanonicalizer.js";
 
 describe("toCanonicalLocale", () => {
   it("preserves canonical form for already-canonical values", () => {

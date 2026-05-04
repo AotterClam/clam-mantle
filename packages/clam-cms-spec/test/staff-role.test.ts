@@ -3,7 +3,7 @@ import {
   STAFF_ROLES,
   isStaffRole,
   meetsRole,
-} from "../src/manifests/grammar.js";
+} from "../src/domain/model/ManifestGrammar.js";
 
 describe("STAFF_ROLES closed enum", () => {
   it("locks the v0.1 role vocabulary", () => {

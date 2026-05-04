@@ -1,27 +1,30 @@
 /**
  * `@aotterclam/clam-cms-spec` — public surface.
  *
- * Pure spec engine: types + manifest YAML parse + validate +
- * diagnostics + JSON-Schema → zod converter. Zero env / adapter deps.
- * Imported by `clam-cms-runtime` (which adds dispatcher / entry-writer
- * / view executor on top) and by `clam-cms-spec`'s own CLI bin.
+ * Pure spec engine: kernel + domain (model + service) + usecase +
+ * infrastructure (CLI). Zero env / adapter deps. Imported by
+ * `clam-cms-runtime` (which adds dispatcher / entry-writer / view
+ * executor on top) and consumed by the CLI bin.
  *
- * Public surface, by category:
- *  - root cross-cutters: `diagnostic` (Diagnostic shape + codes),
- *    `locale` (BCP 47 helpers), `json-schema-zod` (Workers-CSP-safe
- *    runtime validator)
- *  - `manifests/` — the 4-atom grammar (Schema/View/Procedure/Trigger)
- *    plus parse / cross-schema check / diagnose helpers / Loop-1 check
- *  - `schema/` — Schema-internal helpers (DDL emit, entry-data
- *    validator, by-name loader)
- *  - `entry/` — entry row + lifecycle state machine
- *  - `site/` — site-level declarative contract (SiteConfig +
- *    SiteDefaults seed validator); sibling to manifests, not a 5th atom
+ * Layered per Aotter clean-architecture convention (mirrors
+ * `aotter-clam/clam/core`):
+ *
+ *   kernel ← domain ← usecase ← infrastructure
+ *
+ *  - `kernel/` — cross-cutting helpers (Diagnostic shape, codes,
+ *    HTTP status mapping, DiagnosticError).
+ *  - `domain/model/` — pure types: ManifestGrammar (4-atom envelope +
+ *    closed enums), Entry / Revision / Approval, ContentState,
+ *    SiteConfig / SiteDefaults, Locale shape constants.
+ *  - `domain/service/` — pure stateless algorithms operating on the
+ *    domain model: LocaleCanonicalizer, LifecycleStateMachine,
+ *    ManifestParser, CrossSchemaChecker, ManifestPathDiagnoser,
+ *    EntryDataValidator, SchemaDdlEmitter, SchemaLoader,
+ *    SiteDefaultsValidator, JsonSchemaToZod.
+ *  - `usecase/` — application services: ValidateManifestsUseCase
+ *    plus its request/response DTOs.
+ *  - `infrastructure/` — adapters: CLI (file walking + stdout I/O).
  */
-export * from "./diagnostic.js";
-export * from "./locale.js";
-export * from "./json-schema-zod.js";
-export * from "./manifests/index.js";
-export * from "./schema/index.js";
-export * from "./entry/index.js";
-export * from "./site/index.js";
+export * from "./kernel/index.js";
+export * from "./domain/index.js";
+export * from "./usecase/index.js";

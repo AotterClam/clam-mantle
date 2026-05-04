@@ -12,7 +12,7 @@ import {
   runtimeDiagnostic,
   testDiagnostic,
   validateDiagnostic,
-} from "../src/diagnostic.js";
+} from "../src/kernel/diagnostic.js";
 
 describe("phase-tagging helpers", () => {
   it("validateDiagnostic stamps phase: 'validate'", () => {

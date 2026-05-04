@@ -1,0 +1,48 @@
+import {
+  DiagnosticError,
+  type SchemaManifest,
+} from "@aotterclam/clam-cms-spec";
+import type { EntryRow } from "../../domain/model/EntryRow.js";
+import type { Clock } from "../../domain/port/Clock.js";
+import type { EntryRepository } from "../../domain/port/EntryRepository.js";
+import type { IdGenerator } from "../../domain/port/IdGenerator.js";
+import type { CreateDraftRequest } from "../dto/content/index.js";
+import {
+  schemaUnknownDiagnostic,
+  withConflictDiagnostic,
+} from "./diagnostics.js";
+
+/**
+ * `CreateDraftUseCase` — create a new draft entry. Both `simple` and
+ * `editorial` lifecycles start in `'draft'`; the difference shows up
+ * at publish time.
+ */
+export class CreateDraftUseCase {
+  constructor(
+    private readonly entries: EntryRepository,
+    private readonly schemas: ReadonlyMap<string, SchemaManifest>,
+    private readonly clock: Clock,
+    private readonly idgen: IdGenerator,
+  ) {}
+
+  async execute(request: CreateDraftRequest): Promise<EntryRow> {
+    const opPath = `usecase/CreateDraft/${request.collection}`;
+    if (!this.schemas.has(request.collection)) {
+      throw new DiagnosticError(
+        schemaUnknownDiagnostic(opPath, request.collection, [...this.schemas.keys()]),
+      );
+    }
+    const id = this.idgen.next();
+    const now = this.clock.now();
+    return withConflictDiagnostic(opPath, () =>
+      this.entries.create({
+        id,
+        collection: request.collection,
+        status: "draft",
+        data: request.data,
+        authorId: request.authorId,
+        now,
+      }),
+    );
+  }
+}
