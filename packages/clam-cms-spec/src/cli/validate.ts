@@ -2,8 +2,8 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join, resolve, relative } from "node:path";
 import { exit, stdout, stderr, cwd } from "node:process";
 import { parseManifests, ManifestParseError } from "../manifests/parse.js";
-import { check } from "../validate/index.js";
-import type { Manifest } from "../manifests/types.js";
+import { check } from "../manifests/check.js";
+import type { Manifest } from "../manifests/grammar.js";
 import type { Diagnostic } from "../diagnostic.js";
 import { validateDiagnostic } from "../diagnostic.js";
 

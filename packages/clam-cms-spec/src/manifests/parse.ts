@@ -19,7 +19,7 @@ import {
   type SchemaManifest,
   type TriggerManifest,
   type ViewManifest,
-} from "./types.js";
+} from "./grammar.js";
 
 /**
  * Day-1 envelope-and-shape parser. Loop 1 (`clam-cms validate`) does the

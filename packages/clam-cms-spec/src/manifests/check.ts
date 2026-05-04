@@ -6,8 +6,8 @@ import type {
   SchemaManifest,
   TriggerManifest,
   ViewManifest,
-} from "../manifests/types.js";
-import { CLAM_BIND_VALUES } from "../manifests/types.js";
+} from "../manifests/grammar.js";
+import { CLAM_BIND_VALUES } from "../manifests/grammar.js";
 import { partitionManifests } from "../manifests/parse.js";
 import { checkLocaleAndTranslates } from "../manifests/cross-schema.js";
 import { bestMatch, manifestPath } from "../manifests/diagnose.js";

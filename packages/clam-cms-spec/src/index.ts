@@ -18,4 +18,4 @@ export * from "./json-schema-zod.js";
 export * from "./manifests/index.js";
 export * from "./schema/index.js";
 export * from "./entry/index.js";
-export * from "./validate/index.js";
+export * from "./site/index.js";

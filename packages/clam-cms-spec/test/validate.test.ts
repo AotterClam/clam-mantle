@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { check } from "../src/validate/index.js";
+import { check } from "../src/manifests/check.js";
 import { parseManifests } from "../src/manifests/parse.js";
 import type {
   Manifest,
@@ -7,7 +7,7 @@ import type {
   SchemaManifest,
   TriggerManifest,
   ViewManifest,
-} from "../src/manifests/types.js";
+} from "../src/manifests/grammar.js";
 
 /**
  * Tests for the Loop-1 validate check + the structural parse layer it

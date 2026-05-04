@@ -1,5 +1,5 @@
 import type { ContentState } from "./types.js";
-import type { LifecycleMode } from "../manifests/types.js";
+import type { LifecycleMode } from "../manifests/grammar.js";
 
 /**
  * Per-Schema lifecycle state machine. Each Schema declares

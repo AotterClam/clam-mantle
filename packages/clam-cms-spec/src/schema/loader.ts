@@ -1,4 +1,4 @@
-import type { SchemaManifest } from "../manifests/types.js";
+import type { SchemaManifest } from "../manifests/grammar.js";
 
 /**
  * Look up a Schema manifest by `metadata.name` from a parsed manifest

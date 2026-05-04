@@ -212,11 +212,49 @@ export interface HandlerBuiltinBinding {
 }
 
 /** v0.1 closed predicate vocabulary. `ctx.user` is a bare string;
- *  `ctx.staff` carries a role list as an object with the literal key. */
+ *  `ctx.staff` carries a role list as an object with the literal key.
+ *
+ *  v0.1.x roadmap (annotation only — DO NOT IMPLEMENT until ADR-promoted):
+ *  extend with `ctx.user.{tier, verified, owns, in-group}` when platform
+ *  mode lands and user-level auth is needed. Closed enums for `tier` /
+ *  group identity will live next to STAFF_ROLES below. */
 export type AuthPredicate = CtxUserPredicate | CtxStaffPredicate;
 export type CtxUserPredicate = "ctx.user";
 export interface CtxStaffPredicate {
-  readonly "ctx.staff": readonly string[];
+  readonly "ctx.staff": readonly StaffRole[];
+}
+
+/**
+ * Staff role hierarchy. `users` is the base identity layer (runtime);
+ * `staff` is the privilege overlay (one row per privileged user). A
+ * user without a staff row is a regular site member with no admin
+ * access.
+ *
+ *   owner       — full control, manages staff, manages settings
+ *   editor      — publish, approve/reject, manage all entries
+ *   contributor — create drafts, request publish, sees only own entries
+ *
+ * `StaffRole` lives in spec because the manifest grammar references
+ * it directly: `requires.auth.all: [{ "ctx.staff": [<role>, ...] }]`
+ * — the parser checks each role string is in `STAFF_ROLES` at boot.
+ * The `Staff` runtime row shape (with grantedBy / grantedAt) lives in
+ * `clam-cms-runtime`; only the closed enum is grammar.
+ */
+export const STAFF_ROLES = ["owner", "editor", "contributor"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+const ROLE_RANK: Record<StaffRole, number> = {
+  owner: 3,
+  editor: 2,
+  contributor: 1,
+};
+
+export function meetsRole(actual: StaffRole, min: StaffRole): boolean {
+  return ROLE_RANK[actual] >= ROLE_RANK[min];
+}
+
+export function isStaffRole(s: string): s is StaffRole {
+  return (STAFF_ROLES as readonly string[]).includes(s);
 }
 
 /* ─── Trigger ─── */

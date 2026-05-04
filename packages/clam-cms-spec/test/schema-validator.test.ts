@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SchemaValidator } from "../src/schema/validator.js";
-import type { SchemaManifest } from "../src/manifests/types.js";
+import type { SchemaManifest } from "../src/manifests/grammar.js";
 
 /**
  * Build a minimal SchemaManifest for tests. The validator only

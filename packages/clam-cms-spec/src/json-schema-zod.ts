@@ -23,7 +23,7 @@
  * supported — extend here when ADR-0005 promotes them.
  */
 import { z, type ZodType } from "zod";
-import type { JsonSchema } from "./schema/types.js";
+import type { JsonSchema } from "./manifests/grammar.js";
 
 /**
  * Convert a JSON Schema object to a zod schema. The result composes
