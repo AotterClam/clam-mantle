@@ -74,6 +74,15 @@ function unwrap(stmt: PreparedStatement): D1PreparedStatement {
   return native;
 }
 
+/**
+ * Migration runner. Each migration runs in its own batch — the batch
+ * includes the migration's SQL plus the `_mantle_migrations` row insert,
+ * so a single migration is all-or-nothing. Migrations across boots are
+ * NOT transactional: a worker restart between migration N and N+1
+ * leaves N applied, N+1 retried on the next boot. Authors must keep
+ * each migration's SQL idempotent on retry (use `IF NOT EXISTS`,
+ * `INSERT … ON CONFLICT DO NOTHING`, etc.).
+ */
 class D1Migrations implements MigrationRunner {
   constructor(private readonly db: D1Database) {}
 

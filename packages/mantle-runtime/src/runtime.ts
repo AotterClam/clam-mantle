@@ -117,6 +117,7 @@ export interface CmsRuntime {
   readonly proceduresByName: ReadonlyMap<string, ProcedureManifest>;
   readonly viewsByName: ReadonlyMap<string, ViewManifest>;
   readonly triggers: readonly TriggerManifest[];
+  readonly triggersByName: ReadonlyMap<string, TriggerManifest>;
   readonly clock: Clock;
   readonly idgen: IdGenerator;
 
@@ -133,6 +134,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   for (const p of partitioned.procedures) proceduresByName.set(p.metadata.name, p);
   const viewsByName = new Map<string, ViewManifest>();
   for (const v of partitioned.views) viewsByName.set(v.metadata.name, v);
+  const triggersByName = new Map<string, TriggerManifest>();
+  for (const t of partitioned.triggers) triggersByName.set(t.metadata.name, t);
 
   const registry = buildHandlerRegistry(args.handlers ?? {});
   const templates = args.templates ?? new TemplateRegistryImpl();
@@ -216,6 +219,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     proceduresByName,
     viewsByName,
     triggers: partitioned.triggers,
+    triggersByName,
     clock,
     idgen,
 

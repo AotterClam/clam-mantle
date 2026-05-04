@@ -4,11 +4,11 @@ import type { Manifest } from "@aotter/mantle-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import { mountMcp } from "../src/mount/mountMcp.js";
+import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
 import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubOAuthVerifier,
   StubSessionRepository,
 } from "./fakes/runtime-bindings.js";
 
@@ -152,11 +152,11 @@ function harness(opts: { captchaPasses: boolean }): Harness {
       kv: new InMemoryKv(),
       sessions: new StubSessionRepository(),
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier(),
+      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
     },
   });
   const app = new Hono();
-  mountServerEndpoints(app, ref, manifests());
+  mountServerEndpoints(app, ref);
   mountMcp(app, ref);
   return { app, db, captchaCalls, slackCalls };
 }

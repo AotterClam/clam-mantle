@@ -1,18 +1,26 @@
 import type { OAuthIdentity, OAuthVerifier } from "@aotter/mantle-runtime";
 
 /**
- * Stub `OAuthVerifier` for v0.1.0 dev / smoke testing — accepts any
- * bearer token formatted `dev-<userId>` and returns a synthetic
- * identity. Real DCR-compliant verification via
- * `@cloudflare/workers-oauth-provider` lands in a follow-up commit
- * once the OAuth handshake routes are wired (`/oauth/token`,
- * `/oauth/register`, `/.well-known/oauth-*`, consent UI).
+ * Stub `OAuthVerifier` for dev / smoke testing — accepts any bearer
+ * token formatted `dev-<userId>` and returns a synthetic identity.
+ * Real DCR-compliant verification via
+ * `@cloudflare/workers-oauth-provider` lands in a follow-up commit.
  *
- * The stub keeps MCP smoke-testable end-to-end without setting up
- * real OAuth — `Authorization: Bearer dev-u-1` is enough to exercise
- * the verify path. Production wiring replaces this binding entirely.
+ * The constructor REQUIRES `env.MANTLE_ALLOW_STUB_OAUTH === "1"` so a
+ * production deploy can't accidentally wire it. Local dev sets the
+ * flag in `.dev.vars`; smoke tests pass it explicitly.
  */
 export class StubOAuthVerifier implements OAuthVerifier {
+  constructor(env: { readonly MANTLE_ALLOW_STUB_OAUTH?: string }) {
+    if (env.MANTLE_ALLOW_STUB_OAUTH !== "1") {
+      throw new Error(
+        "StubOAuthVerifier refuses to run without env.MANTLE_ALLOW_STUB_OAUTH='1'. " +
+          "This binding accepts any `Bearer dev-<userId>` token and is for local dev / tests only. " +
+          "In production, wire the real @cloudflare/workers-oauth-provider verifier instead.",
+      );
+    }
+  }
+
   async verifyAccessToken(req: Request): Promise<OAuthIdentity | null> {
     const auth = req.headers.get("authorization");
     if (!auth || !auth.startsWith("Bearer ")) return null;

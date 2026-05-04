@@ -20,6 +20,7 @@ export function mountMcp(
   options: { path?: string } = {},
 ): void {
   const path = options.path ?? "/mcp";
+  let dispatcher: McpJsonRpcDispatcher | null = null;
   app.all(path, async (c) => {
     const runtime = await ref.get();
     const identity = await runtime.oauth.verifyAccessToken(c.req.raw);
@@ -29,7 +30,7 @@ export function mountMcp(
         headers: { "www-authenticate": 'Bearer realm="mcp"' },
       });
     }
-    const dispatcher = new McpJsonRpcDispatcher({
+    dispatcher ??= new McpJsonRpcDispatcher({
       listEntries: runtime.listEntries,
       getEntry: runtime.getEntry,
       createDraft: runtime.createDraft,

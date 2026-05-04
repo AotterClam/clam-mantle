@@ -3,8 +3,6 @@ import type {
   KvCache,
   KvListResult,
   KvPutOptions,
-  OAuthIdentity,
-  OAuthVerifier,
   Session,
   SessionRepository,
 } from "@aotter/mantle-runtime";
@@ -13,7 +11,9 @@ import type {
  * Stub bindings for the smoke test. We re-use the runtime's
  * `InMemoryDatabase` for `DatabaseDriver` (already battle-tested) and
  * supply minimal stand-ins for the four other ports — they aren't on
- * the form-submission hot path.
+ * the form-submission hot path. `OAuthVerifier` comes from
+ * `src/bindings/StubOAuthVerifier` (re-exported as part of the public
+ * API; constructed with the dev-only env flag).
  */
 export class InMemoryKv implements KvCache {
   private store = new Map<string, string>();
@@ -50,17 +50,5 @@ export class StubSessionRepository implements SessionRepository {
 export class StubAssetServer implements AssetServer {
   async fetch(_req: Request): Promise<Response | null> {
     return null;
-  }
-}
-
-export class StubOAuthVerifier implements OAuthVerifier {
-  async verifyAccessToken(req: Request): Promise<OAuthIdentity | null> {
-    const auth = req.headers.get("authorization");
-    if (!auth?.startsWith("Bearer dev-")) return null;
-    return {
-      userId: auth.slice("Bearer dev-".length),
-      clientId: "dev",
-      scopes: ["mcp"],
-    };
   }
 }
