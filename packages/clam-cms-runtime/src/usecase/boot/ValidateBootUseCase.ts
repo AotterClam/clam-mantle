@@ -9,6 +9,7 @@ import {
   type TriggerManifest,
 } from "@aotterclam/clam-cms-spec";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
+import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 
 /**
  * `ValidateBootUseCase` — Loop 3 of the SDK authoring contract (see
@@ -130,7 +131,13 @@ export class ValidateBootUseCase {
     diagnostics.push(...checkHttpRouteCollisions(partitioned.triggers));
     diagnostics.push(...checkHttpRoutePrefix(partitioned.triggers));
 
-    // 4. Locale + translates cross-Schema invariants.
+    // 4. MCP tool-name collision (POC PR #48): per-collection tool
+    //    emission lowercases + kebab→snake the Schema name; two
+    //    Schemas that mangle to the same suffix would silently
+    //    overwrite each other in `tools/list`.
+    diagnostics.push(...checkMcpToolNameCollisions(partitioned.schemas));
+
+    // 5. Locale + translates cross-Schema invariants.
     diagnostics.push(
       ...checkLocaleAndTranslates({
         schemas: partitioned.schemas,
@@ -194,6 +201,34 @@ function checkHttpRoutePrefix(triggers: readonly TriggerManifest[]): Diagnostic[
             `pages and Procedure endpoints without ambiguity.`,
         }),
       );
+    }
+  }
+  return out;
+}
+
+function checkMcpToolNameCollisions(schemas: readonly SchemaManifest[]): Diagnostic[] {
+  const seen = new Map<string, string>();
+  const out: Diagnostic[] = [];
+  for (const s of schemas) {
+    const segment = mcpToolNameSegment(s.metadata.name);
+    const prior = seen.get(segment);
+    if (prior && prior !== s.metadata.name) {
+      out.push(
+        bootDiagnostic({
+          code: "MCP_TOOL_NAME_COLLISION",
+          severity: "error",
+          path: `manifest:Schema/${s.metadata.name}#/metadata/name`,
+          value: segment,
+          expected: `Schema name unique after kebab→snake mangling (collides with '${prior}')`,
+          message:
+            `Schema '${s.metadata.name}' mangles to MCP tool suffix '${segment}', ` +
+            `which already comes from Schema '${prior}'. Rename one of the Schemas ` +
+            `(e.g. avoid mixing '${prior}' and '${s.metadata.name}') so per-collection ` +
+            `MCP tool emission stays unambiguous.`,
+        }),
+      );
+    } else if (!prior) {
+      seen.set(segment, s.metadata.name);
     }
   }
   return out;

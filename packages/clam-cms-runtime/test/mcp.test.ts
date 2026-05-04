@@ -39,7 +39,10 @@ function buildHarness(): Harness {
     archive: new ArchiveUseCase(store, schemas, clock),
     deleteEntry: new DeleteEntryUseCase(store),
   };
-  return { store, dispatcher: new McpJsonRpcDispatcher(useCases) };
+  return {
+    store,
+    dispatcher: new McpJsonRpcDispatcher(useCases, [postsSchema()]),
+  };
 }
 
 function jsonRpcReq(method: string, params?: unknown, id: number | string = 1): Request {
@@ -58,23 +61,33 @@ describe("McpJsonRpcDispatcher", () => {
     expect(body.result.protocolVersion).toBe("2025-03-26");
   });
 
-  it("tools/list emits the static catalog", async () => {
+  it("tools/list emits generic + per-collection tools", async () => {
     const { dispatcher } = buildHarness();
     const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" });
     const body = (await res.json()) as {
       result: { tools: { name: string }[] };
     };
     const names = body.result.tools.map((t) => t.name);
-    expect(names).toContain("create_draft");
+    // Generic read/status tools.
     expect(names).toContain("list_entries");
+    expect(names).toContain("get_entry");
+    expect(names).toContain("request_publish");
+    expect(names).toContain("archive_entry");
+    // Per-collection authoring tools.
+    expect(names).toContain("create_draft_posts");
+    expect(names).toContain("update_draft_posts");
+    // Old generic create_draft is gone.
+    expect(names).not.toContain("create_draft");
   });
 
-  it("tools/call create_draft creates an entry through the use case", async () => {
+  it("tools/call create_draft_posts creates an entry through the use case", async () => {
     const { dispatcher, store } = buildHarness();
     const res = await dispatcher.dispatch(
       jsonRpcReq("tools/call", {
-        name: "create_draft",
-        arguments: { collection: "posts", data: { title: "From MCP" } },
+        name: "create_draft_posts",
+        // Per-collection tool: agent sends Schema fields at top level
+        // (no `{ data: ... }` wrapper).
+        arguments: { title: "From MCP" },
       }),
       { userId: "u1" },
     );
@@ -118,17 +131,17 @@ describe("McpJsonRpcDispatcher", () => {
     expect(body.error.code).toBe(-32601);
   });
 
-  it("DiagnosticError surfaces in error.data", async () => {
+  it("create_draft_<unknown> returns -32601 unknown tool", async () => {
     const { dispatcher } = buildHarness();
     const res = await dispatcher.dispatch(
       jsonRpcReq("tools/call", {
-        name: "create_draft",
-        arguments: { collection: "ghost", data: {} },
+        name: "create_draft_ghost",
+        arguments: {},
       }),
       { userId: "u1" },
     );
-    const body = (await res.json()) as { error: { data: { code: string } } };
-    expect(body.error.data.code).toBe("NOT_FOUND");
+    const body = (await res.json()) as { error: { code: number } };
+    expect(body.error.code).toBe(-32601);
   });
 
   it("rejects non-POST methods", async () => {

@@ -30,16 +30,19 @@ export function mountMcp(
         headers: { "www-authenticate": 'Bearer realm="mcp"' },
       });
     }
-    dispatcher ??= new McpJsonRpcDispatcher({
-      listEntries: runtime.listEntries,
-      getEntry: runtime.getEntry,
-      createDraft: runtime.createDraft,
-      updateDraft: runtime.updateDraft,
-      requestPublish: runtime.requestPublish,
-      unpublish: runtime.unpublish,
-      archive: runtime.archive,
-      deleteEntry: runtime.deleteEntry,
-    });
+    dispatcher ??= new McpJsonRpcDispatcher(
+      {
+        listEntries: runtime.listEntries,
+        getEntry: runtime.getEntry,
+        createDraft: runtime.createDraft,
+        updateDraft: runtime.updateDraft,
+        requestPublish: runtime.requestPublish,
+        unpublish: runtime.unpublish,
+        archive: runtime.archive,
+        deleteEntry: runtime.deleteEntry,
+      },
+      [...runtime.schemasByName.values()],
+    );
     return dispatcher.dispatch(c.req.raw, { userId: identity.userId });
   });
 }

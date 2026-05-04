@@ -75,21 +75,27 @@ async function main(): Promise<void> {
     console.log(`[mcp]  1/12  initialize → ${result.protocolVersion}`);
   }
 
-  // 2. tools/list — assert all 6 v0.1.0 static tools present
+  // 2. tools/list — assert generic tools + per-collection authoring
+  //    tools for each Schema in the starter (3: posts,
+  //    post-translations, contact-messages → 6 per-collection tools).
   {
     const r = await rpc("tools/list");
     const result = r.result as { tools: ReadonlyArray<{ name: string }> };
     const names = result.tools.map((t) => t.name).sort();
     const expected = [
       "archive_entry",
-      "create_draft",
+      "create_draft_contact_messages",
+      "create_draft_post_translations",
+      "create_draft_posts",
       "get_entry",
       "list_entries",
       "request_publish",
-      "update_draft",
+      "update_draft_contact_messages",
+      "update_draft_post_translations",
+      "update_draft_posts",
     ];
     assert.deepEqual(names, expected, `tools/list mismatch: got ${names.join(",")}`);
-    console.log(`[mcp]  2/12  tools/list → ${names.length} tools`);
+    console.log(`[mcp]  2/12  tools/list → ${names.length} tools (4 generic + 6 per-collection)`);
   }
 
   // 3. list_entries on post-translations — fixture seeded 6 rows
@@ -110,42 +116,48 @@ async function main(): Promise<void> {
     console.log(`[mcp]  4/12  get_entry(fx-pt-hello-world-en) → "Hello, world"`);
   }
 
-  // 5. create_draft on posts (no hooks bound to this Schema)
+  // 5. create_draft_posts — agent sends Schema fields at top level
+  //    (no `{ data: ... }` wrapper; that's the new typed surface).
   let postId: string;
   {
-    const row = await tool<EntryRow>("create_draft", {
-      collection: "posts",
-      data: { slug: runSlug, coverUrl: "https://example.com/x.jpg" },
+    const row = await tool<EntryRow>("create_draft_posts", {
+      slug: runSlug,
+      coverUrl: "https://example.com/x.jpg",
     });
     assert.equal(row.collection, "posts");
     assert.equal(row.status, "draft");
     assert.equal(row.version, 1);
     postId = row.id;
-    console.log(`[mcp]  5/12  create_draft(posts) → ${postId}`);
+    console.log(`[mcp]  5/12  create_draft_posts → ${postId}`);
   }
 
-  // 6. update_draft with correct OCC → version bump
+  // 6. update_draft_posts with correct OCC → version bump
   {
-    const row = await tool<EntryRow>("update_draft", {
+    const row = await tool<EntryRow>("update_draft_posts", {
       id: postId,
       expected_version: 1,
-      data: { slug: runSlug, coverUrl: "https://example.com/y.jpg" },
+      slug: runSlug,
+      coverUrl: "https://example.com/y.jpg",
     });
     assert.equal(row.version, 2, `expected version 2 after update, got ${row.version}`);
-    console.log(`[mcp]  6/12  update_draft(${postId}) → version 2`);
+    console.log(`[mcp]  6/12  update_draft_posts(${postId}) → version 2`);
   }
 
-  // 7. update_draft with stale OCC → CONFLICT
+  // 7. update_draft_posts with stale OCC → CONFLICT
   {
     let caught: Error | null = null;
     try {
-      await tool("update_draft", { id: postId, expected_version: 1, data: {} });
+      await tool("update_draft_posts", {
+        id: postId,
+        expected_version: 1,
+        slug: runSlug,
+      });
     } catch (e) {
       caught = e as Error;
     }
     assert.ok(caught, "expected stale-OCC update to throw");
     assert.match(caught.message, /CONFLICT|expected_version|version/i);
-    console.log(`[mcp]  7/12  update_draft stale OCC → CONFLICT`);
+    console.log(`[mcp]  7/12  update_draft_posts stale OCC → CONFLICT`);
   }
 
   // 8. request_publish → status flips to published, fires before_publish
@@ -167,32 +179,33 @@ async function main(): Promise<void> {
     console.log(`[mcp]  9/12  archive_entry(${postId}) → archived (v4)`);
   }
 
-  // 10. create_draft on contact-messages — exercises the lifecycle
-  //     hook chain. CAPTCHA hook permits absent token (handler only
-  //     rejects literal "fail"); after_create logs to console.info.
+  // 10. create_draft_contact_messages — exercises the lifecycle hook
+  //     chain. CAPTCHA hook permits absent token (handler only rejects
+  //     literal "fail"); after_create logs to console.info.
   let contactId: string;
   {
-    const row = await tool<EntryRow>("create_draft", {
-      collection: "contact-messages",
-      data: { name: "MCP Tester", email: "mcp@example.com", message: "Hello via MCP" },
+    const row = await tool<EntryRow>("create_draft_contact_messages", {
+      name: "MCP Tester",
+      email: "mcp@example.com",
+      message: "Hello via MCP",
     });
     assert.equal(row.collection, "contact-messages");
     assert.equal(row.status, "draft");
     contactId = row.id;
-    console.log(`[mcp] 10/12  create_draft(contact-messages) + hooks → ${contactId}`);
+    console.log(`[mcp] 10/12  create_draft_contact_messages + hooks → ${contactId}`);
   }
 
-  // 11. create_draft on unknown collection → NOT_FOUND
+  // 11. tools/call on a Schema-named tool that doesn't exist → -32601
   {
     let caught: Error | null = null;
     try {
-      await tool("create_draft", { collection: "ghost", data: {} });
+      await tool("create_draft_ghost", { name: "x" });
     } catch (e) {
       caught = e as Error;
     }
-    assert.ok(caught, "expected unknown-collection to throw");
-    assert.match(caught.message, /No Schema with name|NOT_FOUND/i);
-    console.log(`[mcp] 11/12  create_draft(ghost) → NOT_FOUND`);
+    assert.ok(caught, "expected unknown-collection tool to throw");
+    assert.match(caught.message, /unknown tool/i);
+    console.log(`[mcp] 11/12  create_draft_ghost → unknown tool (-32601)`);
   }
 
   // 12. list_entries with status filter

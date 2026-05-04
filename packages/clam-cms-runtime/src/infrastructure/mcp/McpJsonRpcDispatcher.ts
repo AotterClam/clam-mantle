@@ -2,6 +2,7 @@ import {
   DiagnosticError,
   redactForWire,
   type ContentState,
+  type SchemaManifest,
 } from "@aotterclam/clam-cms-spec";
 import {
   ArchiveUseCase,
@@ -13,7 +14,14 @@ import {
   UnpublishUseCase,
   UpdateDraftUseCase,
 } from "../../usecase/content/index.js";
-import { STATIC_TOOLS_WIRE_JSON } from "./McpToolCatalog.js";
+import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
+import {
+  CREATE_DRAFT_PREFIX,
+  UPDATE_DRAFT_PREFIX,
+  buildMcpToolCatalog,
+  extractCollectionSegment,
+  type McpToolDefinition,
+} from "./McpToolCatalog.js";
 import {
   jsonRpcError,
   jsonRpcOk,
@@ -26,8 +34,13 @@ import {
  * `OAuthVerifier.verifyAccessToken` and hands `dispatch` a
  * `McpAuthContext` plus the use-case bag.
  *
- * v0.1.0 surfaces a static tool catalog (`STATIC_TOOLS_WIRE_JSON`).
- * Per-collection tools land in v0.1.x.
+ * v0.1.0 surfaces a per-collection authoring catalog
+ * (`create_draft_<collection>`, `update_draft_<collection>` for each
+ * Schema in the manifest set, with the Schema's properties inlined
+ * into the tool's `inputSchema`) plus generic read/status tools
+ * (`list_entries`, `get_entry`, `request_publish`, `archive_entry`).
+ * Boot validation refuses Schemas whose names mangle to the same
+ * tool-name suffix.
  *
  * Thin adapter per the clean-arch rule — JSON-RPC envelope handling
  * only, no business logic.
@@ -53,7 +66,24 @@ export interface McpUseCases {
 }
 
 export class McpJsonRpcDispatcher {
-  constructor(private readonly useCases: McpUseCases) {}
+  private readonly catalog: readonly McpToolDefinition[];
+  private readonly catalogWireJson: string;
+  /** segment → original `Schema.metadata.name`. Built once at
+   *  construction; the per-collection routing path looks up the
+   *  segment from the tool name and recovers the canonical
+   *  collection name. */
+  private readonly schemaBySegment: ReadonlyMap<string, string>;
+
+  constructor(
+    private readonly useCases: McpUseCases,
+    private readonly schemas: ReadonlyArray<SchemaManifest>,
+  ) {
+    this.catalog = buildMcpToolCatalog(schemas);
+    this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;
+    const map = new Map<string, string>();
+    for (const s of schemas) map.set(mcpToolNameSegment(s.metadata.name), s.metadata.name);
+    this.schemaBySegment = map;
+  }
 
   async dispatch(req: Request, auth: McpAuthContext): Promise<Response> {
     if (req.method === "GET") {
@@ -79,7 +109,7 @@ export class McpJsonRpcDispatcher {
           serverInfo: { name: "@aotterclam/clam-cms-runtime/mcp", version: "0.0.0" },
         });
       case "tools/list":
-        return jsonRpcOkRaw(id, `{"tools":${STATIC_TOOLS_WIRE_JSON}}`);
+        return jsonRpcOkRaw(id, this.catalogWireJson);
       case "tools/call":
         return this.handleToolCall(id, params, auth);
       default:
@@ -137,29 +167,6 @@ export class McpJsonRpcDispatcher {
         if (typeof id !== "string") return MISSING_ARG;
         return this.useCases.getEntry.execute({ id });
       }
-      case "create_draft": {
-        const collection = args["collection"];
-        const data = args["data"];
-        if (typeof collection !== "string" || !isPlainObject(data)) return MISSING_ARG;
-        return this.useCases.createDraft.execute({
-          collection,
-          data,
-          authorId: auth.userId,
-        });
-      }
-      case "update_draft": {
-        const id = args["id"];
-        const expected = args["expected_version"];
-        const data = args["data"];
-        if (typeof id !== "string" || typeof expected !== "number" || !isPlainObject(data)) {
-          return MISSING_ARG;
-        }
-        return this.useCases.updateDraft.execute({
-          id,
-          expectedVersion: expected,
-          data,
-        });
-      }
       case "request_publish": {
         const id = args["id"];
         if (typeof id !== "string") return MISSING_ARG;
@@ -171,14 +178,61 @@ export class McpJsonRpcDispatcher {
         if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
         return this.useCases.archive.execute({ id, expectedVersion: expected });
       }
-      default:
+      default: {
+        // Per-collection authoring tools: `create_draft_<segment>` /
+        // `update_draft_<segment>`. The agent sends Schema fields at
+        // the top level; we rebuild `data` for the chokepoint.
+        const createSegment = extractCollectionSegment(name, CREATE_DRAFT_PREFIX);
+        if (createSegment) {
+          const collection = this.schemaBySegment.get(createSegment);
+          if (!collection) return UNKNOWN_TOOL;
+          return this.useCases.createDraft.execute({
+            collection,
+            data: stripReservedArgs(args),
+            authorId: auth.userId,
+          });
+        }
+        const updateSegment = extractCollectionSegment(name, UPDATE_DRAFT_PREFIX);
+        if (updateSegment) {
+          const collection = this.schemaBySegment.get(updateSegment);
+          if (!collection) return UNKNOWN_TOOL;
+          const id = args["id"];
+          const expected = args["expected_version"];
+          if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
+          // Caller may also call get_entry separately; we don't need
+          // the collection on the chokepoint args because UpdateDraft
+          // looks it up from the existing row. Pass through anyway
+          // for clarity / future hook context wiring.
+          return this.useCases.updateDraft.execute({
+            id,
+            expectedVersion: expected,
+            data: stripReservedArgs(args),
+          });
+        }
         return UNKNOWN_TOOL;
+      }
     }
   }
 }
 
 const UNKNOWN_TOOL = Symbol("unknown-tool");
 const MISSING_ARG = Symbol("missing-arg");
+
+/**
+ * Strip the `id` + `expected_version` envelope keys before passing
+ * the rest to the chokepoint as `data`. Per-collection update tools
+ * mix routing keys (id, expected_version) with authoring fields at
+ * the same level; this re-separates them.
+ */
+const RESERVED_ARG_KEYS: readonly string[] = ["id", "expected_version"];
+function stripReservedArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (RESERVED_ARG_KEYS.includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
