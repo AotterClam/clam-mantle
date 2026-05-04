@@ -6,7 +6,7 @@ import {
   InvokeFailure,
   InvokeProcedureUseCase,
 } from "../src/usecase/procedure/InvokeProcedureUseCase.js";
-import { makeProcedure } from "./fakes/manifests.js";
+import { makeBuiltinProcedure, makeProcedure } from "./fakes/manifests.js";
 
 const anonCtx: HandlerContext = { user: null, staff: null, env: {} };
 
@@ -153,18 +153,8 @@ describe("InvokeProcedureUseCase", () => {
 
   it("HANDLER_BUILTIN_NOT_IN_V010 if a builtin Procedure reaches Invoke (boot guard bypass)", async () => {
     const { uc } = fresh();
-    const proc = {
-      apiVersion: "cms.mantle.aotter.net/v1" as const,
-      kind: "Procedure" as const,
-      metadata: { name: "create-post" },
-      spec: {
-        input: { type: "object", properties: { data: { type: "object" } } },
-        output: { type: "object" },
-        handler: { kind: "builtin" as const, op: "create" as const, schema: "posts" },
-      },
-    };
     const result = await uc.execute({
-      procedure: proc,
+      procedure: makeBuiltinProcedure({ schema: "posts", op: "create" }),
       input: { data: {} },
       ctx: anonCtx,
     });

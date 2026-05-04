@@ -31,9 +31,11 @@ import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
  *   5. Validate the handler's return against the `output` schema.
  *      Fail ⇒ `OUTPUT_VALIDATION_FAILED` (handler bug).
  *
- * v0.1.0 ships `handler.kind: ref` only. `handler.kind: builtin` is
- * v0.1.x-committed and rejected at boot with
- * `HANDLER_BUILTIN_NOT_IN_V010`.
+ * `handler.kind: builtin` is v0.1.0 grammar but its dispatch path
+ * lands in commit 4.3. Until then `ValidateBootUseCase` rejects boot
+ * with `HANDLER_BUILTIN_NOT_IN_V010`; if a builtin Procedure ever
+ * reaches `execute()` (boot guard bypassed) the same code surfaces
+ * as a structured `InvokeFailure` — defense-in-depth, not a throw.
  */
 export interface InvokeProcedureRequest {
   readonly procedure: ProcedureManifest;

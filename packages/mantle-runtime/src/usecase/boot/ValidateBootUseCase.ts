@@ -3,6 +3,7 @@ import {
   partitionManifests,
   checkLocaleAndTranslates,
   type Diagnostic,
+  type DiagnosticCode,
   type Manifest,
   type ProcedureManifest,
   type SchemaManifest,
@@ -94,18 +95,15 @@ export class ValidateBootUseCase {
             }),
           );
         }
-        // Runtime-pending guard: parser accepts builtin grammar,
-        // but the dispatch path lands in commit 4.3. Until then,
-        // refuse boot so authors get a clear "not yet" instead of a
-        // silent INTERNAL_ERROR at first invocation.
         diagnostics.push(
-          bootDiagnostic({
-            code: "HANDLER_BUILTIN_NOT_IN_V010",
-            severity: "error",
-            path: `manifest:Procedure/${p.metadata.name}#/spec/handler/kind`,
+          runtimePendingGuard({
+            kind: "Procedure",
+            name: p.metadata.name,
+            field: "handler.kind",
             value: "builtin",
-            expected: "handler.kind: 'ref' until builtin op execution lands (next runtime commit)",
-            message: `Procedure '${p.metadata.name}' uses handler.kind: 'builtin'. The grammar is accepted in v0.1.0 but the builtin op execution path is not yet wired (lands next commit). Use kind: 'ref' for now, or wait for the next release.`,
+            allowed: "ref",
+            code: "HANDLER_BUILTIN_NOT_IN_V010",
+            feature: "builtin op execution",
           }),
         );
       }
@@ -140,18 +138,15 @@ export class ValidateBootUseCase {
             }),
           );
         }
-        // Runtime-pending guard: parser accepts lifecycle Trigger grammar,
-        // but the LifecycleHookingEntryRepository decorator lands in
-        // commit 4.2. Until then, refuse boot so authors don't ship a
-        // hook that silently never fires.
         diagnostics.push(
-          bootDiagnostic({
-            code: "LIFECYCLE_NOT_IN_V010",
-            severity: "error",
-            path: `manifest:Trigger/${t.metadata.name}#/spec/source/kind`,
+          runtimePendingGuard({
+            kind: "Trigger",
+            name: t.metadata.name,
+            field: "source.kind",
             value: "lifecycle",
-            expected: "source.kind: 'http' until lifecycle hook execution lands (next runtime commit)",
-            message: `Trigger '${t.metadata.name}' uses source.kind: 'lifecycle'. The grammar is accepted in v0.1.0 but the entry-writer hook decorator is not yet wired (lands next commit). Use source.kind: 'http' for now, or wait for the next release.`,
+            allowed: "http",
+            code: "LIFECYCLE_NOT_IN_V010",
+            feature: "lifecycle hook execution",
           }),
         );
       }
@@ -179,6 +174,32 @@ export class ValidateBootUseCase {
     const result = this.execute(request);
     if (!result.ok) throw new BootValidationError(result.diagnostics);
   }
+}
+
+/**
+ * Boot diagnostic emitted while a v0.1.x grammar key has been promoted
+ * into v0.1.0 grammar but its runtime hasn't shipped yet (commits 4.2 /
+ * 4.3 of the rebuild plan). Each call site is a one-line removal once
+ * the runtime piece lands.
+ */
+function runtimePendingGuard(args: {
+  readonly kind: "Procedure" | "Trigger";
+  readonly name: string;
+  readonly field: string;
+  readonly value: string;
+  readonly allowed: string;
+  readonly code: DiagnosticCode;
+  readonly feature: string;
+}): Diagnostic {
+  const fieldLeaf = args.field.split(".").pop() ?? args.field;
+  return bootDiagnostic({
+    code: args.code,
+    severity: "error",
+    path: `manifest:${args.kind}/${args.name}#/spec/${args.field.replace(/\./g, "/")}`,
+    value: args.value,
+    expected: `${args.field}: '${args.allowed}' until ${args.feature} lands (next runtime commit)`,
+    message: `${args.kind} '${args.name}' uses ${args.field}: '${args.value}'. The grammar is accepted in v0.1.0 but the ${args.feature} path is not yet wired (lands next commit). Use ${fieldLeaf}: '${args.allowed}' for now, or wait for the next release.`,
+  });
 }
 
 function checkHttpRouteCollisions(triggers: readonly TriggerManifest[]): Diagnostic[] {
