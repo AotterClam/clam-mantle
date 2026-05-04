@@ -1,4 +1,5 @@
 import type {
+  LifecycleHook,
   ProcedureManifest,
   SchemaManifest,
   TriggerManifest,
@@ -48,6 +49,10 @@ export function recentPostsView(): ViewManifest {
 export interface ProcedureOpts {
   readonly name?: string;
   readonly handlerRef?: string;
+  /** Override the entire `handler` discriminated union — use to build
+   *  `handler.kind: 'builtin'` Procedures. When unset, defaults to
+   *  `{ kind: 'ref', ref: handlerRef ?? 'echoHandler' }`. */
+  readonly handler?: ProcedureManifest["spec"]["handler"];
   readonly input?: SchemaManifest["spec"]["schema"];
   readonly output?: SchemaManifest["spec"]["schema"];
   readonly authPredicates?: ProcedureManifest["spec"]["requires"]["auth"]["all"] extends infer A
@@ -71,7 +76,7 @@ export function makeProcedure(opts: ProcedureOpts = {}): ProcedureManifest {
         properties: { ok: { type: "boolean" } },
         required: ["ok"],
       },
-      handler: { kind: "ref", ref: opts.handlerRef ?? "echoHandler" },
+      handler: opts.handler ?? { kind: "ref", ref: opts.handlerRef ?? "echoHandler" },
     },
   };
   if (opts.authPredicates) {
@@ -108,22 +113,13 @@ export function makeLifecycleTrigger(opts: {
   readonly name?: string;
   readonly procedure: string;
   readonly schema?: string;
-  readonly on?: ReadonlyArray<
-    | "before_create"
-    | "after_create"
-    | "before_update"
-    | "after_update"
-    | "before_delete"
-    | "after_delete"
-    | "before_publish"
-    | "after_publish"
-  >;
+  readonly on?: ReadonlyArray<LifecycleHook>;
   readonly errorPolicy?: "abort" | "continue";
 }): TriggerManifest {
   return {
     apiVersion: "cms.clam.ai/v1",
     kind: "Trigger",
-    metadata: { name: opts.name ?? `${opts.procedure}-${(opts.on?.[0] ?? "lifecycle")}-trigger` },
+    metadata: { name: opts.name ?? `${opts.procedure}-${opts.on?.[0] ?? "lifecycle"}-trigger` },
     spec: {
       source: {
         kind: "lifecycle",
@@ -141,21 +137,10 @@ export function makeBuiltinProcedure(opts: {
   readonly schema?: string;
   readonly op?: "create" | "update" | "upsert" | "delete";
 }): ProcedureManifest {
-  return {
-    apiVersion: "cms.clam.ai/v1",
-    kind: "Procedure",
-    metadata: { name: opts.name ?? "create-post" },
-    spec: {
-      input: {
-        type: "object",
-        properties: { data: { type: "object" } },
-      },
-      output: { type: "object" },
-      handler: {
-        kind: "builtin",
-        op: opts.op ?? "create",
-        schema: opts.schema ?? "posts",
-      },
-    },
-  };
+  return makeProcedure({
+    name: opts.name ?? "create-post",
+    input: { type: "object", properties: { data: { type: "object" } } },
+    output: { type: "object" },
+    handler: { kind: "builtin", op: opts.op ?? "create", schema: opts.schema ?? "posts" },
+  });
 }
