@@ -1,0 +1,31 @@
+{
+  "name": "@aotterclam/clam-cms-runtime",
+  "version": "0.0.0",
+  "description": "Runtime engine for clam-cms: dispatcher + entry-writer + view executor + content-ops + render pipeline + auth + MCP. Defines the 5 adapter ports (DB / KV / Session / Assets / OAuth). Adapter-agnostic: MUST NOT import D1Database / KVNamespace types.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/clam-cms-runtime",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AotterClam/clam-cms.git",
+    "directory": "packages/clam-cms-runtime"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "echo 'TODO: implement in commit 4'",
+    "typecheck": "echo 'TODO: implement in commit 4'",
+    "test": "echo 'TODO: implement in commit 4'"
+  },
+  "dependencies": {
+    "@aotterclam/clam-cms-spec": "workspace:*"
+  }
+}

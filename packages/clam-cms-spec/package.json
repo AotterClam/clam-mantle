@@ -1,0 +1,28 @@
+{
+  "name": "@aotterclam/clam-cms-spec",
+  "version": "0.0.0",
+  "description": "Spec engine for clam-cms: types + manifest YAML parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env / adapter deps.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/clam-cms-spec",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AotterClam/clam-cms.git",
+    "directory": "packages/clam-cms-spec"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "echo 'TODO: implement in commit 3'",
+    "typecheck": "echo 'TODO: implement in commit 3'",
+    "test": "echo 'TODO: implement in commit 3'"
+  }
+}

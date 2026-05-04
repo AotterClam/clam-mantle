@@ -1,0 +1,23 @@
+{
+  "name": "clam-cms-monorepo",
+  "private": true,
+  "version": "0.0.0",
+  "description": "MCP-native headless CMS for Cloudflare Workers. v0.1.0 rebuild — see issue #1.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/AotterClam/clam-cms",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AotterClam/clam-cms.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter '@aotterclam/clam-cms-*' build",
+    "typecheck": "pnpm -r --filter '@aotterclam/clam-cms-*' typecheck",
+    "test": "pnpm -r --filter '@aotterclam/clam-cms-*' test"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
