@@ -142,9 +142,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // Repositories: DB-backed inner + lifecycle-hook decorator. Every
   // mutation through `entries` (create / update / delete / archive /
   // transitionStatus) fires the matching Triggers via
-  // `RunLifecycleHooksUseCase`. POC ADR-0014 v0.1.y "symmetric
-  // chokepoint" design — MCP, admin, and builtin paths all hit the
-  // same wrapped repository.
+  // `RunLifecycleHooksUseCase`. Symmetric chokepoint per POC ADR-0014:
+  // MCP, admin, and builtin paths all hit the same wrapped repository.
   const innerEntries = new DatabaseEntryRepository(args.db);
   const triggerIndex = new TriggerIndex(partitioned.triggers);
   // `entries` is filled below — assigned via `let` so the lifecycle
@@ -153,20 +152,16 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // DB-backed one. Without this every builtin write inside a hook
   // would skip the decorator and silently bypass downstream hooks.
   let entries: EntryRepository;
-  const invokeBuiltin = new InvokeBuiltinUseCase(
-    {
-      create: (a) => entries.create(a),
-      get: (id) => entries.get(id),
-      update: (a) => entries.update(a),
-      delete: (a) => entries.delete(a),
-      archive: (a) => entries.archive(a),
-      transitionStatus: (a) => entries.transitionStatus(a),
-      list: (a) => entries.list(a),
-    },
-    schemasByName,
-    clock,
-    idgen,
-  );
+  const entriesProxy: EntryRepository = {
+    create: (a) => entries.create(a),
+    get: (id) => entries.get(id),
+    update: (a) => entries.update(a),
+    delete: (a) => entries.delete(a),
+    archive: (a) => entries.archive(a),
+    transitionStatus: (a) => entries.transitionStatus(a),
+    list: (a) => entries.list(a),
+  };
+  const invokeBuiltin = new InvokeBuiltinUseCase(entriesProxy, schemasByName, clock, idgen);
   const invokeProcedure = new InvokeProcedureUseCase(registry, invokeBuiltin);
   const lifecycleHooks = new RunLifecycleHooksUseCase(
     triggerIndex,

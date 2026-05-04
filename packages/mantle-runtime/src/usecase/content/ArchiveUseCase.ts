@@ -40,6 +40,7 @@ export class ArchiveUseCase {
     return withConflictDiagnostic(opPath, () =>
       this.entries.archive({
         id: request.id,
+        collection: existing.collection,
         expectedVersion: request.expectedVersion,
         now: this.clock.now(),
         hookContext: request.ctx,

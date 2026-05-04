@@ -43,6 +43,12 @@ export interface EntryRepository {
  * `hookContext` defaults to an anonymous `HandlerContext` in the
  * decorator when callers don't supply one (test paths, internal
  * boot-time writes).
+ *
+ * `collection` is required on every mutation other than `create` so
+ * the decorator can short-circuit hook firing on no-hook Schemas
+ * without paying an extra `inner.get(id)` round-trip just to learn
+ * the row's collection. Callers always know the collection at write
+ * time (use cases hold the schema; MCP carries it in the request).
  */
 export interface MutationHookFields {
   readonly hookContext?: HandlerContext;
@@ -60,6 +66,7 @@ export interface CreateEntryArgs extends MutationHookFields {
 
 export interface UpdateEntryArgs extends MutationHookFields {
   readonly id: string;
+  readonly collection: string;
   readonly expectedVersion: number;
   readonly data: Record<string, unknown>;
   readonly now: number;
@@ -67,16 +74,19 @@ export interface UpdateEntryArgs extends MutationHookFields {
 
 export interface DeleteEntryArgs extends MutationHookFields {
   readonly id: string;
+  readonly collection: string;
 }
 
 export interface ArchiveEntryArgs extends MutationHookFields {
   readonly id: string;
+  readonly collection: string;
   readonly expectedVersion: number;
   readonly now: number;
 }
 
 export interface TransitionStatusArgs extends MutationHookFields {
   readonly id: string;
+  readonly collection: string;
   readonly to: ContentState;
   readonly expectedStatus?: ContentState;
   readonly now: number;

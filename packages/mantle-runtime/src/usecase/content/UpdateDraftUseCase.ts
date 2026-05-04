@@ -44,6 +44,7 @@ export class UpdateDraftUseCase {
     return withConflictDiagnostic(opPath, () =>
       this.entries.update({
         id: request.id,
+        collection: existing.collection,
         expectedVersion: request.expectedVersion,
         data: stripReservedDataKeys({ ...existing.data, ...request.data }),
         now: this.clock.now(),

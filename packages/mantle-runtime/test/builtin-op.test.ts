@@ -229,6 +229,35 @@ describe("InvokeBuiltinUseCase — update / delete / upsert", () => {
     expect(deleted.data).toEqual({ removed: true });
   });
 
+  it("archive flips status to archived and bumps version", async () => {
+    const h = harness();
+    const created = await h.invoke.execute({
+      procedure: createPostFullInput,
+      input: { title: "stale" },
+      ctx: { user: { id: "u-1" }, staff: null, env: {} },
+    });
+    if (!created.ok) throw new Error("create failed");
+    const row = created.data as { id: string; version: number };
+
+    const archived = await h.invoke.execute({
+      procedure: builtinProcedure({
+        name: "archivePost",
+        op: "archive",
+        schema: "posts",
+        inputProperties: {
+          id: { type: "string" },
+          expectedVersion: { type: "number" },
+        },
+      }),
+      input: { id: row.id, expectedVersion: row.version },
+      ctx: { user: { id: "u-1" }, staff: null, env: {} },
+    });
+    expect(archived.ok).toBe(true);
+    if (!archived.ok) return;
+    expect((archived.data as { status: string }).status).toBe("archived");
+    expect((archived.data as { version: number }).version).toBe(row.version + 1);
+  });
+
   it("upsert: with unknown id falls through to create", async () => {
     const h = harness();
     const result = await h.invoke.execute({

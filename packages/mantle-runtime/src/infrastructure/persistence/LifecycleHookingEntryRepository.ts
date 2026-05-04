@@ -18,7 +18,7 @@ const ANON_CTX: HandlerContext = { user: null, staff: null, env: {} };
 
 /**
  * Decorator that wraps any `EntryRepository` and fires lifecycle
- * Triggers around every mutation (POC ADR-0014 v0.1.y design).
+ * Triggers around every mutation (POC ADR-0014).
  *
  * Symmetry rule: MCP, admin, and builtin write paths all hit the same
  * chokepoint, so all three pay (and gain) the same hook semantics —
@@ -71,15 +71,14 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
   }
 
   async update(args: UpdateEntryArgs): Promise<EntryRow> {
-    const existing = await this.inner.get(args.id);
-    const collection = existing?.collection;
-    if (!collection || !this.triggers.hasAny(collection)) {
+    if (!this.triggers.hasAny(args.collection)) {
       return this.inner.update(args);
     }
+    const existing = await this.inner.get(args.id);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_update",
-      schema: collection,
+      schema: args.collection,
       entry: existing,
       ctx,
       originalInput: args.originalInput,
@@ -90,36 +89,34 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
   }
 
   async delete(args: DeleteEntryArgs): Promise<{ readonly removed: boolean }> {
-    const existing = await this.inner.get(args.id);
-    const collection = existing?.collection;
-    if (!collection || !this.triggers.hasAny(collection)) {
+    if (!this.triggers.hasAny(args.collection)) {
       return this.inner.delete(args);
     }
+    const existing = await this.inner.get(args.id);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_delete",
-      schema: collection,
+      schema: args.collection,
       entry: existing,
       ctx,
       originalInput: args.originalInput,
     });
     const result = await this.inner.delete(args);
-    if (result.removed) {
+    if (result.removed && existing) {
       this.fireAfter("after_delete", existing, ctx, args);
     }
     return result;
   }
 
   async archive(args: ArchiveEntryArgs): Promise<EntryRow> {
-    const existing = await this.inner.get(args.id);
-    const collection = existing?.collection;
-    if (!collection || !this.triggers.hasAny(collection)) {
+    if (!this.triggers.hasAny(args.collection)) {
       return this.inner.archive(args);
     }
+    const existing = await this.inner.get(args.id);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_update",
-      schema: collection,
+      schema: args.collection,
       entry: existing,
       ctx,
       originalInput: args.originalInput,
@@ -130,18 +127,17 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
   }
 
   async transitionStatus(args: TransitionStatusArgs): Promise<EntryRow> {
-    const existing = await this.inner.get(args.id);
-    const collection = existing?.collection;
-    if (!collection || !this.triggers.hasAny(collection)) {
+    if (!this.triggers.hasAny(args.collection)) {
       return this.inner.transitionStatus(args);
     }
     const isPublish = args.to === "published";
     const beforeHook: LifecycleHook = isPublish ? "before_publish" : "before_update";
     const afterHook: LifecycleHook = isPublish ? "after_publish" : "after_update";
+    const existing = await this.inner.get(args.id);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: beforeHook,
-      schema: collection,
+      schema: args.collection,
       entry: existing,
       ctx,
       originalInput: args.originalInput,

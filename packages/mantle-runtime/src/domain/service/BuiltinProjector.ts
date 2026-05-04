@@ -1,5 +1,6 @@
 import {
   MANTLE_BIND_KEYWORD,
+  MANTLE_BIND_VALUES,
   type MantleBindValue,
   type SchemaManifest,
 } from "@aotter/mantle-spec";
@@ -57,7 +58,9 @@ export function projectAndStamp(args: ProjectAndStampArgs): Record<string, unkno
 function bindValueOf(propDef: unknown): MantleBindValue | undefined {
   if (typeof propDef !== "object" || propDef === null) return undefined;
   const v = (propDef as Record<string, unknown>)[MANTLE_BIND_KEYWORD];
-  if (v === "ctx.user" || v === "ctx.staff" || v === "now") return v;
+  if (typeof v === "string" && (MANTLE_BIND_VALUES as readonly string[]).includes(v)) {
+    return v as MantleBindValue;
+  }
   return undefined;
 }
 

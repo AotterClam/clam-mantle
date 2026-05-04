@@ -29,6 +29,7 @@ export class DeleteEntryUseCase {
     }
     return this.entries.delete({
       id: request.id,
+      collection: existing.collection,
       hookContext: request.ctx,
       originalInput: request.originalInput,
     });

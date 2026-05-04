@@ -63,6 +63,7 @@ export class RequestPublishUseCase {
     return withConflictDiagnostic(opPath, () =>
       this.entries.transitionStatus({
         id: request.id,
+        collection: existing.collection,
         to: "published",
         expectedStatus: existing.status,
         now: this.clock.now(),

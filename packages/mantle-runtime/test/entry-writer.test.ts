@@ -61,6 +61,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
     });
     const updated = await repo.update({
       id: "p1",
+      collection: "posts",
       expectedVersion: 1,
       data: { title: "v2" },
       now: 2,
@@ -81,7 +82,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
       now: 1,
     });
     await expect(
-      repo.update({ id: "p1", expectedVersion: 99, data: {}, now: 2 }),
+      repo.update({ id: "p1", collection: "posts", expectedVersion: 99, data: {}, now: 2 }),
     ).rejects.toBeInstanceOf(EntryVersionConflict);
   });
 
@@ -98,6 +99,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
     });
     const published = await repo.transitionStatus({
       id: "p1",
+      collection: "posts",
       to: "published",
       expectedStatus: "draft",
       now: 2,
@@ -120,6 +122,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
     await expect(
       repo.transitionStatus({
         id: "p1",
+        collection: "posts",
         to: "archived",
         expectedStatus: "published",
         now: 2,
@@ -140,6 +143,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
     });
     const archived = await repo.archive({
       id: "p1",
+      collection: "posts",
       expectedVersion: 1,
       now: 2,
     });
@@ -158,7 +162,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
       authorId: null,
       now: 1,
     });
-    const result = await repo.delete({ id: "p1" });
+    const result = await repo.delete({ id: "p1", collection: "posts" });
     expect(result.removed).toBe(true);
     expect(await repo.get("p1")).toBeNull();
   });

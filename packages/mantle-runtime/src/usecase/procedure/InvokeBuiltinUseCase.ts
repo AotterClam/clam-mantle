@@ -89,7 +89,22 @@ export class InvokeBuiltinUseCase {
       case "upsert":
         return this.opUpsert(schema, input, request.ctx, now);
       case "delete":
-        return this.opDelete(input, request.ctx);
+        return this.opDelete(schema, input, request.ctx);
+      case "archive":
+        return this.opArchive(schema, input, request.ctx, now);
+      default: {
+        const _exhaustive: never = handler.op;
+        throw new DiagnosticError(
+          runtimeDiagnostic({
+            code: "INTERNAL_ERROR",
+            severity: "error",
+            path: `usecase/InvokeBuiltin/${request.procedure.metadata.name}#/handler/op`,
+            value: _exhaustive,
+            expected: "one of BUILTIN_OPS",
+            message: `Builtin op '${String(_exhaustive)}' is in BUILTIN_OPS but not handled by InvokeBuiltinUseCase. Add a case branch.`,
+          }),
+        );
+      }
     }
   }
 
@@ -123,6 +138,7 @@ export class InvokeBuiltinUseCase {
     const data = projectAndStamp({ schema, input, ctx, clockNow: now });
     return this.entries.update({
       id,
+      collection: schema.metadata.name,
       expectedVersion,
       data,
       now,
@@ -137,7 +153,7 @@ export class InvokeBuiltinUseCase {
     ctx: HandlerContext,
     now: number,
   ): Promise<EntryRow> {
-    const id = typeof input["id"] === "string" ? (input["id"] as string) : undefined;
+    const id = typeof input["id"] === "string" ? input["id"] : undefined;
     if (id) {
       const existing = await this.entries.get(id);
       if (existing) return this.opUpdate(schema, input, ctx, now);
@@ -146,11 +162,35 @@ export class InvokeBuiltinUseCase {
   }
 
   private async opDelete(
+    schema: SchemaManifest,
     input: Record<string, unknown>,
     ctx: HandlerContext,
   ): Promise<{ readonly removed: boolean }> {
     const id = requireField(input, "id", "string");
-    return this.entries.delete({ id, hookContext: ctx, originalInput: input });
+    return this.entries.delete({
+      id,
+      collection: schema.metadata.name,
+      hookContext: ctx,
+      originalInput: input,
+    });
+  }
+
+  private async opArchive(
+    schema: SchemaManifest,
+    input: Record<string, unknown>,
+    ctx: HandlerContext,
+    now: number,
+  ): Promise<EntryRow> {
+    const id = requireField(input, "id", "string");
+    const expectedVersion = requireField(input, "expectedVersion", "number");
+    return this.entries.archive({
+      id,
+      collection: schema.metadata.name,
+      expectedVersion,
+      now,
+      hookContext: ctx,
+      originalInput: input,
+    });
   }
 }
 

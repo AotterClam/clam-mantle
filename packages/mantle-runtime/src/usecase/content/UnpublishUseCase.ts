@@ -33,6 +33,7 @@ export class UnpublishUseCase {
     return withConflictDiagnostic(opPath, () =>
       this.entries.transitionStatus({
         id: request.id,
+        collection: existing.collection,
         to: "draft",
         expectedStatus: existing.status,
         now: this.clock.now(),

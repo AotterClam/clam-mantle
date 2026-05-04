@@ -108,6 +108,10 @@ export class InvokeProcedureUseCase {
 
     // 3. Dispatch by handler kind.
     const handlerBinding = procedure.spec.handler;
+    const handlerLabel =
+      handlerBinding.kind === "builtin"
+        ? `builtin/${handlerBinding.op}`
+        : handlerBinding.ref;
     let result: unknown;
     try {
       if (handlerBinding.kind === "builtin") {
@@ -155,10 +159,6 @@ export class InvokeProcedureUseCase {
       if (err instanceof DiagnosticError) {
         return { ok: false, diagnostic: err.diagnostic };
       }
-      const handlerLabel =
-        handlerBinding.kind === "builtin"
-          ? `builtin/${handlerBinding.op}`
-          : handlerBinding.ref;
       const msg = err instanceof Error ? err.message : String(err);
       return {
         ok: false,
@@ -178,10 +178,6 @@ export class InvokeProcedureUseCase {
     const outputResult = outputValidator.safeParse(result);
     if (!outputResult.success) {
       const { instancePath, message } = firstZodIssueAsJsonPointer(outputResult.error);
-      const label =
-        handlerBinding.kind === "builtin"
-          ? `builtin/${handlerBinding.op}`
-          : handlerBinding.ref;
       return {
         ok: false,
         diagnostic: makeDiagnostic({
@@ -191,7 +187,7 @@ export class InvokeProcedureUseCase {
           path: `${procPath}#/output${instancePath}`,
           value: readJsonPointer(result, instancePath),
           expected: message,
-          message: `Handler '${label}' returned a value that does not match its declared output schema. This is a handler bug.`,
+          message: `Handler '${handlerLabel}' returned a value that does not match its declared output schema. This is a handler bug.`,
         }),
       };
     }
