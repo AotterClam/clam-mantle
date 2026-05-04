@@ -3,7 +3,6 @@ import {
   partitionManifests,
   checkLocaleAndTranslates,
   type Diagnostic,
-  type DiagnosticCode,
   type Manifest,
   type ProcedureManifest,
   type SchemaManifest,
@@ -27,15 +26,14 @@ import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
  * v0.1.0 invariants:
  *   - Every `Procedure.handler.ref` is in the supplied registry.
  *   - Every `Procedure.handler.builtin.schema` resolves to a declared
- *     Schema. Until commit 4.3 wires the builtin op execution path,
- *     boot rejects builtin Procedures with `HANDLER_BUILTIN_NOT_IN_V010`
- *     (the parser accepts the grammar; the runtime just isn't ready).
+ *     Schema (`BUILTIN_HANDLER_SCHEMA_UNKNOWN`). Builtin op execution
+ *     itself ships in `InvokeBuiltinUseCase`.
  *   - Every `Trigger.target.procedure` resolves to a manifest.
  *   - Every `http` Trigger has a unique `(method, path)` pair and a
  *     `/api/` prefix.
  *   - Every `Trigger.source.kind: lifecycle` watches a declared Schema
- *     (`LIFECYCLE_SCHEMA_UNKNOWN`). The hook runtime ships in commit
- *     4.2 (`LifecycleHookingEntryRepository`).
+ *     (`LIFECYCLE_SCHEMA_UNKNOWN`). The hook runtime is the
+ *     `LifecycleHookingEntryRepository` decorator.
  *   - Locale + translates cross-Schema invariants (ADR-0010) hold.
  */
 export type ValidateBootResponse =
@@ -81,29 +79,16 @@ export class ValidateBootUseCase {
           }),
         );
       }
-      if (h.kind === "builtin") {
-        if (!schemasByName.has(h.schema)) {
-          diagnostics.push(
-            bootDiagnostic({
-              code: "BUILTIN_HANDLER_SCHEMA_UNKNOWN",
-              severity: "error",
-              path: `manifest:Procedure/${p.metadata.name}#/spec/handler/schema`,
-              value: h.schema,
-              expected: "name of a declared Schema",
-              candidates: schemaCandidates,
-              message: `Procedure '${p.metadata.name}' (handler.kind: builtin) targets unknown Schema '${h.schema}'.`,
-            }),
-          );
-        }
+      if (h.kind === "builtin" && !schemasByName.has(h.schema)) {
         diagnostics.push(
-          runtimePendingGuard({
-            kind: "Procedure",
-            name: p.metadata.name,
-            field: "handler.kind",
-            value: "builtin",
-            allowed: "ref",
-            code: "HANDLER_BUILTIN_NOT_IN_V010",
-            feature: "builtin op execution",
+          bootDiagnostic({
+            code: "BUILTIN_HANDLER_SCHEMA_UNKNOWN",
+            severity: "error",
+            path: `manifest:Procedure/${p.metadata.name}#/spec/handler/schema`,
+            value: h.schema,
+            expected: "name of a declared Schema",
+            candidates: schemaCandidates,
+            message: `Procedure '${p.metadata.name}' (handler.kind: builtin) targets unknown Schema '${h.schema}'.`,
           }),
         );
       }
@@ -163,32 +148,6 @@ export class ValidateBootUseCase {
     const result = this.execute(request);
     if (!result.ok) throw new BootValidationError(result.diagnostics);
   }
-}
-
-/**
- * Boot diagnostic emitted while a v0.1.x grammar key has been promoted
- * into v0.1.0 grammar but its runtime hasn't shipped yet (commits 4.2 /
- * 4.3 of the rebuild plan). Each call site is a one-line removal once
- * the runtime piece lands.
- */
-function runtimePendingGuard(args: {
-  readonly kind: "Procedure" | "Trigger";
-  readonly name: string;
-  readonly field: string;
-  readonly value: string;
-  readonly allowed: string;
-  readonly code: DiagnosticCode;
-  readonly feature: string;
-}): Diagnostic {
-  const fieldLeaf = args.field.split(".").pop() ?? args.field;
-  return bootDiagnostic({
-    code: args.code,
-    severity: "error",
-    path: `manifest:${args.kind}/${args.name}#/spec/${args.field.replace(/\./g, "/")}`,
-    value: args.value,
-    expected: `${args.field}: '${args.allowed}' until ${args.feature} lands (next runtime commit)`,
-    message: `${args.kind} '${args.name}' uses ${args.field}: '${args.value}'. The grammar is accepted in v0.1.0 but the ${args.feature} path is not yet wired (lands next commit). Use ${fieldLeaf}: '${args.allowed}' for now, or wait for the next release.`,
-  });
 }
 
 function checkHttpRouteCollisions(triggers: readonly TriggerManifest[]): Diagnostic[] {

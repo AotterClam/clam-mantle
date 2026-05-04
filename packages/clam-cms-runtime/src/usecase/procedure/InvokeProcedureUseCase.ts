@@ -1,4 +1,5 @@
 import {
+  DiagnosticError,
   firstZodIssueAsJsonPointer,
   jsonSchemaToZod,
   makeDiagnostic,
@@ -11,6 +12,7 @@ import {
 import type { ZodType } from "zod";
 import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
+import type { InvokeBuiltinUseCase } from "./InvokeBuiltinUseCase.js";
 
 /**
  * `InvokeProcedureUseCase` — in-process invocation of a Procedure.
@@ -23,19 +25,15 @@ import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
  *      `AUTH_DENIED`.
  *   2. Validate `input` against the Procedure's `input` JSON Schema.
  *      Fail ⇒ `INPUT_VALIDATION_FAILED` (first zod issue).
- *   3. Resolve `handler.ref` in the registry. Missing ⇒
- *      `HANDLER_NOT_REGISTERED` (boot validation should have caught
- *      this; runtime path is defense-in-depth).
- *   4. Call the handler. Throws ⇒ `INTERNAL_ERROR` carrying the
- *      thrown message; `InvokeFailure` is unwrapped instead.
- *   5. Validate the handler's return against the `output` schema.
- *      Fail ⇒ `OUTPUT_VALIDATION_FAILED` (handler bug).
- *
- * `handler.kind: builtin` is v0.1.0 grammar but its dispatch path
- * lands in commit 4.3. Until then `ValidateBootUseCase` rejects boot
- * with `HANDLER_BUILTIN_NOT_IN_V010`; if a builtin Procedure ever
- * reaches `execute()` (boot guard bypassed) the same code surfaces
- * as a structured `InvokeFailure` — defense-in-depth, not a throw.
+ *   3. Dispatch by `handler.kind`:
+ *      - `ref`: resolve in registry, call (`InvokeFailure` → unwrap;
+ *        other throws → `INTERNAL_ERROR`).
+ *      - `builtin`: delegate to `InvokeBuiltinUseCase` (project +
+ *        stamp + chokepoint write per POC ADR-0014). When no builtin
+ *        collaborator was injected (test paths, ref-only runtimes) the
+ *        use case returns `HANDLER_BUILTIN_NOT_IN_V010`.
+ *   4. Validate the result against the `output` schema. Fail ⇒
+ *      `OUTPUT_VALIDATION_FAILED` (handler / builtin bug).
  */
 export interface InvokeProcedureRequest {
   readonly procedure: ProcedureManifest;
@@ -76,7 +74,10 @@ export class InvokeProcedureUseCase {
   private readonly inputCache = new Map<string, ZodType>();
   private readonly outputCache = new Map<string, ZodType>();
 
-  constructor(private readonly registry: HandlerRegistry) {}
+  constructor(
+    private readonly registry: HandlerRegistry,
+    private readonly builtin?: InvokeBuiltinUseCase,
+  ) {}
 
   async execute<O = unknown>(request: InvokeProcedureRequest): Promise<InvokeProcedureResponse<O>> {
     const { procedure, input, ctx } = request;
@@ -105,45 +106,59 @@ export class InvokeProcedureUseCase {
       };
     }
 
-    // 3. Resolve handler.
+    // 3. Dispatch by handler kind.
     const handlerBinding = procedure.spec.handler;
-    if (handlerBinding.kind !== "ref") {
-      return {
-        ok: false,
-        diagnostic: makeDiagnostic({
-          code: "HANDLER_BUILTIN_NOT_IN_V010",
-          phase,
-          severity: "error",
-          path: `${procPath}#/handler/kind`,
-          value: handlerBinding.kind,
-          expected: "handler.kind: ref (v0.1.0 ships ref only)",
-        }),
-      };
-    }
-    const handler = this.registry.get(handlerBinding.ref);
-    if (!handler) {
-      return {
-        ok: false,
-        diagnostic: makeDiagnostic({
-          code: "HANDLER_NOT_REGISTERED",
-          phase,
-          severity: "error",
-          path: `${procPath}#/handler/ref`,
-          value: handlerBinding.ref,
-          expected: "a ref registered via the handlers option / sdk.registerHandler",
-          candidates: this.registry.list(),
-        }),
-      };
-    }
-
-    // 4. Call handler.
     let result: unknown;
     try {
-      result = await handler(inputResult.data, ctx);
+      if (handlerBinding.kind === "builtin") {
+        if (!this.builtin) {
+          return {
+            ok: false,
+            diagnostic: makeDiagnostic({
+              code: "HANDLER_BUILTIN_NOT_IN_V010",
+              phase,
+              severity: "error",
+              path: `${procPath}#/handler/kind`,
+              value: handlerBinding.kind,
+              expected: "InvokeBuiltinUseCase wired into the runtime",
+              message: `Procedure '${procedure.metadata.name}' uses handler.kind: 'builtin' but the runtime was constructed without an InvokeBuiltinUseCase.`,
+            }),
+          };
+        }
+        result = await this.builtin.run({
+          procedure,
+          validatedInput: inputResult.data as Record<string, unknown>,
+          ctx,
+        });
+      } else {
+        const handler = this.registry.get(handlerBinding.ref);
+        if (!handler) {
+          return {
+            ok: false,
+            diagnostic: makeDiagnostic({
+              code: "HANDLER_NOT_REGISTERED",
+              phase,
+              severity: "error",
+              path: `${procPath}#/handler/ref`,
+              value: handlerBinding.ref,
+              expected: "a ref registered via the handlers option / sdk.registerHandler",
+              candidates: this.registry.list(),
+            }),
+          };
+        }
+        result = await handler(inputResult.data, ctx);
+      }
     } catch (err) {
       if (err instanceof InvokeFailure) {
         return { ok: false, diagnostic: err.diagnostic };
       }
+      if (err instanceof DiagnosticError) {
+        return { ok: false, diagnostic: err.diagnostic };
+      }
+      const handlerLabel =
+        handlerBinding.kind === "builtin"
+          ? `builtin/${handlerBinding.op}`
+          : handlerBinding.ref;
       const msg = err instanceof Error ? err.message : String(err);
       return {
         ok: false,
@@ -153,16 +168,20 @@ export class InvokeProcedureUseCase {
           severity: "error",
           path: procPath,
           expected: "handler completes without throwing",
-          message: `Handler '${handlerBinding.ref}' threw: ${msg}`,
+          message: `Handler '${handlerLabel}' threw: ${msg}`,
         }),
       };
     }
 
-    // 5. Output validation.
+    // 4. Output validation.
     const outputValidator = this.compileOutput(procedure);
     const outputResult = outputValidator.safeParse(result);
     if (!outputResult.success) {
       const { instancePath, message } = firstZodIssueAsJsonPointer(outputResult.error);
+      const label =
+        handlerBinding.kind === "builtin"
+          ? `builtin/${handlerBinding.op}`
+          : handlerBinding.ref;
       return {
         ok: false,
         diagnostic: makeDiagnostic({
@@ -172,7 +191,7 @@ export class InvokeProcedureUseCase {
           path: `${procPath}#/output${instancePath}`,
           value: readJsonPointer(result, instancePath),
           expected: message,
-          message: `Handler '${handlerBinding.ref}' returned a value that does not match its declared output schema. This is a handler bug.`,
+          message: `Handler '${label}' returned a value that does not match its declared output schema. This is a handler bug.`,
         }),
       };
     }

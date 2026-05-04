@@ -11,6 +11,7 @@ import type { AnyHandler } from "./domain/model/HandlerContext.js";
 import type { TemplateRegistry } from "./domain/model/TemplateRegistry.js";
 import type { AssetServer } from "./domain/port/AssetServer.js";
 import type { DatabaseDriver } from "./domain/port/DatabaseDriver.js";
+import type { EntryRepository } from "./domain/port/EntryRepository.js";
 import type { KvCache } from "./domain/port/KvCache.js";
 import type { OAuthVerifier } from "./domain/port/OAuthVerifier.js";
 import type { PublishOrchestrator } from "./domain/port/PublishOrchestrator.js";
@@ -36,7 +37,10 @@ import {
   UnpublishUseCase,
   UpdateDraftUseCase,
 } from "./usecase/content/index.js";
-import { InvokeProcedureUseCase } from "./usecase/procedure/index.js";
+import {
+  InvokeBuiltinUseCase,
+  InvokeProcedureUseCase,
+} from "./usecase/procedure/index.js";
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
 import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
@@ -143,13 +147,33 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // same wrapped repository.
   const innerEntries = new DatabaseEntryRepository(args.db);
   const triggerIndex = new TriggerIndex(partitioned.triggers);
-  const invokeProcedure = new InvokeProcedureUseCase(registry);
+  // `entries` is filled below — assigned via `let` so the lifecycle
+  // hooks (which run procedures, which can themselves write entries
+  // via builtin handlers) close over the wrapped repo, not the bare
+  // DB-backed one. Without this every builtin write inside a hook
+  // would skip the decorator and silently bypass downstream hooks.
+  let entries: EntryRepository;
+  const invokeBuiltin = new InvokeBuiltinUseCase(
+    {
+      create: (a) => entries.create(a),
+      get: (id) => entries.get(id),
+      update: (a) => entries.update(a),
+      delete: (a) => entries.delete(a),
+      archive: (a) => entries.archive(a),
+      transitionStatus: (a) => entries.transitionStatus(a),
+      list: (a) => entries.list(a),
+    },
+    schemasByName,
+    clock,
+    idgen,
+  );
+  const invokeProcedure = new InvokeProcedureUseCase(registry, invokeBuiltin);
   const lifecycleHooks = new RunLifecycleHooksUseCase(
     triggerIndex,
     proceduresByName,
     invokeProcedure,
   );
-  const entries = new LifecycleHookingEntryRepository(
+  entries = new LifecycleHookingEntryRepository(
     innerEntries,
     triggerIndex,
     lifecycleHooks,

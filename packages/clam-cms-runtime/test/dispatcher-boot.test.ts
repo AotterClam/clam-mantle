@@ -151,16 +151,13 @@ describe("ValidateBootUseCase", () => {
     expect(codes).toContain("LIFECYCLE_SCHEMA_UNKNOWN");
   });
 
-  it("emits HANDLER_BUILTIN_NOT_IN_V010 (runtime-pending) for builtin Procedures", () => {
+  it("accepts a builtin Procedure pointing at a known Schema (4.3 wired)", () => {
     const reg = new InMemoryHandlerRegistry();
     const result = new ValidateBootUseCase().execute({
       manifests: [postsSchema(), makeBuiltinProcedure({ schema: "posts", op: "create" })],
       registry: reg,
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    const codes = result.diagnostics.map((d) => d.code);
-    expect(codes).toContain("HANDLER_BUILTIN_NOT_IN_V010");
+    expect(result.ok).toBe(true);
   });
 
   it("emits BUILTIN_HANDLER_SCHEMA_UNKNOWN when builtin targets unknown Schema", () => {
