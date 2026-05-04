@@ -205,6 +205,35 @@ describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
     expect(h.db.entries.size).toBe(0);
   });
 
+  it("rides on c.executionCtx.waitUntil for after-hooks when present", async () => {
+    const h = harness({ captchaPasses: true });
+    const captured: Promise<unknown>[] = [];
+    const executionCtx = {
+      waitUntil: (p: Promise<unknown>) => captured.push(p),
+      passThroughOnException: () => undefined,
+    };
+    const res = await h.app.request(
+      "/api/contact",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Carol",
+          message: "with waitUntil",
+          recaptchaToken: "tok-pass",
+        }),
+      },
+      undefined,
+      executionCtx,
+    );
+    expect(res.status).toBe(200);
+    // After-hook ran (Slack notify); when waitUntil is available the
+    // mount layer hands the after-hook promise to it.
+    expect(captured.length).toBeGreaterThan(0);
+    await Promise.all(captured);
+    expect(h.slackCalls).toHaveLength(1);
+  });
+
   it("MCP /mcp without bearer returns 401", async () => {
     const h = harness({ captchaPasses: true });
     const res = await h.app.request("/mcp", { method: "POST" });

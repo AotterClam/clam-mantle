@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import {
   HTTP_STATUS_BY_CODE,
   type Diagnostic,
@@ -39,7 +39,8 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     const triggerName = t.metadata.name;
     app.on(method, honoPath, async (c) => {
       const runtime = await ref.get();
-      return handleHttpTrigger(c.req.raw, runtime, triggerName, path);
+      const waitUntil = readWaitUntil(c);
+      return handleHttpTrigger(c.req.raw, runtime, triggerName, path, waitUntil);
     });
   }
 }
@@ -49,6 +50,7 @@ async function handleHttpTrigger(
   runtime: CmsRuntime,
   triggerName: string,
   triggerPath: string,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<Response> {
   const trigger = runtime.triggersByName.get(triggerName);
   if (!trigger) {
@@ -63,9 +65,12 @@ async function handleHttpTrigger(
   const url = new URL(req.url);
   const params = matchPath(triggerPath, url.pathname) ?? {};
   const body = await readBody(req);
-  const input = { ...params, ...body };
+  // Spread order matters: URL path params are authoritative for the
+  // resource identifier (a `DELETE /entries/{id}` body MUST NOT spoof
+  // `id`). Body fields fill in non-path inputs only.
+  const input = { ...body, ...params };
 
-  const ctx: HandlerContext = await buildHandlerContext(req, runtime);
+  const ctx: HandlerContext = await buildHandlerContext(req, runtime, waitUntil);
 
   const result = await runtime.invokeProcedure.execute({
     procedure,
@@ -95,14 +100,33 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
-async function buildHandlerContext(req: Request, runtime: CmsRuntime): Promise<HandlerContext> {
+async function buildHandlerContext(
+  req: Request,
+  runtime: CmsRuntime,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
+): Promise<HandlerContext> {
   const identity = await runtime.oauth.verifyAccessToken(req);
-  if (!identity) return { user: null, staff: null, env: {} };
-  return { user: { id: identity.userId }, staff: null, env: {} };
+  const user = identity ? { id: identity.userId } : null;
+  return { user, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
 }
 
 function openApiToHono(path: string): string {
   return path.replace(/\{([^}]+)\}/g, ":$1");
+}
+
+/**
+ * Hono's `c.executionCtx` getter THROWS when the underlying request
+ * was dispatched without an `ExecutionContext` (test harness via
+ * `app.request(...)`, non-Workers runtimes). Treat the throw as
+ * "no waitUntil available" and fall back to inline-await downstream.
+ */
+function readWaitUntil(c: Context): ((p: Promise<unknown>) => void) | undefined {
+  try {
+    const ctx = c.executionCtx;
+    return ctx.waitUntil.bind(ctx);
+  } catch {
+    return undefined;
+  }
 }
 
 function jsonResponse(status: number, body: unknown): Response {
