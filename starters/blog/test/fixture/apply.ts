@@ -23,7 +23,12 @@
  */
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { entryHtmlKey, listHtmlKey } from "@aotter/mantle-runtime";
+import {
+  CANONICAL_MIGRATIONS,
+  entryHtmlKey,
+  listHtmlKey,
+  llmsTxtKey,
+} from "@aotter/mantle-runtime";
 import type { Entry, ContentState } from "@aotter/mantle-spec";
 import { postTemplate, postListTemplate } from "../../src/templates/index.js";
 import {
@@ -44,7 +49,15 @@ function escape(s: string): string {
 
 function buildSql(): string {
   const lines: string[] = [];
-  lines.push("-- starter-blog test fixture (idempotent). Re-runnable via OR IGNORE.");
+  lines.push("-- starter-blog test fixture (idempotent).");
+  lines.push("-- 1. Run canonical migrations (wrangler dev runs them in-memory");
+  lines.push("--    only — `wrangler d1 execute --local` opens an isolated DB");
+  lines.push("--    so the fixture must apply migrations itself before inserts).");
+  for (const m of CANONICAL_MIGRATIONS) {
+    lines.push(`-- migration ${m.id}: ${m.description}`);
+    lines.push(m.sql.trim());
+  }
+  lines.push("-- 2. Fixture data (idempotent via OR IGNORE).");
   lines.push("BEGIN TRANSACTION;");
 
   for (const [key, value] of Object.entries({
@@ -157,11 +170,44 @@ function buildKvEntries(): readonly KvEntry[] {
         site: FIXTURE_SITE,
       }),
     });
+    out.push({
+      key: llmsTxtKey(locale),
+      value: renderLlmsTxt(locale, entries),
+    });
   }
+  // Root /llms.txt aggregates every locale.
+  out.push({
+    key: llmsTxtKey(""),
+    value: renderLlmsTxt("", [...byLocale.values()].flat()),
+  });
   return out;
 }
 
-function main(): void {
+/**
+ * Render `llms.txt` content for a locale. The runtime's
+ * `serializeLlmsTxt` helper expects entries with a `content` field;
+ * the starter uses `body` (markdown) instead, so we render in a
+ * matching shape locally — title + URL + first-line excerpt — so the
+ * file is still useful to LLM agents crawling the site.
+ */
+function renderLlmsTxt(locale: string, entries: readonly Entry[]): string {
+  const urlLocale = locale ? `/${locale.toLowerCase()}` : "";
+  let out = `# ${FIXTURE_SITE.title}\n\n`;
+  if (FIXTURE_SITE.description) out += `> ${FIXTURE_SITE.description}\n\n`;
+  if (locale) out += `Locale: ${locale}\n\n`;
+  out += `## post-translations\n\n`;
+  for (const e of entries) {
+    const data = e.data as { slug?: string; title?: string; body?: string };
+    const title = data.title ?? data.slug ?? e.id;
+    const slug = data.slug ?? e.id;
+    const url = `${FIXTURE_SITE.origin}${urlLocale}/posts/${slug}`;
+    const excerpt = (data.body ?? "").split("\n")[0]?.slice(0, 140) ?? "";
+    out += excerpt ? `- [${title}](${url}): ${excerpt}\n` : `- [${title}](${url})\n`;
+  }
+  return out + "\n";
+}
+
+async function main(): Promise<void> {
   const sql = buildSql();
   const kv = buildKvEntries();
   writeFileSync(".fixture.sql", sql);
@@ -169,10 +215,18 @@ function main(): void {
   process.stdout.write(`Wrote .fixture.sql (${sql.split("\n").length} lines)\n`);
   process.stdout.write(`Wrote .fixture.kv.json (${kv.length} entries)\n`);
 
-  process.stdout.write("\nApplying D1 fixtures...\n");
-  execSync("wrangler d1 execute mantle-blog-local --local --file=.fixture.sql", {
-    stdio: "inherit",
-  });
+  // Wrangler dev's D1 + KV state lives in `.wrangler/state` (the
+  // default persist root). `wrangler d1 execute` and `wrangler kv
+  // bulk put` use the same default, so the three commands see the
+  // same miniflare-backed sqlite. The fixture SQL re-runs canonical
+  // migrations (CREATE TABLE IF NOT EXISTS) before inserts, so it
+  // works against either a cold DB or one wrangler dev already
+  // populated.
+  process.stdout.write("\nApplying D1 fixtures (migrations + inserts)...\n");
+  execSync(
+    "wrangler d1 execute mantle-blog-local --local --file=.fixture.sql",
+    { stdio: "inherit" },
+  );
 
   process.stdout.write("\nApplying KV fixtures...\n");
   execSync(
@@ -183,6 +237,7 @@ function main(): void {
   process.stdout.write("\nFixture applied. Try:\n");
   process.stdout.write("  curl http://localhost:8787/en/posts/hello-world\n");
   process.stdout.write("  curl http://localhost:8787/zh-TW/posts\n");
+  process.stdout.write("  curl http://localhost:8787/en/llms.txt\n");
 }
 
 main();

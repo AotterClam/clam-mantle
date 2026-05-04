@@ -45,14 +45,23 @@ pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filte
 # Then in starters/blog/:
 cd starters/blog
 
-# Run wrangler dev (http://localhost:8787):
-pnpm dev
-
-# In another shell, apply the test fixture (writes site_config +
-# 3 posts × 2 locales to D1, plus pre-rendered HTML to KV so the
-# public read path works without an admin publish flow):
+# Apply the test fixture FIRST. It runs canonical migrations,
+# writes site_config + 3 posts × 2 locales to D1, plus pre-rendered
+# HTML + per-locale llms.txt to KV so the public read path works
+# without an admin publish flow:
 pnpm fixture
+
+# Then run wrangler dev:
+pnpm dev
 ```
+
+The fixture re-runs cleanly while `wrangler dev` is up too — the
+migrations are `IF NOT EXISTS` and inserts use `OR IGNORE`, so
+edits to fixture text or templates land on subsequent applies.
+
+Run order matters because `wrangler dev`'s D1 lives in memory
+unless the fixture has populated `.wrangler/state` first; without
+fixture data, every page returns 404.
 
 ## Smoke test (curl)
 
