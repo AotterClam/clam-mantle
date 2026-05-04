@@ -332,7 +332,7 @@ forces it.
 #### Discipline
 
 - The v0.1 validator **rejects DRAFT keys at parse time** with a
-  `V_DRAFT_KEY_USED` warning (not error — see the
+  `DRAFT_KEY_USED` warning (not error — see the
   AI-as-primary-author contract on permissive bias). The
   diagnostic explicitly references the future-grammar reference
   so authors know the key is reserved, not
@@ -641,7 +641,7 @@ block as a manifest.
   4 files (or its own). Without grep / IDE go-to-def, finding
   the Schema definition requires knowing where the author
   put it. Mitigation: Loop 1 (`mantle validate`) emits the
-  filesystem path in `V_VIEW_FROM_UNKNOWN_SCHEMA` diagnostics;
+  filesystem path in `VIEW_FROM_UNKNOWN_SCHEMA` diagnostics;
   IDE-shaped tooling (LSP — DRAFT) closes the rest.
 
 ### Alternatives considered

@@ -11,6 +11,8 @@ MCP-native headless CMS for Cloudflare Workers. Declarative manifest, AI-first a
 - **Apps (OLTP)** — `mantle` (this repo) and future apps. Build a content-driven web service by declaring atoms in YAML; the runtime ships dispatcher + auth + render + MCP for free.
 - **Modeling (OLAP)** — [`aotter-mantle`](https://github.com/aotter/aotter-mantle) (sibling project). Turn enterprise Excel/CSV files into Kimball-modeled DuckLake warehouses by declaring star-schema configs in YAML.
 
+> Note: the two halves intentionally live in different GitHub orgs (`aotter` for mantle, `aotter` for aotter-mantle) — different release cadences, different licensing posture.
+
 The shared spirit: **agents write config, runtime carries the complexity**. Hard problems — schema validation, cache invalidation, OAuth, locale canonicalization, JSON Schema → zod conversion, transactional state — live in the runtime, where they're written once by people who understand them. The authoring surface is YAML the agent fills in, where mistakes are caught by structured diagnostics before they become production failures. Non-coders get AI leverage safely; the runtime is the load-bearing part.
 
 This repo is the OLTP side of that thesis applied to web content.
@@ -19,9 +21,9 @@ This repo is the OLTP side of that thesis applied to web content.
 
 You're an agent helping a (likely non-technical) user install or extend a mantle project.
 
-→ **Install a fresh blog** — start at [`skills/install-blog/SKILL.md`](skills/install-blog/SKILL.md). _(stub during v0.1.0 development)_
-→ **Add a new atom** (Schema / View / Procedure + http Trigger) to an existing starter — start at [`skills/extend-starter/SKILL.md`](skills/extend-starter/SKILL.md). _(stub during v0.1.0 development)_
-→ **Provision Cloudflare resources** (D1, KV, OAuth, Turnstile) — common steps live in [`skills/cf-resources/SKILL.md`](skills/cf-resources/SKILL.md). _(stub during v0.1.0 development)_
+→ **Install a fresh blog** — start at [`skills/install-blog/SKILL.md`](skills/install-blog/SKILL.md). _(coming in commit 9 — see [issue #1](https://github.com/aotter/mantle/issues/1))_
+→ **Add a new atom** (Schema / View / Procedure + http Trigger) to an existing starter — start at [`skills/extend-starter/SKILL.md`](skills/extend-starter/SKILL.md). _(coming in commit 9 — see [issue #1](https://github.com/aotter/mantle/issues/1))_
+→ **Provision Cloudflare resources** (D1, KV, OAuth, Turnstile) — common steps live in [`skills/cf-resources/SKILL.md`](skills/cf-resources/SKILL.md). _(coming in commit 9 — see [issue #1](https://github.com/aotter/mantle/issues/1))_
 
 ## For humans
 
@@ -34,7 +36,7 @@ End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.de
 - `/<locale>/llms.txt` — per-locale llms.txt index
 - public surface in your taste (the v0.1.0 starter ships Hono + hono/jsx + Tailwind)
 
-`docs/getting-started.md` is the canonical Quickstart. _(stub during v0.1.0 development)_
+`docs/getting-started.md` is the canonical Quickstart. _(coming in commit 9 — see [issue #1](https://github.com/aotter/mantle/issues/1))_
 
 ## Packages
 

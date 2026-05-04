@@ -169,7 +169,7 @@ configuration.
   via grammar-revise.
 - **`now` semantics on D1 vs PG diverge.** D1 has no
   column-level `DEFAULT now()`; SDK stamps. PG (v0.2+ via
-  Hyperdrive, per ADR-0004) has native defaults. Authors writing
+  Hyperdrive — see `mantle-cloudflare` README) has native defaults. Authors writing
   `x-mantle-bind: now` on a future PG-targeted deployment may
   expect column-level enforcement; v0.1.0 ships SDK-stamped
   only.

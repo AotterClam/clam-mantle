@@ -40,13 +40,13 @@ This is the lens for every architectural decision in this codebase.
 ## Hard invariants (cross-cutting; never violate)
 
 - **`@aotter/mantle-runtime` MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-specific type.** It defines port interfaces; concrete adapters bind them. Violating this collapses the rebuild's reason for existing — the Netlify stub is the public reminder.
-- **Manifest grammar is locked at v0.1.** DRAFT keys (per the equivalent of POC's ADR-0005 — being ported as ADR-0001 §"Future grammar") are documented but **must not** be implemented in code, types, or starter manifests until promoted.
+- **Manifest grammar is locked at v0.1.** DRAFT keys (see [ADR-0001 §"Future grammar discipline"](docs/adr/0001-four-atom-manifest-model.md)) are documented but **must not** be implemented in code, types, or starter manifests until promoted.
 - **Atom name stability**: Schema / View / Procedure / Trigger. No renames.
 - **Closed enums for `x-mantle-bind` and `ctx.*` predicates** — see (incoming) ADR-0002. New entries go through grammar-revise, not ad-hoc.
 - **Cloudflare-only for v0.1.0.** The Netlify package is a README. PG-via-Hyperdrive, Bun, Deno — all v0.2+.
 - **`@aotter/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
 - **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/json-schema-zod.ts`.
-- **PR base branch is `main`**, not `develop`. (POC used `develop`; the rebuild simplifies to a single trunk during the v0.1.0 milestones.)
+- **PR base branch is `main`.**
 
 ## Build / test / typecheck
 

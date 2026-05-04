@@ -6,7 +6,7 @@
 
 **Deciders**: phsu
 
-**Related**: [ADR-0001](0001-four-atom-manifest-model.md) (the manifest model whose authoring path this ADR opens to consumers), [ADR-0007](0007-ai-as-primary-author-sdk-contract.md) (the AI-author DX this unblocks at the per-project layer)
+**Related**: [ADR-0001](0001-four-atom-manifest-model.md) (the manifest model whose authoring path this ADR opens to consumers), [ADR-0007](0007-ai-as-primary-author.md) (the AI-author DX this unblocks at the per-project layer)
 
 ---
 
@@ -27,7 +27,7 @@ the SDK bundle). A consumer who wants a `comments` Schema, a
 2. Wait for a future SDK release that ships the manifest they want.
 
 Either option is incompatible with the AI-as-primary-author contract
-([ADR-0007](0007-ai-as-primary-author-sdk-contract.md)): the AI is
+([ADR-0007](0007-ai-as-primary-author.md)): the AI is
 working *inside the consumer's project*, not inside the SDK monorepo.
 It cannot extend the SDK without a fork-and-publish loop that has none
 of the three feedback loops the contract guarantees.
@@ -50,8 +50,9 @@ export interface CmsConfig {
   /** Procedure handlers keyed by `Procedure.spec.handler.ref`. */
   readonly handlers?: Readonly<Record<string, AnyHandler>>;
   /** Consumer-authored manifest YAML, one entry per file. Multi-doc
-   *  files (`---`-separated) are supported per ADR-0006. The SDK
-   *  parses and validates these at boot. */
+   *  files (`---`-separated) are supported per [ADR-0001](0001-four-atom-manifest-model.md)
+   *  §"Authoring shape: multi-doc YAML". The SDK parses and validates
+   *  these at boot. */
   readonly manifests?: readonly string[];
 }
 ```
@@ -138,7 +139,8 @@ through the sequence.
 - Text-imported YAML keeps manifests as the YAML source-of-truth on
   disk — no codegen step in the build, no parser drift between
   author-time YAML and runtime parse. Multi-doc YAML grouping
-  (ADR-0006) is preserved end-to-end.
+  ([ADR-0001](0001-four-atom-manifest-model.md) §"Authoring shape: multi-doc YAML")
+  is preserved end-to-end.
 - The MCP `get_schema` reflection automatically picks up the
   consumer's atoms — no separate registration call. The consumer
   adds a `comments` Schema and the AI editor sees it the next deploy.
@@ -257,7 +259,7 @@ Accepted for v0.1.0. The implementation slice:
 - The mount factory builds the registry from the consumer-supplied
   YAML; no SDK fallback.
 - The `@aotter/mantle-cloudflare` package ships zero embedded
-  manifests; no `STARTER_MANIFESTS_YAML` constant exists.
+  manifests.
 - The starter at `starters/blog/` is self-contained: `manifests/`,
   `src/yaml.d.ts`, `wrangler.toml` `[[rules]]` block, and
   `src/mantleConfig.ts` wiring it together.
