@@ -5,11 +5,10 @@
 >
 > **Status**: v0.1 grammar lock. Atoms are shipped; rich sub-spec
 > grammar (policies, recursive views, temporal predicates, quotas,
-> projection triggers) is reserved as **DRAFT** — see "Future grammar"
-> appendix. Built-in handlers (5 ops) and lifecycle Triggers (8 hooks)
-> are part of v0.1.0 — see ADR-0014 (when ported). Editorial lifecycle
-> is the one shipped grammar key whose runtime is **deferred to
-> v0.1.x**: the boot validator accepts the key shape but rejects
+> projection triggers, builtin handler ops, lifecycle Triggers) is
+> reserved as **DRAFT** — see "Future grammar" appendix. Editorial
+> lifecycle is the one shipped grammar key whose runtime is **deferred
+> to v0.1.x**: the boot validator accepts the key shape but rejects
 > `lifecycle: editorial` with a clear "v0.1.x" diagnostic until the
 > approval-queue runtime lands.
 >
@@ -23,8 +22,7 @@
 ## TL;DR
 
 > See ADR-0001 for rationale — why these 4 atoms, why the PG-1:1
-> mapping pitch, and the design history (including the
-> Procedure → Action rename + revert).
+> mapping pitch, and the design history.
 
 The SDK exposes **exactly 4 declarative resource kinds**, scoped to the
 **`cms.clam.ai/v1`** group of the clam universe. They map 1-to-1 to the
@@ -67,7 +65,8 @@ our scope; SaaS multi-tenancy belongs in the consumer's app layer with a
 
 ### Multi-doc YAML — keeping file count down
 
-> See ADR-0006 for rationale — why multi-doc YAML over an inline
+> See [ADR-0001 §"Authoring shape: multi-doc YAML"](adr/0001-four-atom-manifest-model.md#authoring-shape-multi-doc-yaml-was-poc-adr-0006)
+> for rationale — why multi-doc YAML over an inline
 > `Procedure.expose:` shortcut.
 
 A logical feature commonly bundles a Procedure + a Trigger (and often a
@@ -117,11 +116,14 @@ spec:
   schema:
     $schema: https://json-schema.org/draft/2020-12/schema
     type: object
-    required: [title, slug, locale, content]
+    required: [title, slug, content]
     properties:
       title:    { type: string, minLength: 1, maxLength: 200 }
       slug:     { type: string }
-      locale:   { type: string }   # required when spec.localized is true
+      locale:   { type: string }   # NOT in `required:`; the runtime locale
+                                   # gate (clam-cms-runtime helpers.ts, per
+                                   # ADR-0010) enforces presence on writes
+                                   # against localized Schemas.
       content:  { type: string }
       authorId: { type: string, format: uuid, x-clam-bind: ctx.user }
       createdAt: { type: string, format: date-time, x-clam-bind: now }
@@ -155,7 +157,7 @@ state machine.
   (`draft → in_review → changes_requested → approved → published →
   archived`). **Grammar key is reserved; the runtime is on the v0.1.x
   roadmap.** v0.1.0's boot validator rejects `lifecycle: editorial`
-  with the diagnostic `B_LIFECYCLE_NOT_IN_V010` and a message
+  with the diagnostic `LIFECYCLE_NOT_IN_V010` and a message
   pointing at the v0.1.x roadmap. Authors should not write
   `lifecycle: editorial` in v0.1.0 manifests; it will fail boot.
 
@@ -340,41 +342,9 @@ sdk.registerHandler("send-contact-message", sendContactMessage);
 Anything beyond this (`any:`, `owns:`, `withinMinutes:`, `contains:`,
 `requires.window`, `requires.quota`, `errors`, `retry`) is DRAFT.
 
-**v0.1 `handler.kind`** is `ref` (above) or **`builtin`** — the latter
-is a thin shortcut over the storage adapter for trivial CRUD-shaped
-Procedures (see ADR-0014 when ported). Use `builtin` when the body is
-"insert a row" / "update a row" / "delete a row"; reach for `ref`
-when there is real business logic.
-
-```yaml
-spec:
-  input:  { ... JSON Schema for the request body ... }
-  output: { ... JSON Schema for the response body ... }
-  handler:
-    kind:   builtin
-    op:     create | update | upsert | delete | archive
-    schema: <Schema metadata.name>
-```
-
-| op | Behavior |
-|---|---|
-| `create` | INSERT a new row. Project `input ∩ Schema.spec.schema.properties`; stamp `x-clam-bind` fields; status='draft'; generated id. |
-| `update` | UPDATE in place. `input.id` + `input.expectedVersion` (OCC) required. Bumps version. |
-| `upsert` | If `input.id` resolves, behaves as `update`; else as `create`. |
-| `delete` | Hard DELETE by id. |
-| `archive` | Soft-archive (status='archived'). Editorial-lifecycle Schemas only; on `simple` Schemas this is a parse error. (And since editorial runtime ships in v0.1.x, `archive` is effectively unavailable until then.) |
-
-The Procedure's `input` is the contract with the *caller*. It MAY
-declare fields the Schema does not (e.g. a Turnstile token). The
-builtin op silently projects `input ∩ Schema.properties` and
-ignores the rest; JSON Schema's default `additionalProperties: true`
-lets the side-channel fields pass validation. To act on those fields
-(read the token, call the vendor) declare a `before_create` lifecycle
-Trigger — see "Lifecycle Triggers" below.
-
-`request_publish` and `publish` are intentionally not in the builtin
-vocabulary. They are editorial-workflow operations, not CRUD
-primitives, and stay MCP-only in v0.1.x.
+**v0.1 `handler.kind`** is `ref` only. A `builtin` shortcut for
+trivial CRUD-shaped Procedures is reserved for v0.1.x — see Future
+grammar appendix.
 
 **Postgres analogue**: `CREATE FUNCTION send_contact_message(input
 JSONB) RETURNS JSONB LANGUAGE plpgsql AS $$ ... $$;`. PG functions are
@@ -409,73 +379,15 @@ The same Procedure can have multiple Triggers — that's how it becomes
 handler logic. Each transport is one Trigger; the Procedure body is
 shared.
 
-**v0.1 `Trigger.source.kind`** is `http` (above) or **`lifecycle`** —
-the latter binds a Procedure to a Schema event. Other source kinds
-(`mcp`, `cron`, `queue`) are DRAFT.
-
-```yaml
-apiVersion: cms.clam.ai/v1
-kind: Trigger
-metadata: { name: contact-bot-check }
-spec:
-  source:
-    kind:   lifecycle
-    schema: contact-messages
-    on:     [before_create]            # one or more hooks
-    errorPolicy: abort                 # default: abort for before_*, continue for after_*
-  target:
-    procedure: bot-check                # any Procedure — re-bound across schemas
-```
-
-| Hook | Fires |
-|---|---|
-| `before_create` | Before INSERT. Throw cancels. |
-| `after_create` | After INSERT. Default best-effort. |
-| `before_update` | Before UPDATE. Throw cancels. |
-| `after_update` | After UPDATE. Default best-effort. |
-| `before_delete` | Before DELETE. Throw cancels. |
-| `after_delete` | After DELETE. Default best-effort. |
-| `before_publish` | Before status flips to `published`. Editorial Schemas only. |
-| `after_publish` | After status flips to `published`. Editorial Schemas only. |
-
-**Atomicity defaults by phase**:
-- `before_*`: `errorPolicy: abort`. Handler throw cancels the
-  surrounding mutation; caller receives the diagnostic.
-- `after_*`: `errorPolicy: continue`. Handler throw is logged and
-  discarded; the mutation succeeds. Runs via `ctx.waitUntil` when
-  available so the caller doesn't block on a remote call.
-
-Authors override either default by declaring `errorPolicy: abort |
-continue` explicitly.
-
-**Hook handlers** receive the *original* (pre-projection) Procedure
-input — so a `before_create` hook on `contact-messages` can read the
-caller's `recaptchaToken` field even though the row never stores it.
-They also receive `ctx.event = { hook, schema, entry }`. `entry` is
-null only on `before_create` (no row exists yet); the pre-mutation
-row on `before_update` / `before_delete` / `before_publish`; the
-persisted post-mutation row on every `after_*`.
-
-**Hook ordering**: when multiple lifecycle Triggers bind the same
-`(schema, hook)`, the runtime fires them **alphabetically by
-`Trigger.metadata.name`**. v0.1.x reserves `priority: number` for
-v0.2; today, choose names that sort correctly (`010-bot-check`,
-`020-rate-limit`).
-
-**Limitation in v0.1.x**: lifecycle hooks fire from the **builtin op
-execution path** only. The direct admin/api and MCP write paths
-don't fire hooks until the v0.1.y storage-adapter pass — route
-mutations through builtin Procedures for hook coverage.
-
-**Editorial-lifecycle hooks** (`before_publish`, `after_publish`)
-are valid grammar in v0.1.0 but never fire until the editorial
-runtime ships (see Lifecycle above). Declaring them is fine; relying
-on them in v0.1.0 is not.
+**v0.1 `Trigger.source.kind`** is `http` only. Other source kinds
+(`mcp`, `cron`, `queue`, `lifecycle`) are DRAFT — see Future grammar
+appendix.
 
 The state-machine "lifecycle" from the Schema atom
 (`Schema.spec.lifecycle: simple | editorial`) is a separate domain
 that shares the word. The Schema setting governs which states an
-entry can be in; the hooks here govern what fires around mutations.
+entry can be in; lifecycle Triggers (when they ship; see Future
+grammar) govern what fires around mutations.
 
 **Postgres analogue**: `CREATE TRIGGER ... AFTER INSERT ON posts
 EXECUTE FUNCTION ...` (lifecycle); `pg_cron` extension (cron); plus
@@ -485,9 +397,10 @@ mechanisms. We unify them under one atom.
 
 ## OpenAPI emission — manifests in, OpenAPI out
 
-> See ADR-0003 for rationale — why OpenAPI is emission target, not
-> manifest shape (keeps MCP and other source kinds first-class peers,
-> not `x-` extensions on an HTTP-flavored type).
+> See the `clam-cms-spec` README for rationale — why OpenAPI is
+> emission target, not manifest shape (keeps MCP and other source
+> kinds first-class peers, not `x-` extensions on an HTTP-flavored
+> type).
 
 The `Trigger { source.kind: http }` + `Procedure` pair is **not** an
 OpenAPI Operation Object. It's a smaller, transport-neutral pair. The
@@ -614,8 +527,9 @@ Cloudflare D1 / KV abstract away.
 
 ## Storage backend — D1 today, Postgres-via-Hyperdrive tomorrow
 
-> See ADR-0004 for rationale — why D1 for v0.1 (no-CC OSS onboarding,
-> platform-native), and the documented PG path.
+> See the `clam-cms-cloudflare` README for rationale — why D1 for
+> v0.1 (no-CC OSS onboarding, platform-native), and the documented
+> PG path.
 
 ### How `Schema` data is stored on D1 today
 
@@ -627,10 +541,9 @@ Cloudflare adapter's storage migrations in
 CREATE TABLE entries (
   id          TEXT PRIMARY KEY,
   collection  TEXT NOT NULL,        -- discriminator: 'posts', 'comments', ...
-  locale      TEXT NOT NULL,
   status      TEXT NOT NULL,        -- 'draft' / 'published' / ...
   version     INTEGER NOT NULL,
-  data        TEXT NOT NULL,        -- JSON blob: every Schema property
+  data        TEXT NOT NULL,        -- JSON blob: every Schema property (incl. locale, per ADR-0010)
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL,
   author_id   TEXT REFERENCES users(id)
@@ -638,7 +551,11 @@ CREATE TABLE entries (
 ```
 
 Reserved metadata are native columns; **everything in your Schema's
-`spec.schema.properties` lives inside the `data` JSON blob**.
+`spec.schema.properties` lives inside the `data` JSON blob**. Locale
+on localized Schemas lives at `data.locale` (per ADR-0010); for
+indexing it surfaces as a JSON-extracted virtual generated column
+(`json_extract(data, '$.locale')`) with a partial unique index, not as
+a top-level column.
 
 `uniqueIndexes` declarations compile into virtual generated columns +
 partial unique indexes via the spec engine's DDL emitter
@@ -724,13 +641,13 @@ package stays portable across adapters.
 
 ## Future grammar (DRAFT — not implemented in v0.1.0)
 
-> See ADR-0001 § Future grammar discipline (when ported) for the v0.1
-> minimum vs DRAFT discipline, the promotion process, and the YAGNI
-> argument that gates speculative shipping.
+> See [ADR-0001 §"Future grammar discipline"](adr/0001-four-atom-manifest-model.md#future-grammar-discipline-was-poc-adr-0005)
+> for the v0.1 minimum vs DRAFT discipline, the promotion process,
+> and the YAGNI argument that gates speculative shipping.
 
 > **Status of this appendix**: every key below is **DRAFT — not
 > implemented in v0.1.0**. The boot validator will reject any
-> manifest that uses one of these keys with a `B_DRAFT_KEY_USED`
+> manifest that uses one of these keys with a `DRAFT_KEY_USED`
 > diagnostic pointing back at this section. Items land when the first
 > concrete real-world use case forces them, not on speculation.
 
@@ -797,12 +714,101 @@ use case forces it; until then, do not implement.
   limit, backoff, retryOn, idempotencyKey?}`** — failure-policy
   declared. Retry + `op: create` requires `idempotencyKey:` (parse
   error otherwise).
+- **`handler.kind: builtin`** (DRAFT) — thin shortcut over the storage
+  adapter for trivial CRUD-shaped Procedures. Use when the body is
+  "insert a row" / "update a row" / "delete a row"; reach for `ref`
+  when there is real business logic. Shape:
+
+  ```yaml
+  spec:
+    input:  { ... JSON Schema for the request body ... }
+    output: { ... JSON Schema for the response body ... }
+    handler:
+      kind:   builtin
+      op:     create | update | upsert | delete | archive
+      schema: <Schema metadata.name>
+  ```
+
+  | op | Behavior |
+  |---|---|
+  | `create` | INSERT a new row. Project `input ∩ Schema.spec.schema.properties`; stamp `x-clam-bind` fields; status='draft'; generated id. |
+  | `update` | UPDATE in place. `input.id` + `input.expectedVersion` (OCC) required. Bumps version. |
+  | `upsert` | If `input.id` resolves, behaves as `update`; else as `create`. |
+  | `delete` | Hard DELETE by id. |
+  | `archive` | Soft-archive (status='archived'). Editorial-lifecycle Schemas only; on `simple` Schemas this is a parse error. (And since editorial runtime ships in v0.1.x, `archive` is effectively unavailable until then.) |
+
+  The Procedure's `input` is the contract with the *caller*. It MAY
+  declare fields the Schema does not (e.g. a Turnstile token). The
+  builtin op silently projects `input ∩ Schema.properties` and
+  ignores the rest; JSON Schema's default `additionalProperties: true`
+  lets the side-channel fields pass validation. To act on those fields
+  (read the token, call the vendor) declare a `before_create` lifecycle
+  Trigger — see Trigger future.
+
+  `request_publish` and `publish` are intentionally not in the builtin
+  vocabulary. They are editorial-workflow operations, not CRUD
+  primitives.
 
 ### Trigger future
 - **`source.kind: mcp`** — MCP tool exposure. Same Procedure becomes
   an LLM-callable tool by adding a Trigger.
 - **`source.kind: cron`** with `expr:` — scheduled invocation.
 - **`source.kind: queue`** — async fan-out / message-driven invocation.
+- **`source.kind: lifecycle`** (DRAFT) — binds a Procedure to a
+  Schema event. Shape:
+
+  ```yaml
+  apiVersion: cms.clam.ai/v1
+  kind: Trigger
+  metadata: { name: contact-bot-check }
+  spec:
+    source:
+      kind:   lifecycle
+      schema: contact-messages
+      on:     [before_create]            # one or more hooks
+      errorPolicy: abort                 # default: abort for before_*, continue for after_*
+    target:
+      procedure: bot-check                # any Procedure — re-bound across schemas
+  ```
+
+  | Hook | Fires |
+  |---|---|
+  | `before_create` | Before INSERT. Throw cancels. |
+  | `after_create` | After INSERT. Default best-effort. |
+  | `before_update` | Before UPDATE. Throw cancels. |
+  | `after_update` | After UPDATE. Default best-effort. |
+  | `before_delete` | Before DELETE. Throw cancels. |
+  | `after_delete` | After DELETE. Default best-effort. |
+  | `before_publish` | Before status flips to `published`. Editorial Schemas only. |
+  | `after_publish` | After status flips to `published`. Editorial Schemas only. |
+
+  **Atomicity defaults by phase**:
+  - `before_*`: `errorPolicy: abort`. Handler throw cancels the
+    surrounding mutation; caller receives the diagnostic.
+  - `after_*`: `errorPolicy: continue`. Handler throw is logged and
+    discarded; the mutation succeeds. Runs via `ctx.waitUntil` when
+    available so the caller doesn't block on a remote call.
+
+  Authors override either default by declaring `errorPolicy: abort |
+  continue` explicitly.
+
+  **Hook handlers** receive the *original* (pre-projection) Procedure
+  input — so a `before_create` hook on `contact-messages` can read the
+  caller's `recaptchaToken` field even though the row never stores it.
+  They also receive `ctx.event = { hook, schema, entry }`. `entry` is
+  null only on `before_create` (no row exists yet); the pre-mutation
+  row on `before_update` / `before_delete` / `before_publish`; the
+  persisted post-mutation row on every `after_*`.
+
+  **Hook ordering**: when multiple lifecycle Triggers bind the same
+  `(schema, hook)`, the runtime fires them **alphabetically by
+  `Trigger.metadata.name`**. A `priority: number` key is reserved for
+  v0.2; today, choose names that sort correctly (`010-bot-check`,
+  `020-rate-limit`).
+
+  **Editorial-lifecycle hooks** (`before_publish`, `after_publish`)
+  depend on the `lifecycle: editorial` runtime, which is itself
+  v0.1.x.
 - **`target.project: { schema, where, set: { <col>: { aggregate, from,
   where } } }`** — declarative aggregate-projection across Schemas.
   Replaces hand-written counter handlers. Same-transaction on PG;

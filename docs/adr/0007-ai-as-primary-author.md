@@ -104,20 +104,22 @@ What it catches:
 - Each `Procedure.handler.ref` has a corresponding
   `sdk.registerHandler("<ref>", ...)` call somewhere in the
   consumer's TS source (textual grep, not runtime — boot loop is
-  Loop 3's job)
+  Loop 2's job)
 
 This is the cheapest loop; it must be runnable without booting
 anything. AI authors should run it after every manifest edit.
 
-#### Loop 2 — Test harness (`@aotterclam/clam-cms-core/testing`)
+#### Test harness (`@aotterclam/clam-cms-spec/testing`)
 
-In-memory dispatcher invocation. The consumer's test suite imports a
-public testing module that spins up a complete dispatcher against an
-in-memory D1 substitute, seeds rows, and calls Procedures or Views
-directly without going through HTTP.
+Supporting tooling that consumers use inside their own test suites —
+it is not itself a feedback loop, it's the harness those tests run
+against. In-memory dispatcher invocation: the consumer's test suite
+imports a public testing module that spins up a complete dispatcher
+against an in-memory D1 substitute, seeds rows, and calls Procedures
+or Views directly without going through HTTP.
 
 ```ts
-import { createTestDispatcher } from "@aotterclam/clam-cms-core/testing";
+import { createTestDispatcher } from "@aotterclam/clam-cms-spec/testing";
 import { manifests } from "../manifests"; // loaded by build hook
 import { handlers } from "../handlers";   // map of ref → fn
 
@@ -138,7 +140,7 @@ expect(view.items).toHaveLength(2);
 Catches:
 - Handler logic bugs (validation rules, branching, error returns)
 - Auth predicate evaluation (handler called with wrong user/staff
-  context returns `R_AUTH_DENIED`)
+  context returns `AUTH_DENIED`)
 - Input/output schema enforcement (caller-supplied `x-clam-bind` field
   is rejected; handler-returned shape mismatching `output` is
   rejected)
@@ -151,7 +153,7 @@ storage adapter (in-memory SQLite vs production D1). Tests that pass
 here are tests that pass at runtime, modulo D1-vs-SQLite SQL semantic
 gaps (acknowledged risk; covered by SDK integration tests in CI).
 
-#### Loop 3 — Boot-time fail-fast
+#### Loop 2 — Boot-time fail-fast
 
 Dispatcher build phase, after manifests are parsed and handlers are
 registered, before the serve loop starts. Walks the entire manifest
@@ -175,23 +177,22 @@ serve anyway." A missing handler must not surface as a runtime 500 to
 a customer; it must surface as a boot failure to the deploy pipeline,
 which is visible to the AI author who just shipped.
 
-#### Loop 4 — Runtime errors
+#### Loop 3 — Runtime errors
 
-Already exists; not part of the contract added by this ADR. The
-existing `R_*` codes (see ADR-0008 and the design-atoms reference)
+Runtime diagnostics (see ADR-0008 and the design-atoms reference)
 cover the cases that reach this far. The contract's job is to make
-Loop 4 the layer that handles **input it had no way to predict**
+Loop 3 the layer that handles **input it had no way to predict**
 (request shape, auth state, transient infrastructure failures), not
-the layer that handles **author-side mistakes** (those are Loops 1–3's
-job).
+the layer that handles **author-side mistakes** (those are Loops 1
+and 2's job).
 
 #### Phase ordering rationale
 
 The author's lifecycle is:
 
 ```
-edit YAML → run validate (Loop 1) → run tests (Loop 2)
-         → push → deploy boots (Loop 3) → serves (Loop 4)
+edit YAML → run validate (Loop 1) → run tests (test harness)
+         → push → deploy boots (Loop 2) → serves (Loop 3)
 ```
 
 The earlier a class of error is caught, the cheaper it is to fix and
@@ -262,8 +263,8 @@ SDK TS API instead of needing a matching MCP tool).
 - Anything that requires **shell or filesystem access** —
   scaffolding, test running, deploy.
 - Anything **dev-loop shaped** — the three feedback loops above
-  (validate / test / boot) are coder-surface concerns, not
-  operator-surface.
+  (validate / boot / runtime) plus the test harness are
+  coder-surface concerns, not operator-surface.
 - Anything that **mutates code** in the consumer's repo — registering
   handlers, wiring imports, updating `wrangler.toml`.
 - **Skill files** carrying domain context. cc reads these; MCP clients
@@ -278,7 +279,7 @@ Concrete artifacts today:
   can consume them.
 - `clam-cms validate` CLI (shipped in `@aotterclam/clam-cms-spec`)
 - `clam-cms openapi` CLI (likewise)
-- `@aotterclam/clam-cms-core/testing` test harness module
+- `@aotterclam/clam-cms-spec/testing` test harness module
 
 #### What goes on MCP (operator surface)
 
@@ -296,7 +297,7 @@ Concrete artifacts today:
 
 A small third category exists: APIs that only the **runtime itself**
 consumes (the dispatcher, the boot validator, the diagnostic types).
-These are exported from `@aotterclam/clam-cms-core` for the coder to
+These are exported from `@aotterclam/clam-cms-spec` for the coder to
 import inside their handler code, but are not CLI commands and not
 MCP tools — they're library types.
 
@@ -335,7 +336,7 @@ MCP tools — they're library types.
   bounded MCP consumer, with explicit phase ordering — gives reviewers
   a yardstick for proposed SDK features: "which loop does this
   affect, and which surface owns it?" New error types must declare a
-  code prefix (`V_*`, `T_*`, `B_*`, `R_*`).
+  code.
 - Permission boundary maps cleanly to surface boundary. The operator
   agent's permissions are bounded by the MCP tool catalog; the coder
   agent's by what shell + git + the SDK can do. Neither agent can
@@ -355,12 +356,12 @@ MCP tools — they're library types.
   the SDK and a compatibility surface to keep honest against real D1
   quirks.
 - Diagnostic format is locked early (ADR-0008); any field-shape
-  change forces a doc revise and a code change across all four
-  prefixes.
+  change forces a doc revise and a code change across all loops.
 - The error catalog (one named code per failure mode, per loop) must
   stay synchronized with the validator/harness/runtime
-  implementations. A regression where `V_*` and `B_*` emit different
-  codes for the same underlying issue would defeat the point.
+  implementations. A regression where the validator and the boot
+  loop emit different codes for the same underlying issue would
+  defeat the point.
 - Two surfaces means two surfaces. Documentation, releases,
   versioning, and contracts apply to both. Mitigated by the fact
   that the two surfaces have little overlap by design — most features
@@ -389,7 +390,7 @@ MCP tools — they're library types.
   refs, dangling Trigger targets, schema drift). Cosmetic / advisory
   checks are warnings via `--strict` flag, not errors.
 - **AI authors over-trust the contract**: "the SDK said it was fine
-  therefore it is fine." Loop 4 (runtime) still exists for reasons
+  therefore it is fine." Loop 3 (runtime) still exists for reasons
   the contract cannot prevent. Mitigation: docs make clear that
   runtime errors are still possible and that the contract reduces —
   not eliminates — surface area.
@@ -472,8 +473,8 @@ When proposing a new SDK feature or behavior, declare:
      CLI/skills, operator never sees it). Real "both" cases should
      be vanishingly rare.
 
-2. **Which loop owns the failure mode?** (`V_*` static, `T_*` test,
-   `B_*` boot, `R_*` runtime)
+2. **Which loop owns the failure mode?** (Loop 1 static, Loop 2
+   boot, Loop 3 runtime)
 
 3. **Could it move left?** (e.g. a runtime check that could be a
    boot check, a boot check that could be a static check)
@@ -481,7 +482,7 @@ When proposing a new SDK feature or behavior, declare:
 4. **Does it emit the structured diagnostic shape?** (ADR-0008)
 
 5. **Can a consumer reproduce the failure offline?** (i.e. is it
-   visible to Loops 1–3, not only Loop 4)
+   visible to Loop 1 or to the test harness, not only Loop 3)
 
 6. **Does the feature mutate the consumer's repo?** → CLI (or SDK
    API the CLI uses). Never MCP — the operator agent is not in the

@@ -6,7 +6,7 @@
 
 **Deciders**: phsu
 
-**Related**: ADR-0001 (the Schema atom this extends), ADR-0004 (the storage layer the column drop affects), ADR-0005 (the discipline window this lands in)
+**Related**: [ADR-0001](0001-four-atom-manifest-model.md) (the Schema atom this extends; §"Future grammar discipline" covers the v0.1-vs-DRAFT window this lands in).
 
 ---
 
@@ -148,9 +148,8 @@ lets the manifest, the CmsConfig, and the D1 row drift apart safely
     other value is rejected to catch typos like `locaIe: en`).
 - Indexed via virtual generated column + partial unique index on
   `json_extract(data, '$.locale')`, scoped to the Schema's
-  `collection`. Same pattern as `Schema.spec.unique` (ADR-0004).
-  Created only for localized Schemas; non-localized Schemas have no
-  locale index.
+  `collection`. Same pattern as `Schema.spec.unique`. Created only
+  for localized Schemas; non-localized Schemas have no locale index.
 
 The boot/runtime split is the load-bearing change carried over from
 the POC's issue #60 fix (POC PR #71, plus the canonicalize follow-up

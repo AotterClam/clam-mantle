@@ -6,7 +6,7 @@
 
 **Deciders**: phsu
 
-**Related**: ADR-0007 (the AI-as-primary-author contract this diagnostic format serves), ADR-0009 (zod runtime — when ported).
+**Related**: [ADR-0007](0007-ai-as-primary-author.md) (the AI-as-primary-author contract this diagnostic format serves); the zod runtime is described in [`docs/design-atoms.md`](../design-atoms.md) § "Manifest validation — JSON Schema in, zod at runtime".
 
 ---
 
@@ -100,19 +100,18 @@ phase — e.g. `FIXTURE_SCHEMA_VIOLATION` only fires in
 
 ### Why no prefixes
 
-Earlier drafts of this ADR proposed `V_/T_/B_/R_*` prefixes per
-loop. That was retired because:
+Earlier drafts of this ADR proposed per-loop prefixes on the
+code string. That was retired because:
 
 - **It bakes provenance into the symbol** when a structured
   field already carries it cleaner. `phase` is the right place;
   prefix in the code string is redundant.
 - **It forces three different codes for the same root cause**
-  (`V_HANDLER_REF_NOT_REGISTERED_IN_SOURCE`,
-  `B_HANDLER_REF_NOT_REGISTERED`, `R_HANDLER_NOT_REGISTERED`),
-  fragmenting consumer error handling. A consumer that wants
-  "treat any 'handler not registered' issue uniformly" had to
-  parse the prefix off the symbol — defeating the parseability
-  argument that justified structure in the first place.
+  (one per loop), fragmenting consumer error handling. A
+  consumer that wants "treat any 'handler not registered' issue
+  uniformly" had to parse the prefix off the symbol — defeating
+  the parseability argument that justified structure in the
+  first place.
 - **It's not a standard convention** — closest cousins are
   PHP's `E_*` legacy constants and PostgreSQL SQLSTATE class
   prefixes; both are artefacts of language eras when structured
@@ -220,7 +219,7 @@ admin SPA and CF Workers could share a CSP-safe path with no
 from day 1 — manifest authoring stays JSON Schema, but the
 runtime validator a manifest author's request body hits is a
 zod schema, produced by the JSON-Schema → zod converter in
-`@aotterclam/clam-cms-spec` (see ADR-0009 when ported).
+`@aotterclam/clam-cms-spec` (see [`docs/design-atoms.md`](../design-atoms.md) § "Manifest validation — JSON Schema in, zod at runtime").
 
 Concretely, the translation now consumes `ZodError.issues`:
 
