@@ -4,6 +4,17 @@ MCP-native headless CMS for Cloudflare Workers. Declarative manifest, AI-first a
 
 > **v0.1.0 in development.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/AotterClam/clam-cms/issues/1).
 
+## Part of CLAM
+
+**CLAM** (**C**onfig **L**anguage for **A**pps & **M**odeling) is Aotter's family of agent-native config languages. Two halves, one thesis:
+
+- **Apps (OLTP)** — `clam-cms` (this repo) and future apps. Build a content-driven web service by declaring atoms in YAML; the runtime ships dispatcher + auth + render + MCP for free.
+- **Modeling (OLAP)** — [`aotter-clam`](https://github.com/aotter/aotter-clam) (sibling project). Turn enterprise Excel/CSV files into Kimball-modeled DuckLake warehouses by declaring star-schema configs in YAML.
+
+The shared spirit: **agents write config, runtime carries the complexity**. Hard problems — schema validation, cache invalidation, OAuth, locale canonicalization, JSON Schema → zod conversion, transactional state — live in the runtime, where they're written once by people who understand them. The authoring surface is YAML the agent fills in, where mistakes are caught by structured diagnostics before they become production failures. Non-coders get AI leverage safely; the runtime is the load-bearing part.
+
+This repo is the OLTP side of that thesis applied to web content.
+
 ## For AI agents
 
 You're an agent helping a (likely non-technical) user install or extend a clam-cms project.
