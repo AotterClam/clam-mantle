@@ -45,12 +45,13 @@ pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filte
 # Then in starters/blog/:
 cd starters/blog
 
-# Seed the local D1 with site_config + 3 posts × 2 locales:
-pnpm seed > .seed.sql
-wrangler d1 execute mantle-blog-local --local --file=.seed.sql
-
 # Run wrangler dev (http://localhost:8787):
 pnpm dev
+
+# In another shell, apply the test fixture (writes site_config +
+# 3 posts × 2 locales to D1, plus pre-rendered HTML to KV so the
+# public read path works without an admin publish flow):
+pnpm fixture
 ```
 
 ## Smoke test (curl)
@@ -72,10 +73,11 @@ curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
   -d '{"name":"Alice","email":"a@example.com","message":"Hi","recaptchaToken":"tok-pass"}'
 
-# Contact form CAPTCHA fail path (the stub rejects token === "fail"):
+# Contact form CAPTCHA fail path (the stub rejects token === "fail").
+# Expect HTTP 403 with `{ ok: false, diagnostic: { code: AUTH_DENIED, ... } }`:
 curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
-  -d '{"name":"Bot","email":"b@x","message":"spam","recaptchaToken":"fail"}'
+  -d '{"name":"Bot","email":"b@example.com","message":"spam","recaptchaToken":"fail"}'
 
 # MCP /mcp:
 curl -i -X POST http://localhost:8787/mcp \
@@ -84,13 +86,12 @@ curl -i -X POST http://localhost:8787/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 ```
 
-The HTML public-read path requires the publish pipeline to have run.
-For seeded data this happens at first request that needs the rendered
-artifact — the seed script inserts entries in `published` status, but
-the first GET to a post URL may return 404 until you trigger a re-
-publish via admin UI (commit 5). Until then exercise via MCP
-`tools/call request_publish` or extend the seed to write entry HTML
-to KV directly.
+`pnpm fixture` renders pre-published HTML for each post-translation
++ each per-locale list and writes both to KV alongside the D1 inserts
+— the public read path serves immediately, no admin publish flow
+required. The fixture is idempotent (D1 inserts use `OR IGNORE`; KV
+puts overwrite). Re-running picks up edits to fixture text or to the
+templates.
 
 ## Files
 
@@ -99,12 +100,15 @@ manifests/        # YAML: posts + post-translations + contact (Schemas, Procedur
 src/
   index.ts        # worker entrypoint — Hono routes + KV public reader
   mantleConfig.ts   # builds CmsConfig from env
-  loadManifests.ts# parses YAML at module-load (Wrangler bundles via ?raw)
+  loadManifests.ts# parses YAML at module-load (Wrangler [[rules]] type=Text)
   handlers/       # ref handlers (CAPTCHA stub, Slack stub)
   templates/      # hono/jsx HTML for entry + list + binding
-seed/seed.ts      # idempotent dev seed (site_config + posts + translations)
+test/fixture/
+  data.ts         # fixture posts + translations + site config
+  apply.ts        # renders templates, emits .fixture.sql + .fixture.kv.json,
+                  # runs `wrangler d1 execute` + `wrangler kv bulk put`
 wrangler.toml     # local D1 + KV bindings; MANTLE_ALLOW_STUB_OAUTH=1
-.dev.vars         # mirrors wrangler.toml vars; gitignored in real projects
+.dev.vars.example # committed; .dev.vars itself stays gitignored
 ```
 
 ## Production checklist
@@ -114,5 +118,6 @@ Before deploying THIS starter as-is:
 1. Replace `StubOAuthVerifier` with a real `@cloudflare/workers-oauth-provider` verifier and remove `MANTLE_ALLOW_STUB_OAUTH` from vars.
 2. Replace `captchaCheck` with a real Turnstile / hCaptcha siteverify call.
 3. Replace `slackNotify` with your Slack webhook (or a different sink).
-4. Replace `posts.coverUrl` images with assets you own (the seed uses Unsplash for demo).
+4. Replace `posts.coverUrl` images with assets you own (the fixture uses Unsplash for demo).
 5. Bind a real D1 database + KV namespace in `wrangler.toml` and run migrations against it (boot does this automatically on first request, but pre-creating the tables via `wrangler d1 migrations apply` is also fine).
+6. Don't ship `test/fixture/` to production — it's demo content for local dev.

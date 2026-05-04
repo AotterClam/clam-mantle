@@ -2,6 +2,8 @@ import { TemplateRegistry } from "@aotter/mantle-runtime";
 import { postTemplate } from "./post.js";
 import { postListTemplate } from "./postList.js";
 
+export { postTemplate, postListTemplate };
+
 /**
  * Bind templates to their target collections. The render pipeline
  * looks them up by `Schema.metadata.name`; collections without a

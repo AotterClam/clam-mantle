@@ -4,6 +4,8 @@ dist-*/
 *.tsbuildinfo
 .wrangler/
 .dev.vars
+.fixture.sql
+.fixture.kv.json
 .env
 .env.local
 *.log
