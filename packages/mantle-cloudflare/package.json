@@ -17,21 +17,25 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./runtime": {
-      "types": "./dist/runtime/index.d.ts",
-      "import": "./dist/runtime/index.js"
     }
   },
   "files": ["dist", "README.md"],
   "scripts": {
-    "build": "echo 'TODO: implement in commit 6'",
-    "typecheck": "echo 'TODO: implement in commit 6'",
-    "test": "echo 'TODO: implement in commit 6'"
+    "prebuild": "rm -rf dist .tsbuildinfo",
+    "build": "tsc -b tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aotter/mantle-spec": "workspace:*",
     "@aotter/mantle-runtime": "workspace:*",
-    "@aotter/mantle-admin-ui": "workspace:*"
+    "hono": "^4.6.20"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^20",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.5",
+    "wrangler": "^3.103.2"
   }
 }

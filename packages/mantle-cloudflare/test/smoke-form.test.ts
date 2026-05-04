@@ -1,0 +1,228 @@
+import { Hono } from "hono";
+import { describe, expect, it } from "vitest";
+import type { Manifest } from "@aotter/mantle-spec";
+import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
+import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
+import { mountMcp } from "../src/mount/mountMcp.js";
+import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
+import {
+  InMemoryKv,
+  StubAssetServer,
+  StubOAuthVerifier,
+  StubSessionRepository,
+} from "./fakes/runtime-bindings.js";
+
+/**
+ * End-to-end form submission flow: HTTP Trigger → builtin Procedure
+ * (op: create) → projection + x-mantle-bind stamping → entry-writer
+ * chokepoint → before_create CAPTCHA hook → write → after_create
+ * Slack hook. Validates the full lifecycle + builtin arc end-to-end
+ * through the Cloudflare adapter mount layer.
+ */
+function manifests(): Manifest[] {
+  const apiVersion = "cms.mantle.aotter.net/v1" as const;
+  return [
+    {
+      apiVersion,
+      kind: "Schema",
+      metadata: { name: "contact-messages" },
+      spec: {
+        title: "Contact Messages",
+        schema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            message: { type: "string" },
+            createdAt: { type: "number", "x-mantle-bind": "now" },
+          },
+          required: ["name", "message"],
+        },
+        lifecycle: "simple",
+      },
+    },
+    {
+      apiVersion,
+      kind: "Procedure",
+      metadata: { name: "submit-contact" },
+      spec: {
+        input: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            message: { type: "string" },
+            recaptchaToken: { type: "string" },
+          },
+          required: ["name", "message", "recaptchaToken"],
+        },
+        output: { type: "object" },
+        handler: { kind: "builtin", op: "create", schema: "contact-messages" },
+      },
+    },
+    {
+      apiVersion,
+      kind: "Procedure",
+      metadata: { name: "captcha-check" },
+      spec: {
+        input: {
+          type: "object",
+          properties: { recaptchaToken: { type: "string" } },
+        },
+        output: { type: "object" },
+        handler: { kind: "ref", ref: "captchaCheck" },
+      },
+    },
+    {
+      apiVersion,
+      kind: "Procedure",
+      metadata: { name: "slack-notify" },
+      spec: {
+        input: {
+          type: "object",
+          properties: { name: { type: "string" }, message: { type: "string" } },
+        },
+        output: { type: "object" },
+        handler: { kind: "ref", ref: "slackNotify" },
+      },
+    },
+    {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "submit-contact-http" },
+      spec: {
+        source: { kind: "http", method: "POST", path: "/api/contact" },
+        target: { procedure: "submit-contact" },
+      },
+    },
+    {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "010-captcha-guard" },
+      spec: {
+        source: {
+          kind: "lifecycle",
+          schema: "contact-messages",
+          on: ["before_create"],
+          errorPolicy: "abort",
+        },
+        target: { procedure: "captcha-check" },
+      },
+    },
+    {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "020-slack-notify" },
+      spec: {
+        source: {
+          kind: "lifecycle",
+          schema: "contact-messages",
+          on: ["after_create"],
+        },
+        target: { procedure: "slack-notify" },
+      },
+    },
+  ];
+}
+
+interface Harness {
+  app: Hono;
+  db: InMemoryDatabase;
+  captchaCalls: Array<unknown>;
+  slackCalls: Array<unknown>;
+}
+
+function harness(opts: { captchaPasses: boolean }): Harness {
+  const db = new InMemoryDatabase();
+  const captchaCalls: Array<unknown> = [];
+  const slackCalls: Array<unknown> = [];
+  const ref = createCmsRef({
+    manifests: manifests(),
+    handlers: {
+      captchaCheck: (input) => {
+        captchaCalls.push(input);
+        if (!opts.captchaPasses) throw new Error("captcha failed");
+        return { ok: true };
+      },
+      slackNotify: (input) => {
+        slackCalls.push(input);
+        return { ok: true };
+      },
+    },
+    bindings: {
+      db,
+      kv: new InMemoryKv(),
+      sessions: new StubSessionRepository(),
+      assets: new StubAssetServer(),
+      oauth: new StubOAuthVerifier(),
+    },
+  });
+  const app = new Hono();
+  mountServerEndpoints(app, ref, manifests());
+  mountMcp(app, ref);
+  return { app, db, captchaCalls, slackCalls };
+}
+
+describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
+  it("happy path: CAPTCHA passes, row written, Slack fires", async () => {
+    const h = harness({ captchaPasses: true });
+    const res = await h.app.request("/api/contact", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Alice",
+        message: "Hi there",
+        recaptchaToken: "tok-pass",
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(h.captchaCalls).toHaveLength(1);
+    expect(h.slackCalls).toHaveLength(1);
+    expect((h.captchaCalls[0] as { recaptchaToken: string }).recaptchaToken).toBe("tok-pass");
+    expect(h.db.entries.size).toBe(1);
+    const entry = [...h.db.entries.values()][0]!;
+    expect(entry.collection).toBe("contact-messages");
+    expect(entry.status).toBe("draft");
+    const data = JSON.parse(entry.data) as Record<string, unknown>;
+    expect(data["name"]).toBe("Alice");
+    expect(data["message"]).toBe("Hi there");
+    expect(data["createdAt"]).toEqual(expect.any(Number));
+    expect("recaptchaToken" in data).toBe(false);
+  });
+
+  it("CAPTCHA fails: row not written, Slack does NOT fire", async () => {
+    const h = harness({ captchaPasses: false });
+    const res = await h.app.request("/api/contact", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Bob",
+        message: "spam",
+        recaptchaToken: "tok-fail",
+      }),
+    });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(h.captchaCalls).toHaveLength(1);
+    expect(h.slackCalls).toHaveLength(0);
+    expect(h.db.entries.size).toBe(0);
+  });
+
+  it("MCP /mcp without bearer returns 401", async () => {
+    const h = harness({ captchaPasses: true });
+    const res = await h.app.request("/mcp", { method: "POST" });
+    expect(res.status).toBe(401);
+  });
+
+  it("MCP /mcp with dev bearer accepts initialize", async () => {
+    const h = harness({ captchaPasses: true });
+    const res = await h.app.request("/mcp", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer dev-u-1",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { result: { serverInfo: { name: string } } };
+    expect(body.result.serverInfo.name).toContain("mantle");
+  });
+});
