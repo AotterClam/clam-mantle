@@ -36,7 +36,7 @@ POC had 16 ADRs. The rebuild ports 6, writes 1 fresh, and folds / drops the rest
 - **POC ADR-0011** lifecycle binary opt-in → distilled to a §"Lifecycle" subsection in `docs/design-atoms.md`. v0.1.0 ships `simple` only; `editorial` is a v0.1.x feature.
 - **POC ADR-0012** strategic posture vs adjacent CMS designs → strategic / marketing material, lives in `README.md` if anywhere.
 - **POC ADR-0013** role-split surfaces (coder agent vs operator agent) → folded into ADR-0007 (Part B).
-- **POC ADR-0014** builtin handlers and lifecycle Triggers → deferred to v0.1.x (not shipping in v0.1.0). The shapes are documented in `docs/design-atoms.md` and tracked as DRAFT in ADR-0001 §"Future grammar discipline"; they land when a real consumer use case applies pressure.
+- **POC ADR-0014** builtin handlers and lifecycle Triggers → **v0.1.x committed** (full spec lives in `docs/design-atoms.md` § "Roadmap → v0.1.x committed"). v0.1.0 boot validator rejects them with a code naming the feature (e.g. `LIFECYCLE_NOT_IN_V010`); v0.1.x patch release accepts them without manifest changes. They are NOT in the speculative DRAFT tier.
 - **POC ADR-0015** cms-astro internal seam discipline → POC-specific to a package that no longer exists; replaced by ADR-0011 (adapter port spec).
 - **POC ADR-0029** drop Astro from cms-cloudflare → POC-specific historical record; the rebuild starts post-Astro.
 
