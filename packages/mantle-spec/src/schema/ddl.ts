@@ -1,4 +1,4 @@
-import type { SchemaManifest } from "../manifests/types.js";
+import type { SchemaManifest } from "../manifests/grammar.js";
 
 /**
  * DDL fragments derived from a Schema manifest's `uniqueIndexes`. Pure

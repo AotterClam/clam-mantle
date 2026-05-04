@@ -4,7 +4,7 @@ import {
   runtimeDiagnostic,
   type Diagnostic,
 } from "../diagnostic.js";
-import type { SchemaManifest } from "../manifests/types.js";
+import type { SchemaManifest } from "../manifests/grammar.js";
 
 /**
  * Per-collection entry-data validator.

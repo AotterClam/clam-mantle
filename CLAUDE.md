@@ -46,6 +46,30 @@ This is the lens for every architectural decision in this codebase.
 - **Cloudflare-only for v0.1.0.** The Netlify package is a README. PG-via-Hyperdrive, Bun, Deno — all v0.2+.
 - **`@aotter/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
 - **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/json-schema-zod.ts`.
+- **`packages/mantle-spec/src/` layout is topical-by-atom, not layered.**
+  - A new file lives in `src/<X>/` where `<X>` is the manifest atom or
+    runtime concept it OPERATES ON (`manifests/`, `schema/`, `entry/`,
+    `site/`, `cli/`).
+  - Cross-cutting vocabulary — types or helpers consumed by ≥3
+    siblings, today `diagnostic`, `locale`, `json-schema-zod` — sits at
+    `src/` root.
+  - No `domain/` / `application/` / `infrastructure/` layers; folders
+    mirror the v0.1 grammar's closed noun set.
+  - Every folder has ≥2 implementation files; one barrel `index.ts`
+    per folder; contract files named topically (`grammar.ts`) not
+    generically (`types.ts`).
+  - `cli/` may import any concept folder; concept folders MUST NOT
+    import from `cli/`.
+  - Adding a new top-level folder OR a new root-level file requires an
+    ADR-lite paragraph in the PR description.
+- **`mantle-spec` vs `mantle-runtime` boundary** (per the same ADR-pending invariant):
+  - Spec owns: types any spec function takes / returns / validates
+    (manifests, `Entry`, `Approval`, `SiteConfig`, closed enums incl.
+    `StaffRole`, `Diagnostic`).
+  - Runtime owns: rows / runtime facts only the dispatcher fills
+    (`User`, `Staff`, `StaffMembership`, `HandlerContext`, `HandlerFn`).
+  - Test: does any spec function reference this type? If yes → spec.
+    If only runtime ports / dispatcher do → runtime.
 - **PR base branch is `main`.**
 
 ## Build / test / typecheck

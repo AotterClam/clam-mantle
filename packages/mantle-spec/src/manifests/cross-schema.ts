@@ -1,4 +1,4 @@
-import type { SchemaManifest } from "./types.js";
+import type { SchemaManifest } from "./grammar.js";
 import { bestMatch, manifestPath } from "./diagnose.js";
 import { canonicalizeLocaleList } from "../locale.js";
 import {
