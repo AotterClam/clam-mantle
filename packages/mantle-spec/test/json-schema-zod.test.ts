@@ -4,7 +4,7 @@ import {
   firstZodIssueAsJsonPointer,
   jsonSchemaToZod,
   zodPathToJsonPointer,
-} from "../src/json-schema-zod.js";
+} from "../src/domain/service/JsonSchemaToZod.js";
 
 describe("jsonSchemaToZod — object", () => {
   it("requires fields listed in `required` and makes the rest optional", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertSiteDefaultsCanonical,
   InvalidSiteDefaultsError,
-} from "../src/site/validate.js";
+} from "../src/domain/service/SiteDefaultsValidator.js";
 
 describe("assertSiteDefaultsCanonical (boot-time fail-fast)", () => {
   it("accepts canonical BCP 47 locales", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestMatch, manifestPath } from "../src/manifests/diagnose.js";
+import { bestMatch, manifestPath } from "../src/domain/service/ManifestPathDiagnoser.js";
 
 describe("manifestPath", () => {
   it("falls back to synthetic URI when no file paths map", () => {

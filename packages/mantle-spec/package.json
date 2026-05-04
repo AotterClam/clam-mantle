@@ -14,7 +14,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "mantle": "./dist/cli/index.js"
+    "mantle": "./dist/infrastructure/cli/MantleCli.js"
   },
   "exports": {
     ".": {

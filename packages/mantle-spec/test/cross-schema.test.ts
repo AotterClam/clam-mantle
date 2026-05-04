@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { checkLocaleAndTranslates } from "../src/manifests/cross-schema.js";
-import type { SchemaManifest } from "../src/manifests/grammar.js";
+import { checkLocaleAndTranslates } from "../src/domain/service/CrossSchemaChecker.js";
+import type { SchemaManifest } from "../src/domain/model/ManifestGrammar.js";
 
 // Cross-Schema validation from ADR-0010. Runs in the validate phase
 // (CLI, optional siteLocales) and the boot phase (Worker, always with

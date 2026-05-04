@@ -45,42 +45,55 @@ This is the lens for every architectural decision in this codebase.
 - **Closed enums for `x-mantle-bind` and `ctx.*` predicates** — see (incoming) ADR-0002. New entries go through grammar-revise, not ad-hoc.
 - **Cloudflare-only for v0.1.0.** The Netlify package is a README. PG-via-Hyperdrive, Bun, Deno — all v0.2+.
 - **`@aotter/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
-- **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/json-schema-zod.ts`.
-- **`packages/mantle-spec/src/` layout is topical-by-atom, not layered.**
-  - A new file lives in `src/<X>/` where `<X>` is the manifest atom or
-    runtime concept it OPERATES ON (`manifests/`, `schema/`, `entry/`,
-    `site/`, `cli/`).
-  - Cross-cutting primitives sit at `src/` root. Today these are
-    `diagnostic.ts` (consumed by 5 siblings — manifests, schema, cli,
-    site, entry/state-machine), `locale.ts` (consumed by manifests +
-    site today; entry-time locale validation lands in commit 4 →
-    third), and `json-schema-zod.ts` (Workers-CSP-safe runtime
-    validator — used today only by `schema/validator.ts` but is the
-    documented entry point for Procedure I/O validation in
-    `mantle-runtime`; held at root because it's a v0.1 capability
-    boundary, not a Schema-internal helper). New root-level files
-    need to either pass the ≥3-sibling test today OR be a documented
-    capability boundary anchored by an ADR-lite paragraph.
-  - No `domain/` / `application/` / `infrastructure/` layers; folders
-    mirror the v0.1 grammar's closed noun set.
-  - Every folder has ≥2 implementation files (a single types-only
-    file like `entry/types.ts` or `site/types.ts` paired with one
-    impl satisfies this); one barrel `index.ts` per folder; closed-
-    grammar contract files named topically (`grammar.ts`) — the
-    `types.ts` name is acceptable for pure type-bucket files that
-    aren't a single named contract.
-  - `cli/` may import any concept folder; concept folders MUST NOT
-    import from `cli/`.
-  - Adding a new top-level folder OR a new root-level file requires an
-    ADR-lite paragraph in the PR description.
-- **`mantle-spec` vs `mantle-runtime` boundary** (per the same ADR-pending invariant):
-  - Spec owns: types any spec function takes / returns / validates
-    (manifests, `Entry`, `Approval`, `SiteConfig`, closed enums incl.
-    `StaffRole`, `Diagnostic`).
-  - Runtime owns: rows / runtime facts only the dispatcher fills
-    (`User`, `Staff`, `StaffMembership`, `HandlerContext`, `HandlerFn`).
-  - Test: does any spec function reference this type? If yes → spec.
-    If only runtime ports / dispatcher do → runtime.
+- **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/domain/service/JsonSchemaToZod.ts`.
+
+### Clean-architecture layout (mirrors `aotter-mantle/mantle/core`)
+
+Both `mantle-spec` and `mantle-runtime` follow the Aotter clean-architecture convention:
+
+```
+kernel ← domain (model + port + service) ← usecase ← infrastructure
+```
+
+**Hard rules — enforce on every PR:**
+
+1. `domain/` MUST NOT import from `usecase/`, `infrastructure/`, or the assembly root (`runtime.ts`).
+2. `usecase/` MUST NOT import from `infrastructure/`.
+3. `kernel/` MUST NOT import from anything except external libs (zod) and other kernel files.
+4. `domain/port/` is the ONLY place port interfaces live — never inside a use case file. The package's port surface is fully discoverable by listing `domain/port/`.
+5. Use case classes accept request DTOs (`usecase/dto/`); never loose primitives. Each use case has a constructor with explicit port + clock + idgen injection.
+6. `infrastructure/` adapters (HTTP / MCP / persistence / render orchestrator) are thin: no business logic, no validation, no transformation — just envelope handling + delegation to a use case.
+7. The assembly root (`runtime.ts` for runtime, `index.ts` for spec) is the ONLY place concrete adapters wire to use cases via ports.
+
+**Naming convention** (no `*Port` suffix on ports — Aotter rmn-r / trek-dmp / mantle-core convention):
+
+- `*Repository` for data access (CRUD): `EntryRepository`, `SessionRepository`
+- `*Driver` for raw drivers under repositories: `DatabaseDriver`
+- `*Cache` for read-mostly stores: `KvCache`
+- `*Server` for transport-shaped surfaces: `AssetServer`
+- `*Verifier`, `*Reader`, `*Generator`, `*Resolver`, `*Assembler`, `*Orchestrator`, `*Dispatcher`, `*Compiler`, `*Serializer` for narrowly-shaped roles
+- `*UseCase` for application services: `CreateDraftUseCase`, `InvokeProcedureUseCase`
+- `*Request` / `*Response` suffix for use-case DTOs
+- DTOs use enums (e.g. `ContentState`), not strings
+
+**Structural rules:**
+
+- One barrel `index.ts` per folder.
+- Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
+- The 5 ADR-0011 ports — `DatabaseDriver`, `KvCache`, `SessionRepository`, `AssetServer`, `OAuthVerifier` — live in `mantle-runtime/src/domain/port/`. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`mantle-cloudflare`, future `mantle-netlify`).
+
+### Spec/runtime type boundary (separate from layer rules)
+
+- Spec owns: types any spec function takes / returns / validates
+  (manifests, `Entry`, `Revision`, `Approval`, `SiteConfig`, closed enums incl.
+  `StaffRole`, `Diagnostic`).
+- Runtime owns: rows / runtime facts only the dispatcher fills
+  (`EntryRow`, `User`, `Staff`, `StaffMembership`, `HandlerContext`, `HandlerFn`).
+- Test: does any spec function reference this type? If yes → spec. If only
+  runtime ports / use cases / dispatcher do → runtime.
+
+### PR conventions
+
 - **PR base branch is `main`.**
 
 ## Build / test / typecheck

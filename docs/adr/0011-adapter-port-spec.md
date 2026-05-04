@@ -97,14 +97,12 @@ The admin SPA itself lives in `@aotter/mantle-admin-ui` as a pre-built `dist/`. 
 
 ```ts
 export interface OAuthPort {
-  /** Mount the OAuth provider's HTTP routes onto the adapter's HTTP framework.
-   *  The runtime calls this once at adapter setup; the OAuthPort owns
-   *  /oauth/token, /oauth/register, /.well-known/oauth-*, and the consent UI. */
-  mount(framework: AdapterFrameworkContext): void;
   /** Verify an MCP request's bearer token against the provider's state. */
   verifyAccessToken(req: Request): Promise<OAuthIdentity | null>;
 }
 ```
+
+> **Refinement (commit 4):** an earlier draft of this ADR also declared `mount(framework: AdapterFrameworkContext): void` on the port. The runtime never had a use for `AdapterFrameworkContext` — mounting `/oauth/token`, `/oauth/register`, `/.well-known/oauth-*`, and the consent UI is the adapter's HTTP-framework job (the CF adapter binds `@cloudflare/workers-oauth-provider` directly to its Hono app), and surfacing the framework type through the runtime would have leaked HTTP-shape into a port that exists for the verify boundary. Dropped. Adapters are responsible for mounting their OAuth surface; the port covers only the verify path the runtime actually invokes.
 
 CF adapter: `@cloudflare/workers-oauth-provider` (DCR-compliant, KV-backed). Future: standalone oauth2 lib, Hydra, Auth0, etc.
 
