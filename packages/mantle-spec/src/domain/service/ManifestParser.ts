@@ -66,8 +66,7 @@ const KNOWN_KINDS: ReadonlySet<ManifestKind> = new Set([
   "Trigger",
 ]);
 
-const V01_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set(["http"]);
-const V01X_RESERVED_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set(["lifecycle"]);
+const V01_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set(["http", "lifecycle"]);
 const DRAFT_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set([
   "mcp",
   "cron",
@@ -81,8 +80,7 @@ const V01_HTTP_METHODS: ReadonlySet<HttpMethod> = new Set([
   "DELETE",
 ]);
 
-const V01_HANDLER_KINDS: ReadonlySet<string> = new Set(["ref"]);
-const V01X_RESERVED_HANDLER_KINDS: ReadonlySet<string> = new Set(["builtin"]);
+const V01_HANDLER_KINDS: ReadonlySet<string> = new Set(["ref", "builtin"]);
 const V01_BUILTIN_OPS: ReadonlySet<BuiltinOp> = new Set(BUILTIN_OPS);
 const V01_LIFECYCLE_HOOKS: ReadonlySet<LifecycleHook> = new Set(LIFECYCLE_HOOKS);
 const V01_HOOK_ERROR_POLICIES: ReadonlySet<string> = new Set(["abort", "continue"]);
@@ -395,17 +393,9 @@ function validateHandlerBinding(h: Record<string, unknown>, idx: number): void {
   const kind = h["kind"];
   if (typeof kind !== "string") {
     throw new ManifestParseError(
-      "Procedure.spec.handler.kind is required (v0.1.0: 'ref')",
+      `Procedure.spec.handler.kind is required (one of ${[...V01_HANDLER_KINDS].join(", ")})`,
       idx,
       "/spec/handler/kind",
-    );
-  }
-  if (V01X_RESERVED_HANDLER_KINDS.has(kind)) {
-    throw new ManifestParseError(
-      `Procedure.spec.handler.kind: '${kind}' is reserved for v0.1.x but not yet implemented (see ADR-0001 § "What's DRAFT" / Procedure). Use kind: 'ref' in v0.1.0.`,
-      idx,
-      "/spec/handler/kind",
-      "HANDLER_BUILTIN_NOT_IN_V010",
     );
   }
   if (!V01_HANDLER_KINDS.has(kind)) {
@@ -425,9 +415,6 @@ function validateHandlerBinding(h: Record<string, unknown>, idx: number): void {
     }
     return;
   }
-  // Defensive: kind === "builtin" structural checks (currently unreachable
-  // since reserved-kind branch rejects above; preserved so the v0.1.x
-  // promotion is a one-line removal).
   const op = h["op"];
   if (typeof op !== "string" || !V01_BUILTIN_OPS.has(op as BuiltinOp)) {
     throw new ManifestParseError(
@@ -611,14 +598,10 @@ function validateTriggerSpec(m: TriggerManifest, idx: number): TriggerManifest {
   }
   const sourceKind = source["kind"];
   if (typeof sourceKind !== "string") {
-    throw new ManifestParseError("Trigger.spec.source.kind is required (v0.1.0: 'http')", idx, "/spec/source/kind");
-  }
-  if (V01X_RESERVED_TRIGGER_SOURCE_KINDS.has(sourceKind)) {
     throw new ManifestParseError(
-      `Trigger.spec.source.kind: '${sourceKind}' is reserved for v0.1.x but not yet implemented (see ADR-0001 § "What's DRAFT" / Trigger). v0.1.0 supports 'http' only.`,
+      `Trigger.spec.source.kind is required (one of ${[...V01_TRIGGER_SOURCE_KINDS].join(", ")})`,
       idx,
       "/spec/source/kind",
-      "LIFECYCLE_NOT_IN_V010",
     );
   }
   if (DRAFT_TRIGGER_SOURCE_KINDS.has(sourceKind)) {
@@ -631,7 +614,7 @@ function validateTriggerSpec(m: TriggerManifest, idx: number): TriggerManifest {
   }
   if (!V01_TRIGGER_SOURCE_KINDS.has(sourceKind)) {
     throw new ManifestParseError(
-      `Trigger.spec.source.kind must be 'http' (v0.1.0); got '${sourceKind}'`,
+      `Trigger.spec.source.kind must be one of ${[...V01_TRIGGER_SOURCE_KINDS].join(", ")}; got '${sourceKind}'`,
       idx,
       "/spec/source/kind",
     );

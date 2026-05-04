@@ -151,7 +151,7 @@ describe("InvokeProcedureUseCase", () => {
     expect(result.diagnostic.code).toBe("AUTH_DENIED");
   });
 
-  it("HANDLER_BUILTIN_NOT_IN_V010 if a builtin slipped past the parser", async () => {
+  it("HANDLER_BUILTIN_NOT_IN_V010 if a builtin Procedure reaches Invoke (boot guard bypass)", async () => {
     const { uc } = fresh();
     const proc = {
       apiVersion: "cms.mantle.aotter.net/v1" as const,

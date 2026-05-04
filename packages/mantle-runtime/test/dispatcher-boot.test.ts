@@ -5,7 +5,9 @@ import {
   ValidateBootUseCase,
 } from "../src/usecase/boot/ValidateBootUseCase.js";
 import {
+  makeBuiltinProcedure,
   makeHttpTrigger,
+  makeLifecycleTrigger,
   makeProcedure,
   postsSchema,
 } from "./fakes/manifests.js";
@@ -107,5 +109,72 @@ describe("ValidateBootUseCase", () => {
     if (result.ok) return;
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).toContain("SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES");
+  });
+
+  it("emits LIFECYCLE_NOT_IN_V010 (runtime-pending) for lifecycle Triggers", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("captchaCheck", () => ({ ok: true }));
+    const result = new ValidateBootUseCase().execute({
+      manifests: [
+        postsSchema(),
+        makeProcedure({ name: "captchaCheck", handlerRef: "captchaCheck" }),
+        makeLifecycleTrigger({
+          procedure: "captchaCheck",
+          schema: "posts",
+          on: ["before_create"],
+          errorPolicy: "abort",
+        }),
+      ],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain("LIFECYCLE_NOT_IN_V010");
+  });
+
+  it("emits LIFECYCLE_SCHEMA_UNKNOWN when lifecycle Trigger watches an unknown Schema", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("captchaCheck", () => ({ ok: true }));
+    const result = new ValidateBootUseCase().execute({
+      manifests: [
+        postsSchema(),
+        makeProcedure({ name: "captchaCheck", handlerRef: "captchaCheck" }),
+        makeLifecycleTrigger({
+          procedure: "captchaCheck",
+          schema: "ghost",
+          on: ["before_create"],
+        }),
+      ],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain("LIFECYCLE_SCHEMA_UNKNOWN");
+  });
+
+  it("emits HANDLER_BUILTIN_NOT_IN_V010 (runtime-pending) for builtin Procedures", () => {
+    const reg = new InMemoryHandlerRegistry();
+    const result = new ValidateBootUseCase().execute({
+      manifests: [postsSchema(), makeBuiltinProcedure({ schema: "posts", op: "create" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain("HANDLER_BUILTIN_NOT_IN_V010");
+  });
+
+  it("emits BUILTIN_HANDLER_SCHEMA_UNKNOWN when builtin targets unknown Schema", () => {
+    const reg = new InMemoryHandlerRegistry();
+    const result = new ValidateBootUseCase().execute({
+      manifests: [postsSchema(), makeBuiltinProcedure({ schema: "ghost", op: "create" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain("BUILTIN_HANDLER_SCHEMA_UNKNOWN");
   });
 });

@@ -119,6 +119,13 @@ Several v0.1.x features ship as **interface defined, impl stubbed** in v0.1.0:
 
 The "stub" pattern lets consumers compile against the real interface. Replacing the stub with a real impl in v0.1.x doesn't break consumer code.
 
+### Grammar promoted, runtime pending (commit 4.1)
+
+Two v0.1.x-committed grammar items were promoted into v0.1.0 in commit 4.1; the runtime ships in the next two commits. Until then, the boot validator emits the feature-named code so authors get a clear "not yet" instead of silent failure:
+
+- `Trigger.source.kind: lifecycle` — parser accepts; `LIFECYCLE_NOT_IN_V010` at boot until commit 4.2 wires the `LifecycleHookingEntryRepository` decorator.
+- `Procedure.handler.kind: builtin` — parser accepts; `HANDLER_BUILTIN_NOT_IN_V010` at boot until commit 4.3 wires `InvokeBuiltinUseCase`.
+
 ## Failure modes to avoid (encoded in the ADRs)
 
 - **Adapter coupling creep.** A PR adds a "small convenience" import of `D1Database` in `mantle-runtime`. Reject. The whole point of the 5-port boundary is that runtime stays portable.

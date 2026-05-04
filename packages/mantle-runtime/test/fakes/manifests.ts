@@ -103,3 +103,59 @@ export function makeHttpTrigger(opts: {
     },
   };
 }
+
+export function makeLifecycleTrigger(opts: {
+  readonly name?: string;
+  readonly procedure: string;
+  readonly schema?: string;
+  readonly on?: ReadonlyArray<
+    | "before_create"
+    | "after_create"
+    | "before_update"
+    | "after_update"
+    | "before_delete"
+    | "after_delete"
+    | "before_publish"
+    | "after_publish"
+  >;
+  readonly errorPolicy?: "abort" | "continue";
+}): TriggerManifest {
+  return {
+    apiVersion: "cms.mantle.aotter.net/v1",
+    kind: "Trigger",
+    metadata: { name: opts.name ?? `${opts.procedure}-${(opts.on?.[0] ?? "lifecycle")}-trigger` },
+    spec: {
+      source: {
+        kind: "lifecycle",
+        schema: opts.schema ?? "posts",
+        on: opts.on ?? ["before_create"],
+        ...(opts.errorPolicy ? { errorPolicy: opts.errorPolicy } : {}),
+      },
+      target: { procedure: opts.procedure },
+    },
+  };
+}
+
+export function makeBuiltinProcedure(opts: {
+  readonly name?: string;
+  readonly schema?: string;
+  readonly op?: "create" | "update" | "upsert" | "delete";
+}): ProcedureManifest {
+  return {
+    apiVersion: "cms.mantle.aotter.net/v1",
+    kind: "Procedure",
+    metadata: { name: opts.name ?? "create-post" },
+    spec: {
+      input: {
+        type: "object",
+        properties: { data: { type: "object" } },
+      },
+      output: { type: "object" },
+      handler: {
+        kind: "builtin",
+        op: opts.op ?? "create",
+        schema: opts.schema ?? "posts",
+      },
+    },
+  };
+}

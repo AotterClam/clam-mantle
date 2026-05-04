@@ -25,11 +25,16 @@ import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
  *
  * v0.1.0 invariants:
  *   - Every `Procedure.handler.ref` is in the supplied registry.
- *     (handler.kind: builtin is parser-rejected with
- *     `HANDLER_BUILTIN_NOT_IN_V010` so we don't re-check it here.)
+ *   - Every `Procedure.handler.builtin.schema` resolves to a declared
+ *     Schema. Until commit 4.3 wires the builtin op execution path,
+ *     boot rejects builtin Procedures with `HANDLER_BUILTIN_NOT_IN_V010`
+ *     (the parser accepts the grammar; the runtime just isn't ready).
  *   - Every `Trigger.target.procedure` resolves to a manifest.
  *   - Every `http` Trigger has a unique `(method, path)` pair and a
  *     `/api/` prefix.
+ *   - Until commit 4.2 wires the LifecycleHookingEntryRepository
+ *     decorator, boot rejects `Trigger.source.kind: lifecycle` with
+ *     `LIFECYCLE_NOT_IN_V010` (parser accepts; runtime not ready).
  *   - Locale + translates cross-Schema invariants (ADR-0010) hold.
  */
 export type ValidateBootResponse =
@@ -59,7 +64,7 @@ export class ValidateBootUseCase {
     const schemaCandidates = [...schemasByName.keys()];
     const handlerCandidates = request.registry.list();
 
-    // 1. Procedure handler refs.
+    // 1. Procedure handler refs + builtin schema cross-resolution.
     for (const p of partitioned.procedures) {
       const h = p.spec.handler;
       if (h.kind === "ref" && !request.registry.has(h.ref)) {
@@ -75,7 +80,35 @@ export class ValidateBootUseCase {
           }),
         );
       }
-      // h.kind === "builtin" is rejected at parse with HANDLER_BUILTIN_NOT_IN_V010.
+      if (h.kind === "builtin") {
+        if (!schemasByName.has(h.schema)) {
+          diagnostics.push(
+            bootDiagnostic({
+              code: "BUILTIN_HANDLER_SCHEMA_UNKNOWN",
+              severity: "error",
+              path: `manifest:Procedure/${p.metadata.name}#/spec/handler/schema`,
+              value: h.schema,
+              expected: "name of a declared Schema",
+              candidates: schemaCandidates,
+              message: `Procedure '${p.metadata.name}' (handler.kind: builtin) targets unknown Schema '${h.schema}'.`,
+            }),
+          );
+        }
+        // Runtime-pending guard: parser accepts builtin grammar,
+        // but the dispatch path lands in commit 4.3. Until then,
+        // refuse boot so authors get a clear "not yet" instead of a
+        // silent INTERNAL_ERROR at first invocation.
+        diagnostics.push(
+          bootDiagnostic({
+            code: "HANDLER_BUILTIN_NOT_IN_V010",
+            severity: "error",
+            path: `manifest:Procedure/${p.metadata.name}#/spec/handler/kind`,
+            value: "builtin",
+            expected: "handler.kind: 'ref' until builtin op execution lands (next runtime commit)",
+            message: `Procedure '${p.metadata.name}' uses handler.kind: 'builtin'. The grammar is accepted in v0.1.0 but the builtin op execution path is not yet wired (lands next commit). Use kind: 'ref' for now, or wait for the next release.`,
+          }),
+        );
+      }
     }
 
     // 2. Trigger.target.procedure resolves.
@@ -107,6 +140,20 @@ export class ValidateBootUseCase {
             }),
           );
         }
+        // Runtime-pending guard: parser accepts lifecycle Trigger grammar,
+        // but the LifecycleHookingEntryRepository decorator lands in
+        // commit 4.2. Until then, refuse boot so authors don't ship a
+        // hook that silently never fires.
+        diagnostics.push(
+          bootDiagnostic({
+            code: "LIFECYCLE_NOT_IN_V010",
+            severity: "error",
+            path: `manifest:Trigger/${t.metadata.name}#/spec/source/kind`,
+            value: "lifecycle",
+            expected: "source.kind: 'http' until lifecycle hook execution lands (next runtime commit)",
+            message: `Trigger '${t.metadata.name}' uses source.kind: 'lifecycle'. The grammar is accepted in v0.1.0 but the entry-writer hook decorator is not yet wired (lands next commit). Use source.kind: 'http' for now, or wait for the next release.`,
+          }),
+        );
       }
     }
 

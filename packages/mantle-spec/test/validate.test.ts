@@ -153,3 +153,77 @@ spec:
     );
   });
 });
+
+describe("parseManifests() — v0.1.0 promoted grammar", () => {
+  it("accepts Procedure.handler.kind: 'builtin' with op + schema", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: createPost }
+spec:
+  input: { type: object, properties: { data: { type: object } } }
+  output: { type: object }
+  handler:
+    kind: builtin
+    op: create
+    schema: posts
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.manifests).toHaveLength(1);
+    const proc = result.manifests[0] as ProcedureManifest;
+    expect(proc.spec.handler.kind).toBe("builtin");
+  });
+
+  it("rejects builtin handler that also declares ref (mutually exclusive)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: createPost }
+spec:
+  input: { type: object }
+  output: { type: object }
+  handler:
+    kind: builtin
+    op: create
+    schema: posts
+    ref: createPost
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("INVALID_MANIFEST_ENVELOPE");
+  });
+
+  it("accepts Trigger.source.kind: 'lifecycle' with on + schema", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: postsCaptcha }
+spec:
+  source:
+    kind: lifecycle
+    schema: posts
+    on: [before_create]
+    errorPolicy: abort
+  target: { procedure: captchaCheck }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.manifests).toHaveLength(1);
+    const trig = result.manifests[0] as TriggerManifest;
+    expect(trig.spec.source.kind).toBe("lifecycle");
+  });
+
+  it("rejects errorPolicy: 'abort' on after_* hooks", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: postsNotify }
+spec:
+  source:
+    kind: lifecycle
+    schema: posts
+    on: [after_create]
+    errorPolicy: abort
+  target: { procedure: notifySlack }
+`;
+    const result = parseManifests(yaml);
+    const messages = result.diagnostics.map((d) => d.message).join("\n");
+    expect(messages).toMatch(/abort.*after_/);
+  });
+});

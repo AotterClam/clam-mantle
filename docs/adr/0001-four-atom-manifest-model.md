@@ -298,20 +298,31 @@ forces it.
 - `spec.requires.auth.all:` (closed predicate vocabulary)
 - `spec.input:` (JSON Schema 2020-12)
 - `spec.output:` (JSON Schema 2020-12)
-- `spec.handler.{kind: ref, ref: <opaque-key>}` (no `builtin`
-  in v0.1)
+- `spec.handler.{kind: ref, ref: <opaque-key>}` — author-supplied
+  handler function
+- `spec.handler.{kind: builtin, op: <create | update | upsert |
+  delete>, schema: <Schema name>}` — SDK-supplied CRUD shortcut
+  (promoted to v0.1.0; runtime ships in commit 4.3)
 
 **Trigger (v0.1)**:
-- `spec.source.kind: http` (no other sources in v0.1)
-- `spec.source.{method, path}`
+- `spec.source.kind: http` — public HTTP endpoint
+- `spec.source.{method, path}` (when `kind: http`)
+- `spec.source.kind: lifecycle` — entry-writer hook (promoted to
+  v0.1.0; runtime ships in commit 4.2)
+- `spec.source.{schema, on, errorPolicy}` (when `kind: lifecycle`)
 - `spec.target.procedure:`
 
 #### v0.1 closed enums
 
 - `x-mantle-bind: {ctx.user, ctx.staff, now}`
-- `ctx.*` predicate identity: `{user, staff}` (no `system` until
-  lifecycle Triggers ship)
-- `Trigger.source.kind: {http}` (single value)
+- `ctx.*` predicate identity: `{user, staff}` (no `system` until a
+  use case forces it)
+- `Trigger.source.kind: {http, lifecycle}`
+- `Procedure.handler.kind: {ref, builtin}`
+- `BuiltinOp: {create, update, upsert, delete}`
+- `LifecycleHook: {before_create, after_create, before_update,
+  after_update, before_delete, after_delete, before_publish,
+  after_publish}`
 
 #### What's DRAFT (do not implement, do not type)
 
@@ -323,8 +334,8 @@ forces it.
   `in`, `like`)
 - Procedure: `requires.auth.{any | all}` with disjunction;
   `owns:`, `contains:`, `withinMinutes:`, `requires.window`,
-  `requires.quota`, `handler.kind: builtin`, `errors`, `retry`
-- Trigger: `source.kind: {mcp, cron, lifecycle, queue}`,
+  `requires.quota`, `errors`, `retry`
+- Trigger: `source.kind: {mcp, cron, queue}`,
   `target.project`, `atomicity`
 - Cross-cutting: `ctx.system`, `$.*` placeholder namespace,
   `staffBypass:`
