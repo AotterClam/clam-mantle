@@ -12,6 +12,10 @@ import {
 import type { ZodType } from "zod";
 import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
+import type {
+  InvokeProcedureRequest,
+  InvokeProcedureResponse,
+} from "../dto/procedure/index.js";
 import type { InvokeBuiltinUseCase } from "./InvokeBuiltinUseCase.js";
 
 /**
@@ -35,23 +39,12 @@ import type { InvokeBuiltinUseCase } from "./InvokeBuiltinUseCase.js";
  *   4. Validate the result against the `output` schema. Fail ⇒
  *      `OUTPUT_VALIDATION_FAILED` (handler / builtin bug).
  */
-export interface InvokeProcedureRequest {
-  readonly procedure: ProcedureManifest;
-  readonly input: unknown;
-  readonly ctx: HandlerContext;
-  /** Path-locator prefix for `Diagnostic.path`. The HTTP mount passes
-   *  e.g. `POST /api/contact`; the test harness passes
-   *  `manifest:Procedure/<name>`. */
-  readonly pathPrefix?: string;
-  /** Phase to stamp on emitted diagnostics. Default: `"runtime"`. */
-  readonly phase?: Phase;
-}
-
 /**
  * Throwable carrier for handlers that want to surface a structured
  * Diagnostic without going through the generic `INTERNAL_ERROR`
  * envelope. The use case catches it and converts to an
- * `{ ok: false, diagnostic }` return.
+ * `{ ok: false, diagnostic }` return. Lives here (not in
+ * `usecase/dto/`) because it's a runtime value, not a DTO type.
  */
 export class InvokeFailure extends Error {
   constructor(public readonly diagnostic: Diagnostic) {
@@ -59,10 +52,6 @@ export class InvokeFailure extends Error {
     this.name = "InvokeFailure";
   }
 }
-
-export type InvokeProcedureResponse<O = unknown> =
-  | { readonly ok: true; readonly data: O }
-  | { readonly ok: false; readonly diagnostic: Diagnostic };
 
 export class InvokeProcedureUseCase {
   // Per-Procedure compiled zod schemas. zod composition is pure

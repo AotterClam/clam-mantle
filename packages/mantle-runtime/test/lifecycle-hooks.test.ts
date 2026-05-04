@@ -301,6 +301,40 @@ describe("LifecycleHookingEntryRepository — publish + delete", () => {
     expect(row.id).toBe("post-1");
     expect(h.calls).toEqual([]);
   });
+
+  it("does NOT fire before_* hooks when the row doesn't exist (null-entry guard)", async () => {
+    const h = harness({
+      procedures: [
+        makeProcedure({
+          name: "audit",
+          handlerRef: "audit",
+          input: { type: "object" },
+          output: { type: "object" },
+        }),
+      ],
+      triggers: [
+        {
+          procedure: "audit",
+          schema: "posts",
+          on: ["before_delete", "before_update"],
+        },
+      ],
+      handlers: {
+        audit: () => ({ ok: true }),
+      },
+    });
+    // Direct repo call (bypassing use cases that pre-check NOT_FOUND):
+    // simulates the InvokeBuiltinUseCase opDelete path which doesn't
+    // pre-verify the row exists.
+    await h.hookedRepo.delete({ id: "ghost", collection: "posts" });
+    expect(h.calls).toEqual([]);
+    // OCC will throw on a ghost update at the inner repo, but the hook
+    // must not fire either way — wrap in try/catch.
+    await h.hookedRepo
+      .update({ id: "ghost", collection: "posts", expectedVersion: 1, data: {}, now: 0 })
+      .catch(() => undefined);
+    expect(h.calls).toEqual([]);
+  });
 });
 
 describe("LifecycleHookingEntryRepository — multi-trigger ordering", () => {

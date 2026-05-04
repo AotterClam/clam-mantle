@@ -14,10 +14,9 @@ import type { HandlerContext } from "../model/HandlerContext.js";
  *   - `continue`: handler throw is logged via `console.error` and
  *     swallowed. (POC v0.1.x parity; observability table is v0.2.)
  *
- * For after_* hooks, the use case rides on `ctx.waitUntil` when the
- * adapter populates it — the caller doesn't block on remote calls.
- * When `ctx.waitUntil` is absent (test harness, internal paths), the
- * use case awaits inline.
+ * The runner itself awaits every Trigger inline. The decorator decides
+ * whether to ride on `ctx.waitUntil` (CF Workers fast-path) or
+ * inline-await the result; it's not the runner's concern.
  *
  * Lives in `domain/port/` per Aotter clean-arch convention; the
  * implementing use case lives in `usecase/lifecycle/` and is wired at

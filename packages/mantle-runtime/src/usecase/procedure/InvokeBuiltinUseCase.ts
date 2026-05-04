@@ -1,7 +1,6 @@
 import {
   DiagnosticError,
   runtimeDiagnostic,
-  type ProcedureManifest,
   type SchemaManifest,
 } from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
@@ -10,6 +9,7 @@ import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { IdGenerator } from "../../domain/port/IdGenerator.js";
 import { projectAndStamp } from "../../domain/service/BuiltinProjector.js";
+import type { InvokeBuiltinRequest } from "../dto/procedure/index.js";
 
 /**
  * `InvokeBuiltinUseCase` — executes the `handler.kind: builtin` op
@@ -33,13 +33,6 @@ import { projectAndStamp } from "../../domain/service/BuiltinProjector.js";
  * Auth + input/output validation happen upstream in
  * `InvokeProcedureUseCase`. This use case trusts its `validatedInput`.
  */
-export interface InvokeBuiltinRequest {
-  readonly procedure: ProcedureManifest;
-  /** Procedure input that has already cleared zod validation. */
-  readonly validatedInput: Record<string, unknown>;
-  readonly ctx: HandlerContext;
-}
-
 export class InvokeBuiltinUseCase {
   constructor(
     private readonly entries: EntryRepository,

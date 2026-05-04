@@ -5,3 +5,4 @@
  * primitives.
  */
 export * from "./content/index.js";
+export * from "./procedure/index.js";

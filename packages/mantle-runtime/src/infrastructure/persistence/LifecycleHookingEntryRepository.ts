@@ -62,7 +62,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       originalInput: args.originalInput,
     });
     const row = await this.inner.create(args);
-    this.fireAfter("after_create", row, ctx, args);
+    await this.fireAfter("after_create", row, ctx, args);
     return row;
   }
 
@@ -75,6 +75,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       return this.inner.update(args);
     }
     const existing = await this.inner.get(args.id);
+    if (!existing) return this.inner.update(args);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_update",
@@ -84,7 +85,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       originalInput: args.originalInput,
     });
     const row = await this.inner.update(args);
-    this.fireAfter("after_update", row, ctx, args);
+    await this.fireAfter("after_update", row, ctx, args);
     return row;
   }
 
@@ -93,6 +94,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       return this.inner.delete(args);
     }
     const existing = await this.inner.get(args.id);
+    if (!existing) return this.inner.delete(args);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_delete",
@@ -102,8 +104,8 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       originalInput: args.originalInput,
     });
     const result = await this.inner.delete(args);
-    if (result.removed && existing) {
-      this.fireAfter("after_delete", existing, ctx, args);
+    if (result.removed) {
+      await this.fireAfter("after_delete", existing, ctx, args);
     }
     return result;
   }
@@ -113,6 +115,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       return this.inner.archive(args);
     }
     const existing = await this.inner.get(args.id);
+    if (!existing) return this.inner.archive(args);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: "before_update",
@@ -122,7 +125,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       originalInput: args.originalInput,
     });
     const row = await this.inner.archive(args);
-    this.fireAfter("after_update", row, ctx, args);
+    await this.fireAfter("after_update", row, ctx, args);
     return row;
   }
 
@@ -134,6 +137,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     const beforeHook: LifecycleHook = isPublish ? "before_publish" : "before_update";
     const afterHook: LifecycleHook = isPublish ? "after_publish" : "after_update";
     const existing = await this.inner.get(args.id);
+    if (!existing) return this.inner.transitionStatus(args);
     const ctx = ctxOf(args);
     await this.hooks.run({
       hook: beforeHook,
@@ -143,7 +147,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
       originalInput: args.originalInput,
     });
     const row = await this.inner.transitionStatus(args);
-    this.fireAfter(afterHook, row, ctx, args);
+    await this.fireAfter(afterHook, row, ctx, args);
     return row;
   }
 
@@ -152,32 +156,42 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
   }
 
   /**
-   * After-hook fire-and-forget. Rides on `ctx.waitUntil` when the
-   * adapter populated it (Cloudflare Workers extends the request
-   * lifetime); falls back to an inline-awaited promise so test paths
-   * and non-Worker adapters still observe completion.
+   * After-hook execution. Rides on `ctx.waitUntil` when the adapter
+   * populated it (Cloudflare Workers extends the request lifetime past
+   * the response); otherwise inline-awaits because Workers without
+   * `ExecutionContext` (older Astro / non-Workers runtimes / tests)
+   * cancel detached promises when the response is sent. POC PR #41
+   * carry-forward — the inline-await branch trades response latency
+   * for hook-fire reliability.
+   *
+   * Hook throws are surfaced via `RunLifecycleHooksUseCase`'s
+   * `errorPolicy` semantics; for `continue` the runner already
+   * `console.error`s and swallows. Anything that escapes here is an
+   * abort-policy throw on a before_* (impossible — the parser rejects
+   * `errorPolicy: abort` on after_* hooks) or an unexpected internal
+   * error; we log and swallow so the mutation result still reaches the
+   * caller.
    */
-  private fireAfter(
+  private async fireAfter(
     hook: LifecycleHook,
     entry: EntryRow,
     ctx: HandlerContext,
     args: MutationHookFields,
-  ): void {
+  ): Promise<void> {
     const promise = this.hooks.run({
       hook,
       schema: entry.collection,
       entry,
       ctx,
       originalInput: args.originalInput,
+    }).catch((err) => {
+      console.error(`[lifecycle] ${hook} on ${entry.collection}/${entry.id} failed`, err);
     });
     if (ctx.waitUntil) {
       ctx.waitUntil(promise);
-    } else {
-      // No waitUntil — keep the failure path discoverable.
-      void promise.catch((err) => {
-        console.error(`[lifecycle] ${hook} on ${entry.collection}/${entry.id} failed`, err);
-      });
+      return;
     }
+    await promise;
   }
 }
 
