@@ -120,27 +120,19 @@ jobs:
           test "$STATUS" = "403"
           grep -q '"AUTH_DENIED"' /tmp/body
 
-      - name: Smoke — MCP
+      - name: Smoke — MCP transport (auth guard)
         run: |
           set -euo pipefail
-          # Missing bearer: 401
+          # Missing bearer: 401 — verifies the OAuth verifier wires.
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8787/mcp)" = "401"
 
-          # initialize handshake
-          curl -s -X POST http://localhost:8787/mcp \
-            -H 'authorization: Bearer dev-u-staff-1' \
-            -H 'content-type: application/json' \
-            -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
-            | grep -q '"protocolVersion"'
-
-          # tools/list — assert all 6 v0.1.0 static tools present
-          TOOLS=$(curl -s -X POST http://localhost:8787/mcp \
-            -H 'authorization: Bearer dev-u-staff-1' \
-            -H 'content-type: application/json' \
-            -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')
-          for name in list_entries get_entry create_draft update_draft request_publish archive_entry; do
-            echo "$TOOLS" | grep -q "\"name\":\"$name\"" || { echo "missing tool: $name"; exit 1; }
-          done
+      - name: Smoke — MCP integration (12 tool calls)
+        # initialize → tools/list → tools/call for each of the 6 v0.1.0
+        # tools, plus lifecycle hook firing on contact-messages create
+        # and error paths (stale OCC, unknown collection). See
+        # starters/blog/test/integration/mcp-smoke.ts for the script.
+        working-directory: starters/blog
+        run: pnpm mcp-smoke
 
       - name: Tail wrangler log on success (debugging aid)
         if: always()
