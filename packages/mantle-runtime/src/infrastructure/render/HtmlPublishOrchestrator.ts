@@ -5,8 +5,13 @@ import {
   type Entry,
   type SiteConfig,
 } from "@aotter/mantle-spec";
+import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
+import type {
+  PublishEntryRequest,
+  PublishOrchestrator,
+} from "../../domain/port/PublishOrchestrator.js";
 import {
   entryHtmlKey,
   entryMarkdownKey,
@@ -17,7 +22,6 @@ import {
   serializeEntryAsMarkdown,
   serializeLlmsTxt,
 } from "../../domain/service/MarkdownSerializer.js";
-import { TemplateRegistry } from "./TemplateRegistry.js";
 
 /**
  * `HtmlPublishOrchestrator` — the publish pipeline. Renders + writes
@@ -36,16 +40,9 @@ import { TemplateRegistry } from "./TemplateRegistry.js";
  * `KvCache` writes). Pure formatting (markdown serialization, key
  * derivation) lives in `domain/service/`.
  */
-export interface PublishEntryRequest {
-  readonly entryId: string;
-  readonly site: SiteConfig;
-  readonly templates: TemplateRegistry;
-  readonly htmlDoctype?: string;
-}
-
 const DEFAULT_DOCTYPE = "<!DOCTYPE html>\n";
 
-export class HtmlPublishOrchestrator {
+export class HtmlPublishOrchestrator implements PublishOrchestrator {
   constructor(
     private readonly db: DatabaseDriver,
     private readonly kv: KvCache,

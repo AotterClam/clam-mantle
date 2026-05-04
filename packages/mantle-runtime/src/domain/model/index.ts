@@ -11,3 +11,10 @@ export * from "./EntryRow.js";
 export * from "./User.js";
 export * from "./Staff.js";
 export * from "./HandlerContext.js";
+export {
+  TemplateRegistry,
+  type EntryContext,
+  type ListContext,
+  type EntryTemplate,
+  type ListTemplate,
+} from "./TemplateRegistry.js";

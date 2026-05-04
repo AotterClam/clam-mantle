@@ -4,6 +4,7 @@ import {
   type SiteDefaults,
 } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 
 /**
  * `site_config` row read/write. Ships the seed declared by
@@ -26,7 +27,7 @@ const KEYS = {
   locales: "locales",
 } as const;
 
-export class DatabaseSiteConfigRepository {
+export class DatabaseSiteConfigRepository implements SiteConfigRepository {
   constructor(private readonly db: DatabaseDriver) {}
 
   async seed(defaults: SiteDefaults | undefined): Promise<void> {

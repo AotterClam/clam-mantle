@@ -13,6 +13,9 @@ import type { Entry, SiteConfig } from "@aotter/mantle-spec";
  * markdown / `llms.txt` mirrors — the HTML surfaces are simply
  * skipped (per ADR-0009-extended: the SDK ships zero opinionated
  * templates).
+ *
+ * Lives in `domain/model/` because both the `PublishOrchestrator`
+ * port and the HTML adapter that implements it need to reference it.
  */
 export interface EntryContext {
   readonly entry: Entry;

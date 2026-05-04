@@ -9,6 +9,7 @@ import type { IdGenerator } from "../../domain/port/IdGenerator.js";
 import type { CreateDraftRequest } from "../dto/content/index.js";
 import {
   schemaUnknownDiagnostic,
+  stripReservedDataKeys,
   withConflictDiagnostic,
 } from "./diagnostics.js";
 
@@ -39,7 +40,7 @@ export class CreateDraftUseCase {
         id,
         collection: request.collection,
         status: "draft",
-        data: request.data,
+        data: stripReservedDataKeys(request.data),
         authorId: request.authorId,
         now,
       }),

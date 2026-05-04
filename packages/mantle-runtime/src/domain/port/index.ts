@@ -31,6 +31,11 @@ export type {
   TransitionStatusArgs,
   ListEntriesArgs,
 } from "./EntryRepository.js";
+export type { SiteConfigRepository } from "./SiteConfigRepository.js";
+export type {
+  PublishOrchestrator,
+  PublishEntryRequest,
+} from "./PublishOrchestrator.js";
 export { type Clock, SystemClock } from "./Clock.js";
 export { type IdGenerator, RandomUuidGenerator } from "./IdGenerator.js";
 export {

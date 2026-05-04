@@ -21,11 +21,12 @@ import {
  * on the Schema's `lifecycle` mode.
  *
  * v0.1.0 ships `simple` only — request goes straight to `published`
- * with a status guard via the spec's state machine. `editorial` is
- * parser-rejected with `LIFECYCLE_NOT_IN_V010`, so this use case
- * doesn't have to support the approvals queue branch yet — it
- * surfaces a structured error if an editorial Schema somehow slips
- * through.
+ * with a status guard via the spec's state machine. The Schema parser
+ * accepts `lifecycle: editorial` (it's a v0.1.x-committed mode in
+ * `V01_LIFECYCLE_MODES`), so this use case is the only line of
+ * defense: when a Schema declares `editorial`, it surfaces a
+ * structured `LIFECYCLE_NOT_IN_V010` error here at request time.
+ * The approvals-queue branch lands in v0.1.x.
  */
 export class RequestPublishUseCase {
   constructor(

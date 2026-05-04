@@ -10,7 +10,14 @@ import { schemaUnknownDiagnostic } from "./diagnostics.js";
 /**
  * `ListEntriesUseCase` — list entries in a collection, optionally
  * filtered by status. Asserts the collection is a declared Schema.
+ *
+ * Caller-supplied `limit` is clamped at this layer (the trust
+ * boundary between MCP / admin transports and the chokepoint
+ * `EntryRepository`) — same defaults as `ViewSqlCompiler.clampLimit`.
  */
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 500;
+
 export class ListEntriesUseCase {
   constructor(
     private readonly entries: EntryRepository,
@@ -27,7 +34,14 @@ export class ListEntriesUseCase {
     return this.entries.list({
       collection: request.collection,
       status: request.status,
-      limit: request.limit,
+      limit: clampLimit(request.limit),
     });
   }
+}
+
+function clampLimit(limit: number | undefined): number {
+  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
+    return DEFAULT_LIMIT;
+  }
+  return Math.min(Math.floor(limit), MAX_LIMIT);
 }

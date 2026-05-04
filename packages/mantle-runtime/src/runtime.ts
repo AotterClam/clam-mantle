@@ -8,11 +8,14 @@ import {
   type ViewManifest,
 } from "@aotter/mantle-spec";
 import type { AnyHandler } from "./domain/model/HandlerContext.js";
+import type { TemplateRegistry } from "./domain/model/TemplateRegistry.js";
 import type { AssetServer } from "./domain/port/AssetServer.js";
 import type { DatabaseDriver } from "./domain/port/DatabaseDriver.js";
 import type { KvCache } from "./domain/port/KvCache.js";
 import type { OAuthVerifier } from "./domain/port/OAuthVerifier.js";
+import type { PublishOrchestrator } from "./domain/port/PublishOrchestrator.js";
 import type { SessionRepository } from "./domain/port/SessionRepository.js";
+import type { SiteConfigRepository } from "./domain/port/SiteConfigRepository.js";
 import { SystemClock, type Clock } from "./domain/port/Clock.js";
 import {
   RandomUuidGenerator,
@@ -37,12 +40,10 @@ import { InvokeProcedureUseCase } from "./usecase/procedure/index.js";
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
 
+import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
 import { DatabaseEntryRepository } from "./infrastructure/persistence/DatabaseEntryRepository.js";
 import { DatabaseSiteConfigRepository } from "./infrastructure/persistence/DatabaseSiteConfigRepository.js";
-import {
-  HtmlPublishOrchestrator,
-  TemplateRegistry,
-} from "./infrastructure/render/index.js";
+import { HtmlPublishOrchestrator } from "./infrastructure/render/index.js";
 import { CANONICAL_MIGRATIONS } from "./infrastructure/boot/index.js";
 
 /**
@@ -99,8 +100,8 @@ export interface CmsRuntime {
   readonly invokeProcedure: InvokeProcedureUseCase;
   readonly executeView: ExecuteViewUseCase;
   readonly validateBoot: ValidateBootUseCase;
-  readonly publishOrchestrator: HtmlPublishOrchestrator;
-  readonly siteConfig: DatabaseSiteConfigRepository;
+  readonly publishOrchestrator: PublishOrchestrator;
+  readonly siteConfig: SiteConfigRepository;
 
   /** Adapter-helper bag. */
   readonly registry: HandlerRegistry;
@@ -127,7 +128,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   for (const v of partitioned.views) viewsByName.set(v.metadata.name, v);
 
   const registry = buildHandlerRegistry(args.handlers ?? {});
-  const templates = args.templates ?? new TemplateRegistry();
+  const templates = args.templates ?? new TemplateRegistryImpl();
   const clock = args.clock ?? SystemClock;
   const idgen = args.idgen ?? RandomUuidGenerator;
 

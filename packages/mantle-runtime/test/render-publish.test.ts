@@ -6,7 +6,7 @@ import {
   listHtmlKey,
   llmsTxtKey,
 } from "../src/domain/service/PublishKeys.js";
-import { TemplateRegistry } from "../src/infrastructure/render/TemplateRegistry.js";
+import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { InMemoryKv } from "./fakes/kv.js";
 import type { SiteConfig } from "@aotter/mantle-spec";

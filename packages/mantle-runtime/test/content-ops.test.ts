@@ -72,6 +72,28 @@ describe("CreateDraftUseCase", () => {
       h.createDraft.execute({ collection: "ghost", data: {}, authorId: null }),
     ).rejects.toBeInstanceOf(DiagnosticError);
   });
+
+  it("strips reserved metadata keys from caller-supplied data", async () => {
+    const h = harness();
+    const row = await h.createDraft.execute({
+      collection: "posts",
+      data: {
+        title: "Hello",
+        id: "spoofed-id",
+        status: "published",
+        version: 99,
+        expectedVersion: 99,
+        createdAt: 0,
+        updatedAt: 0,
+        authorId: "spoofed-author",
+      },
+      authorId: "user-1",
+    });
+    expect(row.id).not.toBe("spoofed-id");
+    expect(row.status).toBe("draft");
+    expect(row.version).toBe(1);
+    expect(row.data).toEqual({ title: "Hello" });
+  });
 });
 
 describe("UpdateDraftUseCase", () => {
@@ -121,6 +143,30 @@ describe("UpdateDraftUseCase", () => {
     await expect(
       h.updateDraft.execute({ id: created.id, expectedVersion: 99, data: {} }),
     ).rejects.toMatchObject({ diagnostic: { code: "CONFLICT" } });
+  });
+
+  it("strips reserved metadata keys on update merge", async () => {
+    const h = harness();
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "v1" },
+      authorId: null,
+    });
+    const updated = await h.updateDraft.execute({
+      id: created.id,
+      expectedVersion: 1,
+      data: {
+        title: "v2",
+        id: "spoofed",
+        status: "archived",
+        version: 999,
+        authorId: "evil",
+      },
+    });
+    expect(updated.id).toBe(created.id);
+    expect(updated.status).toBe("draft");
+    expect(updated.version).toBe(2);
+    expect(updated.data).toEqual({ title: "v2" });
   });
 });
 
@@ -256,6 +302,23 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     expect(drafts).toHaveLength(1);
     const published = await h.listEntries.execute({ collection: "posts", status: "published" });
     expect(published).toHaveLength(1);
+  });
+
+  it("ListEntriesUseCase clamps caller-supplied limit to MAX_LIMIT (500)", async () => {
+    const h = harness();
+    let listArgs: { limit?: number } | null = null;
+    const original = h.store.list.bind(h.store);
+    h.store.list = async (args) => {
+      listArgs = args;
+      return original(args);
+    };
+    await h.listEntries.execute({ collection: "posts", limit: 999_999 });
+    expect(listArgs).not.toBeNull();
+    expect(listArgs!.limit).toBe(500);
+    await h.listEntries.execute({ collection: "posts", limit: -10 });
+    expect(listArgs!.limit).toBe(50);
+    await h.listEntries.execute({ collection: "posts" });
+    expect(listArgs!.limit).toBe(50);
   });
 
   it("DeleteEntryUseCase removes the row", async () => {

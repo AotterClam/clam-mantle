@@ -8,6 +8,7 @@ import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { UpdateDraftRequest } from "../dto/content/index.js";
 import {
   notFoundDiagnostic,
+  stripReservedDataKeys,
   withConflictDiagnostic,
 } from "./diagnostics.js";
 
@@ -44,7 +45,7 @@ export class UpdateDraftUseCase {
       this.entries.update({
         id: request.id,
         expectedVersion: request.expectedVersion,
-        data: { ...existing.data, ...request.data },
+        data: stripReservedDataKeys({ ...existing.data, ...request.data }),
         now: this.clock.now(),
       }),
     );
