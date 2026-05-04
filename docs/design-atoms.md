@@ -154,8 +154,9 @@ state machine.
 - `simple` (default) — `draft → published → archived`. No approval
   queue. **This is the only mode whose runtime ships in v0.1.0.**
 - `editorial` — the six-state machine with an approval queue
-  (`draft → in_review → changes_requested → approved → published →
-  archived`). **Grammar key is reserved; the runtime is on the v0.1.x
+  (`draft → review → approved → scheduled → published → archived`,
+  with `published` returnable to `draft` for republish). **Grammar
+  key is reserved; the runtime is on the v0.1.x
   roadmap.** v0.1.0's boot validator rejects `lifecycle: editorial`
   with the diagnostic `LIFECYCLE_NOT_IN_V010` and a message
   pointing at the v0.1.x roadmap. Authors should not write

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
-  firstZodIssueAsAjvShape,
+  firstZodIssueAsJsonPointer,
   jsonSchemaToZod,
   zodPathToJsonPointer,
 } from "../src/json-schema-zod.js";
@@ -204,13 +204,13 @@ describe("zodPathToJsonPointer", () => {
   });
 });
 
-describe("firstZodIssueAsAjvShape", () => {
+describe("firstZodIssueAsJsonPointer", () => {
   it("translates a zod issue to the (instancePath, message) shape", () => {
     const zs = z.object({ a: z.string() });
     const r = zs.safeParse({ a: 1 });
     expect(r.success).toBe(false);
     if (r.success) return;
-    const ajv = firstZodIssueAsAjvShape(r.error);
+    const ajv = firstZodIssueAsJsonPointer(r.error);
     expect(ajv.instancePath).toBe("/a");
     expect(typeof ajv.message).toBe("string");
     expect(ajv.message.length).toBeGreaterThan(0);
@@ -221,13 +221,13 @@ describe("firstZodIssueAsAjvShape", () => {
     const r = zs.safeParse(1);
     expect(r.success).toBe(false);
     if (r.success) return;
-    const ajv = firstZodIssueAsAjvShape(r.error);
+    const ajv = firstZodIssueAsJsonPointer(r.error);
     expect(ajv.instancePath).toBe("");
   });
 
   it("ZodError with no issues → fallback message", () => {
     const fake = { issues: [] } as unknown as z.ZodError;
-    const ajv = firstZodIssueAsAjvShape(fake);
+    const ajv = firstZodIssueAsJsonPointer(fake);
     expect(ajv).toEqual({ instancePath: "", message: "validation failed" });
   });
 });

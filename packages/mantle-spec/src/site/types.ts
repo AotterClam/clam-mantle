@@ -50,6 +50,13 @@ export interface SiteConfig {
  * Validated synchronously at module-init by
  * `assertSiteDefaultsCanonical`; a non-canonical locale tag fails fast
  * in `wrangler tail` rather than corrupting the seed.
+ *
+ * `SiteDefaults` is the **author-time** declaration (what the consumer
+ * writes); `SiteConfig` (above) is the **runtime read shape**
+ * (what the dispatcher and templates see after the seed has been
+ * applied and the operator has had a chance to edit). The conversion
+ * happens in `mantle-runtime` via `loadSiteConfig(env)` — spec
+ * defines both types and the validator, runtime owns the read/write.
  */
 export interface SiteDefaults {
   readonly locales?: ReadonlyArray<string>;

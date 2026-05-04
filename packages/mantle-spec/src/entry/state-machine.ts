@@ -90,11 +90,20 @@ function transitionsFor(mode: LifecycleMode): Readonly<Record<ContentState, Read
 }
 
 /**
- * The status values reachable under a given lifecycle. Used by the
- * admin SPA to render the per-Schema sub-nav (Drafts / Review /
- * Published / Archived for editorial; same minus Review for simple).
- * Single source of truth so SPA and runtime agree on what statuses
- * an entry of this Schema can have.
+ * The **navigable** subset of statuses an admin user filters by in
+ * the per-Schema sub-nav (Drafts / Review / Published / Archived for
+ * editorial; same minus Review for simple). This is intentionally a
+ * subset of the full state set: `approved` and `scheduled` are
+ * intermediate editorial states — entries pass through them but
+ * authors don't navigate to them as buckets.
+ *
+ * Distinct from the full transition table (`canTransition`), which
+ * is the runtime invariant. Both files agree this is the right cut;
+ * see `EDITORIAL_TRANSITIONS` above for the complete state set.
+ *
+ * Lives in spec for now because the consumer's admin SPA bundles
+ * this. v0.1.x may move to `mantle-admin-ui` once the SPA is
+ * extracted from the spec dependency graph.
  */
 export function getLifecycleStatuses(mode: LifecycleMode): readonly ContentState[] {
   return mode === "editorial"
@@ -103,9 +112,9 @@ export function getLifecycleStatuses(mode: LifecycleMode): readonly ContentState
 }
 
 /**
- * Lifecycle-agnostic state-transition error. Thrown by callers that
- * detect an invalid transition via `canTransition` and want to bubble
- * the rejection up through a Promise<T> contract.
+ * Lifecycle-agnostic state-transition error. Thrown by `mantle-runtime`'s
+ * dispatcher / entry-writer when a request would violate the transition
+ * table; spec defines the type, runtime is the only thrower.
  */
 export class IllegalTransitionError extends Error {
   constructor(public readonly from: ContentState, public readonly to: ContentState) {

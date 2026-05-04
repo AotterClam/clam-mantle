@@ -6,11 +6,11 @@ import type {
   SchemaManifest,
   TriggerManifest,
   ViewManifest,
-} from "../manifests/grammar.js";
-import { MANTLE_BIND_VALUES } from "../manifests/grammar.js";
-import { partitionManifests } from "../manifests/parse.js";
-import { checkLocaleAndTranslates } from "../manifests/cross-schema.js";
-import { bestMatch, manifestPath } from "../manifests/diagnose.js";
+} from "./grammar.js";
+import { MANTLE_BIND_VALUES } from "./grammar.js";
+import { partitionManifests } from "./parse.js";
+import { checkLocaleAndTranslates } from "./cross-schema.js";
+import { bestMatch, manifestPath } from "./diagnose.js";
 import { type Diagnostic, validateDiagnostic } from "../diagnostic.js";
 
 /**

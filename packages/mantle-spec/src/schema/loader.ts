@@ -1,4 +1,4 @@
-import type { SchemaManifest } from "../manifests/grammar.js";
+import type { Manifest, SchemaManifest } from "../manifests/grammar.js";
 
 /**
  * Look up a Schema manifest by `metadata.name` from a parsed manifest
@@ -14,12 +14,12 @@ import type { SchemaManifest } from "../manifests/grammar.js";
  * looking for.
  */
 export function findSchemaByName(
-  manifests: ReadonlyArray<{ readonly kind: string; readonly metadata: { readonly name: string } }>,
+  manifests: ReadonlyArray<Manifest>,
   name: string,
 ): SchemaManifest | undefined {
   for (const m of manifests) {
     if (m.kind === "Schema" && m.metadata.name === name) {
-      return m as unknown as SchemaManifest;
+      return m;
     }
   }
   return undefined;
@@ -31,11 +31,11 @@ export function findSchemaByName(
  * Schema (e.g. building per-collection validators or DDL).
  */
 export function listSchemas(
-  manifests: ReadonlyArray<{ readonly kind: string }>,
+  manifests: ReadonlyArray<Manifest>,
 ): readonly SchemaManifest[] {
   const out: SchemaManifest[] = [];
   for (const m of manifests) {
-    if (m.kind === "Schema") out.push(m as unknown as SchemaManifest);
+    if (m.kind === "Schema") out.push(m);
   }
   return out;
 }

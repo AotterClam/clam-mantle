@@ -113,9 +113,32 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
 
   // 3. Validate.
   const result = check({ manifests, handlerSource, filePaths });
-  const diagnostics = [...parseErrors, ...result.diagnostics];
+  const cliWarnings: Diagnostic[] = [];
+
+  // The CLI can't reach the runtime D1 to read site_config, so it
+  // can't run the SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES check —
+  // boot does that. Per ADR-0007's leftward-shift principle, surface
+  // a warning so the AI author isn't surprised when boot rejects.
+  const hasLocalized = manifests.some(
+    (m) => m.kind === "Schema" && m.spec.localized === true,
+  );
+  if (hasLocalized) {
+    cliWarnings.push(
+      validateDiagnostic({
+        code: "SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES",
+        severity: "warning",
+        path: "cli:locale-check-skipped",
+        expected:
+          "site_config.locales to declare at least one BCP 47 locale (boot validator will check)",
+        message:
+          "One or more Schemas declare localized: true. The CLI cannot read site_config; boot will reject if locales are not configured. Verify your CmsConfig.siteDefaults.locales is set.",
+      }),
+    );
+  }
+
+  const diagnostics = [...parseErrors, ...result.diagnostics, ...cliWarnings];
   const errorCount = result.errorCount + parseErrors.filter((d) => d.severity === "error").length;
-  const warningCount = result.warningCount + parseErrors.filter((d) => d.severity === "warning").length;
+  const warningCount = result.warningCount + cliWarnings.length + parseErrors.filter((d) => d.severity === "warning").length;
 
   // 4. Emit.
   if (args.format === "json") {

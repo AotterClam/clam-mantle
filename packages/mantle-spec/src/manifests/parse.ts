@@ -118,12 +118,11 @@ export function parseManifests(input: string | readonly string[]): ParseManifest
   const diagnostics: Diagnostic[] = [];
   let globalDocIndex = 0;
   for (const yamlText of inputs) {
-    parseOneStream(yamlText, globalDocIndex, manifests, diagnostics);
-    // Bump the global doc index by however many docs were in this stream
-    // so that diagnostics across multiple input strings stay
-    // unambiguously addressable.
-    const docs = parseAllDocuments(yamlText, { merge: false });
-    globalDocIndex += docs.length;
+    // parseOneStream returns the doc count so the caller can bump the
+    // global index without re-parsing — diagnostics across multiple
+    // input strings stay unambiguously addressable.
+    const docCount = parseOneStream(yamlText, globalDocIndex, manifests, diagnostics);
+    globalDocIndex += docCount;
   }
   return { manifests, diagnostics };
 }
@@ -133,7 +132,7 @@ function parseOneStream(
   baseDocIndex: number,
   manifests: Manifest[],
   diagnostics: Diagnostic[],
-): void {
+): number {
   const docs = parseAllDocuments(yamlText, { merge: false });
   for (let i = 0; i < docs.length; i++) {
     const doc = docs[i]!;
@@ -178,6 +177,7 @@ function parseOneStream(
       }
     }
   }
+  return docs.length;
 }
 
 function pointerFor(docIndex: number, jsonPointer: string): string {

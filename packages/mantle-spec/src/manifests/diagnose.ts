@@ -1,4 +1,22 @@
-// TEMP STUB — actual implementation lands via parallel agent's port.
+/**
+ * Diagnostic-path helpers for cross-manifest validators (`check.ts`,
+ * `cross-schema.ts`). Pure functions, no env, consumed in the same
+ * folder.
+ *
+ * `manifestPath` formats a JSON Pointer path the CLI / boot validator
+ * can render either as a synthetic `manifest:Kind/name#/...` URI or
+ * (when the caller supplies a file-paths map) as the consumer's actual
+ * `file.yaml#/<docIndex>/...` source location. The two formats are
+ * equivalent at the diagnostic-shape level — the file form just gives
+ * the agent / human a clickable line.
+ *
+ * `bestMatch` runs Levenshtein edit distance against a candidate list
+ * and returns the closest match within distance < 3. Used for "did you
+ * mean?" suggestions in `TRIGGER_TARGET_PROCEDURE_UNKNOWN`,
+ * `VIEW_FROM_UNKNOWN_SCHEMA`, etc. Distance threshold of 3 is the
+ * empirically useful one (catches typos like `posst` → `posts` but
+ * not unrelated names).
+ */
 export function manifestPath(
   kind: string,
   name: string,

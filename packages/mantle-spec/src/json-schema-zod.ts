@@ -182,12 +182,11 @@ export function zodPathToJsonPointer(path: ReadonlyArray<PropertyKey>): string {
 
 /**
  * Translate a zod `safeParse` failure to the (instancePath, message)
- * shape the dispatcher's diagnostic emitter expects (mirrors Ajv's
- * `ErrorObject.instancePath` + `.message`). Kept under that name
- * because the Ajv → zod swap (issue #70) was meant to be invisible to
- * call sites that already had the Ajv-shape translator wired in.
+ * shape the dispatcher's diagnostic emitter expects: `instancePath`
+ * is a JSON Pointer to the failing field; `message` is the
+ * human-readable issue.
  */
-export function firstZodIssueAsAjvShape(
+export function firstZodIssueAsJsonPointer(
   err: z.ZodError,
 ): { instancePath: string; message: string } {
   const issue = err.issues[0];
