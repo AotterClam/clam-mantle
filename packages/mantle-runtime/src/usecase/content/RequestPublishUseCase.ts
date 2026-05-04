@@ -66,6 +66,8 @@ export class RequestPublishUseCase {
         to: "published",
         expectedStatus: existing.status,
         now: this.clock.now(),
+        hookContext: request.ctx,
+        originalInput: request.originalInput,
       }),
     );
   }

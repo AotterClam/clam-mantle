@@ -36,6 +36,8 @@ export class UnpublishUseCase {
         to: "draft",
         expectedStatus: existing.status,
         now: this.clock.now(),
+        hookContext: request.ctx,
+        originalInput: request.originalInput,
       }),
     );
   }

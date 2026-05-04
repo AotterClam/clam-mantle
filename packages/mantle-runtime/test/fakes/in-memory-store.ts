@@ -8,6 +8,7 @@ import {
 import type {
   ArchiveEntryArgs,
   CreateEntryArgs,
+  DeleteEntryArgs,
   EntryRepository,
   ListEntriesArgs,
   TransitionStatusArgs,
@@ -65,8 +66,8 @@ export class InMemoryEntryRepository implements EntryRepository {
     return next;
   }
 
-  async delete(id: string): Promise<{ readonly removed: boolean }> {
-    const removed = this.rows.delete(id);
+  async delete(args: DeleteEntryArgs): Promise<{ readonly removed: boolean }> {
+    const removed = this.rows.delete(args.id);
     return { removed };
   }
 

@@ -47,6 +47,8 @@ export class UpdateDraftUseCase {
         expectedVersion: request.expectedVersion,
         data: stripReservedDataKeys({ ...existing.data, ...request.data }),
         now: this.clock.now(),
+        hookContext: request.ctx,
+        originalInput: request.originalInput,
       }),
     );
   }

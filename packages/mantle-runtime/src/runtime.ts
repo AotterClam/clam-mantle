@@ -39,10 +39,13 @@ import {
 import { InvokeProcedureUseCase } from "./usecase/procedure/index.js";
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
+import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
 
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
+import { TriggerIndex } from "./domain/service/TriggerIndex.js";
 import { DatabaseEntryRepository } from "./infrastructure/persistence/DatabaseEntryRepository.js";
 import { DatabaseSiteConfigRepository } from "./infrastructure/persistence/DatabaseSiteConfigRepository.js";
+import { LifecycleHookingEntryRepository } from "./infrastructure/persistence/LifecycleHookingEntryRepository.js";
 import { HtmlPublishOrchestrator } from "./infrastructure/render/index.js";
 import { CANONICAL_MIGRATIONS } from "./infrastructure/boot/index.js";
 
@@ -132,12 +135,30 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const clock = args.clock ?? SystemClock;
   const idgen = args.idgen ?? RandomUuidGenerator;
 
-  // Repositories (adapters that bind ports) and orchestrators.
-  const entries = new DatabaseEntryRepository(args.db);
+  // Repositories: DB-backed inner + lifecycle-hook decorator. Every
+  // mutation through `entries` (create / update / delete / archive /
+  // transitionStatus) fires the matching Triggers via
+  // `RunLifecycleHooksUseCase`. POC ADR-0014 v0.1.y "symmetric
+  // chokepoint" design — MCP, admin, and builtin paths all hit the
+  // same wrapped repository.
+  const innerEntries = new DatabaseEntryRepository(args.db);
+  const triggerIndex = new TriggerIndex(partitioned.triggers);
+  const invokeProcedure = new InvokeProcedureUseCase(registry);
+  const lifecycleHooks = new RunLifecycleHooksUseCase(
+    triggerIndex,
+    proceduresByName,
+    invokeProcedure,
+  );
+  const entries = new LifecycleHookingEntryRepository(
+    innerEntries,
+    triggerIndex,
+    lifecycleHooks,
+  );
   const siteConfig = new DatabaseSiteConfigRepository(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(args.db, args.kv);
 
-  // Use cases (constructor-injected with ports + repositories + clock + idgen).
+  // Content / view / boot use cases. They see `entries` only as the
+  // chokepoint port — hook firing is invisible to them.
   const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen);
   const updateDraft = new UpdateDraftUseCase(entries, clock);
   const getEntry = new GetEntryUseCase(entries);
@@ -146,7 +167,6 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const unpublish = new UnpublishUseCase(entries, clock);
   const archive = new ArchiveUseCase(entries, schemasByName, clock);
   const deleteEntry = new DeleteEntryUseCase(entries);
-  const invokeProcedure = new InvokeProcedureUseCase(registry);
   const executeView = new ExecuteViewUseCase(args.db);
   const validateBoot = new ValidateBootUseCase();
 

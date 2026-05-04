@@ -27,6 +27,10 @@ export class DeleteEntryUseCase {
     if (!existing) {
       throw new DiagnosticError(notFoundDiagnostic(opPath, "<unknown>", request.id));
     }
-    return this.entries.delete(request.id);
+    return this.entries.delete({
+      id: request.id,
+      hookContext: request.ctx,
+      originalInput: request.originalInput,
+    });
   }
 }

@@ -43,6 +43,8 @@ export class CreateDraftUseCase {
         data: stripReservedDataKeys(request.data),
         authorId: request.authorId,
         now,
+        hookContext: request.ctx,
+        originalInput: request.originalInput,
       }),
     );
   }

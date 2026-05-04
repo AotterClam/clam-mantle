@@ -27,15 +27,21 @@ export type {
   EntryRepository,
   CreateEntryArgs,
   UpdateEntryArgs,
+  DeleteEntryArgs,
   ArchiveEntryArgs,
   TransitionStatusArgs,
   ListEntriesArgs,
+  MutationHookFields,
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";
 export type {
   PublishOrchestrator,
   PublishEntryRequest,
 } from "./PublishOrchestrator.js";
+export type {
+  LifecycleHookRunner,
+  RunLifecycleHookRequest,
+} from "./LifecycleHookRunner.js";
 export { type Clock, SystemClock } from "./Clock.js";
 export { type IdGenerator, RandomUuidGenerator } from "./IdGenerator.js";
 export {

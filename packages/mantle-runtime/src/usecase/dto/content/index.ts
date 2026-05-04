@@ -1,19 +1,35 @@
 import type { ContentState } from "@aotter/mantle-spec";
+import type { HandlerContext } from "../../../domain/model/HandlerContext.js";
 
 /**
  * Content-op request DTOs. Each verb takes its own request type;
  * response is `EntryRow` (or `{ removed: boolean }` for delete) which
  * lives in `domain/model/`. Per the clean-arch DTO rule, no loose
  * primitives — every input field is named on the DTO.
+ *
+ * Mutating verbs carry an optional `ctx: HandlerContext` so the
+ * `LifecycleHookingEntryRepository` decorator can fire hooks with the
+ * caller's auth + env when invoked from a real dispatcher (HTTP
+ * Trigger, MCP, admin endpoint). Test paths and internal writes leave
+ * it unset and the decorator falls back to an anonymous ctx.
  */
+export interface ContentMutationFields {
+  readonly ctx?: HandlerContext;
+  /** Pre-projection original input forwarded to lifecycle hooks
+   *  (`ctx.event.originalInput` on the hook's procedure call). When
+   *  unset, hooks see the row data instead. The builtin Procedure path
+   *  populates this with the full procedure input so hooks can read
+   *  side-channel fields like CAPTCHA tokens. */
+  readonly originalInput?: unknown;
+}
 
-export interface CreateDraftRequest {
+export interface CreateDraftRequest extends ContentMutationFields {
   readonly collection: string;
   readonly data: Record<string, unknown>;
   readonly authorId: string | null;
 }
 
-export interface UpdateDraftRequest {
+export interface UpdateDraftRequest extends ContentMutationFields {
   readonly id: string;
   readonly expectedVersion: number;
   /** Partial data — merged onto the existing row's `data` blob. */
@@ -33,20 +49,20 @@ export interface ListEntriesRequest {
   readonly limit?: number;
 }
 
-export interface RequestPublishRequest {
+export interface RequestPublishRequest extends ContentMutationFields {
   readonly id: string;
 }
 
-export interface UnpublishRequest {
+export interface UnpublishRequest extends ContentMutationFields {
   readonly id: string;
 }
 
-export interface ArchiveRequest {
+export interface ArchiveRequest extends ContentMutationFields {
   readonly id: string;
   readonly expectedVersion: number;
 }
 
-export interface DeleteEntryRequest {
+export interface DeleteEntryRequest extends ContentMutationFields {
   readonly id: string;
 }
 

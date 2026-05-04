@@ -158,7 +158,7 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
       authorId: null,
       now: 1,
     });
-    const result = await repo.delete("p1");
+    const result = await repo.delete({ id: "p1" });
     expect(result.removed).toBe(true);
     expect(await repo.get("p1")).toBeNull();
   });

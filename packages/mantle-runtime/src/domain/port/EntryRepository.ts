@@ -1,14 +1,16 @@
 import type { ContentState } from "@aotter/mantle-spec";
 import type { EntryRow } from "../model/EntryRow.js";
+import type { HandlerContext } from "../model/HandlerContext.js";
 
 /**
  * `EntryRepository` — chokepoint for every entry mutation. Content-op
- * use cases, MCP handlers, and (in v0.1.x) builtin Procedure handlers
- * all route their writes through this interface so OCC, status
- * guards, and lifecycle hooks have exactly one place to enforce them.
+ * use cases, MCP handlers, and builtin Procedure handlers all route
+ * writes through this interface so OCC, status guards, and lifecycle
+ * hooks have exactly one place to enforce them.
  *
- * The `DatabaseDriver`-backed implementation lives in
- * `infrastructure/persistence/DatabaseEntryRepository`; the test
+ * Concrete impls: `DatabaseDriver`-backed
+ * (`infrastructure/persistence/DatabaseEntryRepository`) +
+ * `LifecycleHookingEntryRepository` decorator that wraps it. Test
  * harness ships an in-memory fake in `test/fakes/`.
  *
  * Renamed from `EntryStore` per the clean-architecture naming
@@ -20,7 +22,7 @@ export interface EntryRepository {
   /** Throws `EntryVersionConflict` on OCC mismatch. */
   update(args: UpdateEntryArgs): Promise<EntryRow>;
   /** Cascades to revisions + approvals child rows for the entry id. */
-  delete(id: string): Promise<{ readonly removed: boolean }>;
+  delete(args: DeleteEntryArgs): Promise<{ readonly removed: boolean }>;
   /** Throws `EntryVersionConflict` on OCC mismatch. */
   archive(args: ArchiveEntryArgs): Promise<EntryRow>;
   /** Status flip without data update. `expectedStatus`, when set,
@@ -32,7 +34,22 @@ export interface EntryRepository {
   list(args: ListEntriesArgs): Promise<readonly EntryRow[]>;
 }
 
-export interface CreateEntryArgs {
+/**
+ * Hook-related fields shared by every mutating chokepoint args type.
+ * The persistence-layer impl ignores these; the
+ * `LifecycleHookingEntryRepository` decorator reads them to fire
+ * before_/after_ Triggers with the right ctx + original input.
+ *
+ * `hookContext` defaults to an anonymous `HandlerContext` in the
+ * decorator when callers don't supply one (test paths, internal
+ * boot-time writes).
+ */
+export interface MutationHookFields {
+  readonly hookContext?: HandlerContext;
+  readonly originalInput?: unknown;
+}
+
+export interface CreateEntryArgs extends MutationHookFields {
   readonly id: string;
   readonly collection: string;
   readonly status: ContentState;
@@ -41,20 +58,24 @@ export interface CreateEntryArgs {
   readonly now: number;
 }
 
-export interface UpdateEntryArgs {
+export interface UpdateEntryArgs extends MutationHookFields {
   readonly id: string;
   readonly expectedVersion: number;
   readonly data: Record<string, unknown>;
   readonly now: number;
 }
 
-export interface ArchiveEntryArgs {
+export interface DeleteEntryArgs extends MutationHookFields {
+  readonly id: string;
+}
+
+export interface ArchiveEntryArgs extends MutationHookFields {
   readonly id: string;
   readonly expectedVersion: number;
   readonly now: number;
 }
 
-export interface TransitionStatusArgs {
+export interface TransitionStatusArgs extends MutationHookFields {
   readonly id: string;
   readonly to: ContentState;
   readonly expectedStatus?: ContentState;

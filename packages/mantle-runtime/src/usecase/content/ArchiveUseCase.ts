@@ -42,6 +42,8 @@ export class ArchiveUseCase {
         id: request.id,
         expectedVersion: request.expectedVersion,
         now: this.clock.now(),
+        hookContext: request.ctx,
+        originalInput: request.originalInput,
       }),
     );
   }

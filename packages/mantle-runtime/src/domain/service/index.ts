@@ -6,3 +6,4 @@ export * from "./PublishKeys.js";
 export * from "./MarkdownSerializer.js";
 export * from "./ViewSqlCompiler.js";
 export * from "./PathMatcher.js";
+export * from "./TriggerIndex.js";

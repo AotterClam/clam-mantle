@@ -111,7 +111,7 @@ describe("ValidateBootUseCase", () => {
     expect(codes).toContain("SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES");
   });
 
-  it("emits LIFECYCLE_NOT_IN_V010 (runtime-pending) for lifecycle Triggers", () => {
+  it("accepts a lifecycle Trigger pointing at a known Schema (4.2 wired)", () => {
     const reg = new InMemoryHandlerRegistry();
     reg.register("captchaCheck", () => ({ ok: true }));
     const result = new ValidateBootUseCase().execute({
@@ -127,10 +127,7 @@ describe("ValidateBootUseCase", () => {
       ],
       registry: reg,
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    const codes = result.diagnostics.map((d) => d.code);
-    expect(codes).toContain("LIFECYCLE_NOT_IN_V010");
+    expect(result.ok).toBe(true);
   });
 
   it("emits LIFECYCLE_SCHEMA_UNKNOWN when lifecycle Trigger watches an unknown Schema", () => {

@@ -33,9 +33,9 @@ import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
  *   - Every `Trigger.target.procedure` resolves to a manifest.
  *   - Every `http` Trigger has a unique `(method, path)` pair and a
  *     `/api/` prefix.
- *   - Until commit 4.2 wires the LifecycleHookingEntryRepository
- *     decorator, boot rejects `Trigger.source.kind: lifecycle` with
- *     `LIFECYCLE_NOT_IN_V010` (parser accepts; runtime not ready).
+ *   - Every `Trigger.source.kind: lifecycle` watches a declared Schema
+ *     (`LIFECYCLE_SCHEMA_UNKNOWN`). The hook runtime ships in commit
+ *     4.2 (`LifecycleHookingEntryRepository`).
  *   - Locale + translates cross-Schema invariants (ADR-0010) hold.
  */
 export type ValidateBootResponse =
@@ -138,17 +138,6 @@ export class ValidateBootUseCase {
             }),
           );
         }
-        diagnostics.push(
-          runtimePendingGuard({
-            kind: "Trigger",
-            name: t.metadata.name,
-            field: "source.kind",
-            value: "lifecycle",
-            allowed: "http",
-            code: "LIFECYCLE_NOT_IN_V010",
-            feature: "lifecycle hook execution",
-          }),
-        );
       }
     }
 

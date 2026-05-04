@@ -2,6 +2,7 @@ import type { ContentState } from "@aotter/mantle-spec";
 import type {
   ArchiveEntryArgs,
   CreateEntryArgs,
+  DeleteEntryArgs,
   EntryRepository,
   ListEntriesArgs,
   TransitionStatusArgs,
@@ -93,11 +94,11 @@ export class DatabaseEntryRepository implements EntryRepository {
     return rowFromDb(row);
   }
 
-  async delete(id: string): Promise<{ readonly removed: boolean }> {
+  async delete(args: DeleteEntryArgs): Promise<{ readonly removed: boolean }> {
     const result = await this.db.batch([
-      this.db.prepare(`DELETE FROM revisions WHERE entry_id = ?`).bind(id),
-      this.db.prepare(`DELETE FROM approvals WHERE entry_id = ?`).bind(id),
-      this.db.prepare(`DELETE FROM entries WHERE id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM revisions WHERE entry_id = ?`).bind(args.id),
+      this.db.prepare(`DELETE FROM approvals WHERE entry_id = ?`).bind(args.id),
+      this.db.prepare(`DELETE FROM entries WHERE id = ?`).bind(args.id),
     ]);
     const last = result[result.length - 1];
     return { removed: (last?.meta.changes ?? 0) > 0 };
