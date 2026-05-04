@@ -12,6 +12,25 @@
 
 ## Context
 
+This ADR is the local statement of an Aotter-wide thesis. mantle is
+one half of **Mantle** (**C**onfig **L**anguage for **A**pps &
+**M**odeling) — the other half is the OLAP / data-warehouse work in
+[`aotter-mantle`](https://github.com/aotter/aotter-mantle). Both share a
+single design grammar:
+
+> **Agents write config; the runtime carries the complexity.**
+
+Hard problems — schema validation, OAuth, locale canonicalization,
+cache invalidation, transactional state — live in the runtime, where
+they're written once by people who understand them. The authoring
+surface is YAML the agent fills in, with structured diagnostics
+catching mistakes before they become production failures. Non-coders
+benefit from agent leverage *safely* because the load-bearing logic
+isn't in their hands.
+
+This ADR documents what that thesis means concretely for mantle's
+authoring contract.
+
 The primary author/integrator of consumer apps that depend on
 `@aotter/mantle-*` is expected to be Claude Code (or a peer LLM
 agent) running inside the consumer project. Human contributors review

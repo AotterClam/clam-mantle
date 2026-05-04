@@ -2,7 +2,25 @@
 
 This is `@aotter/mantle-*`: MCP-native headless CMS for Cloudflare Workers, built around a 4-atom YAML manifest model. **v0.1.0 is in development**; until v0.1.0 tags, the runtime is stubbed in places and ships in incremental commits per the plan in [#1](https://github.com/aotter/mantle/issues/1).
 
-> **You (an AI agent) are the expected primary author** of consumer projects that depend on these packages. The SDK's authoring contract is designed for that — see `docs/adr/0007-ai-as-primary-author.md` (when ported). When proposing or reviewing changes, weigh AI-author DX (deterministic CLI feedback, structured JSON diagnostics, fail-fast over runtime errors) alongside human-author DX.
+## Mantle thesis (read first)
+
+**Mantle** = **C**onfig **L**anguage for **A**pps & **M**odeling. Aotter's family of agent-native config languages, two halves: this repo (Apps/OLTP) and [`aotter-mantle`](https://github.com/aotter/aotter-mantle) (Modeling/OLAP). The thesis is the same on both sides:
+
+> **Agents write config; the runtime carries the complexity.**
+
+Concretely, when designing or reviewing a change, ask:
+
+- **Did this push complexity up to the authoring surface?** If a manifest field requires the agent to understand a hidden invariant, the runtime is failing its job. Move the invariant into runtime validation with a structured Diagnostic.
+- **Did this make the agent's job harder?** Adding a new manifest key with subtle semantics, a new closed-enum member that's "almost but not quite" like the others, or a runtime behavior that varies by undocumented context — all symptoms of the runtime offloading work onto the author.
+- **Can a non-coder safely benefit from this change?** Vibe-coders won't read source code. They paste a URL into Claude Code and trust the agent. If a misuse of the SDK silently corrupts production data instead of surfacing as a `pre-deploy` diagnostic, you've broken the safety promise.
+
+Hard problems live in the runtime. Examples in this repo: schema validation (zod-translated from JSON Schema; Workers-CSP-safe by construction), locale canonicalization (BCP 47 enforced at every layer), OAuth (DCR-compliant out of the box), KV cache invalidation, and entry-writer chokepoint enforcement. Authors never see those — they see the manifest YAML.
+
+This is the lens for every architectural decision in this codebase.
+
+## You're the primary author
+
+> **You (an AI agent) are the expected primary author** of consumer projects that depend on these packages. The SDK's authoring contract is designed for that — see [`docs/adr/0007-ai-as-primary-author.md`](docs/adr/0007-ai-as-primary-author.md). When proposing or reviewing changes, weigh AI-author DX (deterministic CLI feedback, structured JSON diagnostics, fail-fast over runtime errors) alongside human-author DX.
 
 ## Where things live
 
