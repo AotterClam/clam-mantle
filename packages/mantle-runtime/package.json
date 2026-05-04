@@ -1,0 +1,31 @@
+{
+  "name": "@aotter/mantle-runtime",
+  "version": "0.0.0",
+  "description": "Runtime engine for mantle: dispatcher + entry-writer + view executor + content-ops + render pipeline + auth + MCP. Defines the 5 adapter ports (DB / KV / Session / Assets / OAuth). Adapter-agnostic: MUST NOT import D1Database / KVNamespace types.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-runtime",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aotter/mantle.git",
+    "directory": "packages/mantle-runtime"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "echo 'TODO: implement in commit 4'",
+    "typecheck": "echo 'TODO: implement in commit 4'",
+    "test": "echo 'TODO: implement in commit 4'"
+  },
+  "dependencies": {
+    "@aotter/mantle-spec": "workspace:*"
+  }
+}
