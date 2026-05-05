@@ -1,8 +1,8 @@
 /** @jsxImportSource hono/jsx */
 import { raw } from "hono/html";
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
-import { Layout } from "./components/Layout.js";
-import { bundleFor } from "../i18n/index.js";
+import { Layout } from "../components/Layout.js";
+import { bundleFor } from "../../i18n/index.js";
 import { excerpt, isoDate, renderMarkdown } from "./utils.js";
 
 export interface HomeContext {

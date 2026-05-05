@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 import type { SiteConfig } from "@aotter/mantle-spec";
-import { Layout } from "./components/Layout.js";
-import { bundleFor } from "../i18n/index.js";
+import { Layout } from "../components/Layout.js";
+import { bundleFor } from "../../i18n/index.js";
 
 export interface NotFoundContext {
   readonly site: SiteConfig;

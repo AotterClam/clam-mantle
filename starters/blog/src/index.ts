@@ -13,7 +13,7 @@ import {
   contactTemplate,
   homeTemplate,
   notFoundTemplate,
-} from "./templates/index.js";
+} from "./theme.default/templates/index.js";
 
 /**
  * Worker entrypoint. Lives at `wrangler.toml`'s `main`.

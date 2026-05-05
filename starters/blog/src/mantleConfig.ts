@@ -9,7 +9,7 @@ import {
 import { buildHandlers } from "./handlers/index.js";
 import { loadManifests } from "./loadManifests.js";
 import { PUBLIC_PATH_RESOLVER } from "./paths.js";
-import { buildTemplates } from "./templates/index.js";
+import { buildTemplates } from "./theme.default/templates/index.js";
 
 /**
  * `Env` shape. Wrangler typegen would normally produce this — for the

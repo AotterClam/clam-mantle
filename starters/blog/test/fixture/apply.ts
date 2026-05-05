@@ -36,7 +36,7 @@ import {
   pageTemplate,
   postTemplate,
   postListTemplate,
-} from "../../src/templates/index.js";
+} from "../../src/theme.default/templates/index.js";
 
 // Match HtmlPublishOrchestrator: registered templates return body
 // without a doctype prefix; whoever ships HTML to KV adds one.
