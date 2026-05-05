@@ -1,0 +1,34 @@
+name = "clam-blog"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Stub OAuth verifier — accepts `Bearer dev-<userId>` tokens for local
+# dev / testing. Production deploy MUST replace with the real
+# @cloudflare/workers-oauth-provider verifier (see clam-cms-cloudflare
+# README) and remove this var.
+CLAM_ALLOW_STUB_OAUTH = "1"
+
+# Cloudflare Turnstile site key (public — embedded in the contact
+# form widget). Default is CF's "always passes" test key — good for
+# `pnpm dev` + CI. Production: provision your own at
+# dash.cloudflare.com/?to=/:account/turnstile and replace.
+# https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clam-blog-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "kv-clam-blog-local"
+
+# Bundle YAML manifests as inline text strings — TS imports them via
+# `?raw` query param, esbuild resolves to a string export at build time.
+[[rules]]
+type = "Text"
+globs = ["**/*.yaml"]
+fallthrough = true
