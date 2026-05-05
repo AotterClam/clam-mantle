@@ -12,7 +12,7 @@ instead.
 
 ```
 GET  /api/views/<name>            view REST per View atom
-ALL  /api/<procedure>             procedure dispatcher (POST / PUT / PATCH / DELETE)
+METHOD <trigger path>             manifest-declared HTTP Trigger routes
 ALL  /mcp                         MCP JSON-RPC dispatcher
 ```
 
@@ -61,16 +61,16 @@ example View executing against an empty `notes` collection.
 1. Open `manifests/example.yaml`.
 2. Edit or replace the `Schema` and `View` to match your content.
 3. If you need server-side Procedures (form handlers, webhooks, etc.),
-   add a `Procedure` atom and register the handler in
-   `src/handlers/index.ts`.
+   add a `Procedure` atom, bind it with a `Trigger.source.kind: http`,
+   and register the handler in `src/handlers/index.ts`.
 4. Validate with `pnpm validate` (runs the spec CLI).
 
 ## What you get from the SDK
 
 `@aotterclam/clam-cms-cloudflare` mounts the routes above against
 `@aotterclam/clam-cms-runtime` use cases. Nothing is starter-specific
-once you've wired the bindings — auth, MCP DCR, view executor, and
-procedure dispatcher all come straight from the SDK.
+once you've wired the bindings — bearer-token MCP auth, view executor,
+and HTTP Trigger dispatcher all come straight from the SDK.
 
 If your frontend renders posts (or anything you'd like to expose for
 LLM crawlers), the runtime can ship an `.md` mirror of any entry; see
