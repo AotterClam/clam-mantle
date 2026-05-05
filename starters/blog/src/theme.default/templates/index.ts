@@ -7,12 +7,7 @@ import { homeTemplate as baseHome } from "./home.js";
 import { notFoundTemplate as baseNotFound } from "./notFound.js";
 import { contactTemplate as baseContact } from "./contact.js";
 
-/**
- * Slot resolution at module init: each template falls through to
- * baseline if `theme/index.ts:templates.<name>` is unset. Whatever
- * the consumer drops in via `pnpm theme:fork templates/<name>.tsx`
- * lands here.
- */
+// Slot resolution: theme/index.ts overrides win, fall through to baseline.
 export const postTemplate = overrides.templates?.post ?? basePost;
 export const postListTemplate = overrides.templates?.postList ?? basePostList;
 export const pageTemplate = overrides.templates?.page ?? basePage;

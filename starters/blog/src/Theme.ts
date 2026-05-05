@@ -17,12 +17,12 @@
  * tend to ask for inside the same content shape.
  */
 import type { EntryContext, ListContext } from "@aotter/mantle-runtime";
-import type { I18nBundle } from "../i18n/index.js";
-import type { Header } from "./components/Header.js";
-import type { Footer } from "./components/Footer.js";
-import type { HomeContext } from "./templates/home.js";
-import type { ContactContext } from "./templates/contact.js";
-import type { NotFoundContext } from "./templates/notFound.js";
+import type { I18nBundle } from "./i18n/index.js";
+import type { Header } from "./theme.default/components/Header.js";
+import type { Footer } from "./theme.default/components/Footer.js";
+import type { HomeContext } from "./theme.default/templates/home.js";
+import type { ContactContext } from "./theme.default/templates/contact.js";
+import type { NotFoundContext } from "./theme.default/templates/notFound.js";
 
 type DeepPartial<T> = T extends object
   ? { [K in keyof T]?: DeepPartial<T[K]> }

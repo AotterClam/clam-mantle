@@ -1,19 +1,9 @@
 import overrides from "../theme/index.js";
 
 /**
- * Tiny inline-SVG icon registry. v0.1: hand-authored 24×24 lucide-style
- * paths (https://lucide.dev/), monochrome, single stroke. Adding an
- * icon to the baseline = add an entry to `PATHS` here. To override or
- * extend at the consumer level, populate `theme/index.ts:icons` —
- * its entries spread AFTER the baseline so identically-named icons
- * are replaced and new keys are added.
- *
- * Returns SVG markup as a string (templates inject via `raw()`). All
- * icons inherit `currentColor` for stroke so they follow the
- * surrounding text color, which keeps theme switching free.
- *
- * If the set grows past ~20 icons, swap for `lucide-static` and
- * re-export through this module so callers don't change.
+ * Inline-SVG icons (24×24, lucide-style, currentColor stroke).
+ * `theme/index.ts:icons` spreads after baseline — same name replaces,
+ * new name adds. Past ~20 icons, swap for `lucide-static` + re-export.
  */
 export type IconName =
   | "sun"

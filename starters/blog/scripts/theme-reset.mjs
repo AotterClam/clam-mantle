@@ -1,22 +1,28 @@
 #!/usr/bin/env node
 /**
- * `pnpm theme:reset <relative-path>` — undo a `theme:fork`. Removes
- * the file from src/theme/<path> and strips the matching entry +
- * import from src/theme/index.ts. Leaves the baseline untouched.
+ * `pnpm theme:reset <relative-path>` — undo a theme:fork. Removes
+ * the override file and strips the matching entry + import from
+ * theme/index.ts. Restores the matching example comment if a known
+ * stock example existed.
  *
  * Usage:
  *   pnpm theme:reset tokens.ts
  *   pnpm theme:reset components/Header.tsx
  *   pnpm theme:reset templates/post.tsx
+ *   pnpm theme:reset i18n/en.json
+ *   pnpm theme:reset icons.ts
  */
-import { existsSync, rmSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const STARTER_ROOT = resolve(SCRIPT_DIR, "..");
-const THEME_DIR = join(STARTER_ROOT, "src", "theme");
-const INDEX_PATH = join(THEME_DIR, "index.ts");
+import { existsSync, rmSync, readFileSync, writeFileSync, readdirSync, rmdirSync } from "node:fs";
+import { dirname } from "node:path";
+import {
+  pickSlot,
+  overridePath,
+  importLineFor,
+  entryValueFor,
+  isTopLevelSlot,
+  INDEX_PATH,
+  SlotError,
+} from "./_theme-slots.mjs";
 
 const path = process.argv[2];
 if (!path) {
@@ -24,76 +30,61 @@ if (!path) {
   process.exit(2);
 }
 
-const target = join(THEME_DIR, path);
+let slot;
+try {
+  slot = pickSlot(path);
+} catch (e) {
+  if (e instanceof SlotError) {
+    console.error(e.message);
+    process.exit(2);
+  }
+  throw e;
+}
+
+const target = overridePath(path);
 if (!existsSync(target)) {
   console.error(`No override at src/theme/${path}.`);
   process.exit(1);
 }
 
-const slot = pickSlot(path);
-
 rmSync(target);
+// Remove the parent directory if it was a slot subdir (components / templates / i18n)
+// and is now empty — keeps `src/theme/` tidy across fork/reset cycles.
+const parent = dirname(target);
+if (parent !== INDEX_PATH.replace(/\/index\.ts$/, "") && readdirSync(parent).length === 0) {
+  rmdirSync(parent);
+}
 
 let index = readFileSync(INDEX_PATH, "utf8");
-index = stripEntry(index, slot);
-index = stripImport(index, slot);
+index = removeEntry(index, slot);
+index = removeImport(index, importLineFor(slot));
 writeFileSync(INDEX_PATH, index);
 
-console.log(`Reset: src/theme/${path} removed; theme/index.ts stripped of ${slot.kind}/${slot.key} override.`);
-console.log(`Baseline restored.`);
+console.log(`Reset: src/theme/${path} removed; theme/index.ts entry + import stripped.`);
 
-function pickSlot(rel) {
-  if (rel === "tokens.ts") return { kind: "tokens", key: "tokens" };
-  if (rel === "icons.ts") return { kind: "icons", key: "icons" };
-  if (rel.startsWith("components/")) {
-    return { kind: "components", key: baseName(rel) };
-  }
-  if (rel.startsWith("templates/")) {
-    const name = baseName(rel).replace(/^[A-Z]/, (c) => c.toLowerCase());
-    return { kind: "templates", key: name };
-  }
-  if (rel.startsWith("i18n/")) {
-    return { kind: "i18n", key: baseName(rel).toLowerCase() };
-  }
-  console.error(`Unrecognized path shape: ${rel}`);
-  process.exit(2);
-}
-
-function baseName(rel) {
-  return rel.split("/").slice(-1)[0].replace(/\.[^.]+$/, "");
-}
-
-function stripEntry(source, slot) {
-  // Whole-line strip of the `<kind>:` entry we previously inserted.
-  const re = new RegExp(`^\\s{2}${slot.kind}:.*$\\n`, "m");
+function removeImport(source, importLine) {
+  // Drop the exact import line we wrote at fork time.
+  const re = new RegExp(`^${escape(importLine)}\\n`, "m");
   return source.replace(re, "");
 }
 
-function stripImport(source, slot) {
-  // Best-effort: strip our specific import line shapes.
-  const patterns = {
-    tokens: /^import \{ TOKENS_CSS as ForkedTokens \} from "\.\/tokens\.js";\n/m,
-    icons: /^import \{ icon as forkedIcon \} from "\.\/icons\.js";\n/m,
-    components: new RegExp(
-      `^import \\{ ${slot.key} as ${slot.key}Override \\} from "\\./components/${slot.key}\\.js";\\n`,
-      "m",
-    ),
-    templates: new RegExp(
-      `^import \\{ ${slot.key}Template as ${slot.key}Override \\} from "\\./templates/${capitalize(slot.key)}\\.js";\\n`,
-      "m",
-    ),
-    i18n: new RegExp(
-      `^import ${camelLocale(slot.key)}Override from "\\./i18n/${slot.key.replace(/-/g, "-")}\\.json";\\n`,
-      "m",
-    ),
-  };
-  return source.replace(patterns[slot.kind] ?? /(?!)/, "");
+function removeEntry(source, slot) {
+  if (isTopLevelSlot(slot)) {
+    const re = new RegExp(`^  ${slot.kind}:.*$\\n`, "m");
+    return source.replace(re, "");
+  }
+  // Nested — strip the inner key, then drop the whole block if it's empty.
+  const keyRe =
+    slot.kind === "i18n"
+      ? new RegExp(`^    "${slot.key}":.*$\\n`, "m")
+      : new RegExp(`^    ${slot.key}:.*$\\n`, "m");
+  let updated = source.replace(keyRe, "");
+  // If the block is now empty (`<kind>: {\n  },`), drop the block.
+  const emptyBlock = new RegExp(`^  ${slot.kind}: \\{\\n  \\},\\n`, "m");
+  updated = updated.replace(emptyBlock, "");
+  return updated;
 }
 
-function camelLocale(loc) {
-  return loc.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-function capitalize(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+function escape(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

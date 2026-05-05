@@ -1,20 +1,9 @@
 /**
  * L1 — design tokens. Light + dark CSS custom properties only. Every
- * other style rule (in `styles.ts`) is expressed in terms of these
- * vars, so swapping any single token cascades through the whole
- * theme.
- *
- * Override path for consumers: drop a `src/theme/index.ts:tokens`
- * string. The override is concatenated AFTER this baseline, so its
- * later `:root { ... }` declarations win on normal CSS specificity
- * rules.
- *
- * The baseline is intentionally stylistically inert — neutral
- * grayscale + a single blue accent + system font stack — to give CC
- * and the human a low-opinion starting point. The pre-neutralize
- * editorial values (Fraunces / Source Serif 4 / 朱砂 vermillion /
- * cream paper) are preserved verbatim in
- * `starters/_archive/blog-editorial-2026-05-05/` for reuse.
+ * style rule in `styles.ts` references these, so swapping any token
+ * cascades through the whole theme. Override via
+ * `theme/index.ts:tokens`; concatenated AFTER baseline so later
+ * declarations win on standard CSS specificity.
  */
 export const TOKENS_CSS = `
 :root {

@@ -1,4 +1,4 @@
-import type { ThemeOverride } from "../theme.default/Theme.js";
+import type { ThemeOverride } from "../Theme.js";
 
 // Uncomment imports as you fork files into this directory.
 // `pnpm theme:fork <relative-path>` does the cp + uncomment in one step.
@@ -26,12 +26,7 @@ import type { ThemeOverride } from "../theme.default/Theme.js";
  * For a worked walkthrough: `skills/customize-design/SKILL.md`.
  */
 const overrides: ThemeOverride = {
-  // tokens: `:root { --accent: hotpink; }`,
   // extraCss: `.site-main { max-width: 64rem; }`,
-  // icons: { logo: '<path d="M..."/>' },
-  // i18n: { en: enOverride, "zh-tw": zhTwOverride },
-  // components: { Header: HeaderOverride, Footer: FooterOverride },
-  // templates: { post: postOverride },
 };
 
 export default overrides;
