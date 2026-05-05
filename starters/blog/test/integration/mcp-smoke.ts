@@ -76,8 +76,9 @@ async function main(): Promise<void> {
   }
 
   // 2. tools/list — assert generic tools + per-collection authoring
-  //    tools for each Schema in the starter (3: posts,
-  //    post-translations, contact-messages → 6 per-collection tools).
+  //    tools for each Schema in the starter (5 schemas: posts,
+  //    post-translations, pages, page-translations, contact-messages
+  //    → 10 per-collection tools).
   {
     const r = await rpc("tools/list");
     const result = r.result as { tools: ReadonlyArray<{ name: string }> };
@@ -85,17 +86,23 @@ async function main(): Promise<void> {
     const expected = [
       "archive_entry",
       "create_draft_contact_messages",
+      "create_draft_page_translations",
+      "create_draft_pages",
       "create_draft_post_translations",
       "create_draft_posts",
       "get_entry",
       "list_entries",
       "request_publish",
       "update_draft_contact_messages",
+      "update_draft_page_translations",
+      "update_draft_pages",
       "update_draft_post_translations",
       "update_draft_posts",
     ];
     assert.deepEqual(names, expected, `tools/list mismatch: got ${names.join(",")}`);
-    console.log(`[mcp]  2/12  tools/list → ${names.length} tools (4 generic + 6 per-collection)`);
+    console.log(
+      `[mcp]  2/12  tools/list → ${names.length} tools (4 generic + 10 per-collection)`,
+    );
   }
 
   // 3. list_entries on post-translations — fixture seeded 6 rows

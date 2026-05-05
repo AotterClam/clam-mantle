@@ -93,12 +93,17 @@ jobs:
         run: |
           set -euo pipefail
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/)" = "302"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts/hello-world)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW/posts/translates-by-slug)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/pages/about)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW/pages/contact)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/llms.txt)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/llms.txt)" = "200"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts/does-not-exist)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zz)" = "404"
 
       - name: Smoke — contact form
         run: |

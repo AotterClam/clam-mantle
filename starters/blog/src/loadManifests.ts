@@ -4,6 +4,7 @@ import { parseManifests, type Manifest } from "@aotter/mantle-spec";
 // manifests travel with the worker code, no FS access at runtime.
 import postsYaml from "../manifests/posts.yaml";
 import postTranslationsYaml from "../manifests/post-translations.yaml";
+import pagesYaml from "../manifests/pages.yaml";
 import contactYaml from "../manifests/contact.yaml";
 
 /**
@@ -13,7 +14,12 @@ import contactYaml from "../manifests/contact.yaml";
  * Trigger targets, locale invariants).
  */
 export function loadManifests(): readonly Manifest[] {
-  const result = parseManifests([postsYaml, postTranslationsYaml, contactYaml]);
+  const result = parseManifests([
+    postsYaml,
+    postTranslationsYaml,
+    pagesYaml,
+    contactYaml,
+  ]);
   if (result.diagnostics.length > 0) {
     const summary = result.diagnostics
       .map((d) => `  - [${d.code}] ${d.path}: ${d.message}`)
