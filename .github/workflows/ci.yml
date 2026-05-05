@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Cancel superseded runs on the same ref. PR pushes that arrive in
 # rapid succession only spend CI on the latest commit.
