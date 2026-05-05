@@ -37,7 +37,9 @@ export interface ThemeOverride {
 
   /** L2 — extra CSS appended AFTER baseline `styles.ts`. Use for
    *  ad-hoc rules a consumer wants to add without forking the whole
-   *  stylesheet. */
+   *  stylesheet. Because this is appended after normal rules, CSS
+   *  `@import` statements are too late here; use `@font-face` for
+   *  custom fonts. */
   extraCss?: string;
 
   /** L2 — additional or overriding icons. Each value is the inner
