@@ -47,19 +47,28 @@ export function coerceViewParams(
 }
 
 function coerceScalar(raw: string, schema: JsonSchema, name: string): unknown {
-  const type = schema.type;
+  // Coerce by `type` first so a co-declared `enum` checks membership
+  // against typed values — `["1","2"].includes(1)` and `[1,2].includes("1")`
+  // are both false, so an enum-first check would throw spuriously (or
+  // worse, return a string value when an integer was declared).
+  const coerced = coerceByType(raw, schema.type, name);
   if (Array.isArray(schema.enum) && schema.enum.length > 0) {
-    if (!schema.enum.includes(raw)) {
+    if (!schema.enum.includes(coerced)) {
       throw new ViewParamCoercionError(
         `query param '${name}' must be one of ${schema.enum.join(", ")}; got ${JSON.stringify(raw)}.`,
       );
     }
-    return raw;
   }
+  return coerced;
+}
+
+function coerceByType(raw: string, type: JsonSchema["type"], name: string): unknown {
   switch (type) {
     case "integer": {
       const n = Number.parseInt(raw, 10);
-      // Reject "1.5", "1abc", "  1  " — only canonical decimals pass.
+      // Reject partial parses ("1.5", "1abc") and non-numeric ("abc")
+      // — `parseInt` would silently stop at the first non-digit. The
+      // trim() pair allows whitespace-padded canonicals.
       if (!Number.isFinite(n) || String(n) !== raw.trim()) {
         throw new ViewParamCoercionError(
           `query param '${name}' expected integer; got ${JSON.stringify(raw)}.`,
