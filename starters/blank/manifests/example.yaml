@@ -1,11 +1,11 @@
-# Single-file manifest demonstrating the two atom types this starter
-# uses. Replace with your real content shape and delete this comment.
+# Single-file demo manifest. Replace with your real content shape and
+# delete this comment. The four v0.1 atoms (only Schema + View used
+# below; add the others as your needs grow):
 #
-# v0.1 atom types:
-#   - Schema     : a content collection (the "table")
-#   - View       : a public read query auto-mounted at /api/views/<name>
-#   - Procedure  : an HTTP-callable handler (POST /api/<segment>) — add as needed
-#   - Trigger    : a lifecycle hook (before/after × create/update/delete/publish)
+#   Schema     — content collection (the "table")
+#   View       — public read query auto-mounted at /api/views/<name>
+#   Procedure  — HTTP-callable handler (POST /api/<segment>)
+#   Trigger    — lifecycle hook (before/after × create/update/delete/publish)
 
 apiVersion: cms.mantle.aotter.net/v1
 kind: Schema
