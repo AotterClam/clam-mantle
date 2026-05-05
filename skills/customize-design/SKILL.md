@@ -57,12 +57,19 @@ export const TOKENS_CSS = `
 
 The override is concatenated AFTER baseline tokens, so later declarations win on standard CSS specificity. You only need to redeclare the vars you want to change.
 
-**Custom web fonts**: if your `--font-display` references a font not in the system stack, register the font with an L2 `extraCss` `@import`:
+**Custom web fonts**: if your `--font-display` references a font not in the system stack, register it with L2 `extraCss` using `@font-face`. Do **not** use CSS `@import` here: `extraCss` is appended after baseline rules, and browsers ignore late `@import` statements.
 
 ```ts
 const overrides: ThemeOverride = {
-  extraCss: `@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap");`,
-  tokens: `:root { --font-display: "Fraunces", Georgia, serif; }`,
+  extraCss: `
+    @font-face {
+      font-family: "FrauncesLocal";
+      src: url("/fonts/fraunces.woff2") format("woff2");
+      font-weight: 400 700;
+      font-display: swap;
+    }
+  `,
+  tokens: `:root { --font-display: "FrauncesLocal", Georgia, serif; }`,
 };
 ```
 
