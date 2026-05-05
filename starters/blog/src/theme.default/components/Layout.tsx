@@ -51,12 +51,6 @@ export function Layout(props: LayoutProps) {
         {seo ? html`${raw(renderSeoTagsHtml(seo))}` : null}
         {!seo && description ? <meta name="description" content={description} /> : null}
         {!seo && ogImage ? <meta property="og:image" content={ogImage} /> : null}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500;600&display=swap"
-        />
         <style>{raw(SITE_CSS_RESOLVED)}</style>
         {html`<script>${raw(THEME_BOOTSTRAP_JS)}</script>`}
       </head>

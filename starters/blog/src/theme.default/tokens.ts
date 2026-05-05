@@ -4,43 +4,45 @@
  * vars, so swapping any single token cascades through the whole
  * theme.
  *
- * Override path for consumers: drop a `src/theme/tokens.ts` exporting
- * a `TOKENS_CSS` string. The override is concatenated AFTER this
- * file's tokens, so its later `:root { ... }` declarations win on
- * normal CSS specificity rules.
+ * Override path for consumers: drop a `src/theme/index.ts:tokens`
+ * string. The override is concatenated AFTER this baseline, so its
+ * later `:root { ... }` declarations win on normal CSS specificity
+ * rules.
  *
- * Today these tokens encode the editorial baseline (warm cream paper,
- * vermillion accent, Fraunces serif). The neutralize pass replaces
- * them with a stylistically-inert default; pre-neutralize values are
- * preserved verbatim in starters/_archive/blog-editorial-2026-05-05/.
+ * The baseline is intentionally stylistically inert — neutral
+ * grayscale + a single blue accent + system font stack — to give CC
+ * and the human a low-opinion starting point. The pre-neutralize
+ * editorial values (Fraunces / Source Serif 4 / 朱砂 vermillion /
+ * cream paper) are preserved verbatim in
+ * `starters/_archive/blog-editorial-2026-05-05/` for reuse.
  */
 export const TOKENS_CSS = `
 :root {
-  --paper: #f6f1e7;
-  --ink: #1a1814;
-  --rule: #d4c8b3;
-  --rule-strong: #3d342a;
-  --mute: #7a6d5e;
-  --accent: #a3331f;
-  --accent-soft: #c9614a;
-  --selection: #f0d6a3;
+  --paper: #ffffff;
+  --ink: #1a1a1a;
+  --rule: #e5e5e5;
+  --rule-strong: #c0c0c0;
+  --mute: #6b6b6b;
+  --accent: #2563eb;
+  --accent-soft: #60a5fa;
+  --selection: rgba(37, 99, 235, 0.18);
 
-  --font-display: "Fraunces", "Noto Serif TC", "Source Serif 4", Georgia, serif;
-  --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
 
   --measure: 38rem;
   --gutter: clamp(1.25rem, 4vw, 3rem);
 }
 
 [data-theme="dark"] {
-  --paper: #1a1814;
-  --ink: #f1ebdf;
-  --rule: #3d342a;
-  --rule-strong: #5a4d40;
-  --mute: #9a8d7e;
-  --accent: #e6594a;
-  --accent-soft: #c9614a;
-  --selection: #4a3520;
+  --paper: #0f0f0f;
+  --ink: #ededed;
+  --rule: #2a2a2a;
+  --rule-strong: #444444;
+  --mute: #9b9b9b;
+  --accent: #60a5fa;
+  --accent-soft: #93c5fd;
+  --selection: rgba(96, 165, 250, 0.22);
 }
 `;
