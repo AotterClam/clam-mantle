@@ -3,34 +3,9 @@ import { html, raw } from "hono/html";
 import { marked } from "marked";
 import type { SiteConfig } from "@aotterclam/clam-cms-spec";
 import { Layout } from "./components/Layout.js";
-import { pickCopy } from "./utils.js";
+import { bundleFor } from "../i18n/index.js";
 
 const markedOptions = { gfm: true, breaks: false } as const;
-
-const COPY = {
-  en: {
-    title: "Contact",
-    nameLabel: "Name",
-    emailLabel: "Email",
-    messageLabel: "Message",
-    send: "Send",
-    sending: "Sending…",
-    success: "Thanks — your message landed.",
-    fallback: "Could not send: ",
-    captcha: "Anti-bot check",
-  },
-  "zh-tw": {
-    title: "聯絡",
-    nameLabel: "姓名",
-    emailLabel: "電子信箱",
-    messageLabel: "訊息",
-    send: "送出",
-    sending: "送出中…",
-    success: "感謝你 — 訊息已送達。",
-    fallback: "送出失敗：",
-    captcha: "防機器人驗證",
-  },
-};
 
 export interface ContactContext {
   readonly site: SiteConfig;
@@ -41,8 +16,8 @@ export interface ContactContext {
 
 export function contactTemplate(ctx: ContactContext): string {
   const { site, locale, page, turnstileSiteKey } = ctx;
-  const copy = pickCopy(COPY, locale);
-  const title = page.title || copy.title;
+  const t = bundleFor(locale);
+  const title = page.title || t.contact.title;
   const bodyHtml = page.body ? (marked.parse(page.body, markedOptions) as string) : "";
   const tree = (
     <Layout
@@ -61,46 +36,49 @@ export function contactTemplate(ctx: ContactContext): string {
 
         <form class="contact-form" id="contact-form" novalidate>
           <label class="contact-label">
-            <span>{copy.nameLabel}</span>
+            <span>{t.contact.nameLabel}</span>
             <input name="name" type="text" required autocomplete="name" />
           </label>
           <label class="contact-label">
-            <span>{copy.emailLabel}</span>
+            <span>{t.contact.emailLabel}</span>
             <input name="email" type="email" required autocomplete="email" />
           </label>
           <label class="contact-label">
-            <span>{copy.messageLabel}</span>
+            <span>{t.contact.messageLabel}</span>
             <textarea name="message" rows={6} required></textarea>
           </label>
           <div class="contact-captcha">
-            <span class="contact-captcha-label">{copy.captcha}</span>
+            <span class="contact-captcha-label">{t.contact.captchaLabel}</span>
             <div
-              class="cf-turnstile"
+              id="turnstile-mount"
               data-sitekey={turnstileSiteKey}
-              data-theme="auto"
             ></div>
           </div>
           <button type="submit" class="contact-submit">
-            <span data-state="idle">{copy.send}</span>
+            <span data-state="idle">{t.contact.send}</span>
             <span data-state="sending" hidden>
-              {copy.sending}
+              {t.contact.sending}
             </span>
           </button>
           <p class="contact-status" role="status" aria-live="polite"></p>
         </form>
       </article>
-      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+      <script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__clamTurnstileReady&render=explicit"
+        async
+        defer
+      ></script>
       {html`<script>
-${raw(buildContactRuntimeJs(copy))}
+${raw(buildContactRuntimeJs(t))}
 </script>`}
     </Layout>
   );
   return "<!doctype html>" + String(tree);
 }
 
-function buildContactRuntimeJs(copy: (typeof COPY)["en"]): string {
-  const successMsg = JSON.stringify(copy.success);
-  const fallbackMsg = JSON.stringify(copy.fallback);
+function buildContactRuntimeJs(t: ReturnType<typeof bundleFor>): string {
+  const successMsg = JSON.stringify(t.contact.success);
+  const fallbackMsg = JSON.stringify(t.contact.fallbackPrefix);
   return `
 (function(){
   var form = document.getElementById('contact-form');
@@ -109,17 +87,46 @@ function buildContactRuntimeJs(copy: (typeof COPY)["en"]): string {
   var submit = form.querySelector('button[type="submit"]');
   var idleLabel = submit.querySelector('[data-state="idle"]');
   var sendingLabel = submit.querySelector('[data-state="sending"]');
+  var mount = document.getElementById('turnstile-mount');
+  var sitekey = mount && mount.getAttribute('data-sitekey');
+  var widgetId = null;
+
+  function pageTheme(){
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  }
+  function renderWidget(){
+    if(!mount || !window.turnstile) return;
+    if(widgetId !== null){ window.turnstile.remove(widgetId); }
+    widgetId = window.turnstile.render(mount, {
+      sitekey: sitekey,
+      theme: pageTheme(),
+    });
+  }
+  // Turnstile script calls __clamTurnstileReady() on load (?onload=...).
+  window.__clamTurnstileReady = renderWidget;
+  // If the script loaded before this runtime ran (cached), render now.
+  if(window.turnstile && widgetId === null){ renderWidget(); }
+  document.addEventListener('clam:theme', renderWidget);
+
+  function tokenFromWidget(){
+    if(window.turnstile && widgetId !== null){
+      try { return window.turnstile.getResponse(widgetId) || ''; } catch(_){}
+    }
+    var fd = new FormData(form);
+    return fd.get('cf-turnstile-response') || '';
+  }
+
   form.addEventListener('submit', async function(e){
     e.preventDefault();
     status.textContent = '';
     status.removeAttribute('data-error');
-    var fd = new FormData(form);
-    var token = fd.get('cf-turnstile-response') || '';
+    var token = tokenFromWidget();
     if(!token){
       status.textContent = ${fallbackMsg} + 'captcha';
       status.setAttribute('data-error', '1');
       return;
     }
+    var fd = new FormData(form);
     submit.disabled = true;
     idleLabel.hidden = true;
     sendingLabel.hidden = false;
@@ -138,7 +145,7 @@ function buildContactRuntimeJs(copy: (typeof COPY)["en"]): string {
       if(res.ok && data && data.ok){
         status.textContent = ${successMsg};
         form.reset();
-        if(window.turnstile){ window.turnstile.reset(); }
+        if(window.turnstile && widgetId !== null){ window.turnstile.reset(widgetId); }
       } else {
         var msg = (data && data.diagnostic && data.diagnostic.message) || ('HTTP ' + res.status);
         status.textContent = ${fallbackMsg} + msg;

@@ -2,12 +2,8 @@
 import { raw } from "hono/html";
 import type { Entry, SiteConfig } from "@aotterclam/clam-cms-spec";
 import { Layout } from "./components/Layout.js";
-import { excerpt, isoDate, pickCopy, renderMarkdown } from "./utils.js";
-
-const HEADINGS = {
-  en: { eyebrow: "the dispatch", recent: "Recent posts" },
-  "zh-tw": { eyebrow: "近作", recent: "最新文章" },
-};
+import { bundleFor } from "../i18n/index.js";
+import { excerpt, isoDate, renderMarkdown } from "./utils.js";
 
 export interface HomeContext {
   readonly site: SiteConfig;
@@ -18,7 +14,7 @@ export interface HomeContext {
 
 export function homeTemplate(ctx: HomeContext): string {
   const { site, locale, home, recentPosts } = ctx;
-  const heading = pickCopy(HEADINGS, locale);
+  const t = bundleFor(locale).home;
   const tree = (
     <Layout
       site={site}
@@ -28,14 +24,14 @@ export function homeTemplate(ctx: HomeContext): string {
       current="home"
     >
       <section class="hero">
-        <div class="eyebrow">{heading.eyebrow}</div>
+        <div class="eyebrow">{t.eyebrow}</div>
         <h1>{home.title}</h1>
         {home.intro ? <p class="intro">{home.intro}</p> : null}
         <div class="body">{raw(renderMarkdown(home.body))}</div>
       </section>
       {recentPosts.length > 0 ? (
         <section>
-          <h2>{heading.recent}</h2>
+          <h2>{t.recent}</h2>
           <ul class="entry-list">
             {recentPosts.map((e) => {
               const data = e.data as {

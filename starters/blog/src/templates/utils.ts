@@ -18,12 +18,3 @@ export function excerpt(body: string | undefined, max = 160): string {
   return first.length > max ? first.slice(0, max - 3) + "…" : first;
 }
 
-/**
- * Pick the locale-keyed entry from a copy table. Keys are the URL
- * locale form (e.g. `"zh-tw"` for `zh-TW`); falls back to `en` if the
- * requested locale has no entry. The `en` fallback is asserted with
- * `!` because every starter copy table is required to declare it.
- */
-export function pickCopy<T>(table: Record<string, T>, locale: string): T {
-  return table[locale.toLowerCase()] ?? table.en!;
-}
