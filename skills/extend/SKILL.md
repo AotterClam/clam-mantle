@@ -148,6 +148,25 @@ Both live in `test/integration/`. If you added a new MCP-relevant Schema, the pe
 | New View doesn't appear at `/api/views/<name>`                    | Same as above — restart. Or: name has uppercase / non-URL-safe chars (use kebab-case).               |
 | `VIEW_FILTER_FIELD_NOT_IN_SCHEMA` for a real field                | The Schema is referenced via `View.spec.from`; field must be in that Schema's `properties`.          |
 
+## Stale-KV gotcha (when you change Layout / Header / shared chrome)
+
+The starter renders **registered templates** (post / postList / page) at
+publish time and caches the HTML in KV. **Request-time templates** (home
+/ contact / notFound) compose fresh on each request.
+
+If you change `src/templates/components/Layout.tsx`,
+`Header.tsx`, `styles.ts`, or `src/i18n/*.json` — the new chrome shows
+on home / contact / notFound immediately, but post / postList / page
+keep serving the OLD chrome from KV until you re-publish.
+
+Local dev fix: `pnpm fixture` rebakes everything from seed data.
+
+Production fix: iterate every published entry and call
+`runtime.requestPublish.execute({ id })`. A `mantle republish-all`
+CLI is on the v0.1.x roadmap. Until then, a one-shot script in your
+project that pulls `runtime.listEntries` for every collection and
+re-publishes each row is the right pattern.
+
 ## Don't
 
 - Don't add a Schema-level public-read flag (`Schema.spec.expose.rest` etc) — ADR-0012 forbids; public reads always go through Views.
