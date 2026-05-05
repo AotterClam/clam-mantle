@@ -1,6 +1,9 @@
 /**
- * `infrastructure/cli/` — file-walking, console I/O, and process-exit
- * adapter for the validate use case. Thin wrapper: load files →
- * construct request DTO → call use case → format response.
+ * `infrastructure/cli/` — file-walking + console I/O adapters for
+ * each subcommand. Thin: load files → call use case → format → stdout.
  */
-export { run, parseArgs, type CliArgs } from "./ValidateCommand.js";
+export { loadManifestsFromRoot, type LoadManifestsResult } from "./loadManifests.js";
+export { run as runValidate } from "./ValidateCommand.js";
+export { run as runIntrospect } from "./IntrospectCommand.js";
+export { run as runEmitOpenapi } from "./EmitOpenapiCommand.js";
+export { run as runEmitTypes } from "./EmitTypesCommand.js";

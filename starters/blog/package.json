@@ -9,7 +9,12 @@
     "fixture": "tsx test/fixture/apply.ts",
     "mcp-smoke": "tsx test/integration/mcp-smoke.ts",
     "view-smoke": "tsx test/integration/view-rest-smoke.ts",
+    "validate": "clam-cms validate",
+    "introspect": "clam-cms introspect",
+    "emit-openapi": "clam-cms emit-openapi > openapi.json",
+    "emit-types": "clam-cms emit-types --namespace BlogCms > clam-types.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "pnpm validate && pnpm typecheck",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
