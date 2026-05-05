@@ -87,20 +87,26 @@ export function buildCmsConfig(env: Env): CmsConfig {
         : { fetch: async () => null },
       oauth: env.CLAM_ALLOW_STUB_OAUTH === "1"
         ? new StubOAuthVerifier({ CLAM_ALLOW_STUB_OAUTH: "1" })
-        : new WorkersOAuthVerifier(env.OAUTH_KV!),
+        : (() => {
+            if (!env.OAUTH_KV) throw new Error(
+              "OAUTH_KV binding is required when CLAM_ALLOW_STUB_OAUTH is not set. " +
+              "Add [[kv_namespaces]] binding = \"OAUTH_KV\" to wrangler.toml."
+            );
+            return new WorkersOAuthVerifier(env.OAUTH_KV);
+          })(),
     },
     adminAuth,
   };
 }
 
 function buildAdminAuth(env: Env): AdminAuthConfig | undefined {
-  const { OAUTH_KV, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } = env;
-  if (!OAUTH_KV || !GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) return undefined;
+  const { OAUTH_KV, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, ADMIN_GITHUB_LOGIN } = env;
+  if (!OAUTH_KV || !GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET || !ADMIN_GITHUB_LOGIN) return undefined;
   return {
     oauthProvider: createOAuthProvider(),
     oauthKv: OAUTH_KV,
     githubClientId: GITHUB_CLIENT_ID,
     githubClientSecret: GITHUB_CLIENT_SECRET,
-    adminGithubLogin: env.ADMIN_GITHUB_LOGIN ?? "",
+    adminGithubLogin: ADMIN_GITHUB_LOGIN,
   };
 }

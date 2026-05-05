@@ -70,6 +70,8 @@ export class StubUserRepository implements UserRepository {
 
 export class StubStaffRepository implements StaffRepository {
   async listAll(): Promise<StaffListEntry[]> { return []; }
-  async readByUserId(_userId: string): Promise<Staff | null> { return null; }
+  async readByUserId(userId: string): Promise<Staff | null> {
+    return { userId, role: "owner", grantedBy: null, grantedAt: 0 };
+  }
   async ensureBootstrapOwner(_opts: BootstrapOwnerOpts): Promise<void> {}
 }
