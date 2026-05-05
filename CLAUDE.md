@@ -67,7 +67,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 6. `infrastructure/` adapters (HTTP / MCP / persistence / render orchestrator) are thin: no business logic, no validation, no transformation — just envelope handling + delegation to a use case.
 7. The assembly root (`runtime.ts` for runtime, `index.ts` for spec) is the ONLY place concrete adapters wire to use cases via ports.
 
-**Naming convention** (no `*Port` suffix on ports — Aotter rmn-r / trek-dmp / mantle-core convention):
+**Naming convention** (no `*Port` suffix on ports — Aotter clean-architecture convention):
 
 - `*Repository` for data access (CRUD): `EntryRepository`, `SessionRepository`
 - `*Driver` for raw drivers under repositories: `DatabaseDriver`
@@ -122,12 +122,12 @@ Several v0.1.x features ship as **interface defined, impl stubbed** in v0.1.0:
 
 The "stub" pattern lets consumers compile against the real interface. Replacing the stub with a real impl in v0.1.x doesn't break consumer code.
 
-### Grammar promoted, runtime pending (commit 4.1)
+### Grammar promoted, runtime wired
 
-Two v0.1.x-committed grammar items were promoted into v0.1.0 in commit 4.1; the runtime ships in the next two commits. Until then, the boot validator emits the feature-named code so authors get a clear "not yet" instead of silent failure:
+Two grammar items that were originally committed as v0.1.x are in v0.1.0:
 
-- `Trigger.source.kind: lifecycle` — parser accepts; `LIFECYCLE_NOT_IN_V010` at boot until commit 4.2 wires the `LifecycleHookingEntryRepository` decorator.
-- `Procedure.handler.kind: builtin` — parser accepts; `HANDLER_BUILTIN_NOT_IN_V010` at boot until commit 4.3 wires `InvokeBuiltinUseCase`.
+- `Trigger.source.kind: lifecycle` — parser accepts; `LifecycleHookingEntryRepository` decorator wired.
+- `Procedure.handler.kind: builtin` — parser accepts; `InvokeBuiltinUseCase` wired.
 
 ## Failure modes to avoid (encoded in the ADRs)
 
