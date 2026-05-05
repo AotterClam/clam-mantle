@@ -8,8 +8,8 @@
  * dispatcher-internal ports `Clock`, `IdGenerator`, `HandlerRegistry`,
  * and the chokepoint `EntryRepository`.
  *
- * Per the Aotter naming convention (rmn-r / trek-dmp / clam-core), no
- * `*Port` suffix; ports are discoverable by the package alone.
+ * Per the Aotter clean-architecture convention, no `*Port` suffix;
+ * ports are discoverable by the package alone.
  */
 export type {
   DatabaseDriver,
