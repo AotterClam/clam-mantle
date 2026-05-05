@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./cf": {
+      "types": "./dist/cf.d.ts",
+      "import": "./dist/cf.js"
     }
   },
   "files": ["dist", "README.md"],
