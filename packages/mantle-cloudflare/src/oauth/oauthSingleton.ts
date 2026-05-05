@@ -10,7 +10,6 @@ import {
   OAUTH_TOKEN_PATH,
 } from "./oauthConstants.js";
 
-export { BypassToConsent, isOauthProviderPath } from "./oauthConstants.js";
 
 /**
  * Construct a new `OAuthProvider` without an MCP API route (wired in #20).

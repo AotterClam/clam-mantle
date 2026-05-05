@@ -46,13 +46,7 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
     templates: config.templates,
     siteDefaults: config.siteDefaults,
     publicPathResolver: config.publicPathResolver,
-    db: config.bindings.db,
-    kv: config.bindings.kv,
-    sessions: config.bindings.sessions,
-    assets: config.bindings.assets,
-    oauth: config.bindings.oauth,
-    users: config.bindings.users,
-    staff: config.bindings.staff,
+    ...config.bindings,
   });
 
   let booted: Promise<CmsRuntime> | null = null;

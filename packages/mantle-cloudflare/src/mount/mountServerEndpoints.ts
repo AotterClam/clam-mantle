@@ -14,7 +14,7 @@ import {
   type Session,
 } from "@aotter/mantle-runtime";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
-import { BypassToConsent, isOauthProviderPath } from "../oauth/oauthConstants.js";
+import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
 import { detectConsentLocale, renderConsentHtml, type ConsentModel } from "../oauth/consentHtml.js";
 
@@ -107,13 +107,15 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
 
     const now = Date.now();
     const userId = await runtime.users.upsertByGithub(cbResult.profile, now);
-    await runtime.users.storeGithubToken(userId, cbResult.accessToken, cbResult.grantedScope, now);
-    await runtime.staff.ensureBootstrapOwner({
-      userId,
-      githubLogin: cbResult.profile.login,
-      adminGithubLogin: adminAuth.adminGithubLogin,
-      now,
-    });
+    await Promise.all([
+      runtime.users.storeGithubToken(userId, cbResult.accessToken, cbResult.grantedScope, now),
+      runtime.staff.ensureBootstrapOwner({
+        userId,
+        githubLogin: cbResult.profile.login,
+        adminGithubLogin: adminAuth.adminGithubLogin,
+        now,
+      }),
+    ]);
 
     const session: Session = {
       token: crypto.randomUUID(),
@@ -140,27 +142,12 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     const runtime = await ref.get();
     const locale = detectConsentLocale(c.req.header("accept-language") ?? null);
 
-    // Route through provider so it injects OAUTH_PROVIDER helpers onto env.
-    type OauthEnvWithProvider = typeof oauthEnv & {
-      OAUTH_PROVIDER?: {
-        parseAuthRequest(req: Request): Promise<{ clientId: string; redirectUri: string; scope?: readonly string[] }>;
-        lookupClient(clientId: string): Promise<{ clientName?: string } | null>;
-        completeAuthorization(opts: {
-          request: unknown;
-          userId: string;
-          metadata: Record<string, unknown>;
-          scope: readonly string[];
-          props: Record<string, unknown>;
-        }): Promise<{ redirectTo: string }>;
-      };
-    };
-    const augmented: OauthEnvWithProvider = { ...oauthEnv };
+    const augmented: { OAUTH_KV: KVNamespace; OAUTH_PROVIDER?: OAuthHelpers } = { ...oauthEnv };
     try {
       await oauthProvider.fetch(c.req.raw, augmented as never, c.executionCtx as ExecutionContext);
     } catch (e) {
       if (!(e instanceof BypassToConsent)) throw e;
     }
-
     if (!augmented.OAUTH_PROVIDER) {
       return jsonError({
         status: 500,
@@ -170,7 +157,6 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     }
     const oauthHelpers = augmented.OAUTH_PROVIDER;
 
-    // Auth gate: require a staff session cookie.
     const sessionToken = readSessionToken(c.req.raw);
     const session = sessionToken ? await runtime.sessions.read(sessionToken) : null;
     if (!session) {
@@ -194,97 +180,117 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       });
     }
 
-    if (c.req.method === "POST") {
-      const form = await c.req.raw.formData();
-      const oauthRequestJson = form.get("oauth_request");
-      if (typeof oauthRequestJson !== "string") {
-        return jsonResponse(400, {
-          ok: false,
-          diagnostic: runtimeDiagnostic({
-            code: "INPUT_VALIDATION_FAILED",
-            severity: "error",
-            path: "POST /oauth/authorize#/body/oauth_request",
-            expected: "form-encoded `oauth_request` string",
-            message: "Missing `oauth_request` form field.",
-          }),
-        });
-      }
-      if (form.get("decision") !== "approve") {
-        return jsonResponse(400, {
-          ok: false,
-          diagnostic: runtimeDiagnostic({
-            code: "AUTH_DENIED",
-            severity: "error",
-            path: "POST /oauth/authorize#/body/decision",
-            expected: "decision=approve",
-            message: "Authorization denied by user.",
-          }),
-        });
-      }
-
-      let reqInfo: { scope?: readonly string[] } & Record<string, unknown>;
-      try {
-        reqInfo = JSON.parse(oauthRequestJson) as typeof reqInfo;
-      } catch {
-        return jsonResponse(400, {
-          ok: false,
-          diagnostic: runtimeDiagnostic({
-            code: "INPUT_VALIDATION_FAILED",
-            severity: "error",
-            path: "POST /oauth/authorize#/body/oauth_request",
-            expected: "valid JSON-encoded OAuth request payload",
-            message: "Could not parse `oauth_request` as JSON.",
-          }),
-        });
-      }
-
-      const ghToken = await runtime.users.readGithubToken(session.userId);
-      const { redirectTo } = await oauthHelpers.completeAuthorization({
-        request: reqInfo,
-        userId: session.userId,
-        metadata: {},
-        scope: reqInfo.scope ?? [],
-        props: {
-          userId: session.userId,
-          ...(ghToken
-            ? { githubAccessToken: ghToken.accessToken, githubScope: ghToken.scope }
-            : {}),
-        },
-      });
-      return new Response(null, { status: 302, headers: { location: redirectTo } });
-    }
-
-    // GET: parse auth request and render consent UI.
-    let model: ConsentModel | null = null;
-    try {
-      const reqInfo = await oauthHelpers.parseAuthRequest(c.req.raw);
-      const clientInfo = await oauthHelpers.lookupClient(reqInfo.clientId);
-      model = {
-        clientName: clientInfo?.clientName ?? "(unknown client)",
-        redirectUri: reqInfo.redirectUri,
-        scopes: reqInfo.scope ?? [],
-        oauthRequestJson: JSON.stringify(reqInfo),
-      };
-    } catch {
-      // parseAuthRequest may throw on malformed requests.
-    }
-    return new Response(renderConsentHtml(locale, model), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    if (c.req.method === "POST") return handleConsentPost(c, runtime, session, oauthHelpers);
+    return handleConsentGet(c, runtime, locale, oauthHelpers);
   };
 
   app.get("/oauth/authorize", consentHandler);
   app.post("/oauth/authorize", consentHandler);
 
   // ── OAuth provider passthrough (token / register) ────────────────────
-  app.all("/oauth/token", async (c) => {
-    if (!isOauthProviderPath(new URL(c.req.url).pathname)) return c.notFound();
-    return oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext);
+  app.all("/oauth/token", (c) =>
+    oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext),
+  );
+  app.all("/oauth/register", (c) =>
+    oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext),
+  );
+}
+
+type OAuthHelpers = {
+  parseAuthRequest(req: Request): Promise<{ clientId: string; redirectUri: string; scope?: readonly string[] }>;
+  lookupClient(clientId: string): Promise<{ clientName?: string } | null>;
+  completeAuthorization(opts: {
+    request: unknown;
+    userId: string;
+    metadata: Record<string, unknown>;
+    scope: readonly string[];
+    props: Record<string, unknown>;
+  }): Promise<{ redirectTo: string }>;
+};
+
+async function handleConsentGet(
+  c: Context,
+  runtime: CmsRuntime,
+  locale: "zh-TW" | "en",
+  oauthHelpers: OAuthHelpers,
+): Promise<Response> {
+  let model: ConsentModel | null = null;
+  try {
+    const reqInfo = await oauthHelpers.parseAuthRequest(c.req.raw);
+    const clientInfo = await oauthHelpers.lookupClient(reqInfo.clientId);
+    model = {
+      clientName: clientInfo?.clientName ?? "(unknown client)",
+      redirectUri: reqInfo.redirectUri,
+      scopes: reqInfo.scope ?? [],
+      oauthRequestJson: JSON.stringify(reqInfo),
+    };
+  } catch {
+    // parseAuthRequest may throw on malformed requests.
+  }
+  return new Response(renderConsentHtml(locale, model), {
+    headers: { "content-type": "text/html; charset=utf-8" },
   });
-  app.all("/oauth/register", async (c) => {
-    if (!isOauthProviderPath(new URL(c.req.url).pathname)) return c.notFound();
-    return oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext);
+}
+
+async function handleConsentPost(
+  c: Context,
+  runtime: CmsRuntime,
+  session: Session,
+  oauthHelpers: OAuthHelpers,
+): Promise<Response> {
+  const form = await c.req.raw.formData();
+  const oauthRequestJson = form.get("oauth_request");
+  if (typeof oauthRequestJson !== "string") {
+    return jsonResponse(400, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "INPUT_VALIDATION_FAILED",
+        severity: "error",
+        path: "POST /oauth/authorize#/body/oauth_request",
+        expected: "form-encoded `oauth_request` string",
+        message: "Missing `oauth_request` form field.",
+      }),
+    });
+  }
+  if (form.get("decision") !== "approve") {
+    return jsonResponse(400, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "AUTH_DENIED",
+        severity: "error",
+        path: "POST /oauth/authorize#/body/decision",
+        expected: "decision=approve",
+        message: "Authorization denied by user.",
+      }),
+    });
+  }
+  let reqInfo: { scope?: readonly string[] } & Record<string, unknown>;
+  try {
+    reqInfo = JSON.parse(oauthRequestJson) as typeof reqInfo;
+  } catch {
+    return jsonResponse(400, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "INPUT_VALIDATION_FAILED",
+        severity: "error",
+        path: "POST /oauth/authorize#/body/oauth_request",
+        expected: "valid JSON-encoded OAuth request payload",
+        message: "Could not parse `oauth_request` as JSON.",
+      }),
+    });
+  }
+  const ghToken = await runtime.users.readGithubToken(session.userId);
+  const { redirectTo } = await oauthHelpers.completeAuthorization({
+    request: reqInfo,
+    userId: session.userId,
+    metadata: {},
+    scope: reqInfo.scope ?? [],
+    props: {
+      userId: session.userId,
+      ...(ghToken ? { githubAccessToken: ghToken.accessToken, githubScope: ghToken.scope } : {}),
+    },
   });
+  return new Response(null, { status: 302, headers: { location: redirectTo } });
 }
 
 async function handleHttpTrigger(

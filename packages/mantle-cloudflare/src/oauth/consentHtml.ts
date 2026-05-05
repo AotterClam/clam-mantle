@@ -73,14 +73,20 @@ const CSS = `
   button[value="deny"]:hover{background:rgba(26,48,98,.14)}
 `.trim();
 
-export function renderConsentHtml(locale: "zh-TW" | "en", model: ConsentModel | null): string {
+function wrapCard(locale: "zh-TW" | "en", inner: string): string {
   const t = STRINGS[locale];
   const lang = locale === "zh-TW" ? "zh-Hant-TW" : "en";
-  const head = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${t.title}</title><style>${CSS}</style></head><body><div class="card">`;
-  const tail = `</div></body></html>`;
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${t.title}</title><style>${CSS}</style></head><body><div class="card">${inner}</div></body></html>`;
+}
+
+export function renderConsentHtml(locale: "zh-TW" | "en", model: ConsentModel | null): string {
+  const t = STRINGS[locale];
 
   if (!model) {
-    return `${head}<p class="eyebrow">${t.eyebrow}</p><h1>${t.invalidTitle}</h1><p class="muted">${t.invalidBody}</p>${tail}`;
+    return wrapCard(
+      locale,
+      `<p class="eyebrow">${t.eyebrow}</p><h1>${t.invalidTitle}</h1><p class="muted">${t.invalidBody}</p>`,
+    );
   }
 
   const scopesBlock =
@@ -88,17 +94,16 @@ export function renderConsentHtml(locale: "zh-TW" | "en", model: ConsentModel | 
       ? `<p class="eyebrow">${t.scopesLabel}</p><div class="scopes">${model.scopes.map((s) => `<span class="scope">${escapeHtml(s)}</span>`).join("")}</div>`
       : "";
 
-  return (
-    `${head}` +
+  return wrapCard(
+    locale,
     `<p class="eyebrow">${t.eyebrow}</p>` +
-    `<h1>${t.heading(escapeHtml(model.clientName))}</h1>` +
-    `<p class="muted">${t.redirectLabel} <code>${escapeHtml(model.redirectUri)}</code></p>` +
-    `${scopesBlock}` +
-    `<form method="post" action="/oauth/authorize">` +
-    `<input type="hidden" name="oauth_request" value="${escapeHtml(model.oauthRequestJson)}"/>` +
-    `<button type="submit" name="decision" value="approve">${t.approve}</button>` +
-    `<button type="submit" name="decision" value="deny">${t.deny}</button>` +
-    `</form>` +
-    `${tail}`
+      `<h1>${t.heading(escapeHtml(model.clientName))}</h1>` +
+      `<p class="muted">${t.redirectLabel} <code>${escapeHtml(model.redirectUri)}</code></p>` +
+      `${scopesBlock}` +
+      `<form method="post" action="/oauth/authorize">` +
+      `<input type="hidden" name="oauth_request" value="${escapeHtml(model.oauthRequestJson)}"/>` +
+      `<button type="submit" name="decision" value="approve">${t.approve}</button>` +
+      `<button type="submit" name="decision" value="deny">${t.deny}</button>` +
+      `</form>`,
   );
 }
