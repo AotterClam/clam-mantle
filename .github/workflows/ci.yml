@@ -118,15 +118,22 @@ jobs:
           # Happy path: 200 + ok:true
           OK=$(curl -s -X POST http://localhost:8787/api/contact \
             -H 'content-type: application/json' \
-            -d '{"name":"CI","email":"ci@example.com","message":"hi","recaptchaToken":"tok-pass"}')
+            -d '{"name":"CI","email":"ci@example.com","message":"hi","turnstileToken":"tok-pass"}')
           echo "$OK" | grep -q '"ok":true'
 
-          # CAPTCHA fail: 403 + AUTH_DENIED
+          # CAPTCHA fail: 403 + AUTH_DENIED (handler in dev-stub mode
+          # rejects the literal `"fail"` token).
           STATUS=$(curl -s -o /tmp/body -w '%{http_code}' -X POST http://localhost:8787/api/contact \
             -H 'content-type: application/json' \
-            -d '{"name":"Bot","email":"b@example.com","message":"spam","recaptchaToken":"fail"}')
+            -d '{"name":"Bot","email":"b@example.com","message":"spam","turnstileToken":"fail"}')
           test "$STATUS" = "403"
           grep -q '"AUTH_DENIED"' /tmp/body
+
+          # Contact page renders the Turnstile widget + form
+          PAGE=$(curl -s http://localhost:8787/en/pages/contact)
+          echo "$PAGE" | grep -q 'cf-turnstile'
+          echo "$PAGE" | grep -q 'data-sitekey='
+          echo "$PAGE" | grep -q '<form class="contact-form"'
 
       - name: Smoke — MCP transport (auth guard)
         run: |

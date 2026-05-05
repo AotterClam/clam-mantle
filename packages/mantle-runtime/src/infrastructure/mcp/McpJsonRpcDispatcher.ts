@@ -182,6 +182,10 @@ export class McpJsonRpcDispatcher {
         // Per-collection authoring tools: `create_draft_<segment>` /
         // `update_draft_<segment>`. The agent sends Schema fields at
         // the top level; we rebuild `data` for the chokepoint.
+        // `hookCtx` plumbs the authenticated MCP user into lifecycle
+        // hook context so consumers can branch on `ctx.user` (e.g.
+        // bypass captcha checks for authenticated agents).
+        const hookCtx = { user: { id: auth.userId }, staff: null, env: {} };
         const createSegment = extractCollectionSegment(name, CREATE_DRAFT_PREFIX);
         if (createSegment) {
           const collection = this.schemaBySegment.get(createSegment);
@@ -190,6 +194,7 @@ export class McpJsonRpcDispatcher {
             collection,
             data: stripReservedArgs(args),
             authorId: auth.userId,
+            ctx: hookCtx,
           });
         }
         const updateSegment = extractCollectionSegment(name, UPDATE_DRAFT_PREFIX);
@@ -201,12 +206,12 @@ export class McpJsonRpcDispatcher {
           if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
           // Caller may also call get_entry separately; we don't need
           // the collection on the chokepoint args because UpdateDraft
-          // looks it up from the existing row. Pass through anyway
-          // for clarity / future hook context wiring.
+          // looks it up from the existing row.
           return this.useCases.updateDraft.execute({
             id,
             expectedVersion: expected,
             data: stripReservedArgs(args),
+            ctx: hookCtx,
           });
         }
         return UNKNOWN_TOOL;

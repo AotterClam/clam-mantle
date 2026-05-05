@@ -306,6 +306,97 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 }
 [data-theme="dark"] .preview-banner { color: var(--ink); }
 
+/* — Contact form — */
+
+.contact-form {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  max-width: var(--measure);
+}
+.contact-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.contact-label > span {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.contact-form input,
+.contact-form textarea {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule-strong);
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  padding: 0.4rem 0;
+  width: 100%;
+}
+.contact-form textarea {
+  resize: vertical;
+  min-height: 7rem;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0.8rem;
+}
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.contact-captcha {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.contact-captcha-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.contact-submit {
+  align-self: flex-start;
+  appearance: none;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.6rem;
+  cursor: pointer;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.contact-submit:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.contact-submit:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.contact-status {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--mute);
+  min-height: 1.2em;
+  margin: 0;
+}
+.contact-status[data-error] {
+  color: var(--accent);
+}
+
 /* — 404 — */
 
 .notfound {

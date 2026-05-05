@@ -87,13 +87,13 @@ curl -s 'http://localhost:8787/api/views/posts-by-locale?locale=en&page=1&show=2
 # Contact form happy path (CAPTCHA passes):
 curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
-  -d '{"name":"Alice","email":"a@example.com","message":"Hi","recaptchaToken":"tok-pass"}'
+  -d '{"name":"Alice","email":"a@example.com","message":"Hi","turnstileToken":"tok-pass"}'
 
 # Contact form CAPTCHA fail path (the stub rejects token === "fail").
 # Expect HTTP 403 with `{ ok: false, diagnostic: { code: AUTH_DENIED, ... } }`:
 curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
-  -d '{"name":"Bot","email":"b@example.com","message":"spam","recaptchaToken":"fail"}'
+  -d '{"name":"Bot","email":"b@example.com","message":"spam","turnstileToken":"fail"}'
 
 # MCP /mcp:
 curl -i -X POST http://localhost:8787/mcp \

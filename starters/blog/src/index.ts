@@ -8,7 +8,11 @@ import {
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
 import { publicPathFor } from "./paths.js";
-import { homeTemplate, notFoundTemplate } from "./templates/index.js";
+import {
+  contactTemplate,
+  homeTemplate,
+  notFoundTemplate,
+} from "./templates/index.js";
 
 /**
  * Worker entrypoint. Lives at `wrangler.toml`'s `main`.
@@ -22,7 +26,10 @@ import { homeTemplate, notFoundTemplate } from "./templates/index.js";
  *   GET  /{locale}               home (composed: pages/home + recent posts)
  *   GET  /{locale}/posts         per-locale post index
  *   GET  /{locale}/posts/{slug}  post entry HTML
- *   GET  /{locale}/pages/{slug}  static page entry HTML (about, contact, …)
+ *   GET  /{locale}/pages/{slug}  static page entry HTML (about, …)
+ *                                — `contact` is special-cased to a
+ *                                  request-time template that embeds
+ *                                  the Turnstile widget + form
  *   GET  /{locale}/llms.txt      per-locale llms.txt
  *   GET  /llms.txt               root llms.txt (non-localized aggregate)
  *   GET  /sitemap.xml            cross-locale + cross-collection urlset
@@ -159,6 +166,9 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   });
   app.get("/:locale/pages/:slug", async (c) => {
     const { locale, slug } = c.req.param();
+    if (slug === "contact") {
+      return renderContact(env, cms, locale);
+    }
     if (c.req.query("preview") === "1") {
       return previewEntry(env, cms, "page-translations", locale, slug);
     }
@@ -274,6 +284,49 @@ async function previewEntry(
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
+    },
+  });
+}
+
+async function renderContact(
+  env: Env,
+  cms: CmsRuntimeRef,
+  locale: string,
+): Promise<Response> {
+  const site = siteConfigFromEnv(env);
+  const localesLower = site.locales.map((l) => l.toLowerCase());
+  if (!localesLower.includes(locale.toLowerCase())) {
+    return notFound(env, locale);
+  }
+  const runtime = await cms.get();
+  const all = await runtime.listEntries.execute({
+    collection: "page-translations",
+    status: "published",
+    limit: 50,
+  });
+  const entry = all.find(
+    (e) =>
+      (e.data as { slug?: string }).slug === "contact" &&
+      (e.data as { locale?: string }).locale === locale,
+  );
+  const data = (entry?.data ?? {}) as { title?: string; intro?: string; body?: string };
+  const html = contactTemplate({
+    site,
+    locale,
+    page: {
+      title: data.title ?? "",
+      intro: data.intro,
+      body: data.body ?? "",
+    },
+    turnstileSiteKey: env.TURNSTILE_SITE_KEY ?? "1x00000000000000000000AA",
+  });
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      // Site key + form embedded — short edge cache is fine. Real
+      // submission goes through POST /api/contact (no caching there).
+      "cache-control": "public, max-age=60, s-maxage=60",
     },
   });
 }

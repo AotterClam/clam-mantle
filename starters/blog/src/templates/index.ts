@@ -4,6 +4,7 @@ import { postListTemplate } from "./postList.js";
 import { pageTemplate } from "./page.js";
 import { homeTemplate } from "./home.js";
 import { notFoundTemplate } from "./notFound.js";
+import { contactTemplate } from "./contact.js";
 
 export {
   postTemplate,
@@ -11,6 +12,7 @@ export {
   pageTemplate,
   homeTemplate,
   notFoundTemplate,
+  contactTemplate,
 };
 
 /**
@@ -19,10 +21,12 @@ export {
  * registered template still get markdown / `llms.txt` mirrors but
  * skip HTML.
  *
- * `homeTemplate` and `notFoundTemplate` are NOT registered here:
- * `homeTemplate` composes two collections (page + recent-posts), and
- * `notFoundTemplate` is request-time only. Both are called directly
- * from the worker route handlers.
+ * `homeTemplate`, `notFoundTemplate`, and `contactTemplate` are NOT
+ * registered here — all three are request-time only:
+ *   - homeTemplate composes two collections (page + recent-posts);
+ *   - notFoundTemplate runs on KV-miss + global notFound;
+ *   - contactTemplate needs the live Turnstile site key from env.
+ * Each is called directly from a worker route handler.
  */
 export function buildTemplates(): TemplateRegistry {
   const registry = new TemplateRegistry();

@@ -7,10 +7,10 @@ spec:
   description: |
     Public-submitted contact form. Anonymous-with-email pattern (no
     member system in v0.1.0): visitor supplies name + email + message;
-    a CAPTCHA token rides on the input but is dropped from the row by
-    the builtin op's projection — the `before_create` lifecycle hook
-    reads it via `ctx.event.originalInput` to verify the request, then
-    aborts the create on failure.
+    a Cloudflare Turnstile token rides on the input but is dropped
+    from the row by the builtin op's projection — the `before_create`
+    lifecycle hook reads it via `ctx.event.originalInput`, calls
+    Turnstile siteverify, and aborts the create on failure.
   schema:
     type: object
     required:
@@ -41,18 +41,19 @@ spec:
       - name
       - email
       - message
-      - recaptchaToken
+      - turnstileToken
     properties:
       name: { type: string }
       email: { type: string, format: email }
       message: { type: string, minLength: 1 }
-      recaptchaToken:
+      turnstileToken:
         type: string
         description: |
-          Side-channel field — declared on the input so the
-          before_create hook can read it via ctx.event.originalInput.
-          The builtin op's projection drops it from the persisted
-          contact-messages row (it is not in the Schema properties).
+          Cloudflare Turnstile token from the widget. Side-channel
+          field — declared on the input so the before_create hook
+          can read it via ctx.event.originalInput. The builtin op's
+          projection drops it from the persisted contact-messages
+          row (not in Schema properties).
   output:
     type: object
   handler:
@@ -68,7 +69,7 @@ spec:
   input:
     type: object
     properties:
-      recaptchaToken:
+      turnstileToken:
         type: string
   output:
     type: object

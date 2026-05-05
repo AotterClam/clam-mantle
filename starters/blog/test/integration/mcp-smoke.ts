@@ -187,8 +187,8 @@ async function main(): Promise<void> {
   }
 
   // 10. create_draft_contact_messages — exercises the lifecycle hook
-  //     chain. CAPTCHA hook permits absent token (handler only rejects
-  //     literal "fail"); after_create logs to console.info.
+  //     chain. The captcha hook bypasses authenticated callers (MCP +
+  //     admin), so no token needed; after_create logs to console.info.
   let contactId: string;
   {
     const row = await tool<EntryRow>("create_draft_contact_messages", {
