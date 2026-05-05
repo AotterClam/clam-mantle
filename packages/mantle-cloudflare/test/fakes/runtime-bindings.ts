@@ -8,6 +8,7 @@ import type {
   KvPutOptions,
   Session,
   SessionRepository,
+  Staff,
   StaffListEntry,
   StaffRepository,
   User,
@@ -69,5 +70,6 @@ export class StubUserRepository implements UserRepository {
 
 export class StubStaffRepository implements StaffRepository {
   async listAll(): Promise<StaffListEntry[]> { return []; }
+  async readByUserId(_userId: string): Promise<Staff | null> { return null; }
   async ensureBootstrapOwner(_opts: BootstrapOwnerOpts): Promise<void> {}
 }

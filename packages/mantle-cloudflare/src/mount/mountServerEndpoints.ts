@@ -6,9 +6,11 @@ import {
   type Diagnostic,
 } from "@aotter/mantle-spec";
 import {
+  DEFAULT_SESSION_COOKIE,
   ViewParamCoercionError,
   coerceViewParams,
   matchPath,
+  readCookie,
   type CmsRuntime,
   type HandlerContext,
   type Session,
@@ -125,7 +127,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     };
     await runtime.sessions.write(session);
     const maxAge = Math.floor((session.expiresAt - now) / 1000);
-    const cookie = `cms_session=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+    const cookie = `${DEFAULT_SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
     return new Response(null, {
       status: 302,
       headers: { location: cbResult.returnTo, "set-cookie": cookie },
@@ -144,7 +146,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
 
     const augmented: { OAUTH_KV: KVNamespace; OAUTH_PROVIDER?: OAuthHelpers } = { ...oauthEnv };
     try {
-      await oauthProvider.fetch(c.req.raw, augmented as never, c.executionCtx as ExecutionContext);
+      await oauthProvider.fetch(c.req.raw, augmented as never, safeExecutionCtx(c));
     } catch (e) {
       if (!(e instanceof BypassToConsent)) throw e;
     }
@@ -157,7 +159,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     }
     const oauthHelpers = augmented.OAUTH_PROVIDER;
 
-    const sessionToken = readSessionToken(c.req.raw);
+    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
     const session = sessionToken ? await runtime.sessions.read(sessionToken) : null;
     if (!session) {
       if (c.req.method !== "GET") {
@@ -180,6 +182,20 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       });
     }
 
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) {
+      return jsonResponse(403, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "AUTH_DENIED",
+          severity: "error",
+          path: `${c.req.method} /oauth/authorize`,
+          expected: "active staff membership",
+          message: "Only staff members may approve OAuth grants.",
+        }),
+      });
+    }
+
     if (c.req.method === "POST") return handleConsentPost(c, runtime, session, oauthHelpers);
     return handleConsentGet(c, runtime, locale, oauthHelpers);
   };
@@ -189,10 +205,10 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
 
   // ── OAuth provider passthrough (token / register) ────────────────────
   app.all("/oauth/token", (c) =>
-    oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext),
+    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
   );
   app.all("/oauth/register", (c) =>
-    oauthProvider.fetch(c.req.raw, oauthEnv as never, c.executionCtx as ExecutionContext),
+    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
   );
 }
 
@@ -412,17 +428,6 @@ async function buildHandlerContext(
   return { user, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
 }
 
-function readSessionToken(req: Request): string | null {
-  const header = req.headers.get("cookie");
-  if (!header) return null;
-  for (const part of header.split(/;\s*/)) {
-    const eq = part.indexOf("=");
-    if (eq === -1) continue;
-    if (part.slice(0, eq) === "cms_session") return part.slice(eq + 1) || null;
-  }
-  return null;
-}
-
 function openApiToHono(path: string): string {
   return path.replace(/\{([^}]+)\}/g, ":$1");
 }
@@ -439,6 +444,15 @@ function readWaitUntil(c: Context): ((p: Promise<unknown>) => void) | undefined 
     return ctx.waitUntil.bind(ctx);
   } catch {
     return undefined;
+  }
+}
+
+/** Safe variant for callers that need the full ExecutionContext (OAuth provider). */
+function safeExecutionCtx(c: Context): ExecutionContext {
+  try {
+    return c.executionCtx;
+  } catch {
+    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
   }
 }
 

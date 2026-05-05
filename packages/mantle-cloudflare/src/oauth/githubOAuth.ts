@@ -29,8 +29,13 @@ export interface StartAuthorizeOpts {
 /** Build the GitHub authorize URL and persist an anti-CSRF state token. */
 export async function startAuthorize(opts: StartAuthorizeOpts): Promise<string> {
   const { kv, origin, githubClientId, returnTo = "/admin" } = opts;
+  // Only permit relative same-origin paths — reject absolute URLs and protocol-relative //urls.
+  const safeReturnTo =
+    typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? returnTo
+      : "/admin";
   const state = randomState();
-  await kv.put(`${STATE_KEY_PREFIX}${state}`, returnTo, { expirationTtl: STATE_TTL_S });
+  await kv.put(`${STATE_KEY_PREFIX}${state}`, safeReturnTo, { expirationTtl: STATE_TTL_S });
   const params = new URLSearchParams({
     client_id: githubClientId,
     redirect_uri: `${origin}/admin/auth/github/callback`,

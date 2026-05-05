@@ -1,4 +1,4 @@
-import type { StaffMembership } from "../model/Staff.js";
+import type { Staff, StaffMembership } from "../model/Staff.js";
 
 export interface StaffListEntry extends StaffMembership {
   readonly githubLogin: string | null;
@@ -27,6 +27,8 @@ export interface BootstrapOwnerOpts {
 export interface StaffRepository {
   /** Full roster with GitHub login, for admin UI display. */
   listAll(): Promise<StaffListEntry[]>;
+  /** Look up a single staff row by user id. Returns null if the user is not staff. */
+  readByUserId(userId: string): Promise<Staff | null>;
   /**
    * Bootstrap the first owner. No-op when any staff row already exists,
    * or when `githubLogin` does not match `adminGithubLogin`.
