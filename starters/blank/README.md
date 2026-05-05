@@ -14,8 +14,7 @@ instead.
 GET  /api/views/<name>            view REST per View atom
 ALL  /api/<procedure>             procedure dispatcher (POST / PUT / PATCH / DELETE)
 ALL  /mcp                         MCP JSON-RPC dispatcher
-GET  /admin/api/*                 admin REST (when admin SPA ships)
-GET  /oauth/{authorize,token,...} OAuth 2.1 / DCR for MCP clients
+/oauth/{authorize,token,...}      OAuth 2.1 / DCR for MCP clients
 ```
 
 No public read routes (`/{locale}/...`, `/sitemap.xml`, `.md` mirrors,
