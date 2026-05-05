@@ -1,5 +1,6 @@
 import {
   DiagnosticError,
+  RESERVED_ENTRY_COLUMNS,
   isParamRef,
   runtimeDiagnostic,
   type FilterAst,
@@ -35,6 +36,10 @@ export interface CompileViewOptions {
   readonly show?: number;
 }
 
+// alias → SQL column. Aliases mirror RESERVED_ENTRY_COLUMNS from
+// spec; SQL column shape (snake_case) is local to the storage layout.
+// The compile-time check below ensures the alias set stays in sync —
+// adding to spec without updating here is a type error.
 const RESERVED_COLUMN: Readonly<Record<string, string>> = {
   id: "id",
   status: "status",
@@ -43,6 +48,9 @@ const RESERVED_COLUMN: Readonly<Record<string, string>> = {
   updatedAt: "updated_at",
   authorId: "author_id",
 };
+const _aliasCheck: Readonly<Record<(typeof RESERVED_ENTRY_COLUMNS)[number], string>> =
+  RESERVED_COLUMN;
+void _aliasCheck;
 
 const DEFAULT_PROJECTION = Object.entries(RESERVED_COLUMN)
   .map(([alias, col]) => (alias === col ? col : `${col} AS ${alias}`))

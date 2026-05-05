@@ -1,9 +1,8 @@
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 
 /**
- * Sitemap.xml emission. v0.1 emits the minimal urlset (loc + lastmod).
- * Hreflang alternates land in v0.1.x once cross-locale entry pairing
- * is first-class.
+ * Hreflang alternates are deferred to v0.1.x (need cross-locale entry
+ * pairing first); only minimal `loc + lastmod` shipped.
  *
  * Entries arrive pre-mapped from storage row to public path — the
  * caller (`ComposeSitemapUseCase`) decides how a (collection, slug,

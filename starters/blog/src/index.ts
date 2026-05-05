@@ -7,6 +7,7 @@ import {
   type CmsRuntimeRef,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
+import { publicPathFor } from "./paths.js";
 import { homeTemplate, notFoundTemplate } from "./templates/index.js";
 
 /**
@@ -58,22 +59,7 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     const runtime = await cms.get();
     const xml = await runtime.composeSitemap.execute({
       site: siteConfigFromEnv(env),
-      // Map storage shape (post-translations / page-translations) onto
-      // the starter's public routes (/{locale}/posts/{slug}, etc.).
-      // Skip the language-neutral parents (`posts`, `pages`) — they
-      // never have a public URL of their own.
-      pathFor: (e) => {
-        const data = e.data as { slug?: string };
-        const slug = data.slug;
-        const locale = e.locale?.toLowerCase();
-        if (!slug || !locale) return null;
-        if (e.collection === "post-translations") return `/${locale}/posts/${slug}`;
-        if (e.collection === "page-translations") {
-          if (slug === "home") return `/${locale}`;
-          return `/${locale}/pages/${slug}`;
-        }
-        return null;
-      },
+      pathFor: publicPathFor,
     });
     return new Response(xml, {
       status: 200,
@@ -193,8 +179,8 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   return appRef;
 }
 
-/** Read pre-rendered HTML from KV; on miss, render the localized 404
- *  template instead of returning bare "not found" text. */
+/** On miss, render the localized 404 template — bare "not found"
+ *  text would be misread as CMS content by the public reader. */
 async function readKvOrFallback(
   env: Env,
   key: string,

@@ -1,6 +1,10 @@
-import { exit, stdout, stderr } from "node:process";
+import { stdout, stderr } from "node:process";
 import { partitionManifests } from "../../domain/service/ManifestParser.js";
-import type { JsonSchema } from "../../domain/model/ManifestGrammar.js";
+import {
+  RESERVED_ENTRY_COLUMNS,
+  type JsonSchema,
+  type ReservedEntryColumn,
+} from "../../domain/model/ManifestGrammar.js";
 import { loadManifestsFromRoot } from "./loadManifests.js";
 
 /**
@@ -20,21 +24,21 @@ export interface EmitTypesArgs {
   readonly namespace: string;
 }
 
-export function parseArgs(rawArgs: ReadonlyArray<string>): EmitTypesArgs {
+export type ParseResult = { kind: "args"; args: EmitTypesArgs } | { kind: "help" };
+
+export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
   let manifests = "./manifests";
   let namespace = "Mantle";
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
     if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
     else if (a === "--namespace") namespace = rawArgs[++i] ?? namespace;
-    else if (a === "--help" || a === "-h") {
-      printHelp();
-      exit(0);
-    } else if (a !== undefined) {
+    else if (a === "--help" || a === "-h") return { kind: "help" };
+    else if (a !== undefined) {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
-  return { manifests, namespace };
+  return { kind: "args", args: { manifests, namespace } };
 }
 
 function printHelp(): void {
@@ -55,13 +59,18 @@ Output: TypeScript declarations on stdout. One namespace contains:
 }
 
 export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
-  let args: EmitTypesArgs;
+  let parsed: ParseResult;
   try {
-    args = parseArgs(rawArgs);
+    parsed = parseArgs(rawArgs);
   } catch (err) {
     stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     return 2;
   }
+  if (parsed.kind === "help") {
+    printHelp();
+    return 0;
+  }
+  const args = parsed.args;
   const { manifests, parseErrors } = await loadManifestsFromRoot(args.manifests);
   if (parseErrors.some((d) => d.severity === "error")) {
     stderr.write(`Manifest parse errors — run \`mantle validate\` to inspect.\n`);
@@ -98,11 +107,12 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
       out.push(`  export type ViewRow_${tsId(v.metadata.name)} = unknown;`);
     } else {
       const props = (parent.spec.schema.properties ?? {}) as Record<string, JsonSchema>;
-      const fields = v.spec.fields ?? [...RESERVED_COLUMNS, ...Object.keys(props)];
+      const fields = v.spec.fields ?? [...RESERVED_ENTRY_COLUMNS, ...Object.keys(props)];
       const rendered: string[] = [];
+      const reservedSet = new Set<string>(RESERVED_ENTRY_COLUMNS);
       for (const f of fields) {
-        if (RESERVED_COLUMNS.includes(f as ReservedColumn)) {
-          rendered.push(`    ${f}: ${RESERVED_COLUMN_TYPES[f as ReservedColumn]};`);
+        if (reservedSet.has(f)) {
+          rendered.push(`    ${f}: ${RESERVED_COLUMN_TYPES[f as ReservedEntryColumn]};`);
         } else if (props[f]) {
           rendered.push(`    ${f}?: ${renderTypeInline(props[f]!)};`);
         } else {
@@ -122,9 +132,11 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
   return 0;
 }
 
-const RESERVED_COLUMNS = ["id", "status", "version", "createdAt", "updatedAt", "authorId"] as const;
-type ReservedColumn = (typeof RESERVED_COLUMNS)[number];
-const RESERVED_COLUMN_TYPES: Record<ReservedColumn, string> = {
+// Names come from spec's RESERVED_ENTRY_COLUMNS; the TS-type strings
+// stay local because they bake in `ContentState` enum values
+// (`"draft" | "published" | ...`) — those are also exported from
+// spec so a future ContentState change touches both.
+const RESERVED_COLUMN_TYPES: Record<ReservedEntryColumn, string> = {
   id: "string",
   status: `"draft" | "published" | "archived"`,
   version: "number",

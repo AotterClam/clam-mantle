@@ -1,4 +1,4 @@
-import { exit, stdout, stderr } from "node:process";
+import { stdout, stderr } from "node:process";
 import { partitionManifests } from "../../domain/service/ManifestParser.js";
 import { loadManifestsFromRoot } from "./loadManifests.js";
 
@@ -19,19 +19,19 @@ export interface IntrospectArgs {
   readonly manifests: string;
 }
 
-export function parseArgs(rawArgs: ReadonlyArray<string>): IntrospectArgs {
+export type ParseResult = { kind: "args"; args: IntrospectArgs } | { kind: "help" };
+
+export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
   let manifests = "./manifests";
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
     if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
-    else if (a === "--help" || a === "-h") {
-      printHelp();
-      exit(0);
-    } else if (a !== undefined) {
+    else if (a === "--help" || a === "-h") return { kind: "help" };
+    else if (a !== undefined) {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
-  return { manifests };
+  return { kind: "args", args: { manifests } };
 }
 
 function printHelp(): void {
@@ -51,13 +51,18 @@ schema, view filter AST.
 }
 
 export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
-  let args: IntrospectArgs;
+  let parsed: ParseResult;
   try {
-    args = parseArgs(rawArgs);
+    parsed = parseArgs(rawArgs);
   } catch (err) {
     stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     return 2;
   }
+  if (parsed.kind === "help") {
+    printHelp();
+    return 0;
+  }
+  const args = parsed.args;
 
   const { manifests, parseErrors } = await loadManifestsFromRoot(args.manifests);
   const { schemas, views, procedures, triggers } = partitionManifests(manifests);

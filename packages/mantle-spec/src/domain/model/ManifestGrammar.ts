@@ -361,3 +361,18 @@ export type Manifest = SchemaManifest | ViewManifest | ProcedureManifest | Trigg
  *  require an explicit grammar-revise round (see ADR-0002). */
 export const MANTLE_BIND_VALUES = ["ctx.user", "ctx.staff", "now"] as const;
 export type MantleBindValue = (typeof MANTLE_BIND_VALUES)[number];
+
+/** Storage-row metadata columns reserved across every Schema. Used by
+ *  the View SQL compiler (to project them as native columns rather
+ *  than `json_extract`) and by the type emitter (to surface them on
+ *  every Entry interface). Adding a new reserved column is a grammar
+ *  revise — touch this constant + every consumer. */
+export const RESERVED_ENTRY_COLUMNS = [
+  "id",
+  "status",
+  "version",
+  "createdAt",
+  "updatedAt",
+  "authorId",
+] as const;
+export type ReservedEntryColumn = (typeof RESERVED_ENTRY_COLUMNS)[number];

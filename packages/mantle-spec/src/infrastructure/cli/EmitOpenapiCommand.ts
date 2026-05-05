@@ -1,4 +1,4 @@
-import { exit, stdout, stderr } from "node:process";
+import { stdout, stderr } from "node:process";
 import { partitionManifests } from "../../domain/service/ManifestParser.js";
 import type {
   ProcedureManifest,
@@ -28,7 +28,9 @@ export interface EmitOpenapiArgs {
   readonly version: string;
 }
 
-export function parseArgs(rawArgs: ReadonlyArray<string>): EmitOpenapiArgs {
+export type ParseResult = { kind: "args"; args: EmitOpenapiArgs } | { kind: "help" };
+
+export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
   let manifests = "./manifests";
   let title = "mantle";
   let version = "0.1.0";
@@ -37,14 +39,12 @@ export function parseArgs(rawArgs: ReadonlyArray<string>): EmitOpenapiArgs {
     if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
     else if (a === "--title") title = rawArgs[++i] ?? title;
     else if (a === "--version") version = rawArgs[++i] ?? version;
-    else if (a === "--help" || a === "-h") {
-      printHelp();
-      exit(0);
-    } else if (a !== undefined) {
+    else if (a === "--help" || a === "-h") return { kind: "help" };
+    else if (a !== undefined) {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
-  return { manifests, title, version };
+  return { kind: "args", args: { manifests, title, version } };
 }
 
 function printHelp(): void {
@@ -66,13 +66,18 @@ Covers HTTP Triggers (POST/PUT/PATCH/DELETE) and View REST routes
 }
 
 export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
-  let args: EmitOpenapiArgs;
+  let parsed: ParseResult;
   try {
-    args = parseArgs(rawArgs);
+    parsed = parseArgs(rawArgs);
   } catch (err) {
     stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     return 2;
   }
+  if (parsed.kind === "help") {
+    printHelp();
+    return 0;
+  }
+  const args = parsed.args;
   const { manifests, parseErrors } = await loadManifestsFromRoot(args.manifests);
   if (parseErrors.some((d) => d.severity === "error")) {
     stderr.write(`Manifest parse errors — run \`mantle validate\` to inspect.\n`);
@@ -123,8 +128,11 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
 }
 
 function httpOperation(t: TriggerManifest, p: ProcedureManifest): Record<string, unknown> {
+  // Caller (run) only invokes httpOperation when source.kind === "http",
+  // so the narrowing here is safe.
+  const method = t.spec.source.kind === "http" ? t.spec.source.method : "POST";
   const op: Record<string, unknown> = {
-    operationId: `${t.spec.source.kind === "http" ? t.spec.source.method.toLowerCase() : "invoke"}_${p.metadata.name.replace(/[^a-z0-9]+/gi, "_")}`,
+    operationId: `${method.toLowerCase()}_${p.metadata.name.replace(/[^a-z0-9]+/gi, "_")}`,
     summary: `Trigger ${t.metadata.name}`,
     requestBody: {
       required: true,
