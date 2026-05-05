@@ -7,34 +7,32 @@ import {
   type CmsRuntimeRef,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
-import { homeTemplate } from "./templates/index.js";
+import { homeTemplate, notFoundTemplate } from "./templates/index.js";
 
 /**
  * Worker entrypoint. Lives at `wrangler.toml`'s `main`.
  *
- * Two long-lived per-isolate bindings:
- *  - `app`: the Hono router (stateless beyond closure capture)
- *  - `cmsRef`: the `CmsRuntimeRef` returned by `createCmsRef`. Carries
- *    the boot-cached runtime; reused across requests within an
- *    isolate. Built lazily on first request so the worker doesn't pay
- *    boot cost on warm CPU init.
- *
  * Public read path serves pre-rendered HTML from KV (the publish
- * pipeline writes there at publish time). Layout:
- *   GET  /                       → 302 to /{canonicalLocale}
- *   GET  /{locale}               → home page (composes pages/home + recent posts)
- *   GET  /{locale}/posts         → per-locale post index
- *   GET  /{locale}/posts/{slug}  → post entry HTML
- *   GET  /{locale}/pages/{slug}  → static page entry HTML (about, contact, …)
- *   GET  /llms.txt               → llms.txt root
- *   GET  /{locale}/llms.txt      → llms.txt per locale
- *   POST /api/contact            → builtin Procedure (CAPTCHA-gated)
- *   ALL  /mcp                    → MCP JSON-RPC dispatcher
+ * pipeline writes there at publish time). The home + 404 surfaces
+ * are request-time-composed.
  *
- * The home route is the only request-time-composed surface — it
- * fetches the `slug = "home"` page-translation from KV and joins it
- * with a small recent-posts list. Everything else is a single KV
- * read of pre-rendered HTML.
+ * URL surface:
+ *   GET  /                       302 → /{canonicalLocale}
+ *   GET  /{locale}               home (composed: pages/home + recent posts)
+ *   GET  /{locale}/posts         per-locale post index
+ *   GET  /{locale}/posts/{slug}  post entry HTML
+ *   GET  /{locale}/pages/{slug}  static page entry HTML (about, contact, …)
+ *   GET  /{locale}/llms.txt      per-locale llms.txt
+ *   GET  /llms.txt               root llms.txt
+ *   POST /api/contact            builtin Procedure (CAPTCHA-gated)
+ *   GET  /api/views/<name>       per-View public REST (ADR-0012)
+ *   ALL  /mcp                    MCP JSON-RPC dispatcher
+ *
+ * Preview mode: append `?preview=1` to any post / page URL to bypass
+ * KV and render via the registered template at request time —
+ * useful when iterating on templates without re-running the publish
+ * pipeline. Also surfaces `status: draft` rows so authors can preview
+ * unpublished work.
  */
 let appRef: { app: Hono; cms: CmsRuntimeRef } | null = null;
 
@@ -46,7 +44,6 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
 
-  // Root → canonical locale (cheap redirect, no KV read).
   app.get("/", async (c) => {
     const canonical = buildCmsConfig(env).siteDefaults?.locales?.[0] ?? "en";
     return c.redirect(`/${canonical}`);
@@ -57,23 +54,14 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   // and the locale check 404s before the literal handler ever sees it.
   app.get("/llms.txt", async () => readKv(env, `llms:root`, "text/plain"));
 
-  // Per-locale home — composed at request time from
-  // `pages/home`'s translation + a recent-posts list. The home
-  // template itself lives in src/templates/home.tsx and is NOT
-  // registered to the publish pipeline (it crosses collections).
   app.get("/:locale", async (c) => {
     const { locale } = c.req.param();
     const config = buildCmsConfig(env);
     const localesLower = (config.siteDefaults?.locales ?? []).map((l) => l.toLowerCase());
     if (!localesLower.includes(locale.toLowerCase())) {
-      return new Response("not found", { status: 404 });
+      return notFound(env, locale);
     }
 
-    // Cheap path: fetch the home translation row's data via the
-    // entry-list KV key the publish pipeline writes. We index by
-    // slug=home directly via the runtime use case rather than via
-    // KV (the entry data shape is what we want, not pre-rendered
-    // HTML — the home page is composed, not pre-baked).
     const runtime = await cms.get();
     const all = await runtime.listEntries.execute({
       collection: "page-translations",
@@ -86,7 +74,7 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
         (e.data as { locale?: string }).locale === locale,
     );
     if (!homeEntry) {
-      return new Response("home page not published yet", { status: 404 });
+      return notFound(env, locale);
     }
 
     const recent = await runtime.listEntries.execute({
@@ -112,15 +100,7 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
       intro?: string;
       body?: string;
     };
-    const defaults = config.siteDefaults!;
-    const site: SiteConfig = {
-      brand: defaults.brand ?? "",
-      title: defaults.title ?? defaults.brand ?? "",
-      description: defaults.description ?? "",
-      origin: defaults.origin ?? "",
-      locales: [...(defaults.locales ?? [])],
-      canonicalLocale: defaults.locales?.[0] ?? null,
-    };
+    const site = siteConfigFromEnv(env);
     const html = homeTemplate({
       site,
       locale,
@@ -142,22 +122,63 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
 
   app.get("/:locale/posts/:slug", async (c) => {
     const { locale, slug } = c.req.param();
-    return readKv(env, `entry:html:${locale.toLowerCase()}/post-translations/${slug}`, "text/html");
+    if (c.req.query("preview") === "1") {
+      return previewEntry(env, cms, "post-translations", locale, slug);
+    }
+    return readKvOrFallback(
+      env,
+      `entry:html:${locale.toLowerCase()}/post-translations/${slug}`,
+      "text/html",
+      locale,
+    );
   });
   app.get("/:locale/posts", async (c) => {
     const { locale } = c.req.param();
-    return readKv(env, `list:html:${locale.toLowerCase()}/post-translations`, "text/html");
+    return readKvOrFallback(
+      env,
+      `list:html:${locale.toLowerCase()}/post-translations`,
+      "text/html",
+      locale,
+    );
   });
   app.get("/:locale/pages/:slug", async (c) => {
     const { locale, slug } = c.req.param();
-    return readKv(env, `entry:html:${locale.toLowerCase()}/page-translations/${slug}`, "text/html");
+    if (c.req.query("preview") === "1") {
+      return previewEntry(env, cms, "page-translations", locale, slug);
+    }
+    return readKvOrFallback(
+      env,
+      `entry:html:${locale.toLowerCase()}/page-translations/${slug}`,
+      "text/html",
+      locale,
+    );
   });
   app.get("/:locale/llms.txt", async (c) =>
     readKv(env, `llms:${c.req.param("locale").toLowerCase()}`, "text/plain"),
   );
 
+  app.notFound((c) => notFound(env, inferLocale(c.req.path, env)));
+
   appRef = { app, cms };
   return appRef;
+}
+
+/** Read pre-rendered HTML from KV; on miss, render the localized 404
+ *  template instead of returning bare "not found" text. */
+async function readKvOrFallback(
+  env: Env,
+  key: string,
+  contentType: string,
+  locale: string,
+): Promise<Response> {
+  const body = await env.KV.get(key, "text");
+  if (body === null) {
+    return notFound(env, locale);
+  }
+  return new Response(body, {
+    status: 200,
+    headers: { "content-type": `${contentType}; charset=utf-8` },
+  });
 }
 
 async function readKv(env: Env, key: string, contentType: string): Promise<Response> {
@@ -169,6 +190,77 @@ async function readKv(env: Env, key: string, contentType: string): Promise<Respo
     status: 200,
     headers: { "content-type": `${contentType}; charset=utf-8` },
   });
+}
+
+/** Render the registered entry template for a (collection, slug,
+ *  locale) at request time, regardless of `status`. Skips KV. */
+async function previewEntry(
+  env: Env,
+  cms: CmsRuntimeRef,
+  collection: "post-translations" | "page-translations",
+  locale: string,
+  slug: string,
+): Promise<Response> {
+  const runtime = await cms.get();
+  const tpl = runtime.templates.getEntryTemplate(collection);
+  if (!tpl) return notFound(env, locale);
+  const all = await runtime.listEntries.execute({ collection, limit: 200 });
+  const entry = all.find(
+    (e) =>
+      (e.data as { slug?: string }).slug === slug &&
+      (e.data as { locale?: string }).locale === locale,
+  );
+  if (!entry) return notFound(env, locale);
+  const site = siteConfigFromEnv(env);
+  const html = tpl({
+    entry: {
+      id: entry.id,
+      collection: entry.collection,
+      locale: entry.locale,
+      status: entry.status,
+      version: entry.version,
+      data: entry.data,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+    },
+    site,
+  });
+  // Preview surface MUST NOT cache — the whole point is iteration.
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+async function notFound(env: Env, locale: string): Promise<Response> {
+  const site = siteConfigFromEnv(env);
+  const html = notFoundTemplate({ site, locale: locale || site.canonicalLocale || "en" });
+  return new Response(html, {
+    status: 404,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+function siteConfigFromEnv(env: Env): SiteConfig {
+  const defaults = buildCmsConfig(env).siteDefaults!;
+  return {
+    brand: defaults.brand ?? "",
+    title: defaults.title ?? defaults.brand ?? "",
+    description: defaults.description ?? "",
+    origin: defaults.origin ?? "",
+    locales: [...(defaults.locales ?? [])],
+    canonicalLocale: defaults.locales?.[0] ?? null,
+  };
+}
+
+function inferLocale(path: string, env: Env): string {
+  const candidates = (buildCmsConfig(env).siteDefaults?.locales ?? []).map((l) => l.toLowerCase());
+  const seg = path.split("/")[1] ?? "";
+  if (seg && candidates.includes(seg.toLowerCase())) return seg;
+  return candidates[0] ?? "en";
 }
 
 export default {

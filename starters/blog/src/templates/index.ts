@@ -3,8 +3,15 @@ import { postTemplate } from "./post.js";
 import { postListTemplate } from "./postList.js";
 import { pageTemplate } from "./page.js";
 import { homeTemplate } from "./home.js";
+import { notFoundTemplate } from "./notFound.js";
 
-export { postTemplate, postListTemplate, pageTemplate, homeTemplate };
+export {
+  postTemplate,
+  postListTemplate,
+  pageTemplate,
+  homeTemplate,
+  notFoundTemplate,
+};
 
 /**
  * Bind templates to their target collections. The render pipeline
@@ -12,12 +19,10 @@ export { postTemplate, postListTemplate, pageTemplate, homeTemplate };
  * registered template still get markdown / `llms.txt` mirrors but
  * skip HTML.
  *
- * `homeTemplate` is NOT registered here — the home page composes a
- * `pages` row (slug=home) with a recent-posts list from
- * `post-translations`, which crosses collections and can't be
- * expressed in the per-Schema publish pipeline. The starter's
- * `GET /{locale}/` handler calls `homeTemplate` directly at request
- * time after fetching both pieces from KV.
+ * `homeTemplate` and `notFoundTemplate` are NOT registered here:
+ * `homeTemplate` composes two collections (page + recent-posts), and
+ * `notFoundTemplate` is request-time only. Both are called directly
+ * from the worker route handlers.
  */
 export function buildTemplates(): TemplateRegistry {
   const registry = new TemplateRegistry();

@@ -1,16 +1,17 @@
 /** @jsxImportSource hono/jsx */
+import { raw } from "hono/html";
+import { marked } from "marked";
 import type { EntryContext } from "@aotter/mantle-runtime";
+import { Layout } from "./components/Layout.js";
+
+const markedOptions = { gfm: true, breaks: false } as const;
 
 /**
  * Single-post HTML template. Receives the `post-translations` entry
  * (a per-locale row joined to its parent `posts` for cover URL +
- * publish time). The runtime renders this at publish time and writes
- * the result to KV; the public read path serves the cached HTML.
- *
- * Markdown body rendering is intentionally minimal here — production
- * starters typically pipe `entry.data.body` through `marked` or a
- * shortcode preprocessor. For v0.1.0 we render as a `<pre>` block so
- * the demo stays dependency-free.
+ * publish time). Markdown body is rendered with `marked` (CSP-safe —
+ * no eval). The runtime renders this at publish time and writes the
+ * result to KV; the public read path serves the cached HTML.
  */
 export function postTemplate(ctx: EntryContext): string {
   const { entry, site } = ctx;
@@ -22,32 +23,31 @@ export function postTemplate(ctx: EntryContext): string {
     coverUrl?: string;
     publishedAt?: number;
   };
+  const locale = data.locale ?? site.canonicalLocale ?? "en";
+  const title = data.title ?? data.slug ?? "Untitled";
+  const bodyHtml = data.body ? (marked.parse(data.body, markedOptions) as string) : "";
   const tree = (
-    <html lang={data.locale ?? site.canonicalLocale ?? "en"}>
-      <head>
-        <meta charSet="utf-8" />
-        <title>{`${data.title ?? data.slug ?? "Untitled"} — ${site.brand}`}</title>
-        <meta name="description" content={site.description ?? ""} />
-        {data.coverUrl ? <meta property="og:image" content={data.coverUrl} /> : null}
-      </head>
-      <body>
-        <header>
-          <a href="/">{site.brand}</a>
+    <Layout
+      site={site}
+      locale={locale}
+      title={`${title} — ${site.brand}`}
+      description={site.description}
+      ogImage={data.coverUrl}
+      current="posts"
+    >
+      <article>
+        <header class="post-meta">
+          {data.publishedAt ? (
+            <time dateTime={new Date(data.publishedAt).toISOString()}>
+              {new Date(data.publishedAt).toISOString().slice(0, 10)}
+            </time>
+          ) : null}
+          <h1>{title}</h1>
         </header>
-        <main>
-          <article>
-            {data.coverUrl ? <img src={data.coverUrl} alt="" /> : null}
-            <h1>{data.title}</h1>
-            {data.publishedAt ? (
-              <time dateTime={new Date(data.publishedAt).toISOString()}>
-                {new Date(data.publishedAt).toISOString().slice(0, 10)}
-              </time>
-            ) : null}
-            <pre style="white-space: pre-wrap; font-family: inherit;">{data.body ?? ""}</pre>
-          </article>
-        </main>
-      </body>
-    </html>
+        {data.coverUrl ? <img class="post-cover" src={data.coverUrl} alt="" /> : null}
+        <div class="post-body">{raw(bodyHtml)}</div>
+      </article>
+    </Layout>
   );
-  return String(tree);
+  return "<!doctype html>" + String(tree);
 }
