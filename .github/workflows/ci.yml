@@ -47,17 +47,20 @@ jobs:
       - name: Check package boundaries
         run: pnpm run check:boundaries
 
-      - name: Typecheck workspace (all packages including admin-ui / netlify stubs + starters/blog)
+      - name: Typecheck workspace + starters
         run: |
           pnpm typecheck
           pnpm -C starters/blog typecheck
+          pnpm -C starters/blank typecheck
 
       - name: Validate starter manifests (Loop 1 — `mantle validate`)
-        # Runs the spec CLI against starters/blog so any v0.1 grammar
+        # Runs the spec CLI against each starter so any v0.1 grammar
         # regression (DRAFT key creep, dangling Trigger.target, View
         # filter referencing unknown fields, etc.) breaks the build
         # before the tests do.
-        run: pnpm -C starters/blog validate
+        run: |
+          pnpm -C starters/blog validate
+          pnpm -C starters/blank validate
 
       - name: Theme fork/reset round-trip (all slot kinds)
         # Locks the theme:fork ↔ theme:reset invariant: any consumer

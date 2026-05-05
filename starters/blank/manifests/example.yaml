@@ -1,0 +1,47 @@
+# Single-file demo manifest. Replace with your real content shape and
+# delete this comment. The four v0.1 atoms (only Schema + View used
+# below; add the others as your needs grow):
+#
+#   Schema     — content collection (the "table")
+#   View       — public read query auto-mounted at /api/views/<name>
+#   Procedure  — HTTP-callable handler (POST /api/<segment>)
+#   Trigger    — lifecycle hook (before/after × create/update/delete/publish)
+
+apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata:
+  name: notes
+spec:
+  title: Notes
+  description: Example collection. Delete or rewrite to match your content.
+  schema:
+    type: object
+    required: [slug, title]
+    properties:
+      slug:
+        type: string
+        pattern: "^[a-z0-9-]+$"
+        description: URL slug.
+      title:
+        type: string
+        minLength: 1
+      body:
+        type: string
+        description: Markdown body.
+  uniqueIndexes:
+    - [slug]
+  localized: false
+  lifecycle: simple
+---
+apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata:
+  name: published-notes
+spec:
+  from: notes
+  fields: [id, slug, title, body, updatedAt]
+  filter:
+    eq: { field: status, value: published }
+  orderBy:
+    - { field: updatedAt, direction: desc }
+  limit: 50
