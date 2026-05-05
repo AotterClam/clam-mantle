@@ -81,6 +81,34 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.4))
 
+  starters/blank:
+    dependencies:
+      '@aotterclam/clam-cms-cloudflare':
+        specifier: workspace:*
+        version: link:../../packages/clam-cms-cloudflare
+      '@aotterclam/clam-cms-runtime':
+        specifier: workspace:*
+        version: link:../../packages/clam-cms-runtime
+      '@aotterclam/clam-cms-spec':
+        specifier: workspace:*
+        version: link:../../packages/clam-cms-spec
+      hono:
+        specifier: ^4.6.20
+        version: 4.12.16
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251101.0
+        version: 4.20260504.1
+      '@types/node':
+        specifier: ^20
+        version: 20.19.39
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^3.103.2
+        version: 3.114.17(@cloudflare/workers-types@4.20260504.1)
+
   starters/blog:
     dependencies:
       '@aotterclam/clam-cms-cloudflare':

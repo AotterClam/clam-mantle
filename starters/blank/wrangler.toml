@@ -1,0 +1,25 @@
+name = "clam-blank"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Stub OAuth verifier — accepts `Bearer dev-<userId>` tokens for local
+# dev / testing. Production: replace with the real DCR-compliant
+# verifier from `@cloudflare/workers-oauth-provider` and remove this.
+CLAM_ALLOW_STUB_OAUTH = "1"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clam-blank-local"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "kv-clam-blank-local"
+
+# Bundle YAML manifests as inline text strings.
+[[rules]]
+type = "Text"
+globs = ["**/*.yaml"]
+fallthrough = true
