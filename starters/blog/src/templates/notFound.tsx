@@ -1,8 +1,9 @@
 /** @jsxImportSource hono/jsx */
 import type { SiteConfig } from "@aotter/mantle-spec";
 import { Layout } from "./components/Layout.js";
+import { pickCopy } from "./utils.js";
 
-const COPY: Record<string, { title: string; body: string; back: string }> = {
+const COPY = {
   en: {
     title: "Lost at sea",
     body: "The page you sought is unwritten — or unpublished, or unremembered.",
@@ -22,7 +23,7 @@ export interface NotFoundContext {
 
 export function notFoundTemplate(ctx: NotFoundContext): string {
   const { site, locale } = ctx;
-  const copy = COPY[locale.toLowerCase()] ?? COPY.en!;
+  const copy = pickCopy(COPY, locale);
   const tree = (
     <Layout
       site={site}
