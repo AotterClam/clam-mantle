@@ -52,6 +52,11 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     return c.redirect(`/${canonical}`);
   });
 
+  // Literal root paths register BEFORE the `/:locale` catch-all —
+  // otherwise Hono's trie matches `/llms.txt` as `:locale = "llms.txt"`
+  // and the locale check 404s before the literal handler ever sees it.
+  app.get("/llms.txt", async () => readKv(env, `llms:root`, "text/plain"));
+
   // Per-locale home — composed at request time from
   // `pages/home`'s translation + a recent-posts list. The home
   // template itself lives in src/templates/home.tsx and is NOT
@@ -147,7 +152,6 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     const { locale, slug } = c.req.param();
     return readKv(env, `entry:html:${locale.toLowerCase()}/page-translations/${slug}`, "text/html");
   });
-  app.get("/llms.txt", async () => readKv(env, `llms:`, "text/plain"));
   app.get("/:locale/llms.txt", async (c) =>
     readKv(env, `llms:${c.req.param("locale").toLowerCase()}`, "text/plain"),
   );
