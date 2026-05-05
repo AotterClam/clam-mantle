@@ -1,7 +1,7 @@
 {
   "name": "@aotter/mantle-admin-ui",
   "version": "0.0.0",
-  "description": "Admin SPA for mantle. React 19 + Vite + Tailwind v4 + shadcn primitives + react-query. Talks /admin/api/* over fetch — env-agnostic. Pre-built dist/ shipped via workspace dep; consumers don't bundle the source.",
+  "description": "Admin SPA for mantle. React 19 + Vite + Tailwind v4. In development; ships in v0.1.0 (GitHub issue #21).",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-admin-ui",
   "repository": {
@@ -14,8 +14,8 @@
   "main": "./dist/index.html",
   "files": ["dist"],
   "scripts": {
-    "build": "echo 'TODO: implement in commit 5'",
-    "typecheck": "echo 'TODO: implement in commit 5'",
-    "test": "echo 'TODO: implement in commit 5'"
+    "build": "echo 'admin-ui build not yet implemented — see GitHub issue #21'",
+    "typecheck": "echo 'admin-ui typecheck not yet implemented — see GitHub issue #21'",
+    "test": "echo 'admin-ui tests not yet implemented — see GitHub issue #21'"
   }
 }
