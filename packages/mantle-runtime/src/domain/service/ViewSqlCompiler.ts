@@ -5,30 +5,19 @@ import {
   type FilterAst,
   type ViewManifest,
 } from "@aotter/mantle-spec";
+import { clampPage, clampShow } from "./Pagination.js";
 
 /**
- * View → SQL compilation. Targets SQLite + JSON1 (D1's dialect; also
- * Postgres-compatible enough for v0.2 via Hyperdrive).
+ * View → SQL compilation. Targets SQLite + JSON1 (D1's dialect).
+ * Reserved metadata fields project as native columns; everything else
+ * goes through `json_extract(data, '$.<field>')`. SQL uses positional
+ * `?` parameters; field-name escapes are defense-in-depth on top of
+ * the Schema validator gate.
  *
- *   - Reserved metadata fields (`id`, `status`, `version`, `createdAt`,
- *     `updatedAt`, `authorId`) are emitted as native columns.
- *   - Anything else (including `locale` per ADR-0010) is read via
- *     `json_extract(data, '$.<field>')`.
- *
- * Filter AST grammar is v0.1: `eq` / `and` / `or` only. `eq.value` may
- * be a literal or a `{ $param: <name> }` sentinel; the parser already
- * rejected DRAFT operators and validated that every paramRef'd name
- * lives in `View.spec.params.required`.
- *
- * Pagination is owned by the runtime — public REST callers send
- * `?page=&show=`; this compiler emits `LIMIT show OFFSET (page-1)*show`
- * after clamping `show` to `min(show, View.spec.limit ?? DEFAULT_LIMIT)`.
- *
- * SQL is built with positional parameters (`?`). Author-facing field
- * names should already be JSON-safe identifiers (Schema validator
- * gate); the escapes here are defense-in-depth.
- *
- * Pure stateless service — no I/O. Lives in `domain/service/`.
+ * v0.1 filter AST is `eq | and | or`; `eq.value` may be a literal or a
+ * `{ $param: <name> }` sentinel substituted from `options.params` at
+ * compile time. Pagination knobs `page` / `show` come in via
+ * `options`; the runtime owns the LIMIT/OFFSET emission.
  */
 export interface CompiledView {
   readonly sql: string;
@@ -38,14 +27,11 @@ export interface CompiledView {
 }
 
 export interface CompileViewOptions {
-  /** Resolved query-string params (post zod-coercion). Substituted
-   *  into filter `{ $param: <name> }` sentinels. */
+  /** Resolved query-string params, post-coercion. */
   readonly params?: Record<string, unknown>;
-  /** 1-indexed page number. Defaults to 1. Non-positive / non-finite
-   *  values fall back to 1. */
+  /** 1-indexed; non-positive / non-finite falls back to 1. */
   readonly page?: number;
-  /** Page size requested by the caller. Clamped at runtime to the
-   *  View's declared `spec.limit` (or DEFAULT_LIMIT when absent). */
+  /** Caller's requested page size; clamped to View.spec.limit. */
   readonly show?: number;
 }
 
@@ -58,8 +44,9 @@ const RESERVED_COLUMN: Readonly<Record<string, string>> = {
   authorId: "author_id",
 };
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
+const DEFAULT_PROJECTION = Object.entries(RESERVED_COLUMN)
+  .map(([alias, col]) => (alias === col ? col : `${col} AS ${alias}`))
+  .join(", ");
 
 export function compileView(view: ViewManifest, options: CompileViewOptions = {}): CompiledView {
   const sqlParams: unknown[] = [];
@@ -80,11 +67,7 @@ export function compileView(view: ViewManifest, options: CompileViewOptions = {}
 }
 
 function buildSelect(fields?: readonly string[]): string {
-  if (!fields || fields.length === 0) {
-    return Object.entries(RESERVED_COLUMN)
-      .map(([alias, col]) => (alias === col ? col : `${col} AS ${alias}`))
-      .join(", ");
-  }
+  if (!fields || fields.length === 0) return DEFAULT_PROJECTION;
   return fields.map(fieldExpr).join(", ");
 }
 
@@ -103,17 +86,13 @@ function fieldRefExpr(field: string): string {
 }
 
 /**
- * Compile one filter node. Returns `null` when the node should be
- * treated as TRUE — happens when an `eq` node references a param via
- * `{ $param: <name> }` and the resolved value is `undefined` (i.e. the
- * caller didn't supply it). v0.1.0 parser enforces required-only param
- * refs, so this drop path is dead code today; it lives here so v0.1.x
- * "optional param ref" promotion is purely a parser change.
- *
- * AND / OR fold over their children: any child that returns `null`
- * drops out. An AND/OR whose children all dropped returns `null` (no
- * constraint) — "missing constraint" is treated as TRUE for both
- * operators in v0.1.0 (documented in ADR-0012).
+ * Returns `null` when the node should evaluate to TRUE (no constraint).
+ * That happens when an `eq` references a param via `{ $param: <name> }`
+ * and the resolved value is `undefined`. v0.1.0 parser enforces
+ * required-only param refs, so this drop path is dead code today; it
+ * lives here so v0.1.x "optional param ref" promotion is purely a
+ * parser change. AND/OR fold over their children: any null child
+ * drops; an AND/OR whose children all drop returns null itself.
  */
 function compileFilter(
   node: FilterAst,
@@ -154,24 +133,6 @@ function buildOrderBy(
     return `${fieldRefExpr(o.field)} ${dir}`;
   });
   return ` ORDER BY ${parts.join(", ")}`;
-}
-
-function clampShow(show: number | undefined, viewLimit: number | undefined): number {
-  const cap = clampLimit(viewLimit);
-  if (typeof show !== "number" || !Number.isFinite(show) || show <= 0) return cap;
-  return Math.min(Math.floor(show), cap);
-}
-
-function clampPage(page: number | undefined): number {
-  if (typeof page !== "number" || !Number.isFinite(page) || page < 1) return 1;
-  return Math.floor(page);
-}
-
-function clampLimit(limit?: number): number {
-  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
-    return DEFAULT_LIMIT;
-  }
-  return Math.min(Math.floor(limit), MAX_LIMIT);
 }
 
 function escapeJsonKey(key: string): string {

@@ -4,6 +4,7 @@ import {
 } from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
+import { clampLimit } from "../../domain/service/Pagination.js";
 import type { ListEntriesRequest } from "../dto/content/index.js";
 import { schemaUnknownDiagnostic } from "./diagnostics.js";
 
@@ -13,11 +14,8 @@ import { schemaUnknownDiagnostic } from "./diagnostics.js";
  *
  * Caller-supplied `limit` is clamped at this layer (the trust
  * boundary between MCP / admin transports and the chokepoint
- * `EntryRepository`) — same defaults as `ViewSqlCompiler.clampLimit`.
+ * `EntryRepository`).
  */
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
-
 export class ListEntriesUseCase {
   constructor(
     private readonly entries: EntryRepository,
@@ -37,11 +35,4 @@ export class ListEntriesUseCase {
       limit: clampLimit(request.limit),
     });
   }
-}
-
-function clampLimit(limit: number | undefined): number {
-  if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
-    return DEFAULT_LIMIT;
-  }
-  return Math.min(Math.floor(limit), MAX_LIMIT);
 }

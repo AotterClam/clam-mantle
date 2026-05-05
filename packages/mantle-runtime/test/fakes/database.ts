@@ -356,12 +356,9 @@ function runCompiledViewQuery(
     ? remaining.slice("AND ".length).trim()
     : "";
 
-  // Walk the filter AST once to collect the positional params each
-  // atom consumes — this is independent of the row being matched. The
-  // earlier impl mutated a shared `consumed` counter inside `.filter()`,
-  // so atom #2 for row #2 would read params[3] (off-the-end) instead of
-  // params[2]. Pre-resolving the (atom → param) mapping eliminates the
-  // cross-row leak and lets per-row eval be a pure read.
+  // Pre-collect the positional param each atom consumes so per-row
+  // eval is a pure read — sharing a mutable counter across rows would
+  // off-the-end on the second row.
   const matchFilter = (row: EntryRecord, expr: string): boolean => {
     if (!expr) return true;
     const ctx = { atomIndex: 0 };
@@ -461,12 +458,6 @@ function projectRow(row: EntryRecord, projection: string): Record<string, unknow
   return out;
 }
 
-/**
- * Pre-compute the positional value each `?` placeholder consumes, in
- * left-to-right order. Lets `evalAtom` look up its slot by atom-index
- * instead of mutating a shared "consumed" counter (which leaked across
- * rows when `.filter()` reused the eval closure).
- */
 function collectAtomParams(
   expr: string,
   params: readonly unknown[],
