@@ -35,6 +35,15 @@ jobs:
         # build before test. Spec + runtime tests use src/ directly.
         run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-cloudflare' build
 
+      - name: Re-link bins now that dist/ exists
+        # First `pnpm install` runs before SDK build, so spec's
+        # `bin: ./dist/.../MantleCli.js` target doesn't exist and pnpm
+        # silently skips bin linking (logs WARN: "Failed to create bin
+        # ... ENOENT"). Re-running install (idempotent) after build
+        # creates the symlink. Without this, `pnpm -C starters/blog
+        # validate` fails with `sh: mantle: not found`.
+        run: pnpm install --frozen-lockfile
+
       - name: Typecheck workspace (all packages including admin-ui / netlify stubs + starters/blog)
         run: |
           pnpm typecheck
