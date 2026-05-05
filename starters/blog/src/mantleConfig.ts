@@ -6,6 +6,9 @@ import {
   D1UserRepository,
   KvCacheBinding,
   StubOAuthVerifier,
+  WorkersOAuthVerifier,
+  createOAuthProvider,
+  type AdminAuthConfig,
   type CmsConfig,
 } from "@aotter/mantle-cloudflare";
 import { buildHandlers } from "./handlers/index.js";
@@ -21,7 +24,21 @@ export interface Env {
   readonly DB: D1Database;
   readonly KV: KVNamespace;
   readonly ASSETS?: Fetcher;
+  /** KV namespace used by @cloudflare/workers-oauth-provider for token,
+   *  grant, and client registration storage. Bind as `OAUTH_KV` in
+   *  wrangler.toml. Required in production; omit in dev when using
+   *  StubOAuthVerifier (MANTLE_ALLOW_STUB_OAUTH=1). */
+  readonly OAUTH_KV?: KVNamespace;
+  /** Dev-only flag that enables StubOAuthVerifier (accepts `Bearer dev-<id>`).
+   *  Remove from wrangler.toml [vars] before deploying to production. */
   readonly MANTLE_ALLOW_STUB_OAUTH?: string;
+  /** GitHub OAuth App client_id — provision at github.com/settings/developers. */
+  readonly GITHUB_CLIENT_ID?: string;
+  /** GitHub OAuth App client_secret. Use `wrangler secret put GITHUB_CLIENT_SECRET`. */
+  readonly GITHUB_CLIENT_SECRET?: string;
+  /** GitHub login that receives the `owner` staff role on first sign-in.
+   *  Must match exactly — case-insensitive. Use `wrangler secret put ADMIN_GITHUB_LOGIN`. */
+  readonly ADMIN_GITHUB_LOGIN?: string;
   /** Public — embedded in the contact form widget. wrangler.toml
    *  ships CF's "always passes" test key as the dev default. */
   readonly TURNSTILE_SITE_KEY?: string;
@@ -46,6 +63,7 @@ export interface Env {
  * chain is built once per isolate.
  */
 export function buildCmsConfig(env: Env): CmsConfig {
+  const adminAuth = buildAdminAuth(env);
   return {
     manifests: loadManifests(),
     handlers: buildHandlers(env),
@@ -67,7 +85,22 @@ export function buildCmsConfig(env: Env): CmsConfig {
       assets: env.ASSETS
         ? new AssetsAssetServer(env.ASSETS)
         : { fetch: async () => null },
-      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: env.MANTLE_ALLOW_STUB_OAUTH }),
+      oauth: env.MANTLE_ALLOW_STUB_OAUTH === "1"
+        ? new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" })
+        : new WorkersOAuthVerifier(env.OAUTH_KV!),
     },
+    adminAuth,
+  };
+}
+
+function buildAdminAuth(env: Env): AdminAuthConfig | undefined {
+  const { OAUTH_KV, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } = env;
+  if (!OAUTH_KV || !GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) return undefined;
+  return {
+    oauthProvider: createOAuthProvider(),
+    oauthKv: OAUTH_KV,
+    githubClientId: GITHUB_CLIENT_ID,
+    githubClientSecret: GITHUB_CLIENT_SECRET,
+    adminGithubLogin: env.ADMIN_GITHUB_LOGIN ?? "",
   };
 }

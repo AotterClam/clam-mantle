@@ -4,10 +4,10 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-# Stub OAuth verifier — accepts `Bearer dev-<userId>` tokens for local
-# dev / testing. Production deploy MUST replace with the real
-# @cloudflare/workers-oauth-provider verifier (see mantle-cloudflare
-# README) and remove this var.
+# Dev-only flag — enables StubOAuthVerifier which accepts `Bearer dev-<userId>`.
+# Production deploy: remove this var and bind OAUTH_KV + set GitHub
+# OAuth secrets (GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET / ADMIN_GITHUB_LOGIN)
+# so WorkersOAuthVerifier and the admin consent UI are used instead.
 MANTLE_ALLOW_STUB_OAUTH = "1"
 
 # Cloudflare Turnstile site key (public — embedded in the contact
@@ -25,6 +25,10 @@ database_id = "00000000-0000-0000-0000-000000000000"
 [[kv_namespaces]]
 binding = "KV"
 id = "kv-mantle-blog-local"
+
+[[kv_namespaces]]
+binding = "OAUTH_KV"
+id = "kv-mantle-blog-oauth-local"
 
 # Bundle YAML manifests as inline text strings — TS imports them via
 # `?raw` query param, esbuild resolves to a string export at build time.

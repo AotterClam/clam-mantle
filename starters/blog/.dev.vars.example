@@ -1,7 +1,7 @@
 # Local-only vars wrangler dev reads. NOT deployed.
 # StubOAuthVerifier requires this flag so dev tokens (Bearer dev-<id>)
-# are accepted. Production wires the real DCR-compliant verifier — DO
-# NOT set MANTLE_ALLOW_STUB_OAUTH on production deploys.
+# are accepted. Production: remove this and supply OAUTH_KV + GitHub
+# credentials below so WorkersOAuthVerifier is used instead.
 MANTLE_ALLOW_STUB_OAUTH=1
 
 # Cloudflare Turnstile secret key. Default `dev-stub` short-circuits
@@ -14,3 +14,10 @@ TURNSTILE_SECRET_KEY=dev-stub
 # (Header, Layout, styles, i18n) show on every route immediately.
 # Don't set in production.
 MANTLE_LOCAL_DEV=1
+
+# ── Production OAuth (remove MANTLE_ALLOW_STUB_OAUTH when setting these) ──
+# GitHub OAuth App credentials — github.com/settings/developers
+# GITHUB_CLIENT_ID=<your_github_oauth_app_client_id>
+# GITHUB_CLIENT_SECRET=<your_github_oauth_app_client_secret>
+# GitHub login that gets the `owner` staff role on first sign-in:
+# ADMIN_GITHUB_LOGIN=<your_github_login>
