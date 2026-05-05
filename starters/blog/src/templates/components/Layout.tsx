@@ -13,12 +13,11 @@ export interface LayoutProps {
   readonly description?: string;
   readonly ogImage?: string;
   readonly current?: HeaderProps["current"];
-  readonly preview?: boolean;
   readonly children: unknown;
 }
 
 export function Layout(props: LayoutProps) {
-  const { site, locale, title, description, ogImage, current, preview, children } = props;
+  const { site, locale, title, description, ogImage, current, children } = props;
   return (
     <html lang={locale || site.canonicalLocale || "en"}>
       <head>
@@ -37,7 +36,6 @@ export function Layout(props: LayoutProps) {
         {html`<script>${raw(THEME_BOOTSTRAP_JS)}</script>`}
       </head>
       <body>
-        {preview ? <div class="preview-banner">Preview · unpublished content</div> : null}
         <Header site={site} locale={locale} current={current} />
         <main class="site-main">{children}</main>
         <footer class="site-footer">

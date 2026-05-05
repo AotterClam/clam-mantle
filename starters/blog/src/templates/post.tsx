@@ -39,5 +39,5 @@ export function postTemplate(ctx: EntryContext): string {
       </article>
     </Layout>
   );
-  return "<!doctype html>" + String(tree);
+  return String(tree);
 }

@@ -323,8 +323,7 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 }
 `;
 
-/** Set [data-theme] before paint to avoid FOUC. Reads localStorage,
- *  falls back to prefers-color-scheme. */
+/** Runs in <head> before paint to avoid FOUC. */
 export const THEME_BOOTSTRAP_JS = `
 (function(){try{
   var t = localStorage.getItem('clam-theme');
