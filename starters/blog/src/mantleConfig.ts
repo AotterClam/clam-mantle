@@ -27,6 +27,13 @@ export interface Env {
    *  value triggers real siteverify (provision via
    *  `wrangler secret put TURNSTILE_SECRET_KEY`). */
   readonly TURNSTILE_SECRET_KEY?: string;
+  /** Local-dev live-render flag. `1` bypasses KV for post / postList
+   *  / page routes — every request re-renders via the registered
+   *  templates against the current D1 state. Lets you edit shared
+   *  chrome (Header / Layout / styles / i18n) and see the change on
+   *  every page immediately, no `pnpm fixture` rebake. Don't set in
+   *  production — defeats the publish pipeline's KV cache. */
+  readonly MANTLE_LOCAL_DEV?: string;
 }
 
 /**

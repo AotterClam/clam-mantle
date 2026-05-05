@@ -9,3 +9,8 @@ MANTLE_ALLOW_STUB_OAUTH=1
 # rejects, anything else passes). Production: real secret via
 # `wrangler secret put TURNSTILE_SECRET_KEY`.
 TURNSTILE_SECRET_KEY=dev-stub
+
+# Live-render mode in local dev — bypass KV cache so chrome edits
+# (Header, Layout, styles, i18n) show on every route immediately.
+# Don't set in production.
+MANTLE_LOCAL_DEV=1
