@@ -1,5 +1,11 @@
 import { Hono } from "hono";
-import type { Entry, SiteConfig } from "@aotterclam/clam-cms-spec";
+import type { ContentState, Entry, SiteConfig } from "@aotterclam/clam-cms-spec";
+import {
+  readEntryBySlug,
+  readPublishedEntries,
+  renderEntryHtml,
+  renderListHtml,
+} from "@aotterclam/clam-cms-runtime";
 import {
   createCmsRef,
   mountMcp,
@@ -148,6 +154,9 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     if (c.req.query("preview") === "1") {
       return previewEntry(env, cms, "post-translations", locale, slug);
     }
+    if (isLocalDev(env)) {
+      return liveRenderEntry(env, cms, "post-translations", locale, slug);
+    }
     return readKvOrFallback(
       env,
       `entry:html:${locale.toLowerCase()}/post-translations/${slug}`,
@@ -157,6 +166,9 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   });
   app.get("/:locale/posts", async (c) => {
     const { locale } = c.req.param();
+    if (isLocalDev(env)) {
+      return liveRenderList(env, cms, "post-translations", locale);
+    }
     return readKvOrFallback(
       env,
       `list:html:${locale.toLowerCase()}/post-translations`,
@@ -171,6 +183,9 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     }
     if (c.req.query("preview") === "1") {
       return previewEntry(env, cms, "page-translations", locale, slug);
+    }
+    if (isLocalDev(env)) {
+      return liveRenderEntry(env, cms, "page-translations", locale, slug);
     }
     return readKvOrFallback(
       env,
@@ -221,14 +236,67 @@ async function readKv(env: Env, key: string, contentType: string): Promise<Respo
   });
 }
 
-/** Render the registered entry template for a (collection, slug,
- *  locale) at request time, regardless of `status`. Skips KV. */
-const PREVIEW_STATUS_PRIORITY: Record<string, number> = {
-  draft: 0,
-  published: 1,
-  archived: 2,
-};
+function isLocalDev(env: Env): boolean {
+  return env.CLAM_LOCAL_DEV === "1";
+}
 
+const HTML_NO_STORE = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "no-store",
+} as const;
+
+/** Live-render a published entry via the registered template against
+ *  current D1 state. Wired only when `CLAM_LOCAL_DEV=1` so chrome
+ *  edits show without re-fixturing. Production uses the KV-cached
+ *  path instead. */
+async function liveRenderEntry(
+  env: Env,
+  cms: CmsRuntimeRef,
+  collection: "post-translations" | "page-translations",
+  locale: string,
+  slug: string,
+): Promise<Response> {
+  const runtime = await cms.get();
+  const entry = await readEntryBySlug(runtime.db, {
+    collection,
+    slug,
+    locale,
+    status: "published",
+  });
+  if (!entry) return notFound(env, locale);
+  const html = renderEntryHtml({
+    entry,
+    site: siteConfigFromEnv(env),
+    templates: runtime.templates,
+  });
+  if (html === null) return notFound(env, locale);
+  return new Response(html, { status: 200, headers: HTML_NO_STORE });
+}
+
+async function liveRenderList(
+  env: Env,
+  cms: CmsRuntimeRef,
+  collection: "post-translations" | "page-translations",
+  locale: string,
+): Promise<Response> {
+  const runtime = await cms.get();
+  const entries = await readPublishedEntries(runtime.db, { collection, locale });
+  const html = renderListHtml({
+    collection,
+    locale,
+    entries,
+    site: siteConfigFromEnv(env),
+    templates: runtime.templates,
+  });
+  if (html === null) return notFound(env, locale);
+  return new Response(html, { status: 200, headers: HTML_NO_STORE });
+}
+
+const PREVIEW_STATUS_ORDER: ReadonlyArray<ContentState> = ["draft", "published", "archived"];
+
+/** `?preview=1` route. Looks up the entry preferring draft, falling
+ *  back to published, then archived; renders via the registered
+ *  template; injects a preview banner just inside `<body>`. */
 async function previewEntry(
   env: Env,
   cms: CmsRuntimeRef,
@@ -237,54 +305,22 @@ async function previewEntry(
   slug: string,
 ): Promise<Response> {
   const runtime = await cms.get();
-  const tpl = runtime.templates.getEntryTemplate(collection);
-  if (!tpl) return notFound(env, locale);
-  const all = await runtime.listEntries.execute({ collection, limit: 200 });
-  // Preview prefers the in-progress draft over a published copy of the
-  // same (slug, locale); fall back to published, then archived.
-  const matches = all
-    .filter(
-      (e) =>
-        (e.data as { slug?: string }).slug === slug &&
-        (e.data as { locale?: string }).locale === locale,
-    )
-    .sort((a, b) => {
-      const pa = PREVIEW_STATUS_PRIORITY[a.status] ?? 99;
-      const pb = PREVIEW_STATUS_PRIORITY[b.status] ?? 99;
-      if (pa !== pb) return pa - pb;
-      return (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
-    });
-  const entry = matches[0];
+  let entry: Entry | null = null;
+  for (const status of PREVIEW_STATUS_ORDER) {
+    entry = await readEntryBySlug(runtime.db, { collection, slug, locale, status });
+    if (entry) break;
+  }
   if (!entry) return notFound(env, locale);
-  const site = siteConfigFromEnv(env);
-  const body = tpl({
-    entry: {
-      id: entry.id,
-      collection: entry.collection,
-      locale: entry.locale,
-      status: entry.status,
-      version: entry.version,
-      data: entry.data,
-      createdAt: entry.createdAt,
-      updatedAt: entry.updatedAt,
-    },
-    site,
+  const html = renderEntryHtml({
+    entry,
+    site: siteConfigFromEnv(env),
+    templates: runtime.templates,
   });
-  // Inject the preview banner just after <body>. The registered
-  // template doesn't know about preview mode; doing this here keeps
-  // EntryContext free of a worker-only flag and avoids forking the
-  // template just for a 1-line UI cue.
-  // Registered templates omit the doctype (the publish pipeline adds
-  // it before KV write). Preview bypasses publish, so prepend here.
+  if (html === null) return notFound(env, locale);
   const banner = `<div class="preview-banner">Preview · ${entry.status} · ${slug}</div>`;
-  const html =
-    "<!doctype html>" + body.replace(/<body([^>]*)>/, `<body$1>${banner}`);
-  return new Response(html, {
+  return new Response(html.replace(/<body([^>]*)>/, `<body$1>${banner}`), {
     status: 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
-    },
+    headers: HTML_NO_STORE,
   });
 }
 

@@ -148,6 +148,18 @@ Both live in `test/integration/`. If you added a new MCP-relevant Schema, the pe
 | New View doesn't appear at `/api/views/<name>`                    | Same as above — restart. Or: name has uppercase / non-URL-safe chars (use kebab-case).               |
 | `VIEW_FILTER_FIELD_NOT_IN_SCHEMA` for a real field                | The Schema is referenced via `View.spec.from`; field must be in that Schema's `properties`.          |
 
+## Live-render dev mode
+
+Set `CLAM_LOCAL_DEV=1` in `.dev.vars` (the starter ships this on by
+default). The worker bypasses the KV cache for `post` / `postList` /
+`page` routes and re-renders via the registered templates against
+current D1 state on every request. Edit `Header.tsx` / `Layout.tsx` /
+`styles.ts` / `i18n/*.json` and reload — every page reflects the
+change immediately, no `pnpm fixture` rebake.
+
+Production / CI: leave `CLAM_LOCAL_DEV` unset so the publish-pipeline
+path is exercised.
+
 ## Stale-KV gotcha (when you change Layout / Header / shared chrome)
 
 The starter renders **registered templates** (post / postList / page) at

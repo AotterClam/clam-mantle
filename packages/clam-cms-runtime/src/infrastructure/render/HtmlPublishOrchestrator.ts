@@ -22,6 +22,10 @@ import {
   readPublishedEntries,
 } from "../../domain/service/PublishedEntries.js";
 import { serializeEntryAsMarkdown } from "../../domain/service/MarkdownSerializer.js";
+import {
+  renderEntryHtml,
+  renderListHtml,
+} from "../../domain/service/HtmlRenderer.js";
 import { ComposeLlmsTxtUseCase } from "../../usecase/render/ComposeLlmsTxtUseCase.js";
 
 /**
@@ -78,9 +82,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     templates: TemplateRegistry,
     doctype: string,
   ): Promise<void> {
-    const tpl = templates.getEntryTemplate(entry.collection);
-    if (tpl) {
-      const html = doctype + tpl({ entry, site });
+    const html = renderEntryHtml({ entry, site, templates, doctype });
+    if (html !== null) {
       await this.kv.put(entryHtmlKey(entry), html);
     }
     const md = serializeEntryAsMarkdown(entry);
@@ -96,18 +99,18 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     templates: TemplateRegistry,
     doctype: string,
   ): Promise<void> {
-    const tpl = templates.getListTemplate(collection);
-    if (!tpl) return;
     const entries = await readPublishedEntries(this.db, { locale, collection });
-    const html =
-      doctype +
-      tpl({
-        collection,
-        locale: locale ?? "",
-        entries,
-        site,
-      });
-    await this.kv.put(listHtmlKey(collection, locale ?? ""), html);
+    const html = renderListHtml({
+      collection,
+      locale: locale ?? "",
+      entries,
+      site,
+      templates,
+      doctype,
+    });
+    if (html !== null) {
+      await this.kv.put(listHtmlKey(collection, locale ?? ""), html);
+    }
   }
 
   private async renderLlmsTxt(locale: string | null, site: SiteConfig): Promise<void> {

@@ -76,6 +76,43 @@ export async function readEntryById(
   return row ? rowToEntry(row) : null;
 }
 
+/** Lookup an entry by (collection, slug[, locale][, status]). Used by
+ *  request-time render paths (preview, live-dev) that route by URL
+ *  slug — not the publish pipeline's flow which already holds the
+ *  entry id. Returns the most-recently-updated row if multiple
+ *  match. */
+export interface ReadEntryBySlugArgs {
+  readonly collection: string;
+  readonly slug: string;
+  /** `string` filters to that locale; `null` filters to non-localized
+   *  entries (data.locale IS NULL); omitted = no locale filter. */
+  readonly locale?: string | null;
+  readonly status?: ContentState;
+}
+
+export async function readEntryBySlug(
+  db: DatabaseDriver,
+  args: ReadEntryBySlugArgs,
+): Promise<Entry | null> {
+  const conditions: string[] = ["collection = ?", `json_extract(data, '$.slug') = ?`];
+  const binds: unknown[] = [args.collection, args.slug];
+  if (args.locale === null) {
+    conditions.push(`json_extract(data, '$.locale') IS NULL`);
+  } else if (typeof args.locale === "string") {
+    conditions.push(`json_extract(data, '$.locale') = ?`);
+    binds.push(args.locale);
+  }
+  if (args.status) {
+    conditions.push("status = ?");
+    binds.push(args.status);
+  }
+  const sql =
+    `SELECT id, collection, status, version, data, created_at, updated_at` +
+    ` FROM entries WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC LIMIT 1`;
+  const row = await db.prepare(sql).bind(...binds).first<EntryDbRow>();
+  return row ? rowToEntry(row) : null;
+}
+
 function rowToEntry(row: EntryDbRow): Entry {
   const data = JSON.parse(row.data) as Record<string, unknown>;
   const dataLocale = data["locale"];

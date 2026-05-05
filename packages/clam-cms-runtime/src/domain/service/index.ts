@@ -6,6 +6,7 @@ export * from "./PublishKeys.js";
 export * from "./MarkdownSerializer.js";
 export * from "./PublishedEntries.js";
 export * from "./SitemapSerializer.js";
+export * from "./HtmlRenderer.js";
 export * from "./ViewSqlCompiler.js";
 export * from "./Pagination.js";
 export * from "./ViewParamCoercer.js";
