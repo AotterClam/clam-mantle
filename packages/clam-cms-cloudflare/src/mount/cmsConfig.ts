@@ -17,7 +17,8 @@ import type { Manifest, SiteDefaults } from "@aotterclam/clam-cms-spec";
  *
  * Adapters separate runtime config from CF binding config so the
  * consumer can compose `bindings` from `env` once at the top of their
- * worker and pass to both `mountServerEndpoints` and `mountAdmin`.
+ * worker and pass to every mount factory (`mountServerEndpoints`,
+ * `mountMcp`, `mountPublicRoutes`).
  */
 export interface CmsConfig {
   readonly manifests: readonly Manifest[];

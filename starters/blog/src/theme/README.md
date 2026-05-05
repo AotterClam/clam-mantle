@@ -31,8 +31,9 @@ need:
    work fits here. Edit `theme/tokens.ts` (after `pnpm theme:fork
    tokens.ts`).
 2. **L2 atomic** — extra rules / icons / strings without
-   restructuring the chrome. Drop `theme/extra.css` / `theme/icons.ts`
-   / `theme/i18n/<locale>.json`.
+   restructuring the chrome. Add CSS via `theme/index.ts:extraCss`
+   (a string field — no separate `extra.css` file); fork
+   `theme/icons.ts` / `theme/i18n/<locale>.json` for those.
 3. **L3 component** — replace the Header or Footer wholesale.
 4. **L4 template** — replace a whole page kind. Last resort; means
    the consumer owns that page's structure going forward.

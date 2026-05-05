@@ -12,11 +12,15 @@ import { buildCmsConfig, type Env } from "./clamConfig.js";
  *   GET  /api/views/<name>          — view REST (auto-mounted per View atom)
  *   ALL  /api/<procedure>           — procedure dispatcher (POST/PUT/PATCH/DELETE)
  *   ALL  /mcp                       — MCP JSON-RPC dispatcher
- *   /oauth/{authorize,token,...}    — OAuth 2.1 / DCR for MCP clients
  *
  * No `mountPublicRoutes` — this starter intentionally serves nothing
  * to end users. Wire your Next.js / Astro / SvelteKit / native app to
  * the API + MCP endpoints above.
+ *
+ * MCP auth is bearer-token-only via the runtime `OAuthVerifier` port
+ * (StubOAuthVerifier behind `CLAM_ALLOW_STUB_OAUTH=1` for dev). No
+ * `/oauth/{authorize,token,register}` route mount in v0.1.0; a
+ * `@cloudflare/workers-oauth-provider` integration is v0.1.x.
  *
  * If you decide to render HTML on the server later, swap to
  * `starters/blog` (or copy its `mountPublicRoutes` setup back in).
