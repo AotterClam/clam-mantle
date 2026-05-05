@@ -37,6 +37,17 @@ export type { KvCache, KvPutOptions, KvListResult } from "./domain/port/KvCache.
 export type { SessionRepository, Session } from "./domain/port/SessionRepository.js";
 export type { AssetServer } from "./domain/port/AssetServer.js";
 export type { OAuthVerifier, OAuthIdentity } from "./domain/port/OAuthVerifier.js";
+export type { UserRepository, GithubToken } from "./domain/port/UserRepository.js";
+export type {
+  StaffRepository,
+  StaffListEntry,
+  BootstrapOwnerOpts,
+} from "./domain/port/StaffRepository.js";
+
+// Identity-layer model types consumed by adapters implementing the auth ports.
+export type { User } from "./domain/model/User.js";
+export type { GithubProfile } from "./domain/model/GithubProfile.js";
+export type { Staff, StaffMembership } from "./domain/model/Staff.js";
 
 // Consumer/starter handler and render contracts.
 export type {

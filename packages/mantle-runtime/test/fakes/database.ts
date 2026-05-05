@@ -35,7 +35,7 @@ interface StaffRecord {
 }
 interface UserRecord {
   id: string;
-  email: string;
+  email: string | null;
   name: string | null;
   created_at: number;
 }
