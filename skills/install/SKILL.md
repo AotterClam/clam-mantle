@@ -17,7 +17,7 @@ Ask the user which surface they need. Don't assume.
 | Need | Starter | What ships |
 |---|---|---|
 | Working public site out of the box (HTML chrome, theme stack, i18n, contact form, sitemap, `.md` mirror, llms.txt, SEO + AEO meta) | **`starters/blog`** | Hono server-rendered, neutral baseline + L1–L4 customization stack. Covers most "I want a blog / marketing site / docs landing" requests. |
-| API + MCP backend only (no public HTML); you have your own frontend (Next.js, Astro, SvelteKit, native iOS/Android, partner integration) | **`starters/blank`** | Same SDK, no UI deps, no theme stack. Just `/api/views/*`, `/api/<procedure>`, `/mcp`, `/oauth/*`. |
+| API + MCP backend only (no public HTML); you have your own frontend (Next.js, Astro, SvelteKit, native iOS/Android, partner integration) | **`starters/blank`** | Same SDK, no UI deps, no theme stack. Just `/api/views/*`, manifest-declared HTTP Trigger routes, and `/mcp`. |
 
 **Decision shortcuts:**
 
@@ -107,7 +107,7 @@ Visit (blank):
 
 - `http://localhost:8787/` (404 — by design; no public HTML routes)
 - `http://localhost:8787/api/views/published-notes` (returns `{ok:true, data:{rows:[]}}` — empty until you create entries)
-- `http://localhost:8787/mcp` (returns `unauthorized` without OAuth bearer; the MCP DCR flow is for client tools)
+- `http://localhost:8787/mcp` (returns `unauthorized` without a bearer token; OAuth/DCR route mounting is a v0.1.x follow-up)
 
 ### 4. Stamp generated artifacts (optional but recommended)
 

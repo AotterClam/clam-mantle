@@ -1,7 +1,7 @@
 {
   "name": "@aotter/mantle-cloudflare",
   "version": "0.0.0",
-  "description": "Cloudflare Workers adapter for mantle. Hono-based mountAdmin / mountServerEndpoints. Implements the 5 runtime ports against D1 / KV / ASSETS / Workers OAuth. Bundles mantle-admin-ui dist for the admin SPA static surface.",
+  "description": "Cloudflare Workers adapter for mantle. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Implements the 5 runtime ports against D1 / KV / ASSETS / bearer-token OAuth verification.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-cloudflare",
   "repository": {

@@ -10,7 +10,7 @@ import { buildCmsConfig, type Env } from "./mantleConfig.js";
  * Headless worker entrypoint. Mounts only the API + MCP surfaces:
  *
  *   GET  /api/views/<name>          — view REST (auto-mounted per View atom)
- *   ALL  /api/<procedure>           — procedure dispatcher (POST/PUT/PATCH/DELETE)
+ *   METHOD <trigger path>           — manifest-declared HTTP Trigger routes
  *   ALL  /mcp                       — MCP JSON-RPC dispatcher
  *
  * No `mountPublicRoutes` — this starter intentionally serves nothing
