@@ -30,10 +30,15 @@ import {
   llmsTxtKey,
 } from "@aotterclam/clam-cms-runtime";
 import type { Entry, ContentState } from "@aotterclam/clam-cms-spec";
-import { postTemplate, postListTemplate } from "../../src/templates/index.js";
+import {
+  pageTemplate,
+  postTemplate,
+  postListTemplate,
+} from "../../src/templates/index.js";
 import {
   FIXTURE_AUTHOR_ID,
   FIXTURE_NOW,
+  FIXTURE_PAGES,
   FIXTURE_POSTS,
   FIXTURE_SITE,
 } from "./data.js";
@@ -101,6 +106,32 @@ function buildSql(): string {
       });
       lines.push(
         `INSERT OR IGNORE INTO entries (id, collection, status, version, data, author_id, created_at, updated_at) VALUES ('${trId}', 'post-translations', 'published', 1, '${escape(trData)}', '${FIXTURE_AUTHOR_ID}', ${FIXTURE_NOW}, ${FIXTURE_NOW});`,
+      );
+    }
+  }
+
+  let pageIndex = 1;
+  for (const page of FIXTURE_PAGES) {
+    const pageId = `fx-page-${pageIndex++}`;
+    const data = JSON.stringify({
+      slug: page.slug,
+      authorId: FIXTURE_AUTHOR_ID,
+      publishedAt: FIXTURE_NOW,
+    });
+    lines.push(
+      `INSERT OR IGNORE INTO entries (id, collection, status, version, data, author_id, created_at, updated_at) VALUES ('${pageId}', 'pages', 'published', 1, '${escape(data)}', '${FIXTURE_AUTHOR_ID}', ${FIXTURE_NOW}, ${FIXTURE_NOW});`,
+    );
+    for (const tr of page.translations) {
+      const trId = `fx-pgt-${page.slug}-${tr.locale.toLowerCase()}`;
+      const trData = JSON.stringify({
+        slug: page.slug,
+        locale: tr.locale,
+        title: tr.title,
+        intro: tr.intro,
+        body: tr.body,
+      });
+      lines.push(
+        `INSERT OR IGNORE INTO entries (id, collection, status, version, data, author_id, created_at, updated_at) VALUES ('${trId}', 'page-translations', 'published', 1, '${escape(trData)}', '${FIXTURE_AUTHOR_ID}', ${FIXTURE_NOW}, ${FIXTURE_NOW});`,
       );
     }
   }
@@ -180,6 +211,32 @@ function buildKvEntries(): readonly KvEntry[] {
     key: llmsTxtKey(""),
     value: renderLlmsTxt("", [...byLocale.values()].flat()),
   });
+
+  // page-translations: render entry HTML for static pages (about,
+  // contact, etc.). The home page composes at request time and is
+  // NOT pre-rendered to KV — we still render the slug=home entry
+  // here so admin previews / future surfaces can link to a stable
+  // URL, but the worker's `/{locale}` route never reads it.
+  for (const page of FIXTURE_PAGES) {
+    for (const tr of page.translations) {
+      const entry = buildEntry({
+        id: `fx-pgt-${page.slug}-${tr.locale.toLowerCase()}`,
+        collection: "page-translations",
+        locale: tr.locale,
+        data: {
+          slug: page.slug,
+          locale: tr.locale,
+          title: tr.title,
+          intro: tr.intro,
+          body: tr.body,
+        },
+      });
+      out.push({
+        key: entryHtmlKey(entry),
+        value: pageTemplate({ entry, site: FIXTURE_SITE }),
+      });
+    }
+  }
   return out;
 }
 
@@ -235,7 +292,9 @@ async function main(): Promise<void> {
   );
 
   process.stdout.write("\nFixture applied. Try:\n");
+  process.stdout.write("  curl http://localhost:8787/en\n");
   process.stdout.write("  curl http://localhost:8787/en/posts/hello-world\n");
+  process.stdout.write("  curl http://localhost:8787/en/pages/about\n");
   process.stdout.write("  curl http://localhost:8787/zh-TW/posts\n");
   process.stdout.write("  curl http://localhost:8787/en/llms.txt\n");
 }

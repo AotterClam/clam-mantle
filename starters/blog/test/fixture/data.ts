@@ -79,3 +79,67 @@ export const FIXTURE_POSTS: readonly FixturePost[] = [
     ],
   },
 ];
+
+export interface FixturePage {
+  readonly slug: string;
+  readonly translations: ReadonlyArray<{
+    readonly locale: string;
+    readonly title: string;
+    readonly intro?: string;
+    readonly body: string;
+  }>;
+}
+
+export const FIXTURE_PAGES: readonly FixturePage[] = [
+  {
+    slug: "home",
+    translations: [
+      {
+        locale: "en",
+        title: "Welcome to Clam Blog",
+        intro: "Localized posts + contact form, served from Cloudflare D1 + KV.",
+        body: "This site is the v0.1.0 reference starter for clam-cms. It exercises every locked grammar feature: posts (language-neutral parent), post-translations (translates demo), pages (this page is one), and a CAPTCHA-gated contact form running on lifecycle hooks. Recent posts are listed below; About + Contact pages are reachable from the header.",
+      },
+      {
+        locale: "zh-TW",
+        title: "歡迎來到 Clam Blog",
+        intro: "多語系文章 + 聯絡表單，跑在 Cloudflare D1 + KV 上。",
+        body: "這個網站是 clam-cms v0.1.0 的範本 starter。Locked grammar 全跑一遍：posts（語系無關的 parent）、post-translations（translates demo）、pages（這頁就是其中一個）、以及一個用 lifecycle hooks 過 CAPTCHA 的聯絡表單。最新文章列在下面；標頭可以連到 About / Contact。",
+      },
+    ],
+  },
+  {
+    slug: "about",
+    translations: [
+      {
+        locale: "en",
+        title: "About",
+        intro: "What this starter is for.",
+        body: "Clam Blog is a reference deployment of the clam-cms v0.1.0 manifest engine on Cloudflare Workers. It demonstrates the four locked atoms — Schema, View, Procedure, Trigger — composed into a real, runnable site. Source: github.com/AotterClam/clam-cms.",
+      },
+      {
+        locale: "zh-TW",
+        title: "關於",
+        intro: "這個 starter 的用途。",
+        body: "Clam Blog 是 clam-cms v0.1.0 manifest 引擎跑在 Cloudflare Workers 上的範例佈署。它把四個 locked atom（Schema、View、Procedure、Trigger）組成一個真的能跑的網站。原始碼：github.com/AotterClam/clam-cms。",
+      },
+    ],
+  },
+  {
+    slug: "contact",
+    translations: [
+      {
+        locale: "en",
+        title: "Contact",
+        intro: "Send us a message.",
+        body: "POST to `/api/contact` with name, email, message, and a CAPTCHA token. The before_create lifecycle hook verifies the token; valid submissions land in the contact-messages collection and trigger an after_create notification.",
+      },
+      {
+        locale: "zh-TW",
+        title: "聯絡",
+        intro: "傳訊息給我們。",
+        body: "POST 到 `/api/contact`，帶上 name、email、message 和 CAPTCHA token。before_create lifecycle hook 會驗證 token；通過的訊息進 contact-messages collection，並觸發 after_create 通知。",
+      },
+    ],
+  },
+];
