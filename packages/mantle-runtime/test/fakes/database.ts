@@ -275,7 +275,10 @@ class InMemoryStatement implements PreparedStatement {
     // Publish read paths — SELECT id, collection, status, version, data, created_at, updated_at FROM entries WHERE …
     if (sql.startsWith("SELECT id, collection, status, version, data, created_at, updated_at FROM entries WHERE")) {
       const tail = sql.slice("SELECT id, collection, status, version, data, created_at, updated_at FROM entries WHERE ".length);
-      const rest = tail.replace(/ ORDER BY updated_at DESC$/, "");
+      const limitMatch = tail.match(/ LIMIT (\d+)$/);
+      const limit = limitMatch ? Number(limitMatch[1]) : undefined;
+      const stripped = limit ? tail.slice(0, tail.length - limitMatch![0].length) : tail;
+      const rest = stripped.replace(/ ORDER BY updated_at DESC$/, "");
       const conds = rest.split(" AND ");
       const matchedRows = [...this.db.entries.values()].filter((r) => {
         let pi = 0;
@@ -298,7 +301,8 @@ class InMemoryStatement implements PreparedStatement {
         return true;
       });
       matchedRows.sort((a, b) => b.updated_at - a.updated_at);
-      return { rows: matchedRows.map((r) => ({ ...r })), changes: 0 };
+      const capped = limit ? matchedRows.slice(0, limit) : matchedRows;
+      return { rows: capped.map((r) => ({ ...r })), changes: 0 };
     }
 
     // View-compiled SELECT: starts with SELECT and FROM entries WHERE collection = ? …

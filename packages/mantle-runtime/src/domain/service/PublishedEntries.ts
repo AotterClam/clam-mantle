@@ -17,6 +17,10 @@ import type { DatabaseDriver } from "../port/DatabaseDriver.js";
 export interface PublishedEntriesFilter {
   readonly locale?: string | null;
   readonly collection?: string;
+  /** Optional `LIMIT N` on the SQL query — caps both D1 read and JS
+   *  memory. Sitemap composition uses this; publish pipeline omits
+   *  (one entry-locale-collection scan is naturally small). */
+  readonly limit?: number;
 }
 
 interface EntryDbRow {
@@ -45,9 +49,12 @@ export async function readPublishedEntries(
     conditions.push("collection = ?");
     binds.push(filter.collection);
   }
-  const sql =
+  let sql =
     `SELECT id, collection, status, version, data, created_at, updated_at` +
     ` FROM entries WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC`;
+  if (typeof filter.limit === "number" && Number.isFinite(filter.limit) && filter.limit > 0) {
+    sql += ` LIMIT ${Math.floor(filter.limit)}`;
+  }
   const rows = await db.prepare(sql).bind(...binds).all<EntryDbRow>();
   return rows.map(rowToEntry);
 }

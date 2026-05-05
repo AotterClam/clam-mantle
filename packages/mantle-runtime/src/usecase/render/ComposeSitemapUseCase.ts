@@ -35,11 +35,10 @@ export class ComposeSitemapUseCase {
 
   async execute(request: ComposeSitemapRequest): Promise<string> {
     const cap = request.maxUrls ?? SITEMAP_MAX_URLS_DEFAULT;
-    const all = await readPublishedEntries(this.db);
+    const all = await readPublishedEntries(this.db, { limit: cap });
     const mapper = request.pathFor ?? entryPublicPath;
     const entries: { entry: Entry; path: string }[] = [];
     for (const e of all) {
-      if (entries.length >= cap) break;
       const path = mapper(e);
       if (path !== null) entries.push({ entry: e, path });
     }

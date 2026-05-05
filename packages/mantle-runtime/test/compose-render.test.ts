@@ -140,6 +140,21 @@ describe("ComposeSitemapUseCase", () => {
     expect(out).not.toContain("/internal/");
   });
 
+  it("maxUrls caps the SQL read (not just the JS array)", async () => {
+    const db = new InMemoryDatabase();
+    for (let i = 0; i < 8; i++) {
+      seedPublished(db, {
+        id: `p${i}`,
+        collection: "posts",
+        locale: "en",
+        data: { slug: `s${i}` },
+      });
+    }
+    const out = await new ComposeSitemapUseCase(db).execute({ site, maxUrls: 3 });
+    const urlCount = (out.match(/<url>/g) ?? []).length;
+    expect(urlCount).toBe(3);
+  });
+
   it("XML-escapes ampersands in origins / paths", async () => {
     const db = new InMemoryDatabase();
     seedPublished(db, {
