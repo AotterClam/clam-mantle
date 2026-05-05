@@ -31,6 +31,12 @@ export function mountMcp(
       });
     }
     const staff = await runtime.staff.readByUserId(identity.userId);
+    if (!staff) {
+      return new Response("forbidden", {
+        status: 403,
+        headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
+      });
+    }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
         listEntries: runtime.listEntries,
