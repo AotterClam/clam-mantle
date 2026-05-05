@@ -187,7 +187,7 @@ describe("ExecuteViewUseCase", () => {
     const useCase = new ExecuteViewUseCase(db);
     const result = await useCase.execute({
       view: view({ from: "posts" }),
-      show: 2,
+      options: { show: 2 },
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;

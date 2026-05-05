@@ -193,7 +193,8 @@ export function isParamRef(v: unknown): v is ParamRef {
  *  (`/api/views/<name>?...`). The runtime owns these for pagination; a
  *  View manifest that declares `params.<name>` for any of them is
  *  rejected at parse time (`VIEW_PARAMS_RESERVED_NAME`). */
-export const VIEW_PARAMS_RESERVED: ReadonlyArray<string> = ["page", "show", "cursor"];
+export const VIEW_PARAMS_RESERVED = ["page", "show", "cursor"] as const;
+export type ViewParamReserved = (typeof VIEW_PARAMS_RESERVED)[number];
 export interface FilterAnd {
   readonly and: readonly FilterAst[];
 }

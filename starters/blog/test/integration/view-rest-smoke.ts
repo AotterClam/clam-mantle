@@ -1,25 +1,8 @@
 /**
- * Public View REST integration smoke (ADR-0012). Assumes:
- *   - wrangler dev on http://localhost:8787 (override via WRANGLER_BASE_URL)
- *   - `pnpm fixture` applied (3 posts × 2 locales seeded)
- *
- * Exercises every shape in ADR-0012 against a real worker:
- *   1.  static View (no params)
- *   2.  param-driven View (?locale=)
- *   3.  pagination (?page=&show=)
- *   4.  show clamp at View.spec.limit
- *   5.  hasMore boundary semantics
- *   6.  required-param missing → 400 INPUT_VALIDATION_FAILED
- *   7.  unknown View name → 404
- *   8.  unknown query param silently ignored (lenient v0.1.0)
- *   9.  envelope shape (`{ rows, page, show, hasMore }`, no `entries`)
- *  10.  reserved-name collision NOT possible at runtime (parser gate)
- *
- * Catches integration bugs that in-process Hono unit tests miss:
- * miniflare-D1 OFFSET/LIMIT semantics, JSON1 json_extract behaviour
- * on the param-substituted column path, and CF Workers query-string
- * decoding. Exit non-zero on any assertion failure with the failing
- * context printed; CI surfaces this as a job failure.
+ * Public View REST integration smoke (ADR-0012). Assumes wrangler dev
+ * on http://localhost:8787 (override via WRANGLER_BASE_URL) and
+ * `pnpm fixture` applied (3 posts × 2 locales seeded). Exits non-zero
+ * on any assertion failure.
  */
 import { strict as assert } from "node:assert";
 
@@ -80,8 +63,6 @@ async function main(): Promise<void> {
     assert.equal(r.body.data.page, 1);
     assert.equal(r.body.data.show, 20, "recent-posts.spec.limit = 20");
     assert.equal(r.body.data.hasMore, false);
-    // Schema-property fields project as data.<field>; reserved metadata
-    // (updatedAt) projects as the aliased reserved column.
     const first = r.body.data.rows[0]!;
     assert.equal(typeof first.slug, "string");
     assert.equal(typeof first.locale, "string");
@@ -170,9 +151,8 @@ async function main(): Promise<void> {
     console.log(`[view] 8/10  unknown query keys silently ignored`);
   }
 
-  // 9. Envelope shape: data is { rows, page, show, hasMore } — never
-  //    the legacy { items, nextCursor } (was rewritten in ADR-0012).
-  //    Asserting the negative shape catches future regressions.
+  // 9. Envelope shape — assert the negative on legacy keys so a
+  //    future revert can't slip past green tests.
   {
     const r = await getView<PostTranslation>("/api/views/recent-posts");
     assertOk(r.body, "[9] envelope shape");
@@ -187,11 +167,9 @@ async function main(): Promise<void> {
     console.log(`[view] 9/10  envelope = { rows, page, show, hasMore } (no legacy keys)`);
   }
 
-  // 10. Reserved name (page) cannot reach the runtime — the parser
-  //     would have rejected the manifest. We can't synthesise that
-  //     locally without restarting the worker, so we assert the
-  //     reverse: passing ?page= still parses cleanly as pagination
-  //     (proves the runtime owns the reserved name end-to-end).
+  // 10. Asserts the inverse of the reserved-name parser gate: the
+  //     runtime owns ?page= / ?show= end-to-end, never re-routing them
+  //     through View.spec.params coercion.
   {
     const r = await getView<PostTranslation>(
       "/api/views/recent-posts?page=2&show=2",
