@@ -59,6 +59,51 @@ jobs:
         # before the tests do.
         run: pnpm -C starters/blog validate
 
+      - name: Theme fork/reset round-trip (all slot kinds)
+        # Locks the theme:fork ↔ theme:reset invariant: any consumer
+        # following the SKILL.md recipe can fork at every layer and
+        # revert cleanly. Single-slot smoke missed bugs in template
+        # path casing, i18n source resolution, multi-fork merge, and
+        # icons stub wiring; this exercises all six.
+        working-directory: starters/blog
+        run: |
+          set -euo pipefail
+          # Fork every supported slot kind.
+          pnpm theme:fork tokens.ts
+          pnpm theme:fork components/Header.tsx
+          pnpm theme:fork components/Footer.tsx
+          pnpm theme:fork templates/post.tsx
+          pnpm theme:fork i18n/en.json
+          pnpm theme:fork icons.ts
+          # Every override file is on disk.
+          test -f src/theme/tokens.ts
+          test -f src/theme/components/Header.tsx
+          test -f src/theme/components/Footer.tsx
+          test -f src/theme/templates/post.tsx
+          test -f src/theme/i18n/en.json
+          test -f src/theme/icons.ts
+          # Index has all six imports + entries (multi-fork merged blocks).
+          grep -q 'tokens: ForkedTokens' src/theme/index.ts
+          grep -q 'Header: HeaderOverride' src/theme/index.ts
+          grep -q 'Footer: FooterOverride' src/theme/index.ts
+          grep -q 'post: postOverride' src/theme/index.ts
+          grep -q '"en": enOverride' src/theme/index.ts
+          grep -q 'icons: customIcons' src/theme/index.ts
+          pnpm typecheck
+          # Reset each in turn — round-trip restores baseline.
+          pnpm theme:reset tokens.ts
+          pnpm theme:reset components/Header.tsx
+          pnpm theme:reset components/Footer.tsx
+          pnpm theme:reset templates/post.tsx
+          pnpm theme:reset i18n/en.json
+          pnpm theme:reset icons.ts
+          test ! -f src/theme/tokens.ts
+          test ! -d src/theme/components
+          test ! -d src/theme/templates
+          test ! -d src/theme/i18n
+          test ! -f src/theme/icons.ts
+          pnpm typecheck
+
       - run: pnpm test
 
   # Heavier integration smoke. Runs wrangler dev against the starter,

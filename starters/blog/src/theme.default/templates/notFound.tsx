@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 import type { SiteConfig } from "@aotter/mantle-spec";
-import { Layout } from "./components/Layout.js";
-import { bundleFor } from "../i18n/index.js";
+import { Layout } from "../components/Layout.js";
+import { bundleFor } from "../../i18n/index.js";
 
 export interface NotFoundContext {
   readonly site: SiteConfig;
@@ -19,7 +19,6 @@ export function notFoundTemplate(ctx: NotFoundContext): string {
       description={t.body}
     >
       <section class="notfound">
-        <div class="glyph" aria-hidden="true">404</div>
         <h1>{t.title}</h1>
         <p>{t.body}</p>
         <p>

@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 import { raw } from "hono/html";
 import type { EntryContext } from "@aotter/mantle-runtime";
-import { Layout } from "./components/Layout.js";
+import { Layout } from "../components/Layout.js";
 import { isoDate, renderMarkdown } from "./utils.js";
 
 export function postTemplate(ctx: EntryContext): string {

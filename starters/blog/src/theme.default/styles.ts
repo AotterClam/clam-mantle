@@ -1,33 +1,9 @@
+/**
+ * Site styles. All rules reference tokens declared in `tokens.ts`;
+ * splitting them lets a consumer override the entire palette / type
+ * scale via `src/theme/tokens.ts` without touching the rules below.
+ */
 export const SITE_CSS = `
-:root {
-  --paper: #f6f1e7;
-  --ink: #1a1814;
-  --rule: #d4c8b3;
-  --rule-strong: #3d342a;
-  --mute: #7a6d5e;
-  --accent: #a3331f;
-  --accent-soft: #c9614a;
-  --selection: #f0d6a3;
-
-  --font-display: "Fraunces", "Noto Serif TC", "Source Serif 4", Georgia, serif;
-  --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-  --measure: 38rem;
-  --gutter: clamp(1.25rem, 4vw, 3rem);
-}
-
-[data-theme="dark"] {
-  --paper: #1a1814;
-  --ink: #f1ebdf;
-  --rule: #3d342a;
-  --rule-strong: #5a4d40;
-  --mute: #9a8d7e;
-  --accent: #e6594a;
-  --accent-soft: #c9614a;
-  --selection: #4a3520;
-}
-
 * { box-sizing: border-box; }
 
 html {
@@ -36,7 +12,7 @@ html {
   font-family: var(--font-body);
   font-size: 18px;
   line-height: 1.65;
-  font-feature-settings: "kern", "liga", "onum";
+  font-feature-settings: "kern", "liga";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background-color 200ms ease, color 200ms ease;
@@ -55,19 +31,17 @@ a { color: inherit; text-underline-offset: 0.18em; text-decoration-thickness: 0.
 a:hover { color: var(--accent); }
 
 p { margin: 0 0 1.1em 0; }
-p + p { text-indent: 1.5em; }
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-variation-settings: "opsz" 36, "SOFT" 30;
+  font-weight: 600;
   letter-spacing: -0.012em;
-  line-height: 1.15;
+  line-height: 1.2;
   margin: 0 0 0.5em 0;
 }
-h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); font-variation-settings: "opsz" 96, "SOFT" 30; }
-h2 { font-size: clamp(1.6rem, 3.4vw, 2.2rem); }
-h3 { font-size: clamp(1.25rem, 2.4vw, 1.5rem); }
+h1 { font-size: clamp(2rem, 4.5vw, 2.8rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+h3 { font-size: clamp(1.2rem, 2.2vw, 1.4rem); }
 
 small, time, .meta {
   font-family: var(--font-mono);
@@ -105,13 +79,11 @@ img { max-width: 100%; height: auto; display: block; }
 .site-header .brand {
   font-family: var(--font-display);
   font-weight: 600;
-  font-variation-settings: "opsz" 36, "SOFT" 30;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   letter-spacing: -0.005em;
   text-decoration: none;
 }
 .site-header .brand:hover { color: var(--accent); }
-.site-header .brand .dot { color: var(--accent); margin: 0 0.18em; }
 
 .site-nav {
   display: flex;
@@ -251,18 +223,6 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 .post-cover { margin: 0 0 2rem 0; border: 1px solid var(--rule); }
 
 .post-body { font-size: 1.05rem; }
-.post-body > p:first-of-type::first-letter {
-  font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 3.4em;
-  line-height: 0.85;
-  float: left;
-  margin: 0.05em 0.12em -0.05em 0;
-  color: var(--accent);
-}
-.post-body > p:first-of-type { text-indent: 0; }
-.post-body p { text-indent: 0; }
-.post-body p + p { text-indent: 1.5em; }
 .post-body h2 { margin-top: 2.2rem; }
 .post-body h3 { margin-top: 1.8rem; }
 .post-body blockquote {
@@ -309,10 +269,9 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
   margin-bottom: 1rem;
 }
 .hero h1 {
-  font-size: clamp(2.6rem, 6vw, 4rem);
-  font-variation-settings: "opsz" 144, "SOFT" 30;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
   letter-spacing: -0.02em;
-  line-height: 1.05;
+  line-height: 1.1;
   margin-bottom: 1.5rem;
 }
 .hero .intro { font-size: 1.15rem; color: var(--mute); }
@@ -333,12 +292,11 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 .entry-list time { padding-top: 0.3em; }
 .entry-list a {
   font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 500;
-  font-variation-settings: "opsz" 24, "SOFT" 30;
+  font-size: 1.2rem;
+  font-weight: 600;
   text-decoration: none;
   letter-spacing: -0.005em;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 .entry-list a:hover { color: var(--accent); }
 .entry-list .excerpt { color: var(--mute); margin-top: 0.4rem; font-size: 0.95rem; }
@@ -475,14 +433,6 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
   max-width: var(--measure);
   text-align: center;
   margin: 4rem auto;
-}
-.notfound .glyph {
-  font-family: var(--font-display);
-  font-size: clamp(6rem, 18vw, 12rem);
-  line-height: 0.8;
-  color: var(--accent);
-  margin-bottom: 1rem;
-  font-variation-settings: "opsz" 144, "SOFT" 100;
 }
 `;
 

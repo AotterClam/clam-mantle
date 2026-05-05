@@ -15,7 +15,9 @@
     "emit-types": "mantle emit-types --namespace BlogCms > mantle-types.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm validate && pnpm typecheck",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "theme:fork": "node scripts/theme-fork.mjs",
+    "theme:reset": "node scripts/theme-reset.mjs"
   },
   "dependencies": {
     "@aotter/mantle-spec": "workspace:*",

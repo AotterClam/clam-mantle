@@ -2,24 +2,12 @@
 import { raw } from "hono/html";
 import type { SiteConfig } from "@aotter/mantle-spec";
 import { I18N_BUNDLES, bundleFor, localeLabel } from "../../i18n/index.js";
-import { icon } from "../../icons.js";
+import { icon } from "../icons.js";
 
 export interface HeaderProps {
   readonly site: SiteConfig;
   readonly locale: string;
   readonly current?: "home" | "posts" | "about" | "contact";
-}
-
-function brandWordmark(brand: string) {
-  if (!brand.includes(" ")) return brand;
-  const [first, ...rest] = brand.split(" ");
-  return (
-    <>
-      {first}
-      <span class="dot" aria-hidden="true">·</span>
-      {rest.join(" ")}
-    </>
-  );
 }
 
 export function Header(props: HeaderProps) {
@@ -31,7 +19,7 @@ export function Header(props: HeaderProps) {
   return (
     <header class="site-header">
       <a class="brand" href={`/${locale}`} aria-label={site.brand}>
-        {brandWordmark(site.brand)}
+        {site.brand}
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href={`/${locale}/posts`} aria-current={current === "posts" ? "page" : undefined}>
