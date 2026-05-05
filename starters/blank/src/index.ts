@@ -19,8 +19,8 @@ import { buildCmsConfig, type Env } from "./mantleConfig.js";
  *
  * MCP auth is bearer-token-only via the runtime `OAuthVerifier` port
  * (StubOAuthVerifier behind `MANTLE_ALLOW_STUB_OAUTH=1` for dev). No
- * `/oauth/{authorize,token,register}` route mount in v0.1.0; a
- * `@cloudflare/workers-oauth-provider` integration is v0.1.x.
+ * `/oauth/{authorize,token,register}` consent-UI route is mounted here;
+ * use `starters/blog` if you need the full admin OAuth consent flow.
  *
  * If you decide to render HTML on the server later, swap to
  * `starters/blog` (or copy its `mountPublicRoutes` setup back in).

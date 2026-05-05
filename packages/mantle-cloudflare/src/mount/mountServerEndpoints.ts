@@ -424,8 +424,10 @@ async function buildHandlerContext(
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
   const identity = await runtime.oauth.verifyAccessToken(req);
-  const user = identity ? { id: identity.userId } : null;
-  return { user, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  if (!identity) return { user: null, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  const staffRow = await runtime.staff.readByUserId(identity.userId);
+  const staff = staffRow ? { id: staffRow.userId, role: staffRow.role } : null;
+  return { user: { id: identity.userId }, staff, env: {}, ...(waitUntil ? { waitUntil } : {}) };
 }
 
 function openApiToHono(path: string): string {

@@ -30,6 +30,13 @@ export function mountMcp(
         headers: { "www-authenticate": 'Bearer realm="mcp"' },
       });
     }
+    const staff = await runtime.staff.readByUserId(identity.userId);
+    if (!staff) {
+      return new Response("forbidden", {
+        status: 403,
+        headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
+      });
+    }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
         listEntries: runtime.listEntries,
@@ -43,6 +50,6 @@ export function mountMcp(
       },
       [...runtime.schemasByName.values()],
     );
-    return dispatcher.dispatch(c.req.raw, { userId: identity.userId });
+    return dispatcher.dispatch(c.req.raw, { userId: identity.userId, staff });
   });
 }

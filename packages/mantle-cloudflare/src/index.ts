@@ -23,3 +23,5 @@
 export * from "./bindings/index.js";
 export * from "./mount/index.js";
 export * from "./handlers/index.js";
+// WorkersOAuthVerifier and createOAuthProvider are in the "/cf" subpath only —
+// they import cloudflare:workers which is not resolvable in Node/Vitest.

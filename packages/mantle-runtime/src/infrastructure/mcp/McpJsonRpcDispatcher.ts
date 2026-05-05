@@ -27,6 +27,7 @@ import {
   jsonRpcOk,
   jsonRpcOkRaw,
 } from "./McpResponses.js";
+import type { Staff } from "../../domain/model/Staff.js";
 
 /**
  * `McpJsonRpcDispatcher` — JSON-RPC dispatcher for the MCP transport.
@@ -47,6 +48,9 @@ import {
  */
 export interface McpAuthContext {
   readonly userId: string;
+  /** Resolved staff row for the authenticated user. Null when the user
+   *  is not staff (e.g. a service-account token with no staff row). */
+  readonly staff: Staff | null;
 }
 
 /**
@@ -185,7 +189,11 @@ export class McpJsonRpcDispatcher {
         // `hookCtx` plumbs the authenticated MCP user into lifecycle
         // hook context so consumers can branch on `ctx.user` (e.g.
         // bypass captcha checks for authenticated agents).
-        const hookCtx = { user: { id: auth.userId }, staff: null, env: {} };
+        const hookCtx = {
+          user: { id: auth.userId },
+          staff: auth.staff ? { id: auth.staff.userId, role: auth.staff.role } : null,
+          env: {},
+        };
         const createSegment = extractCollectionSegment(name, CREATE_DRAFT_PREFIX);
         if (createSegment) {
           const collection = this.schemaBySegment.get(createSegment);

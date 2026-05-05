@@ -5,3 +5,5 @@ export { D1UserRepository } from "./D1UserRepository.js";
 export { D1StaffRepository } from "./D1StaffRepository.js";
 export { AssetsAssetServer } from "./AssetsAssetServer.js";
 export { StubOAuthVerifier } from "./StubOAuthVerifier.js";
+// WorkersOAuthVerifier intentionally omitted — it imports cloudflare:workers.
+// Import from "@aotter/mantle-cloudflare/cf" in CF Workers entrypoints only.
