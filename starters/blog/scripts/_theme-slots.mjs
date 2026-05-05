@@ -29,14 +29,44 @@ export const INDEX_PATH = join(THEME_DIR, "index.ts");
  *
  * Throws on unrecognized shapes; callers exit with usage help.
  */
+// Component / template slots are bounded by what `Theme.ts:ThemeOverride`
+// actually accepts. Forking outside this set would copy the file but
+// produce an entry the override surface can't register — typecheck
+// would then fail downstream. Fail-fast at fork time keeps the SKILL
+// promise honest.
+const SUPPORTED_COMPONENT_SLOTS = new Set(["Header", "Footer"]);
+const SUPPORTED_TEMPLATE_SLOTS = new Set([
+  "post",
+  "postList",
+  "page",
+  "home",
+  "contact",
+  "notFound",
+]);
+
 export function pickSlot(rel) {
   if (rel === "tokens.ts") return { kind: "tokens" };
   if (rel === "icons.ts") return { kind: "icons" };
   if (rel.startsWith("components/")) {
-    return { kind: "components", key: stem(rel) };
+    const key = stem(rel);
+    if (!SUPPORTED_COMPONENT_SLOTS.has(key)) {
+      throw new SlotError(
+        `components/${key}.tsx is not a supported override slot. ` +
+          `ThemeOverride.components only allows: ${[...SUPPORTED_COMPONENT_SLOTS].join(", ")}. ` +
+          `Layout shape is intentionally locked — change envelope via L4 template forks or pick another starter.`,
+      );
+    }
+    return { kind: "components", key };
   }
   if (rel.startsWith("templates/")) {
-    return { kind: "templates", key: stem(rel) };
+    const key = stem(rel);
+    if (!SUPPORTED_TEMPLATE_SLOTS.has(key)) {
+      throw new SlotError(
+        `templates/${key}.tsx is not a supported override slot. ` +
+          `ThemeOverride.templates only allows: ${[...SUPPORTED_TEMPLATE_SLOTS].join(", ")}.`,
+      );
+    }
+    return { kind: "templates", key };
   }
   if (rel.startsWith("i18n/")) {
     return { kind: "i18n", key: stem(rel).toLowerCase() };

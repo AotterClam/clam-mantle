@@ -14,12 +14,21 @@ instead.
 GET  /api/views/<name>            view REST per View atom
 ALL  /api/<procedure>             procedure dispatcher (POST / PUT / PATCH / DELETE)
 ALL  /mcp                         MCP JSON-RPC dispatcher
-/oauth/{authorize,token,...}      OAuth 2.1 / DCR for MCP clients
 ```
 
 No public read routes (`/{locale}/...`, `/sitemap.xml`, `.md` mirrors,
 `llms.txt`). Add `mountPublicRoutes` from
 `@aotter/mantle-cloudflare` if you change your mind.
+
+### Auth
+
+MCP requests must carry a verified bearer token. The runtime's
+`OAuthVerifier` port (`StubOAuthVerifier` for dev,
+`MANTLE_ALLOW_STUB_OAUTH=1` env-gated) does the verification — there is
+no `/oauth/{authorize,token,register}` route mount in v0.1.0. A real
+OAuth 2.1 / DCR endpoint mount via `@cloudflare/workers-oauth-provider`
+is a v0.1.x follow-up; until it lands, MCP clients need an
+out-of-band token.
 
 ## Layout
 
