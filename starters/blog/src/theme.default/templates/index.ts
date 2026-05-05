@@ -1,19 +1,24 @@
 import { TemplateRegistry } from "@aotter/mantle-runtime";
-import { postTemplate } from "./post.js";
-import { postListTemplate } from "./postList.js";
-import { pageTemplate } from "./page.js";
-import { homeTemplate } from "./home.js";
-import { notFoundTemplate } from "./notFound.js";
-import { contactTemplate } from "./contact.js";
+import overrides from "../../theme/index.js";
+import { postTemplate as basePost } from "./post.js";
+import { postListTemplate as basePostList } from "./postList.js";
+import { pageTemplate as basePage } from "./page.js";
+import { homeTemplate as baseHome } from "./home.js";
+import { notFoundTemplate as baseNotFound } from "./notFound.js";
+import { contactTemplate as baseContact } from "./contact.js";
 
-export {
-  postTemplate,
-  postListTemplate,
-  pageTemplate,
-  homeTemplate,
-  notFoundTemplate,
-  contactTemplate,
-};
+/**
+ * Slot resolution at module init: each template falls through to
+ * baseline if `theme/index.ts:templates.<name>` is unset. Whatever
+ * the consumer drops in via `pnpm theme:fork templates/<name>.tsx`
+ * lands here.
+ */
+export const postTemplate = overrides.templates?.post ?? basePost;
+export const postListTemplate = overrides.templates?.postList ?? basePostList;
+export const pageTemplate = overrides.templates?.page ?? basePage;
+export const homeTemplate = overrides.templates?.home ?? baseHome;
+export const notFoundTemplate = overrides.templates?.notFound ?? baseNotFound;
+export const contactTemplate = overrides.templates?.contact ?? baseContact;
 
 /**
  * Bind templates to their target collections. The render pipeline
