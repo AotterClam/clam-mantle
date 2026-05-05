@@ -57,7 +57,16 @@ export const TOKENS_CSS = `
 
 The override is concatenated AFTER baseline tokens, so later declarations win on standard CSS specificity. You only need to redeclare the vars you want to change.
 
-**Custom web fonts**: if your `--font-display` references a font not in the system stack, the browser falls back. To register it, escalate to L3 (`pnpm theme:fork components/Layout.tsx`) and add `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?...">` inside `<head>`.
+**Custom web fonts**: if your `--font-display` references a font not in the system stack, register the font with an L2 `extraCss` `@import`:
+
+```ts
+const overrides: ThemeOverride = {
+  extraCss: `@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap");`,
+  tokens: `:root { --font-display: "Fraunces", Georgia, serif; }`,
+};
+```
+
+`Layout` is intentionally NOT a customization slot — `Theme.ts` only allows Header / Footer overrides. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If you need to change `<head>` content beyond what tokens / extraCss can express, the path is L4 fork on every template (each takes responsibility for its own envelope), or pick another starter.
 
 Revert: `pnpm theme:reset tokens.ts`.
 
@@ -123,17 +132,16 @@ Revert: `pnpm theme:reset i18n/en.json`.
 
 ```bash
 pnpm theme:fork components/Header.tsx
+pnpm theme:fork components/Footer.tsx
 ```
 
-Edit `src/theme/components/Header.tsx`. Key contracts:
+Only `Header` and `Footer` are supported component slots — `theme:fork components/Layout.tsx` (or any other component name) fails fast with a clear error. Edit `src/theme/components/Header.tsx`. Key contracts:
 
 - Don't change the props signature: `Header(props: HeaderProps)`.
 - `props.site.brand`, `props.site.locales`, `props.locale`, `props.current` are available.
 - Baseline siblings (icon registry, etc.) auto-rewritten on fork to `../../theme.default/<path>`. Keep those unless you want to drop the baseline icon set.
 
-Same shape for `components/Footer.tsx`.
-
-`Layout` is intentionally NOT a slot. If you need the whole envelope different, that's an L4 sweep on every template, or a different starter.
+Same shape for `Footer`.
 
 Revert: `pnpm theme:reset components/Header.tsx`.
 
