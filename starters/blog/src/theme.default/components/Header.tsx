@@ -10,18 +10,6 @@ export interface HeaderProps {
   readonly current?: "home" | "posts" | "about" | "contact";
 }
 
-function brandWordmark(brand: string) {
-  if (!brand.includes(" ")) return brand;
-  const [first, ...rest] = brand.split(" ");
-  return (
-    <>
-      {first}
-      <span class="dot" aria-hidden="true">·</span>
-      {rest.join(" ")}
-    </>
-  );
-}
-
 export function Header(props: HeaderProps) {
   const { site, locale, current } = props;
   const t = bundleFor(locale);
@@ -31,7 +19,7 @@ export function Header(props: HeaderProps) {
   return (
     <header class="site-header">
       <a class="brand" href={`/${locale}`} aria-label={site.brand}>
-        {brandWordmark(site.brand)}
+        {site.brand}
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href={`/${locale}/posts`} aria-current={current === "posts" ? "page" : undefined}>

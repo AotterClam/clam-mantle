@@ -19,7 +19,6 @@ export function notFoundTemplate(ctx: NotFoundContext): string {
       description={t.body}
     >
       <section class="notfound">
-        <div class="glyph" aria-hidden="true">404</div>
         <h1>{t.title}</h1>
         <p>{t.body}</p>
         <p>
