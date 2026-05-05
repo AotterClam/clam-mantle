@@ -45,7 +45,7 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   mountMcp(app, cms);
 
   app.get("/", async (c) => {
-    const canonical = buildCmsConfig(env).siteDefaults?.locales?.[0] ?? "en";
+    const canonical = siteConfigFromEnv(env).canonicalLocale ?? "en";
     return c.redirect(`/${canonical}`);
   });
 
@@ -56,18 +56,25 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
 
   app.get("/:locale", async (c) => {
     const { locale } = c.req.param();
-    const config = buildCmsConfig(env);
-    const localesLower = (config.siteDefaults?.locales ?? []).map((l) => l.toLowerCase());
+    const site = siteConfigFromEnv(env);
+    const localesLower = site.locales.map((l) => l.toLowerCase());
     if (!localesLower.includes(locale.toLowerCase())) {
       return notFound(env, locale);
     }
 
     const runtime = await cms.get();
-    const all = await runtime.listEntries.execute({
-      collection: "page-translations",
-      status: "published",
-      limit: 50,
-    });
+    const [all, recent] = await Promise.all([
+      runtime.listEntries.execute({
+        collection: "page-translations",
+        status: "published",
+        limit: 50,
+      }),
+      runtime.listEntries.execute({
+        collection: "post-translations",
+        status: "published",
+        limit: 5,
+      }),
+    ]);
     const homeEntry = all.find(
       (e) =>
         (e.data as { slug?: string }).slug === "home" &&
@@ -76,12 +83,6 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
     if (!homeEntry) {
       return notFound(env, locale);
     }
-
-    const recent = await runtime.listEntries.execute({
-      collection: "post-translations",
-      status: "published",
-      limit: 5,
-    });
     const recentForLocale = recent
       .filter((e) => (e.data as { locale?: string }).locale === locale)
       .map<Entry>((e) => ({
@@ -100,7 +101,6 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
       intro?: string;
       body?: string;
     };
-    const site = siteConfigFromEnv(env);
     const html = homeTemplate({
       site,
       locale,
@@ -181,6 +181,9 @@ async function readKvOrFallback(
   });
 }
 
+/** Plain-text 404 sibling to `readKvOrFallback`. Used only for the
+ *  `llms.txt` routes — those are machine-readable surfaces where an
+ *  HTML 404 page would break clients. */
 async function readKv(env: Env, key: string, contentType: string): Promise<Response> {
   const body = await env.KV.get(key, "text");
   if (body === null) {
@@ -244,9 +247,14 @@ async function notFound(env: Env, locale: string): Promise<Response> {
   });
 }
 
+// Per-isolate cache. `siteDefaults` is hardcoded in clamConfig; once
+// resolved it never changes, so reusing avoids per-request port
+// allocation inside `buildCmsConfig`.
+let cachedSite: SiteConfig | null = null;
 function siteConfigFromEnv(env: Env): SiteConfig {
+  if (cachedSite) return cachedSite;
   const defaults = buildCmsConfig(env).siteDefaults!;
-  return {
+  cachedSite = {
     brand: defaults.brand ?? "",
     title: defaults.title ?? defaults.brand ?? "",
     description: defaults.description ?? "",
@@ -254,13 +262,15 @@ function siteConfigFromEnv(env: Env): SiteConfig {
     locales: [...(defaults.locales ?? [])],
     canonicalLocale: defaults.locales?.[0] ?? null,
   };
+  return cachedSite;
 }
 
 function inferLocale(path: string, env: Env): string {
-  const candidates = (buildCmsConfig(env).siteDefaults?.locales ?? []).map((l) => l.toLowerCase());
+  const site = siteConfigFromEnv(env);
+  const candidates = site.locales.map((l) => l.toLowerCase());
   const seg = path.split("/")[1] ?? "";
   if (seg && candidates.includes(seg.toLowerCase())) return seg;
-  return candidates[0] ?? "en";
+  return site.canonicalLocale ?? "en";
 }
 
 export default {

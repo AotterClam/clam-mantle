@@ -4,21 +4,8 @@ import { html, raw } from "hono/html";
 import { HEADER_RUNTIME_JS, SITE_CSS, THEME_BOOTSTRAP_JS } from "../styles.js";
 import { Header, type HeaderProps } from "./Header.js";
 
-/**
- * Single page chrome. Owns:
- *   - HTML envelope (`<html>`, `<head>`, `<body>`)
- *   - Web font preconnect + load
- *   - Inline stylesheet
- *   - Theme bootstrap script (runs before paint to avoid FOUC)
- *   - Site header
- *   - Optional preview banner
- *   - Footer / colophon
- *   - Header runtime script (theme toggle + locale switch)
- *
- * Templates compose `<Layout>{children}</Layout>` and pass page-level
- * `<title>` / meta via props. Children are server-rendered JSX trees
- * stringified to HTML.
- */
+/** Page chrome (HTML envelope, head, header, footer). Templates
+ *  compose `<Layout>{children}</Layout>`. */
 export interface LayoutProps {
   readonly site: SiteConfig;
   readonly locale: string;

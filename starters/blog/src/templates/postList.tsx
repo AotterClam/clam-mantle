@@ -1,26 +1,16 @@
 /** @jsxImportSource hono/jsx */
 import type { ListContext } from "@aotterclam/clam-cms-runtime";
 import { Layout } from "./components/Layout.js";
+import { excerpt, isoDate, pickCopy } from "./utils.js";
 
-const HEADINGS: Record<string, { title: string; eyebrow: string }> = {
+const HEADINGS = {
   en: { title: "Posts", eyebrow: "the index" },
   "zh-tw": { title: "文章", eyebrow: "目錄" },
 };
 
-function excerpt(body: string | undefined): string {
-  if (!body) return "";
-  const first = body.split(/\n+/).find((l) => l.trim().length > 0) ?? "";
-  return first.length > 140 ? first.slice(0, 137) + "…" : first;
-}
-
-/**
- * Per-locale post list. Used as the locale's posts index
- * (`/{locale}/posts`). Sorted by `updatedAt` descending; runtime
- * supplies entries already filtered to `status: 'published'`.
- */
 export function postListTemplate(ctx: ListContext): string {
   const { entries, locale, site } = ctx;
-  const heading = HEADINGS[locale.toLowerCase()] ?? HEADINGS.en!;
+  const heading = pickCopy(HEADINGS, locale);
   const tree = (
     <Layout
       site={site}
@@ -42,12 +32,9 @@ export function postListTemplate(ctx: ListContext): string {
             locale?: string;
           };
           const href = `/${data.locale ?? locale}/posts/${data.slug ?? e.id}`;
-          const updated = e.updatedAt
-            ? new Date(e.updatedAt).toISOString().slice(0, 10)
-            : "";
           return (
             <li>
-              <time>{updated}</time>
+              <time>{isoDate(e.updatedAt)}</time>
               <div>
                 <a href={href}>{data.title ?? data.slug ?? e.id}</a>
                 <div class="excerpt">{excerpt(data.body)}</div>

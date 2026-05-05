@@ -1,18 +1,4 @@
-/**
- * Inline stylesheet for the starter blog. Single source of truth —
- * imported by `Layout` and embedded in every page's `<style>`.
- *
- * Editorial typographic palette:
- *   - Display: Fraunces (variable, opsz)
- *   - Body:    Source Serif 4 (variable)
- *   - CJK:     Noto Serif TC
- *   - Mono:    JetBrains Mono
- *
- * Two-tone, warm. Single accent (vermillion / 朱砂) used sparingly
- * on hover + active locale. Light/dark via `[data-theme]` attribute on
- * `<html>` (set by an inline bootstrap script in <head> before paint).
- */
-export const SITE_CSS = String.raw`
+export const SITE_CSS = `
 :root {
   --paper: #f6f1e7;
   --ink: #1a1814;
@@ -337,11 +323,9 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 }
 `;
 
-/**
- * Inline script: set [data-theme] before paint to avoid FOUC.
- * Reads localStorage, falls back to prefers-color-scheme.
- */
-export const THEME_BOOTSTRAP_JS = String.raw`
+/** Set [data-theme] before paint to avoid FOUC. Reads localStorage,
+ *  falls back to prefers-color-scheme. */
+export const THEME_BOOTSTRAP_JS = `
 (function(){try{
   var t = localStorage.getItem('clam-theme');
   if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
@@ -349,11 +333,7 @@ export const THEME_BOOTSTRAP_JS = String.raw`
 }catch(e){}})();
 `;
 
-/**
- * Header runtime script: theme toggle + locale switcher.
- * Tiny & idempotent; safe to run on every page load.
- */
-export const HEADER_RUNTIME_JS = String.raw`
+export const HEADER_RUNTIME_JS = `
 (function(){
   var html = document.documentElement;
   var btn = document.querySelector('[data-theme-toggle]');
