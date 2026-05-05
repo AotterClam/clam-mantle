@@ -35,6 +35,15 @@ export type {
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";
 export type {
+  UserRepository,
+  GithubToken,
+} from "./UserRepository.js";
+export type {
+  StaffRepository,
+  StaffListEntry,
+  BootstrapOwnerOpts,
+} from "./StaffRepository.js";
+export type {
   PublishOrchestrator,
   PublishEntryRequest,
 } from "./PublishOrchestrator.js";
