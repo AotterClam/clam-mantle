@@ -59,6 +59,24 @@ jobs:
         # before the tests do.
         run: pnpm -C starters/blog validate
 
+      - name: Theme fork/reset round-trip
+        # Locks the L4 theme:fork ↔ theme:reset invariant: any consumer
+        # follows the SKILL.md recipe `pnpm theme:fork <path>` to
+        # customize, can revert via `pnpm theme:reset <path>` and end
+        # up with a typechecking baseline. Without this, the SKILL
+        # promise drifts silently.
+        working-directory: starters/blog
+        run: |
+          set -euo pipefail
+          pnpm theme:fork tokens.ts
+          test -f src/theme/tokens.ts
+          grep -q 'tokens: ForkedTokens' src/theme/index.ts
+          pnpm typecheck
+          pnpm theme:reset tokens.ts
+          test ! -f src/theme/tokens.ts
+          ! grep -q 'tokens: ForkedTokens' src/theme/index.ts
+          pnpm typecheck
+
       - run: pnpm test
 
   # Heavier integration smoke. Runs wrangler dev against the starter,
