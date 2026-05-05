@@ -1,10 +1,17 @@
 import type {
   AssetServer,
+  BootstrapOwnerOpts,
+  GithubProfile,
+  GithubToken,
   KvCache,
   KvListResult,
   KvPutOptions,
   Session,
   SessionRepository,
+  StaffListEntry,
+  StaffRepository,
+  User,
+  UserRepository,
 } from "@aotter/mantle-runtime";
 
 /**
@@ -51,4 +58,16 @@ export class StubAssetServer implements AssetServer {
   async fetch(_req: Request): Promise<Response | null> {
     return null;
   }
+}
+
+export class StubUserRepository implements UserRepository {
+  async findById(_id: string): Promise<User | null> { return null; }
+  async upsertByGithub(_profile: GithubProfile, _now: number): Promise<string> { return "stub-user"; }
+  async storeGithubToken(_userId: string, _accessToken: string, _scope: string, _now: number): Promise<void> {}
+  async readGithubToken(_userId: string): Promise<GithubToken | null> { return null; }
+}
+
+export class StubStaffRepository implements StaffRepository {
+  async listAll(): Promise<StaffListEntry[]> { return []; }
+  async ensureBootstrapOwner(_opts: BootstrapOwnerOpts): Promise<void> {}
 }
