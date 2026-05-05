@@ -3,6 +3,7 @@ import type { SiteConfig } from "@aotter/mantle-spec";
 import { renderSeoTagsHtml, type SeoMeta } from "@aotter/mantle-runtime";
 import { html, raw } from "hono/html";
 import { HEADER_RUNTIME_JS, SITE_CSS, THEME_BOOTSTRAP_JS } from "../styles.js";
+import { TOKENS_CSS } from "../tokens.js";
 import { Header, type HeaderProps } from "./Header.js";
 
 /** Page chrome (HTML envelope, head, header, footer). Templates
@@ -42,7 +43,7 @@ export function Layout(props: LayoutProps) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+TC:wght@400;500;600&display=swap"
         />
-        <style>{raw(SITE_CSS)}</style>
+        <style>{raw(TOKENS_CSS + SITE_CSS)}</style>
         {html`<script>${raw(THEME_BOOTSTRAP_JS)}</script>`}
       </head>
       <body>

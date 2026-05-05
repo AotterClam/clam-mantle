@@ -1,33 +1,9 @@
+/**
+ * Site styles. All rules reference tokens declared in `tokens.ts`;
+ * splitting them lets a consumer override the entire palette / type
+ * scale via `src/theme/tokens.ts` without touching the rules below.
+ */
 export const SITE_CSS = `
-:root {
-  --paper: #f6f1e7;
-  --ink: #1a1814;
-  --rule: #d4c8b3;
-  --rule-strong: #3d342a;
-  --mute: #7a6d5e;
-  --accent: #a3331f;
-  --accent-soft: #c9614a;
-  --selection: #f0d6a3;
-
-  --font-display: "Fraunces", "Noto Serif TC", "Source Serif 4", Georgia, serif;
-  --font-body: "Source Serif 4", "Noto Serif TC", Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-
-  --measure: 38rem;
-  --gutter: clamp(1.25rem, 4vw, 3rem);
-}
-
-[data-theme="dark"] {
-  --paper: #1a1814;
-  --ink: #f1ebdf;
-  --rule: #3d342a;
-  --rule-strong: #5a4d40;
-  --mute: #9a8d7e;
-  --accent: #e6594a;
-  --accent-soft: #c9614a;
-  --selection: #4a3520;
-}
-
 * { box-sizing: border-box; }
 
 html {
