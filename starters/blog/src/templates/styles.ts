@@ -89,13 +89,18 @@ img { max-width: 100%; height: auto; display: block; }
 
 .site-header {
   border-bottom: 1px solid var(--rule);
-  padding: 1.25rem var(--gutter);
+  padding: 1.1rem var(--gutter);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 1.5rem;
   flex-wrap: wrap;
-  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 .site-header .brand {
   font-family: var(--font-display);
@@ -130,30 +135,94 @@ img { max-width: 100%; height: auto; display: block; }
 .site-controls {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.4rem;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
-.site-controls select,
-.site-controls button {
+
+/* — Popover (theme + lang) — */
+
+.popover { position: relative; }
+.popover-trigger {
   appearance: none;
   background: transparent;
   color: inherit;
   font: inherit;
-  border: 1px solid var(--rule);
-  border-radius: 2px;
-  padding: 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
   cursor: pointer;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  line-height: 1;
 }
-.site-controls select:hover,
-.site-controls button:hover { border-color: var(--ink); color: var(--accent); }
-.site-controls select { padding-right: 1.5rem; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%); background-position: right 0.55rem top 50%, right 0.3rem top 50%; background-size: 4px 4px, 4px 4px; background-repeat: no-repeat; }
-.site-controls .theme-toggle { min-width: 2.2rem; text-align: center; }
-.site-controls .theme-toggle .glyph-light { display: none; }
-.site-controls .theme-toggle .glyph-dark { display: inline; }
-[data-theme="dark"] .site-controls .theme-toggle .glyph-light { display: inline; }
-[data-theme="dark"] .site-controls .theme-toggle .glyph-dark { display: none; }
+.popover-trigger:hover { border-color: var(--rule); color: var(--accent); }
+.popover-trigger[aria-expanded="true"] {
+  border-color: var(--rule);
+  background: color-mix(in srgb, var(--rule) 35%, transparent);
+}
+.popover-trigger-icon { padding: 0.4rem; }
+.popover-trigger-icon svg { display: block; }
+.popover-trigger-text .popover-trigger-label { font-weight: 500; }
+.popover-trigger > svg:last-child { opacity: 0.55; }
+
+.popover-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 9.5rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--ink) 12%, transparent);
+  z-index: 20;
+}
+.popover-menu[hidden] { display: none; }
+[data-theme="dark"] .popover-menu {
+  background: color-mix(in srgb, var(--paper) 92%, var(--ink));
+  border-color: var(--rule-strong);
+}
+
+.popover-item {
+  appearance: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  border: none;
+  border-radius: 5px;
+  padding: 0.4rem 0.55rem;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  letter-spacing: 0.01em;
+  font-size: 0.85rem;
+  text-align: left;
+  width: 100%;
+}
+.popover-item:hover {
+  background: color-mix(in srgb, var(--rule) 40%, transparent);
+}
+.popover-item-icon { display: inline-flex; opacity: 0.75; }
+.popover-item-label { font-weight: 500; }
+.popover-item-check {
+  display: inline-flex;
+  color: var(--accent);
+  visibility: hidden;
+}
+.popover-item[aria-checked="true"] .popover-item-check { visibility: visible; }
+.popover-item[aria-checked="true"] .popover-item-icon { opacity: 1; }
+
+.popover-trigger-label { white-space: nowrap; }
 
 @media (max-width: 720px) {
   .site-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
@@ -166,7 +235,10 @@ img { max-width: 100%; height: auto; display: block; }
 .site-main {
   flex: 1 0 auto;
   padding: clamp(2rem, 6vw, 4rem) var(--gutter);
-  max-width: 64rem;
+  /* Tight column — just wider than --measure (38rem) so the editorial
+   * single-column layout doesn't leave a dead zone on the right. The
+   * recent-posts grid (date 7rem + title 1fr) still fits comfortably. */
+  max-width: 48rem;
   width: 100%;
   margin: 0 auto;
 }
@@ -414,11 +486,19 @@ article header.post-meta h1 { margin-bottom: 0.5rem; }
 }
 `;
 
-/** Runs in <head> before paint to avoid FOUC. */
+/** Runs in <head> before paint to avoid FOUC. Resolves the
+ *  three-way preference (system / light / dark) into a concrete
+ *  data-theme value. Stored value `system` (or unset) means "follow
+ *  prefers-color-scheme"; explicit `light` / `dark` overrides. */
 export const THEME_BOOTSTRAP_JS = `
 (function(){try{
-  var t = localStorage.getItem('mantle-theme');
-  if(!t){ t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+  var stored = localStorage.getItem('mantle-theme');
+  var t;
+  if(stored === 'light' || stored === 'dark'){
+    t = stored;
+  } else {
+    t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
   document.documentElement.setAttribute('data-theme', t);
 }catch(e){}})();
 `;
@@ -426,19 +506,93 @@ export const THEME_BOOTSTRAP_JS = `
 export const HEADER_RUNTIME_JS = `
 (function(){
   var html = document.documentElement;
-  var btn = document.querySelector('[data-theme-toggle]');
-  if(btn){
-    btn.addEventListener('click', function(){
-      var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      html.setAttribute('data-theme', next);
-      try{ localStorage.setItem('mantle-theme', next); }catch(e){}
+
+  // — Popover plumbing (one toggleable menu at a time) —
+  var openTrigger = null;
+  function closeOpen(){
+    if(!openTrigger) return;
+    var name = openTrigger.getAttribute('data-popover-trigger');
+    var menu = document.querySelector('[data-popover-menu="' + name + '"]');
+    if(menu){ menu.hidden = true; }
+    openTrigger.setAttribute('aria-expanded', 'false');
+    openTrigger = null;
+  }
+  document.addEventListener('click', function(e){
+    var trigger = e.target.closest && e.target.closest('[data-popover-trigger]');
+    if(trigger){
+      e.preventDefault();
+      e.stopPropagation();
+      var name = trigger.getAttribute('data-popover-trigger');
+      var menu = document.querySelector('[data-popover-menu="' + name + '"]');
+      if(!menu) return;
+      var isOpen = openTrigger === trigger;
+      closeOpen();
+      if(!isOpen){
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        openTrigger = trigger;
+      }
+      return;
+    }
+    var item = e.target.closest && e.target.closest('.popover-item');
+    if(item){ return; /* handled by per-popover listeners below */ }
+    closeOpen();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && openTrigger){ closeOpen(); }
+  });
+
+  // — Theme: 3-way (system / light / dark) —
+  function resolveSystem(){
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function applyTheme(stored){
+    var t = (stored === 'light' || stored === 'dark') ? stored : resolveSystem();
+    html.setAttribute('data-theme', t);
+    refreshThemeUi(stored);
+    document.dispatchEvent(new CustomEvent('mantle:theme', { detail: { theme: t, stored: stored } }));
+  }
+  function refreshThemeUi(stored){
+    var key = (stored === 'light' || stored === 'dark') ? stored : 'system';
+    document.querySelectorAll('[data-theme-icon]').forEach(function(el){
+      el.hidden = el.getAttribute('data-theme-icon') !== key;
+    });
+    document.querySelectorAll('[data-popover-menu="theme"] [data-value]').forEach(function(item){
+      item.setAttribute('aria-checked', item.getAttribute('data-value') === key ? 'true' : 'false');
     });
   }
-  var sel = document.querySelector('[data-locale-switch]');
-  if(sel){
-    sel.addEventListener('change', function(e){
-      var to = e.target.value;
-      var current = sel.getAttribute('data-current');
+  var themeMenu = document.querySelector('[data-popover-menu="theme"]');
+  if(themeMenu){
+    themeMenu.addEventListener('click', function(e){
+      var item = e.target.closest('[data-value]');
+      if(!item) return;
+      var v = item.getAttribute('data-value');
+      try {
+        if(v === 'system'){ localStorage.removeItem('mantle-theme'); }
+        else { localStorage.setItem('mantle-theme', v); }
+      } catch(_){}
+      applyTheme(v === 'system' ? null : v);
+      closeOpen();
+    });
+  }
+  // Initial UI sync (bootstrap script already set [data-theme]).
+  try { refreshThemeUi(localStorage.getItem('mantle-theme')); } catch(_){}
+  // Follow OS theme changes when the user picked 'system'.
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){
+      var stored = localStorage.getItem('mantle-theme');
+      if(!stored){ applyTheme(null); }
+    });
+  } catch(_){}
+
+  // — Lang: navigate to equivalent path under the chosen locale —
+  var langMenu = document.querySelector('[data-popover-menu="lang"]');
+  if(langMenu){
+    langMenu.addEventListener('click', function(e){
+      var item = e.target.closest('[data-value]');
+      if(!item) return;
+      var to = item.getAttribute('data-value');
+      var current = item.getAttribute('data-current-locale');
       var path = location.pathname;
       var next;
       if(current && path.indexOf('/' + current) === 0){

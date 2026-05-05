@@ -1,27 +1,23 @@
 /** @jsxImportSource hono/jsx */
 import type { ListContext } from "@aotter/mantle-runtime";
 import { Layout } from "./components/Layout.js";
-import { excerpt, isoDate, pickCopy } from "./utils.js";
-
-const HEADINGS = {
-  en: { title: "Posts", eyebrow: "the index" },
-  "zh-tw": { title: "文章", eyebrow: "目錄" },
-};
+import { bundleFor } from "../i18n/index.js";
+import { excerpt, isoDate } from "./utils.js";
 
 export function postListTemplate(ctx: ListContext): string {
   const { entries, locale, site } = ctx;
-  const heading = pickCopy(HEADINGS, locale);
+  const t = bundleFor(locale).postList;
   const tree = (
     <Layout
       site={site}
       locale={locale}
-      title={`${heading.title} — ${site.brand}`}
+      title={`${t.title} — ${site.brand}`}
       description={site.description}
       current="posts"
     >
       <section class="hero">
-        <div class="eyebrow">{heading.eyebrow}</div>
-        <h1>{heading.title}</h1>
+        <div class="eyebrow">{t.eyebrow}</div>
+        <h1>{t.title}</h1>
       </section>
       <ul class="entry-list">
         {entries.map((e) => {
