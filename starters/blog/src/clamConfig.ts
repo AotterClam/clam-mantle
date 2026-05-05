@@ -6,11 +6,13 @@ import {
   D1UserRepository,
   KvCacheBinding,
   StubOAuthVerifier,
-  WorkersOAuthVerifier,
-  createOAuthProvider,
   type AdminAuthConfig,
   type CmsConfig,
 } from "@aotterclam/clam-cms-cloudflare";
+import {
+  WorkersOAuthVerifier,
+  createOAuthProvider,
+} from "@aotterclam/clam-cms-cloudflare/cf";
 import { buildHandlers } from "./handlers/index.js";
 import { loadManifests } from "./loadManifests.js";
 import { PUBLIC_PATH_RESOLVER } from "./paths.js";

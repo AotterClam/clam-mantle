@@ -4,18 +4,14 @@ compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-# Dev-only flag — enables StubOAuthVerifier which accepts `Bearer dev-<userId>`.
-# Production deploy: remove this var and bind OAUTH_KV + set GitHub
-# OAuth secrets (GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET / ADMIN_GITHUB_LOGIN)
-# so WorkersOAuthVerifier and the admin consent UI are used instead.
-CLAM_ALLOW_STUB_OAUTH = "1"
-
 # Cloudflare Turnstile site key (public — embedded in the contact
 # form widget). Default is CF's "always passes" test key — good for
 # `pnpm dev` + CI. Production: provision your own at
 # dash.cloudflare.com/?to=/:account/turnstile and replace.
 # https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+# CLAM_ALLOW_STUB_OAUTH is intentionally NOT set here. Set it only in
+# .dev.vars (local dev). wrangler deploy should always use WorkersOAuthVerifier.
 
 [[d1_databases]]
 binding = "DB"
