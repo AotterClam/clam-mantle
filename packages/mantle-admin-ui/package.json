@@ -14,8 +14,8 @@
   "main": "./dist/index.html",
   "files": ["dist"],
   "scripts": {
-    "build": "echo 'admin-ui not yet implemented — see GitHub issue #21'",
-    "typecheck": "echo 'admin-ui not yet implemented — see GitHub issue #21'",
-    "test": "echo 'admin-ui not yet implemented — see GitHub issue #21'"
+    "build": "echo 'admin-ui build not yet implemented — see GitHub issue #21'",
+    "typecheck": "echo 'admin-ui typecheck not yet implemented — see GitHub issue #21'",
+    "test": "echo 'admin-ui tests not yet implemented — see GitHub issue #21'"
   }
 }
