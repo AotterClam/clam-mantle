@@ -45,5 +45,5 @@ export function postListTemplate(ctx: ListContext): string {
       </ul>
     </Layout>
   );
-  return "<!doctype html>" + String(tree);
+  return String(tree);
 }

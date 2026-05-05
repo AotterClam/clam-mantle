@@ -197,6 +197,12 @@ async function readKv(env: Env, key: string, contentType: string): Promise<Respo
 
 /** Render the registered entry template for a (collection, slug,
  *  locale) at request time, regardless of `status`. Skips KV. */
+const PREVIEW_STATUS_PRIORITY: Record<string, number> = {
+  draft: 0,
+  published: 1,
+  archived: 2,
+};
+
 async function previewEntry(
   env: Env,
   cms: CmsRuntimeRef,
@@ -208,14 +214,24 @@ async function previewEntry(
   const tpl = runtime.templates.getEntryTemplate(collection);
   if (!tpl) return notFound(env, locale);
   const all = await runtime.listEntries.execute({ collection, limit: 200 });
-  const entry = all.find(
-    (e) =>
-      (e.data as { slug?: string }).slug === slug &&
-      (e.data as { locale?: string }).locale === locale,
-  );
+  // Preview prefers the in-progress draft over a published copy of the
+  // same (slug, locale); fall back to published, then archived.
+  const matches = all
+    .filter(
+      (e) =>
+        (e.data as { slug?: string }).slug === slug &&
+        (e.data as { locale?: string }).locale === locale,
+    )
+    .sort((a, b) => {
+      const pa = PREVIEW_STATUS_PRIORITY[a.status] ?? 99;
+      const pb = PREVIEW_STATUS_PRIORITY[b.status] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
+    });
+  const entry = matches[0];
   if (!entry) return notFound(env, locale);
   const site = siteConfigFromEnv(env);
-  const html = tpl({
+  const body = tpl({
     entry: {
       id: entry.id,
       collection: entry.collection,
@@ -228,7 +244,15 @@ async function previewEntry(
     },
     site,
   });
-  // Preview surface MUST NOT cache — the whole point is iteration.
+  // Inject the preview banner just after <body>. The registered
+  // template doesn't know about preview mode; doing this here keeps
+  // EntryContext free of a worker-only flag and avoids forking the
+  // template just for a 1-line UI cue.
+  // Registered templates omit the doctype (the publish pipeline adds
+  // it before KV write). Preview bypasses publish, so prepend here.
+  const banner = `<div class="preview-banner">Preview · ${entry.status} · ${slug}</div>`;
+  const html =
+    "<!doctype html>" + body.replace(/<body([^>]*)>/, `<body$1>${banner}`);
   return new Response(html, {
     status: 200,
     headers: {
@@ -247,9 +271,7 @@ async function notFound(env: Env, locale: string): Promise<Response> {
   });
 }
 
-// Per-isolate cache. `siteDefaults` is hardcoded in mantleConfig; once
-// resolved it never changes, so reusing avoids per-request port
-// allocation inside `buildCmsConfig`.
+// Memoized to avoid `buildCmsConfig`'s per-call port allocation.
 let cachedSite: SiteConfig | null = null;
 function siteConfigFromEnv(env: Env): SiteConfig {
   if (cachedSite) return cachedSite;

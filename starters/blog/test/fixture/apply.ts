@@ -35,6 +35,10 @@ import {
   postTemplate,
   postListTemplate,
 } from "../../src/templates/index.js";
+
+// Match HtmlPublishOrchestrator: registered templates return body
+// without a doctype prefix; whoever ships HTML to KV adds one.
+const DOCTYPE = "<!doctype html>";
 import {
   FIXTURE_AUTHOR_ID,
   FIXTURE_NOW,
@@ -184,7 +188,7 @@ function buildKvEntries(): readonly KvEntry[] {
       });
       out.push({
         key: entryHtmlKey(entry),
-        value: postTemplate({ entry, site: FIXTURE_SITE }),
+        value: DOCTYPE + postTemplate({ entry, site: FIXTURE_SITE }),
       });
       const list = byLocale.get(tr.locale) ?? [];
       list.push(entry);
@@ -194,12 +198,14 @@ function buildKvEntries(): readonly KvEntry[] {
   for (const [locale, entries] of byLocale) {
     out.push({
       key: listHtmlKey("post-translations", locale),
-      value: postListTemplate({
-        collection: "post-translations",
-        locale,
-        entries,
-        site: FIXTURE_SITE,
-      }),
+      value:
+        DOCTYPE +
+        postListTemplate({
+          collection: "post-translations",
+          locale,
+          entries,
+          site: FIXTURE_SITE,
+        }),
     });
     out.push({
       key: llmsTxtKey(locale),
@@ -233,7 +239,7 @@ function buildKvEntries(): readonly KvEntry[] {
       });
       out.push({
         key: entryHtmlKey(entry),
-        value: pageTemplate({ entry, site: FIXTURE_SITE }),
+        value: DOCTYPE + pageTemplate({ entry, site: FIXTURE_SITE }),
       });
     }
   }
