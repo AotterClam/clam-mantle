@@ -1,0 +1,29 @@
+{
+  "name": "@aotter/starter-blank",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Headless CMS starter for mantle — API + MCP only, no public HTML rendering. Bring your own frontend.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "validate": "mantle validate",
+    "introspect": "mantle introspect",
+    "emit-openapi": "mantle emit-openapi > openapi.json",
+    "emit-types": "mantle emit-types --namespace BlankCms > mantle-types.d.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "pnpm validate && pnpm typecheck",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@aotter/mantle-spec": "workspace:*",
+    "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-cloudflare": "workspace:*",
+    "hono": "^4.6.20"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^20",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.103.2"
+  }
+}

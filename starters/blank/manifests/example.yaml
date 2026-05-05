@@ -1,0 +1,47 @@
+# Single-file manifest demonstrating the two atom types this starter
+# uses. Replace with your real content shape and delete this comment.
+#
+# v0.1 atom types:
+#   - Schema     : a content collection (the "table")
+#   - View       : a public read query auto-mounted at /api/views/<name>
+#   - Procedure  : an HTTP-callable handler (POST /api/<segment>) — add as needed
+#   - Trigger    : a lifecycle hook (before/after × create/update/delete/publish)
+
+apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata:
+  name: notes
+spec:
+  title: Notes
+  description: Example collection. Delete or rewrite to match your content.
+  schema:
+    type: object
+    required: [slug, title]
+    properties:
+      slug:
+        type: string
+        pattern: "^[a-z0-9-]+$"
+        description: URL slug.
+      title:
+        type: string
+        minLength: 1
+      body:
+        type: string
+        description: Markdown body.
+  uniqueIndexes:
+    - [slug]
+  localized: false
+  lifecycle: simple
+---
+apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata:
+  name: published-notes
+spec:
+  from: notes
+  fields: [id, slug, title, body, updatedAt]
+  filter:
+    eq: { field: status, value: published }
+  orderBy:
+    - { field: updatedAt, direction: desc }
+  limit: 50
