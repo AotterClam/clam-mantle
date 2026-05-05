@@ -44,6 +44,9 @@ jobs:
         # validate` fails with `sh: mantle: not found`.
         run: pnpm install --frozen-lockfile
 
+      - name: Check package boundaries
+        run: pnpm run check:boundaries
+
       - name: Typecheck workspace (all packages including admin-ui / netlify stubs + starters/blog)
         run: |
           pnpm typecheck
