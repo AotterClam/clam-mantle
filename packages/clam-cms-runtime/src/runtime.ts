@@ -16,6 +16,8 @@ import type { KvCache } from "./domain/port/KvCache.js";
 import type { OAuthVerifier } from "./domain/port/OAuthVerifier.js";
 import type { PublishOrchestrator } from "./domain/port/PublishOrchestrator.js";
 import type { SessionRepository } from "./domain/port/SessionRepository.js";
+import type { UserRepository } from "./domain/port/UserRepository.js";
+import type { StaffRepository } from "./domain/port/StaffRepository.js";
 import type { SiteConfigRepository } from "./domain/port/SiteConfigRepository.js";
 import { SystemClock, type Clock } from "./domain/port/Clock.js";
 import {
@@ -84,12 +86,14 @@ export interface CreateCmsRuntimeArgs {
   readonly handlers?: Readonly<Record<string, AnyHandler>>;
   readonly templates?: TemplateRegistry;
   readonly siteDefaults?: SiteDefaults;
-  /** The 5 ADR-0011 ports. */
+  /** The 5 ADR-0011 ports + identity layer. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
   readonly sessions: SessionRepository;
   readonly assets: AssetServer;
   readonly oauth: OAuthVerifier;
+  readonly users: UserRepository;
+  readonly staff: StaffRepository;
   /** Optional public-path resolver. When set, the publish pipeline
    *  composes SEO/AEO meta on every entry render and the resolved
    *  paths drive sitemap / hreflang sibling URLs. Adapters that
@@ -103,12 +107,14 @@ export interface CreateCmsRuntimeArgs {
 }
 
 export interface CmsRuntime {
-  /** The 5 ports — re-exposed so adapters can pass them downstream. */
+  /** The 5 ADR-0011 ports + identity layer — re-exposed so adapters can pass them downstream. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
   readonly sessions: SessionRepository;
   readonly assets: AssetServer;
   readonly oauth: OAuthVerifier;
+  readonly users: UserRepository;
+  readonly staff: StaffRepository;
 
   /** Use cases (pre-wired with ports + clock + idgen). */
   readonly createDraft: CreateDraftUseCase;
@@ -245,6 +251,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     sessions: args.sessions,
     assets: args.assets,
     oauth: args.oauth,
+    users: args.users,
+    staff: args.staff,
 
     createDraft,
     updateDraft,

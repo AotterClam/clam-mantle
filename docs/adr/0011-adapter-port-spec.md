@@ -21,15 +21,17 @@ The POC accumulated multiple half-decisions about this seam (POC ADR-0015 docume
 
 ## Decision
 
-**Five ports**, defined as TypeScript interfaces in `@aotterclam/clam-cms-runtime/src/ports/`. Concrete adapters provide implementations and inject them at module init via a single factory call.
+**Seven ports**, defined as TypeScript interfaces in `@aotterclam/clam-cms-runtime/src/domain/port/`. Concrete adapters provide implementations and inject them at module init via a single factory call.
 
 | Port | Surface |
 |---|---|
-| `DatabasePort` | All persistent state — `entries`, `site_config`, `staff`, `users`, `approvals`, plus migrations. |
-| `KvPort` | Publish-pipeline cache — pre-rendered HTML, `.md` mirrors, `llms.txt` per locale. Read-mostly, written by the publish pipeline. |
-| `SessionPort` | Cookie-session state — staff session lookup, OAuth state, MCP session. |
-| `AssetsPort` | Static-asset serving for the admin SPA. The runtime hands the adapter an asset path + `Request`; the adapter returns a `Response` with the right MIME and caching. |
-| `OAuthPort` | MCP OAuth provider with Dynamic Client Registration. Responsible for the `/oauth/{token,register}` and `/.well-known/oauth-*` surfaces. |
+| `DatabaseDriver` | All persistent state — `entries`, `site_config`, `staff`, `users`, `approvals`, plus migrations. |
+| `KvCache` | Publish-pipeline cache — pre-rendered HTML, `.md` mirrors, `llms.txt` per locale. Read-mostly, written by the publish pipeline. |
+| `SessionRepository` | Cookie-session state — staff session lookup, OAuth state, MCP session. |
+| `AssetServer` | Static-asset serving for the admin SPA. The runtime hands the adapter an asset path + `Request`; the adapter returns a `Response` with the right MIME and caching. |
+| `OAuthVerifier` | MCP OAuth provider with Dynamic Client Registration. Responsible for the `/oauth/{token,register}` and `/.well-known/oauth-*` surfaces. |
+| `UserRepository` | User identity — upsert by GitHub profile, store/read GitHub access token. |
+| `StaffRepository` | Staff roster — list all, read by user id, bootstrap first owner. |
 
 ### `DatabasePort`
 
@@ -132,7 +134,7 @@ export function mountAdmin(app: Hono, config: CmsConfig): Hono {
 }
 ```
 
-The runtime gets the 5 ports as a constructor object. There's no module-global state holding adapter-specific bindings (POC's `db-init.ts > stashedSiteDefaults` was the closest thing to that and survived only because the stash was framework-agnostic; with explicit ports there's no temptation to add module globals).
+The runtime gets the 7 ports as a constructor object. There's no module-global state holding adapter-specific bindings (POC's `db-init.ts > stashedSiteDefaults` was the closest thing to that and survived only because the stash was framework-agnostic; with explicit ports there's no temptation to add module globals).
 
 ## Consequences
 
@@ -142,7 +144,7 @@ The runtime gets the 5 ports as a constructor object. There's no module-global s
 - Removing a port is also possible (if a port is found to overlap or be unnecessary), again by amending this ADR.
 
 **Discoverability for adapter authors**:
-- A future Bun/Deno/Vercel/Netlify port author reads this ADR + reads the 5 port interface files in `clam-cms-runtime/src/ports/` + writes 5 port impl files. That's the contract. No hidden state, no implicit assumptions about the HTTP framework.
+- A future Bun/Deno/Vercel/Netlify port author reads this ADR + reads the 7 port interface files in `clam-cms-runtime/src/domain/port/` + writes 7 port impl files. That's the contract. No hidden state, no implicit assumptions about the HTTP framework.
 
 **Test ergonomics**:
 - Each port is small and isolated. Tests can mock individual ports without spinning up D1 / KV / OAuth provider.

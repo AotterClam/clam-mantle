@@ -8,18 +8,20 @@ This package is intentionally empty in v0.1.0.
 
 It exists as an **engineering forcing function**.
 
-The 5 adapter ports defined in `@aotterclam/clam-cms-runtime` (DB / KV / Session / Assets / OAuth) only stay adapter-agnostic if there's pressure to implement them in more than one place. With only `clam-cms-cloudflare` shipping, `clam-cms-runtime` would slowly grow Cloudflare-specific imports in PR review (`D1Database` here, `KVNamespace` there) — death by a thousand papercuts. After a year, "adapter-agnostic" is a comment, not a constraint.
+The 7 adapter ports defined in `@aotterclam/clam-cms-runtime` (DatabaseDriver / KvCache / SessionRepository / AssetServer / OAuthVerifier / UserRepository / StaffRepository) only stay adapter-agnostic if there's pressure to implement them in more than one place. With only `clam-cms-cloudflare` shipping, `clam-cms-runtime` would slowly grow Cloudflare-specific imports in PR review (`D1Database` here, `KVNamespace` there) — death by a thousand papercuts. After a year, "adapter-agnostic" is a comment, not a constraint.
 
 This README declares the public commitment to a second adapter. PR reviewers can point at this directory when blocking a CF-coupling slip.
 
 ## What v0.2 will ship
 
 - Netlify Functions handler (replaces Cloudflare Workers' Hono adapter)
-- D1 → Postgres-via-Neon port impl, OR Netlify Blob storage if first-party support exists
-- KV → Netlify Blobs (or Redis bridge)
-- Session → cookie-session over Postgres
-- Assets → Netlify static publish dir (consumes `clam-cms-admin-ui` dist same as Cloudflare)
-- OAuth → standalone OAuth provider (no Workers-OAuth-Provider equivalent on Netlify)
+- `DatabaseDriver` → Postgres-via-Neon impl, OR Netlify Blob storage if first-party support exists
+- `KvCache` → Netlify Blobs (or Redis bridge)
+- `SessionRepository` → cookie-session over Postgres
+- `AssetServer` → Netlify static publish dir (consumes `clam-cms-admin-ui` dist same as Cloudflare)
+- `OAuthVerifier` → standalone OAuth provider (no Workers-OAuth-Provider equivalent on Netlify)
+- `UserRepository` → Postgres impl for user identity + GitHub token storage
+- `StaffRepository` → Postgres impl for staff roster + bootstrap owner
 
 The port interface is documented in [`docs/adr/0011-adapter-port-spec.md`](../../docs/adr/0011-adapter-port-spec.md). _(Authored in commit 2.)_
 

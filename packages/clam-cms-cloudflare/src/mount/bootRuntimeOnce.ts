@@ -3,7 +3,7 @@ import {
   type CmsRuntime,
 } from "@aotterclam/clam-cms-runtime";
 import type { Manifest } from "@aotterclam/clam-cms-spec";
-import type { CmsConfig } from "./cmsConfig.js";
+import type { AdminAuthConfig, CmsConfig } from "./cmsConfig.js";
 
 /**
  * Per-isolate runtime singleton with poison-isolate-resistant boot
@@ -32,6 +32,11 @@ export interface CmsRuntimeRef {
   /** The manifest set this ref's runtime was built from. Mounts use
    *  this to materialize routes statically without awaiting boot. */
   readonly manifests: readonly Manifest[];
+  /** Present when `config.adminAuth` was supplied. Exposes the
+   *  OAuthProvider and GitHub OAuth config to mount factories
+   *  (`mountServerEndpoints` for consent UI / passthrough;
+   *  `mountMcp` in issue #20 for token verification). */
+  readonly adminAuth: AdminAuthConfig | null;
 }
 
 export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
@@ -41,16 +46,13 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
     templates: config.templates,
     siteDefaults: config.siteDefaults,
     publicPathResolver: config.publicPathResolver,
-    db: config.bindings.db,
-    kv: config.bindings.kv,
-    sessions: config.bindings.sessions,
-    assets: config.bindings.assets,
-    oauth: config.bindings.oauth,
+    ...config.bindings,
   });
 
   let booted: Promise<CmsRuntime> | null = null;
   return {
     manifests: config.manifests,
+    adminAuth: config.adminAuth ?? null,
     get(): Promise<CmsRuntime> {
       if (booted) return booted;
       booted = runtime

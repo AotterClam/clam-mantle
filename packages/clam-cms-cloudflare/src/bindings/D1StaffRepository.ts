@@ -1,5 +1,5 @@
 import { isStaffRole, type StaffRole } from "@aotterclam/clam-cms-spec";
-import type { BootstrapOwnerOpts, StaffListEntry, StaffRepository } from "@aotterclam/clam-cms-runtime";
+import type { BootstrapOwnerOpts, Staff, StaffListEntry, StaffRepository } from "@aotterclam/clam-cms-runtime";
 
 export class D1StaffRepository implements StaffRepository {
   constructor(private readonly db: D1Database) {}
@@ -34,6 +34,15 @@ export class D1StaffRepository implements StaffRepository {
         name: r.name,
         githubLogin: r.github_login,
       }));
+  }
+
+  async readByUserId(userId: string): Promise<Staff | null> {
+    const row = await this.db
+      .prepare(`SELECT user_id, role, granted_by, granted_at FROM staff WHERE user_id = ? LIMIT 1`)
+      .bind(userId)
+      .first<{ user_id: string; role: string; granted_by: string | null; granted_at: number }>();
+    if (!row || !isStaffRole(row.role)) return null;
+    return { userId: row.user_id, role: row.role as StaffRole, grantedBy: row.granted_by, grantedAt: row.granted_at };
   }
 
   async ensureBootstrapOwner(opts: BootstrapOwnerOpts): Promise<void> {

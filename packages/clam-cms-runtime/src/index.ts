@@ -105,6 +105,10 @@ export {
 // infrastructure do not become root public API by accident.
 export { CANONICAL_MIGRATIONS } from "./infrastructure/boot/canonicalMigrations.js";
 
+// Cookie session helpers — adapters use these to stay consistent with
+// the session name used by the runtime's session-assembly infrastructure.
+export { DEFAULT_SESSION_COOKIE, readCookie } from "./infrastructure/auth/CookieReader.js";
+
 // Procedure handler failure carrier used by platform helper handlers
 // such as Cloudflare Turnstile.
 export { InvokeFailure } from "./usecase/procedure/InvokeProcedureUseCase.js";

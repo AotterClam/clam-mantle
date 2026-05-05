@@ -2,6 +2,8 @@ import {
   AssetsAssetServer,
   D1DatabaseDriver,
   D1SessionRepository,
+  D1StaffRepository,
+  D1UserRepository,
   KvCacheBinding,
   StubOAuthVerifier,
   type CmsConfig,
@@ -37,6 +39,8 @@ export function buildCmsConfig(env: Env): CmsConfig {
       db: new D1DatabaseDriver(env.DB),
       kv: new KvCacheBinding(env.KV),
       sessions: new D1SessionRepository(env.DB),
+      users: new D1UserRepository(env.DB),
+      staff: new D1StaffRepository(env.DB),
       assets: env.ASSETS
         ? new AssetsAssetServer(env.ASSETS)
         : { fetch: async () => null },
