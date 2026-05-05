@@ -94,7 +94,8 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 ### PR conventions
 
-- **PR base branch is `main`.**
+- **PR base branch is `develop`.** `develop` is the integration branch; `main` only updates at release tags (v0.1.0, v0.1.x, …) via a `develop → main` merge.
+- Feature branches cut from `develop`, merge back via `gh pr merge --merge --delete-branch` (NOT `--squash` — see project preference).
 
 ## Build / test / typecheck
 
