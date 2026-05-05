@@ -6,3 +6,6 @@
  */
 export * from "./dto/index.js";
 export * from "./ValidateManifestsUseCase.js";
+export * from "./IntrospectManifestsUseCase.js";
+export * from "./EmitOpenapiUseCase.js";
+export * from "./EmitTypesUseCase.js";

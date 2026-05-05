@@ -1,8 +1,7 @@
 export {
   ComposeLlmsTxtUseCase,
-  type ComposeLlmsTxtRequest,
 } from "./ComposeLlmsTxtUseCase.js";
 export {
   ComposeSitemapUseCase,
-  type ComposeSitemapRequest,
+  SITEMAP_MAX_URLS_DEFAULT,
 } from "./ComposeSitemapUseCase.js";

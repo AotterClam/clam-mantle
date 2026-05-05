@@ -59,6 +59,23 @@ export async function readPublishedEntries(
   return rows.map(rowToEntry);
 }
 
+/** Single-entry lookup by id. Used by the publish pipeline to load
+ *  the entry it's about to render; lifted into the domain service so
+ *  the orchestrator stops owning row-to-domain mapping. */
+export async function readEntryById(
+  db: DatabaseDriver,
+  id: string,
+): Promise<Entry | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, collection, status, version, data, created_at, updated_at` +
+        ` FROM entries WHERE id = ?`,
+    )
+    .bind(id)
+    .first<EntryDbRow>();
+  return row ? rowToEntry(row) : null;
+}
+
 function rowToEntry(row: EntryDbRow): Entry {
   const data = JSON.parse(row.data) as Record<string, unknown>;
   const dataLocale = data["locale"];

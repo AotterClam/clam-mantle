@@ -1,0 +1,51 @@
+import type {
+  AuthPredicate,
+  FilterAst,
+  HandlerBinding,
+  JsonSchema,
+  TriggerSource,
+} from "../../domain/model/ManifestGrammar.js";
+import type { Diagnostic } from "../../kernel/diagnostic.js";
+
+export interface IntrospectedSchema {
+  readonly name: string;
+  readonly title: string;
+  readonly localized: boolean;
+  readonly lifecycle: string;
+  readonly translates: { readonly parent: string; readonly on: string } | null;
+  readonly uniqueIndexes: ReadonlyArray<ReadonlyArray<string>>;
+  readonly properties: ReadonlyArray<string>;
+}
+
+export interface IntrospectedView {
+  readonly name: string;
+  readonly from: string;
+  readonly params: JsonSchema | null;
+  readonly filter: FilterAst | null;
+  readonly orderBy: ReadonlyArray<{ readonly field: string; readonly direction?: "asc" | "desc" }>;
+  readonly fields: ReadonlyArray<string> | null;
+  readonly limit: number | null;
+  readonly restPath: string;
+}
+
+export interface IntrospectedProcedure {
+  readonly name: string;
+  readonly handler: HandlerBinding;
+  readonly auth: { readonly all: ReadonlyArray<AuthPredicate> } | null;
+  readonly input: JsonSchema;
+  readonly output: JsonSchema;
+}
+
+export interface IntrospectedTrigger {
+  readonly name: string;
+  readonly source: TriggerSource;
+  readonly target: { readonly procedure: string };
+}
+
+export interface IntrospectManifestsResponse {
+  readonly schemas: ReadonlyArray<IntrospectedSchema>;
+  readonly views: ReadonlyArray<IntrospectedView>;
+  readonly procedures: ReadonlyArray<IntrospectedProcedure>;
+  readonly triggers: ReadonlyArray<IntrospectedTrigger>;
+  readonly parseErrors: ReadonlyArray<Diagnostic>;
+}

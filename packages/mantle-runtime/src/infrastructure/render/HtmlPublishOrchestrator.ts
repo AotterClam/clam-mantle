@@ -1,7 +1,6 @@
 import {
   DiagnosticError,
   runtimeDiagnostic,
-  type ContentState,
   type Entry,
   type SiteConfig,
 } from "@aotter/mantle-spec";
@@ -18,7 +17,10 @@ import {
   listHtmlKey,
   llmsTxtKey,
 } from "../../domain/service/PublishKeys.js";
-import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
+import {
+  readEntryById,
+  readPublishedEntries,
+} from "../../domain/service/PublishedEntries.js";
 import { serializeEntryAsMarkdown } from "../../domain/service/MarkdownSerializer.js";
 import { ComposeLlmsTxtUseCase } from "../../usecase/render/ComposeLlmsTxtUseCase.js";
 
@@ -47,7 +49,7 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
   }
 
   async publish(request: PublishEntryRequest): Promise<void> {
-    const entry = await readEntry(this.db, request.entryId);
+    const entry = await readEntryById(this.db, request.entryId);
     if (!entry) {
       throw new DiagnosticError(
         runtimeDiagnostic({
@@ -114,38 +116,3 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
   }
 }
 
-interface EntryDbRow {
-  readonly id: string;
-  readonly collection: string;
-  readonly status: string;
-  readonly version: number;
-  readonly data: string;
-  readonly created_at: number;
-  readonly updated_at: number;
-}
-
-async function readEntry(db: DatabaseDriver, id: string): Promise<Entry | null> {
-  const row = await db
-    .prepare(
-      `SELECT id, collection, status, version, data, created_at, updated_at
-       FROM entries WHERE id = ?`,
-    )
-    .bind(id)
-    .first<EntryDbRow>();
-  return row ? rowToEntry(row) : null;
-}
-
-function rowToEntry(row: EntryDbRow): Entry {
-  const data = JSON.parse(row.data) as Record<string, unknown>;
-  const dataLocale = data["locale"];
-  return {
-    id: row.id,
-    collection: row.collection,
-    locale: typeof dataLocale === "string" ? dataLocale : undefined,
-    status: row.status as ContentState,
-    version: row.version,
-    data,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}

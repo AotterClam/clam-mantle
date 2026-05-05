@@ -1,7 +1,8 @@
-import type { Entry, SiteConfig } from "@aotter/mantle-spec";
+import type { Entry } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
 import { serializeLlmsTxt } from "../../domain/service/MarkdownSerializer.js";
+import type { ComposeLlmsTxtRequest } from "../dto/render/ComposeLlmsTxtRequest.js";
 
 /**
  * Compose a `/llms.txt` body from currently-published entries.
@@ -14,11 +15,6 @@ import { serializeLlmsTxt } from "../../domain/service/MarkdownSerializer.js";
  *                       aggregate at the root URL should iterate
  *                       site.locales themselves and concat.
  */
-export interface ComposeLlmsTxtRequest {
-  readonly site: SiteConfig;
-  readonly locale: string | null;
-}
-
 export class ComposeLlmsTxtUseCase {
   constructor(private readonly db: DatabaseDriver) {}
 

@@ -1,13 +1,10 @@
 import {
   runtimeDiagnostic,
   type Diagnostic,
-  type ViewManifest,
 } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
-import {
-  compileView,
-  type CompileViewOptions,
-} from "../../domain/service/ViewSqlCompiler.js";
+import { compileView } from "../../domain/service/ViewSqlCompiler.js";
+import type { ExecuteViewRequest } from "../dto/view/ExecuteViewRequest.js";
 
 /**
  * Compile a View manifest and run it against `DatabaseDriver`. The
@@ -15,11 +12,6 @@ import {
  * against `View.spec.params` happens at the adapter (or via
  * `coerceViewParams`) before the request reaches here.
  */
-export interface ExecuteViewRequest {
-  readonly view: ViewManifest;
-  readonly pathPrefix?: string;
-  readonly options?: CompileViewOptions;
-}
 
 export interface ViewQueryResult<R = Record<string, unknown>> {
   readonly rows: readonly R[];
