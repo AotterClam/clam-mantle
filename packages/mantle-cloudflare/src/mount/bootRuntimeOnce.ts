@@ -40,6 +40,7 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
     handlers: config.handlers,
     templates: config.templates,
     siteDefaults: config.siteDefaults,
+    publicPathResolver: config.publicPathResolver,
     db: config.bindings.db,
     kv: config.bindings.kv,
     sessions: config.bindings.sessions,

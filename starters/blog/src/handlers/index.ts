@@ -1,5 +1,5 @@
 import type { AnyHandler } from "@aotter/mantle-runtime";
-import { buildCaptchaCheck } from "./captchaCheck.js";
+import { cloudflareTurnstileCheck } from "@aotter/mantle-cloudflare";
 import { slackNotify } from "./slackNotify.js";
 
 export interface HandlerEnv {
@@ -15,7 +15,9 @@ export interface HandlerEnv {
  */
 export function buildHandlers(env: HandlerEnv): Readonly<Record<string, AnyHandler>> {
   return {
-    captchaCheck: buildCaptchaCheck(env) as AnyHandler,
+    captchaCheck: cloudflareTurnstileCheck({
+      secret: env.TURNSTILE_SECRET_KEY ?? "dev-stub",
+    }) as AnyHandler,
     slackNotify: slackNotify as AnyHandler,
   };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HtmlPublishOrchestrator } from "../src/infrastructure/render/HtmlPublishOrchestrator.js";
+import { ComposeEntrySeoMetaUseCase } from "../src/usecase/render/ComposeEntrySeoMetaUseCase.js";
 import {
   entryHtmlKey,
   entryMarkdownKey,
@@ -48,7 +49,7 @@ describe("HtmlPublishOrchestrator", () => {
     );
     templates.registerListTemplate("posts", ({ entries }) => `<ul>${entries.length}</ul>`);
 
-    const orchestrator = new HtmlPublishOrchestrator(db, kv);
+    const orchestrator = new HtmlPublishOrchestrator(db, kv, null, new ComposeEntrySeoMetaUseCase(db));
     await orchestrator.publish({ entryId: "p1", site, templates });
 
     const snap = kv._snapshot();
@@ -69,7 +70,7 @@ describe("HtmlPublishOrchestrator", () => {
   it("throws NOT_FOUND for unknown entry id", async () => {
     const db = new InMemoryDatabase();
     const kv = new InMemoryKv();
-    const orchestrator = new HtmlPublishOrchestrator(db, kv);
+    const orchestrator = new HtmlPublishOrchestrator(db, kv, null, new ComposeEntrySeoMetaUseCase(db));
     await expect(
       orchestrator.publish({
         entryId: "ghost",

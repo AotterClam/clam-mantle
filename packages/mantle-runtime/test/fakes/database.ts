@@ -285,6 +285,8 @@ class InMemoryStatement implements PreparedStatement {
         for (const cond of conds) {
           if (cond === `status = 'published'`) {
             if (r.status !== "published") return false;
+          } else if (cond === `status = ?`) {
+            if (r.status !== (p[pi++] as string)) return false;
           } else if (cond === `json_extract(data, '$.locale') IS NULL`) {
             const data = JSON.parse(r.data) as Record<string, unknown>;
             if (typeof data["locale"] === "string") return false;
@@ -292,6 +294,10 @@ class InMemoryStatement implements PreparedStatement {
             const want = p[pi++] as string;
             const data = JSON.parse(r.data) as Record<string, unknown>;
             if (data["locale"] !== want) return false;
+          } else if (cond === `json_extract(data, '$.slug') = ?`) {
+            const want = p[pi++] as string;
+            const data = JSON.parse(r.data) as Record<string, unknown>;
+            if (data["slug"] !== want) return false;
           } else if (cond === `collection = ?`) {
             if (r.collection !== (p[pi++] as string)) return false;
           } else {

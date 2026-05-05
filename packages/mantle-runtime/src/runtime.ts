@@ -45,9 +45,14 @@ import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
 import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
 import {
+  ComposeEntrySeoMetaUseCase,
   ComposeLlmsTxtUseCase,
   ComposeSitemapUseCase,
+  PreviewEntryUseCase,
+  RenderEntryLiveUseCase,
+  RenderListLiveUseCase,
 } from "./usecase/render/index.js";
+import type { PublicPathResolver } from "./domain/service/PublicPathResolver.js";
 
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
 import { TriggerIndex } from "./domain/service/TriggerIndex.js";
@@ -85,6 +90,12 @@ export interface CreateCmsRuntimeArgs {
   readonly sessions: SessionRepository;
   readonly assets: AssetServer;
   readonly oauth: OAuthVerifier;
+  /** Optional public-path resolver. When set, the publish pipeline
+   *  composes SEO/AEO meta on every entry render and the resolved
+   *  paths drive sitemap / hreflang sibling URLs. Adapters that
+   *  expose request-time render routes should also pass this through
+   *  so request-time HTML matches publish-time HTML. */
+  readonly publicPathResolver?: PublicPathResolver;
   /** Optional clock — test seam. Defaults to `SystemClock`. */
   readonly clock?: Clock;
   /** Optional id generator — test seam. Defaults to `RandomUuidGenerator`. */
@@ -112,9 +123,17 @@ export interface CmsRuntime {
   readonly executeView: ExecuteViewUseCase;
   readonly composeLlmsTxt: ComposeLlmsTxtUseCase;
   readonly composeSitemap: ComposeSitemapUseCase;
+  readonly composeEntrySeoMeta: ComposeEntrySeoMetaUseCase;
+  readonly renderEntryLive: RenderEntryLiveUseCase;
+  readonly renderListLive: RenderListLiveUseCase;
+  readonly previewEntry: PreviewEntryUseCase;
   readonly validateBoot: ValidateBootUseCase;
   readonly publishOrchestrator: PublishOrchestrator;
   readonly siteConfig: SiteConfigRepository;
+  /** The resolver passed at boot, or `null` when the consumer didn't
+   *  supply one. Adapters use this to derive URLs (sitemap, SEO
+   *  hreflangs) without rebuilding the mapping. */
+  readonly publicPathResolver: PublicPathResolver | null;
 
   /** Adapter-helper bag. */
   readonly registry: HandlerRegistry;
@@ -183,7 +202,14 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     lifecycleHooks,
   );
   const siteConfig = new DatabaseSiteConfigRepository(args.db);
-  const publishOrchestrator = new HtmlPublishOrchestrator(args.db, args.kv);
+  const publicPathResolver = args.publicPathResolver ?? null;
+  const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
+  const publishOrchestrator = new HtmlPublishOrchestrator(
+    args.db,
+    args.kv,
+    publicPathResolver,
+    composeEntrySeoMeta,
+  );
 
   // Content / view / boot use cases. They see `entries` only as the
   // chokepoint port — hook firing is invisible to them.
@@ -198,6 +224,19 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const executeView = new ExecuteViewUseCase(args.db);
   const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);
   const composeSitemap = new ComposeSitemapUseCase(args.db);
+  const renderEntryLive = new RenderEntryLiveUseCase(
+    args.db,
+    templates,
+    publicPathResolver,
+    composeEntrySeoMeta,
+  );
+  const renderListLive = new RenderListLiveUseCase(args.db, templates);
+  const previewEntry = new PreviewEntryUseCase(
+    args.db,
+    templates,
+    publicPathResolver,
+    composeEntrySeoMeta,
+  );
   const validateBoot = new ValidateBootUseCase();
 
   return {
@@ -219,9 +258,14 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     executeView,
     composeLlmsTxt,
     composeSitemap,
+    composeEntrySeoMeta,
+    renderEntryLive,
+    renderListLive,
+    previewEntry,
     validateBoot,
     publishOrchestrator,
     siteConfig,
+    publicPathResolver,
 
     registry,
     templates,

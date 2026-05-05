@@ -5,7 +5,7 @@ import { bundleFor } from "../i18n/index.js";
 import { excerpt, isoDate } from "./utils.js";
 
 export function postListTemplate(ctx: ListContext): string {
-  const { entries, locale, site } = ctx;
+  const { entries, locale, site, seo } = ctx;
   const t = bundleFor(locale).postList;
   const tree = (
     <Layout
@@ -14,6 +14,7 @@ export function postListTemplate(ctx: ListContext): string {
       title={`${t.title} — ${site.brand}`}
       description={site.description}
       current="posts"
+      seo={seo}
     >
       <section class="hero">
         <div class="eyebrow">{t.eyebrow}</div>

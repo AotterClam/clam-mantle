@@ -16,3 +16,4 @@
  */
 export * from "./bindings/index.js";
 export * from "./mount/index.js";
+export * from "./handlers/index.js";

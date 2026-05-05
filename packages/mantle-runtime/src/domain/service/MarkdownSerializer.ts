@@ -1,4 +1,5 @@
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
+import { absoluteUrl, appendMarkdownExt } from "./AbsoluteUrl.js";
 
 /**
  * Built-in markdown serializer. Fixed format, applied to every entry
@@ -20,13 +21,33 @@ import type { Entry, SiteConfig } from "@aotter/mantle-spec";
  *
  *   <content>
  *
- * Entries without a `content` field skip the `.md` mirror.
+ * Entries without a `content` (or `body`) field skip the `.md`
+ * mirror — see `getMarkdownBody` below for the dual-field rule.
  *
  * Pure transformation — no I/O. Lives in `domain/service/`.
  */
+/**
+ * The canonical markdown source field. Spec-preferred name is
+ * `content`; the reference starter (and likely consumers cribbing
+ * from it) declares `body`. Both are markdown text under the hood;
+ * accept either everywhere a markdown payload is read so consumers
+ * don't have to choose. Single predicate so `serializeEntryAsMarkdown`,
+ * `serializeLlmsTxt`, and the article-signal heuristic stay in sync.
+ */
+export function getMarkdownBody(entry: Entry): string | null {
+  const data = entry.data;
+  if (typeof data["content"] === "string") return data["content"];
+  if (typeof data["body"] === "string") return data["body"];
+  return null;
+}
+
+export function hasMarkdownBody(entry: Entry): boolean {
+  return getMarkdownBody(entry) !== null;
+}
+
 export function serializeEntryAsMarkdown(entry: Entry): string | null {
   const data = entry.data;
-  const content = typeof data["content"] === "string" ? data["content"] : null;
+  const content = getMarkdownBody(entry);
   if (content == null) return null;
 
   const fm: Array<[string, string]> = [];
@@ -67,13 +88,13 @@ export function serializeLlmsTxt(args: {
     if (entries.length === 0) continue;
     out += `## ${collection}\n\n`;
     for (const e of entries) {
+      if (!hasMarkdownBody(e)) continue;
       const data = e.data;
-      if (typeof data["content"] !== "string") continue;
       const title = (data["title"] as string | undefined) ?? e.id;
       const slug = (data["slug"] as string | undefined) ?? e.id;
       const desc = (data["description"] as string | undefined) ?? "";
       const localePrefix = urlLocale ? `/${urlLocale}` : "";
-      const url = `${site.origin}${localePrefix}/${collection}/${slug}.md`;
+      const url = appendMarkdownExt(absoluteUrl(site.origin, `${localePrefix}/${collection}/${slug}`));
       out += desc ? `- [${title}](${url}): ${desc}\n` : `- [${title}](${url})\n`;
     }
     out += "\n";

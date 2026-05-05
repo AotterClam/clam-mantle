@@ -1,4 +1,5 @@
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
+import type { SeoMeta } from "./SeoMeta.js";
 
 /**
  * Render-pipeline types + consumer-supplied template registry.
@@ -14,12 +15,18 @@ import type { Entry, SiteConfig } from "@aotter/mantle-spec";
  * skipped (per ADR-0009-extended: the SDK ships zero opinionated
  * templates).
  *
+ * `seo` is populated when the renderer is given a composed SeoMeta
+ * block — templates render `<SeoTags seo={seo} />` (or read fields
+ * directly) when present. Renderers that skip composition leave
+ * `seo` undefined so opt-out templates don't break.
+ *
  * Lives in `domain/model/` because both the `PublishOrchestrator`
  * port and the HTML adapter that implements it need to reference it.
  */
 export interface EntryContext {
   readonly entry: Entry;
   readonly site: SiteConfig;
+  readonly seo?: SeoMeta;
 }
 
 export interface ListContext {
@@ -27,6 +34,7 @@ export interface ListContext {
   readonly locale: string;
   readonly entries: readonly Entry[];
   readonly site: SiteConfig;
+  readonly seo?: SeoMeta;
 }
 
 export type EntryTemplate = (ctx: EntryContext) => string;

@@ -8,6 +8,7 @@ import {
 } from "@aotter/mantle-cloudflare";
 import { buildHandlers } from "./handlers/index.js";
 import { loadManifests } from "./loadManifests.js";
+import { PUBLIC_PATH_RESOLVER } from "./paths.js";
 import { buildTemplates } from "./templates/index.js";
 
 /**
@@ -54,6 +55,7 @@ export function buildCmsConfig(env: Env): CmsConfig {
       origin: "https://example.com",
       locales: ["en", "zh-TW"],
     },
+    publicPathResolver: PUBLIC_PATH_RESOLVER,
     bindings: {
       db: new D1DatabaseDriver(env.DB),
       kv: new KvCacheBinding(env.KV),

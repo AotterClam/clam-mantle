@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { check } from "../src/usecase/ValidateManifestsUseCase.js";
-import { parseManifests } from "../src/domain/service/ManifestParser.js";
+import {
+  parseManifests,
+  parseManifestsOrThrow,
+} from "../src/domain/service/ManifestParser.js";
 import type {
   Manifest,
   ProcedureManifest,
@@ -353,5 +356,46 @@ spec:
     eq: { field: tag, value: { $param: tag } }
 `);
     expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_FILTER_PARAM_REF_UNKNOWN");
+  });
+});
+
+describe("parseManifestsOrThrow", () => {
+  const okYaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: posts }
+spec:
+  title: Posts
+  schema: { type: object, properties: { slug: { type: string } } }
+  uniqueIndexes: [[slug]]
+  lifecycle: simple
+`;
+
+  it("returns the parsed manifests when no diagnostics fire", () => {
+    const out = parseManifestsOrThrow(okYaml);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.kind).toBe("Schema");
+  });
+
+  it("throws with diagnostics formatted as `[CODE] path: msg`", () => {
+    const bad = `apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: posts }
+spec:
+  schema: { type: object }
+  uniqueIndexes: [[ "slug" ]]
+  lifecycle: editorial
+`;
+    expect(() => parseManifestsOrThrow(bad)).toThrow(/Manifest parse failed:/);
+    try {
+      parseManifestsOrThrow(bad);
+    } catch (e) {
+      expect(String(e)).toMatch(/\[[A-Z_]+\] /);
+    }
+  });
+
+  it("includes the context label in the error envelope when supplied", () => {
+    expect(() =>
+      parseManifestsOrThrow("not even yaml: : :", { context: "starters/blog" }),
+    ).toThrow(/Manifest parse failed in starters\/blog/);
   });
 });

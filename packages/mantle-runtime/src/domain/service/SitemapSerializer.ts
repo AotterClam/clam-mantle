@@ -1,4 +1,5 @@
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
+import { absoluteUrl } from "./AbsoluteUrl.js";
 
 /**
  * Hreflang alternates are deferred to v0.1.x (need cross-locale entry
@@ -20,12 +21,11 @@ export interface SitemapInput {
 
 export function serializeSitemap(input: SitemapInput): string {
   const { site, entries } = input;
-  const origin = (site.origin ?? "").replace(/\/+$/, "");
   const out: string[] = [];
   out.push(`<?xml version="1.0" encoding="UTF-8"?>`);
   out.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
   for (const { entry, path } of entries) {
-    const loc = `${origin}${path}`;
+    const loc = absoluteUrl(site.origin ?? "", path);
     out.push("  <url>");
     out.push(`    <loc>${escapeXml(loc)}</loc>`);
     if (entry.updatedAt) {

@@ -26,7 +26,10 @@ import {
   renderEntryHtml,
   renderListHtml,
 } from "../../domain/service/HtmlRenderer.js";
+import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import { ComposeLlmsTxtUseCase } from "../../usecase/render/ComposeLlmsTxtUseCase.js";
+import { composeSeoIfPathed } from "../../usecase/render/EntrySeoSupport.js";
+import type { ComposeEntrySeoMetaUseCase } from "../../usecase/render/ComposeEntrySeoMetaUseCase.js";
 
 /**
  * `HtmlPublishOrchestrator` — the publish pipeline. Renders + writes
@@ -48,6 +51,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
   constructor(
     private readonly db: DatabaseDriver,
     private readonly kv: KvCache,
+    private readonly paths: PublicPathResolver | null,
+    private readonly composeSeo: ComposeEntrySeoMetaUseCase,
   ) {
     this.composeLlmsTxt = new ComposeLlmsTxtUseCase(db);
   }
@@ -82,7 +87,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     templates: TemplateRegistry,
     doctype: string,
   ): Promise<void> {
-    const html = renderEntryHtml({ entry, site, templates, doctype });
+    const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, site);
+    const html = renderEntryHtml({ entry, site, templates, doctype, seo });
     if (html !== null) {
       await this.kv.put(entryHtmlKey(entry), html);
     }

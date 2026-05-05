@@ -1,0 +1,336 @@
+import type { Context, Hono } from "hono";
+import type { ContentState, SiteConfig } from "@aotter/clam-cms-spec";
+import {
+  entryHtmlKeyFromParts,
+  entryMarkdownKeyFromParts,
+  inferLocaleFromPath,
+  isKnownLocale,
+  listHtmlKey,
+  llmsTxtKey,
+  toUrlLocale,
+  type CmsRuntime,
+  type KvCache,
+} from "@aotter/clam-cms-runtime";
+import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
+
+/**
+ * `mountPublicRoutes` — mounts the SDK-managed public surface on the
+ * consumer's Hono app. Replaces ~140 lines of route-stitching every
+ * starter would otherwise hand-roll.
+ *
+ * Routes (per `collectionRoutes` config):
+ *
+ *   - `GET /`                                  → 302 to `/{canonicalLocale}` (skipped if `homeRenderer` not set)
+ *   - `GET /{locale}`                          → `homeRenderer` (composed; cross-collection)
+ *   - `GET /{locale}/{segment}`                → KV-cached collection list
+ *   - `GET /{locale}/{segment}/{slug}`         → KV-cached entry HTML
+ *   - `GET /{locale}/{segment}/{slug}.md`      → KV-cached entry markdown mirror (AEO)
+ *   - `GET /{locale}/{segment}/{slug}?preview=1` → live render via `previewEntry` use case
+ *   - `GET /{locale}/llms.txt`                 → KV-cached llms.txt
+ *   - `GET /llms.txt`                          → KV-cached root llms.txt
+ *   - `GET /sitemap.xml`                       → composed sitemap
+ *
+ * Slug overrides intercept `(collection, slug)` pairs the consumer
+ * wants to serve from a hand-rolled template (e.g. a contact form
+ * page that needs `<TURNSTILE_SITE_KEY>` injected) rather than a
+ * pre-rendered KV blob. Overrides take precedence over preview /
+ * live-dev / KV.
+ *
+ * `liveDev: true` (typically `env.CLAM_LOCAL_DEV === "1"`) bypasses
+ * KV for entry / list HTML — every request live-renders against
+ * current D1 state via the `RenderEntryLiveUseCase` /
+ * `RenderListLiveUseCase`. `.md` mirrors and `llms.txt` still come
+ * from KV (those are cheap to rebuild via `pnpm fixture`). Don't set
+ * in production — defeats the publish pipeline cache.
+ */
+export interface CollectionRouteConfig {
+  /** Schema name (e.g. `"post-translations"`). */
+  readonly collection: string;
+  /** URL segment beneath `/{locale}/`. Empty string puts entries
+   *  directly under `/{locale}/{slug}` (rare; useful when a single
+   *  collection owns the whole locale tree). */
+  readonly segment: string;
+  /** When true, expose `GET /{locale}/{segment}` for the collection
+   *  list. Default false (most starters use a hand-rolled list page). */
+  readonly listRoute?: boolean;
+  /** When true, expose `GET /{locale}/{segment}/{slug}.md` for the
+   *  AEO markdown mirror. Default true — the publish pipeline already
+   *  writes the mirror to KV; not exposing it would be silent waste. */
+  readonly markdownMirror?: boolean;
+  /** Slug to collapse to `/{locale}` (no trailing segment + slug).
+   *  Used for the home page when it lives in a translations
+   *  collection. */
+  readonly homeSlug?: string;
+}
+
+export type SiteAccessor = (env: unknown) => SiteConfig;
+
+export interface PublicRouteContext {
+  readonly c: Context;
+  readonly runtime: CmsRuntime;
+  readonly site: SiteConfig;
+  readonly locale: string;
+}
+
+export interface SlugOverride {
+  readonly collection: string;
+  readonly slug: string;
+  readonly render: (ctx: PublicRouteContext) => Promise<Response>;
+}
+
+export interface MountPublicRoutesOptions {
+  readonly collectionRoutes: ReadonlyArray<CollectionRouteConfig>;
+  /** Reads the site config off the worker env. The starter typically
+   *  memoizes this. */
+  readonly site: SiteAccessor;
+  /** Renderer for `/{locale}` — typically composes home page +
+   *  recent posts across collections. Optional; without it `/` and
+   *  `/{locale}` are not registered. */
+  readonly homeRenderer?: (ctx: PublicRouteContext) => Promise<Response>;
+  /** Renderer for the locale 404 fallback. Required — every miss
+   *  falls through here. */
+  readonly notFoundRenderer: (ctx: PublicRouteContext) => Promise<Response>;
+  /** Per-(collection, slug) override taking precedence over KV. */
+  readonly slugOverrides?: ReadonlyArray<SlugOverride>;
+  /** Live-dev flag — bypasses KV for entry / list HTML. Default
+   *  false. */
+  readonly liveDev?: boolean;
+}
+
+const HTML_NO_STORE = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "no-store",
+} as const;
+
+const HTML_PUBLIC = {
+  "content-type": "text/html; charset=utf-8",
+} as const;
+
+const MD_PUBLIC = {
+  "content-type": "text/markdown; charset=utf-8",
+} as const;
+
+const TEXT_PUBLIC = {
+  "content-type": "text/plain; charset=utf-8",
+} as const;
+
+const SITEMAP_HEADERS = {
+  "content-type": "application/xml; charset=utf-8",
+  "cache-control": "public, max-age=300, s-maxage=300",
+} as const;
+
+export function mountPublicRoutes(
+  app: Hono,
+  ref: CmsRuntimeRef,
+  options: MountPublicRoutesOptions,
+): void {
+  const liveDev = options.liveDev === true;
+  const overrideIndex = buildOverrideIndex(options.slugOverrides ?? []);
+
+  // Literal root paths register BEFORE any param-catch-all routes —
+  // Hono's trie matches `/llms.txt` against `/:locale` with
+  // `:locale = "llms.txt"` if the literal route registers later.
+  app.get("/llms.txt", async () => {
+    const runtime = await ref.get();
+    return readKvText(runtime.kv, llmsTxtKey(""), TEXT_PUBLIC);
+  });
+
+  app.get("/sitemap.xml", async (c) => {
+    const env = c.env as Record<string, unknown> | undefined;
+    const runtime = await ref.get();
+    const site = options.site(env);
+    if (!runtime.publicPathResolver) {
+      return new Response("sitemap unavailable: no publicPathResolver configured", {
+        status: 500,
+      });
+    }
+    const xml = await runtime.composeSitemap.execute({
+      site,
+      pathFor: (e) => runtime.publicPathResolver!.forEntry(e),
+    });
+    return new Response(xml, { status: 200, headers: SITEMAP_HEADERS });
+  });
+
+  if (options.homeRenderer) {
+    app.get("/", (c) => {
+      const env = c.env as Record<string, unknown> | undefined;
+      const site = options.site(env);
+      const canonical = site.canonicalLocale ?? site.locales[0] ?? "en";
+      return Promise.resolve(c.redirect(`/${toUrlLocale(canonical)}`));
+    });
+    app.get("/:locale", async (c) => {
+      const env = c.env as Record<string, unknown> | undefined;
+      const site = options.site(env);
+      const locale = c.req.param("locale");
+      const runtime = await ref.get();
+      const ctx = buildCtx(c, runtime, site, locale);
+      if (!isKnownLocale(locale, site)) return options.notFoundRenderer(ctx);
+      return options.homeRenderer!(ctx);
+    });
+  }
+
+  app.get("/:locale/llms.txt", async (c) => {
+    const runtime = await ref.get();
+    const locale = c.req.param("locale");
+    return readKvText(runtime.kv, llmsTxtKey(locale), TEXT_PUBLIC);
+  });
+
+  for (const route of options.collectionRoutes) {
+    mountCollection(app, ref, options, route, liveDev, overrideIndex);
+  }
+
+  app.notFound(async (c) => {
+    const env = c.env as Record<string, unknown> | undefined;
+    const site = options.site(env);
+    const locale = inferLocaleFromPath(c.req.path, site);
+    const runtime = await ref.get();
+    return options.notFoundRenderer(buildCtx(c, runtime, site, locale));
+  });
+}
+
+function mountCollection(
+  app: Hono,
+  ref: CmsRuntimeRef,
+  options: MountPublicRoutesOptions,
+  route: CollectionRouteConfig,
+  liveDev: boolean,
+  overrides: ReadonlyMap<string, SlugOverride>,
+): void {
+  const segPath = route.segment ? `/${route.segment}` : "";
+
+  if (route.listRoute) {
+    app.get(`/:locale${segPath}`, async (c) => {
+      const env = c.env as Record<string, unknown> | undefined;
+      const site = options.site(env);
+      const locale = c.req.param("locale");
+      const runtime = await ref.get();
+      const ctx = buildCtx(c, runtime, site, locale);
+      const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
+      if (!isKnownLocale(locale, site)) return notFound();
+      if (liveDev) {
+        const html = await runtime.renderListLive.execute({
+          collection: route.collection,
+          locale,
+          site,
+        });
+        if (html === null) return notFound();
+        return new Response(html, { status: 200, headers: HTML_NO_STORE });
+      }
+      return readKvHtmlOrFallback(runtime.kv, listHtmlKey(route.collection, locale), notFound);
+    });
+  }
+
+  // Register the `.md` mirror BEFORE the bare `:slug` entry route —
+  // Hono matches in registration order, so without this the entry
+  // route swallows `slug = "foo.md"` and 404s on KV lookup.
+  if (route.markdownMirror !== false) {
+    // `[^/]+\\.md` (not `.+\\.md`) so a malicious crawler can't
+    // squat sub-paths like `/en/posts/long/random.md` and burn KV
+    // reads — the `:slug` group stays single-segment.
+    app.get(`/:locale${segPath}/:slug{[^/]+\\.md}`, async (c) => {
+      const runtime = await ref.get();
+      const locale = c.req.param("locale");
+      const slugParam = c.req.param("slug") ?? "";
+      const slug = slugParam.endsWith(".md") ? slugParam.slice(0, -3) : slugParam;
+      const key = entryMarkdownKeyFromParts(route.collection, locale, slug);
+      const body = await runtime.kv.get(key);
+      if (body === null) {
+        return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
+      }
+      return new Response(body, { status: 200, headers: MD_PUBLIC });
+    });
+  }
+
+  app.get(`/:locale${segPath}/:slug`, async (c) => {
+    const env = c.env as Record<string, unknown> | undefined;
+    const site = options.site(env);
+    const locale = c.req.param("locale");
+    const slug = c.req.param("slug");
+    const runtime = await ref.get();
+    const ctx = buildCtx(c, runtime, site, locale);
+    const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
+
+    const override = overrides.get(overrideKey(route.collection, slug));
+    if (override) return override.render(ctx);
+
+    if (c.req.query("preview") === "1") {
+      const html = await runtime.previewEntry.execute({
+        collection: route.collection,
+        slug,
+        locale,
+        site,
+      });
+      if (html === null) return notFound();
+      return new Response(html, { status: 200, headers: HTML_NO_STORE });
+    }
+
+    if (liveDev) {
+      const html = await runtime.renderEntryLive.execute({
+        collection: route.collection,
+        slug,
+        locale,
+        site,
+      });
+      if (html === null) return notFound();
+      return new Response(html, { status: 200, headers: HTML_NO_STORE });
+    }
+
+    const key = entryHtmlKeyFromParts(route.collection, locale, slug);
+    return readKvHtmlOrFallback(runtime.kv, key, notFound);
+  });
+
+  if (route.homeSlug && options.homeRenderer == null) {
+    // Without a homeRenderer the `homeSlug` collapse is a noop —
+    // there's no `/{locale}` route to serve. Surface as a console
+    // warning at boot rather than silently misconfiguring.
+    console.warn(
+      `[clam-cms] collectionRoute "${route.collection}" declares homeSlug="${route.homeSlug}" ` +
+        `but no homeRenderer was passed to mountPublicRoutes — /{locale} will 404.`,
+    );
+  }
+}
+
+async function readKvText(
+  kv: KvCache,
+  key: string,
+  headers: Record<string, string>,
+): Promise<Response> {
+  const body = await kv.get(key);
+  if (body === null) {
+    return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
+  }
+  return new Response(body, { status: 200, headers });
+}
+
+async function readKvHtmlOrFallback(
+  kv: KvCache,
+  key: string,
+  fallback: () => Promise<Response> | Response,
+): Promise<Response> {
+  const body = await kv.get(key);
+  if (body === null) return fallback();
+  return new Response(body, { status: 200, headers: HTML_PUBLIC });
+}
+
+function buildCtx(
+  c: Context,
+  runtime: CmsRuntime,
+  site: SiteConfig,
+  locale: string,
+): PublicRouteContext {
+  return { c, runtime, site, locale };
+}
+
+function buildOverrideIndex(
+  overrides: ReadonlyArray<SlugOverride>,
+): ReadonlyMap<string, SlugOverride> {
+  const map = new Map<string, SlugOverride>();
+  for (const o of overrides) map.set(overrideKey(o.collection, o.slug), o);
+  return map;
+}
+
+function overrideKey(collection: string, slug: string): string {
+  return `${collection} ${slug}`;
+}
+
+export type { ContentState };

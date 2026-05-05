@@ -4,6 +4,7 @@ import type {
   ListTemplate,
   TemplateRegistry,
 } from "../model/TemplateRegistry.js";
+import type { SeoMeta } from "../model/SeoMeta.js";
 
 /**
  * Pure render functions over the consumer-supplied template registry.
@@ -26,6 +27,11 @@ export interface RenderEntryArgs {
   /** Defaults to `<!doctype html>`. Pipelines that want the
    *  upper-case `<!DOCTYPE html>\n` shape pass it explicitly. */
   readonly doctype?: string;
+  /** Optional pre-composed SEO/AEO block. Threaded into the
+   *  `EntryContext.seo` field so templates can emit `<SeoTags
+   *  seo={seo}/>` inside `<head>`. Renderers that skip composition
+   *  leave it undefined — opt-out templates keep working. */
+  readonly seo?: SeoMeta;
 }
 
 /** Returns the full HTML doc (doctype + body) or `null` if no entry
@@ -35,7 +41,10 @@ export function renderEntryHtml(args: RenderEntryArgs): string | null {
     args.entry.collection,
   );
   if (!tpl) return null;
-  return (args.doctype ?? DEFAULT_DOCTYPE) + tpl({ entry: args.entry, site: args.site });
+  return (
+    (args.doctype ?? DEFAULT_DOCTYPE) +
+    tpl({ entry: args.entry, site: args.site, seo: args.seo })
+  );
 }
 
 export interface RenderListArgs {
@@ -45,6 +54,7 @@ export interface RenderListArgs {
   readonly site: SiteConfig;
   readonly templates: TemplateRegistry;
   readonly doctype?: string;
+  readonly seo?: SeoMeta;
 }
 
 /** Returns the full HTML doc or `null` if no list template is
@@ -59,6 +69,7 @@ export function renderListHtml(args: RenderListArgs): string | null {
       locale: args.locale,
       entries: args.entries,
       site: args.site,
+      seo: args.seo,
     })
   );
 }

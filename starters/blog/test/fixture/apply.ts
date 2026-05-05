@@ -26,8 +26,10 @@ import { writeFileSync } from "node:fs";
 import {
   CANONICAL_MIGRATIONS,
   entryHtmlKey,
+  entryMarkdownKey,
   listHtmlKey,
   llmsTxtKey,
+  serializeEntryAsMarkdown,
 } from "@aotter/mantle-runtime";
 import type { Entry, ContentState } from "@aotter/mantle-spec";
 import {
@@ -190,6 +192,8 @@ function buildKvEntries(): readonly KvEntry[] {
         key: entryHtmlKey(entry),
         value: DOCTYPE + postTemplate({ entry, site: FIXTURE_SITE }),
       });
+      const md = serializeEntryAsMarkdown(entry);
+      if (md) out.push({ key: entryMarkdownKey(entry), value: md });
       const list = byLocale.get(tr.locale) ?? [];
       list.push(entry);
       byLocale.set(tr.locale, list);
@@ -241,6 +245,8 @@ function buildKvEntries(): readonly KvEntry[] {
         key: entryHtmlKey(entry),
         value: DOCTYPE + pageTemplate({ entry, site: FIXTURE_SITE }),
       });
+      const md = serializeEntryAsMarkdown(entry);
+      if (md) out.push({ key: entryMarkdownKey(entry), value: md });
     }
   }
   return out;

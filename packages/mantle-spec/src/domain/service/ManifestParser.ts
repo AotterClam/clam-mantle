@@ -112,6 +112,39 @@ export function parseManifests(input: string | readonly string[]): ParseManifest
   return { manifests, diagnostics };
 }
 
+export interface ParseManifestsOrThrowOptions {
+  /** Optional context label woven into the thrown error message
+   *  (e.g. `"starter manifests"`). Helps multi-source consumers
+   *  identify which call site produced the failure. */
+  readonly context?: string;
+}
+
+/**
+ * Convenience wrapper around `parseManifests` for the common case
+ * where any diagnostic is fatal (worker module-init, CLI tools).
+ * Throws an `Error` with one diagnostic per line —
+ * `[CODE] path: message` — when `result.diagnostics.length > 0`.
+ *
+ * Adapters and starters should prefer this over hand-rolling the
+ * "format diagnostics → throw" three-liner so the error envelope
+ * stays consistent across consumers (matters for AI authors reading
+ * boot failures in `wrangler tail`).
+ */
+export function parseManifestsOrThrow(
+  input: string | readonly string[],
+  options?: ParseManifestsOrThrowOptions,
+): readonly Manifest[] {
+  const result = parseManifests(input);
+  if (result.diagnostics.length > 0) {
+    const summary = result.diagnostics
+      .map((d) => `  - [${d.code}] ${d.path}: ${d.message}`)
+      .join("\n");
+    const ctx = options?.context ? ` in ${options.context}` : "";
+    throw new Error(`Manifest parse failed${ctx}:\n${summary}`);
+  }
+  return result.manifests;
+}
+
 function parseOneStream(
   yamlText: string,
   baseDocIndex: number,

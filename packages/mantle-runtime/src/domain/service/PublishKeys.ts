@@ -53,3 +53,31 @@ export function entryPublicPath(entry: Entry): string {
   if (entry.locale) return `/${toUrlLocale(entry.locale)}/${entry.collection}/${slug}`;
   return `/${entry.collection}/${slug}`;
 }
+
+/**
+ * Build the entry HTML key from URL-side parts. The router has the
+ * (collection, locale, slug) tuple from path params; reconstructing
+ * a partial `Entry` just to call `entryHtmlKey` is bug-bait. Use
+ * this helper instead.
+ *
+ * Pass `locale = ""` for non-localized entries (matches publish
+ * pipeline semantic where non-localized entries write to
+ * `entry:html:/{collection}/{slug}`).
+ */
+export function entryHtmlKeyFromParts(
+  collection: string,
+  locale: string,
+  slug: string,
+): string {
+  const urlLocale = locale ? locale.toLowerCase() : "";
+  return `entry:html:${urlLocale}/${collection}/${slug}`;
+}
+
+export function entryMarkdownKeyFromParts(
+  collection: string,
+  locale: string,
+  slug: string,
+): string {
+  const urlLocale = locale ? locale.toLowerCase() : "";
+  return `entry:md:${urlLocale}/${collection}/${slug}`;
+}

@@ -10,7 +10,7 @@ const NAV_HINTS: Record<string, "about" | "contact" | undefined> = {
 };
 
 export function pageTemplate(ctx: EntryContext): string {
-  const { entry, site } = ctx;
+  const { entry, site, seo } = ctx;
   const data = entry.data as {
     slug?: string;
     title?: string;
@@ -28,6 +28,7 @@ export function pageTemplate(ctx: EntryContext): string {
       title={`${title} — ${site.brand}`}
       description={data.intro ?? site.description}
       current={current}
+      seo={seo}
     >
       <article>
         <header class="post-meta">

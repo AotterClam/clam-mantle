@@ -11,6 +11,7 @@ export * from "./EntryRow.js";
 export * from "./User.js";
 export * from "./Staff.js";
 export * from "./HandlerContext.js";
+export type { SeoMeta } from "./SeoMeta.js";
 export {
   TemplateRegistry,
   type EntryContext,

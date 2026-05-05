@@ -1,23 +1,20 @@
-import type { Entry } from "@aotter/mantle-spec";
+import { createPublicPathResolver, type PublicPathResolver } from "@aotter/mantle-runtime";
 
 /**
- * Single source of truth for the public-route shape of each storage
- * collection. Hono routes (`src/index.ts`) and the sitemap pathFor
- * mapper read from here so a rename / restructure stays in one place.
+ * The starter's collection→URL routing table. Single source of truth
+ * for both the request router (`mountPublicRoutes`) and outbound URL
+ * emission (sitemap, hreflang, SEO canonical) — change a segment here
+ * and every surface follows.
  *
- * Returning `null` means "this collection has no public URL" — used
- * for the language-neutral parents (`posts`, `pages`) which only
- * surface via their per-locale child collections.
+ * Returning `null` (segment: null) for a collection means "this
+ * collection has no public URL" — used for the language-neutral
+ * parents (`posts`, `pages`) which only surface via their per-locale
+ * children. Schemas without an entry here keep working; they just
+ * don't appear in the sitemap or get hreflang siblings.
  */
-export function publicPathFor(entry: Entry): string | null {
-  const data = entry.data as { slug?: string };
-  const slug = data.slug;
-  const locale = entry.locale?.toLowerCase();
-  if (!slug || !locale) return null;
-  if (entry.collection === "post-translations") return `/${locale}/posts/${slug}`;
-  if (entry.collection === "page-translations") {
-    if (slug === "home") return `/${locale}`;
-    return `/${locale}/pages/${slug}`;
-  }
-  return null;
-}
+export const PUBLIC_PATH_RESOLVER: PublicPathResolver = createPublicPathResolver({
+  collectionRoutes: {
+    "post-translations": { segment: "posts" },
+    "page-translations": { segment: "pages", homeSlug: "home" },
+  },
+});

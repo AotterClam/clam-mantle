@@ -5,7 +5,7 @@ import { Layout } from "./components/Layout.js";
 import { isoDate, renderMarkdown } from "./utils.js";
 
 export function postTemplate(ctx: EntryContext): string {
-  const { entry, site } = ctx;
+  const { entry, site, seo } = ctx;
   const data = entry.data as {
     slug?: string;
     title?: string;
@@ -24,6 +24,7 @@ export function postTemplate(ctx: EntryContext): string {
       description={site.description}
       ogImage={data.coverUrl}
       current="posts"
+      seo={seo}
     >
       <article>
         <header class="post-meta">
