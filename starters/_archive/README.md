@@ -22,20 +22,31 @@ do.
 
 ## Re-using a snapshot
 
+The snapshot's `package.json` declares its SDK dependencies as
+`workspace:*`. That works as-is **inside this monorepo** (back into
+`starters/` under a fresh name). For use **outside the monorepo**, swap
+those `workspace:*` entries to one of:
+
+- `"@aotter/mantle-spec": "^<version>"` — once the SDK is published
+  to npm; pick the version closest to the snapshot date.
+- `"@aotter/mantle-spec": "file:<relative-path-to-checkout>"` —
+  while iterating against a local SDK checkout.
+
 ```bash
-# 1. Copy the snapshot somewhere outside the monorepo (or back into
-#    starters/, with a fresh name).
-cp -r starters/_archive/blog-editorial-2026-05-05 my-editorial-blog
+# Inside-the-monorepo reuse (workspace:* keeps working):
+cp -r starters/_archive/blog-editorial-2026-05-05 starters/blog-editorial
+# Edit starters/blog-editorial/package.json `name` to a fresh value
+# (e.g. @aotter/starter-blog-editorial).
 
-# 2. Re-attach SDK deps. The package.json's `file:` paths inside the
-#    snapshot point at the SDK version current at snapshot time; rewrite
-#    them to your target version.
-cd my-editorial-blog
-sed -i '' 's|file:\.\./\.\./packages/|<your-target-paths>|g' package.json
-
-# 3. Apply any SDK API migrations the changelog called out since the
-#    snapshot date.
+# Outside-the-monorepo reuse (rewrite workspace:* deps):
+cp -r starters/_archive/blog-editorial-2026-05-05 ~/my-editorial-blog
+cd ~/my-editorial-blog
+# Then hand-edit package.json to replace `workspace:*` with whatever
+# resolution mode applies.
 ```
+
+After moving, apply any SDK API migrations the changelog called out
+since the snapshot date.
 
 Snapshots are **read-only by convention**. Do not add commits that edit
 snapshot directories — fork them out of the archive instead.
