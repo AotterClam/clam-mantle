@@ -23,7 +23,8 @@ import { homeTemplate, notFoundTemplate } from "./templates/index.js";
  *   GET  /{locale}/posts/{slug}  post entry HTML
  *   GET  /{locale}/pages/{slug}  static page entry HTML (about, contact, …)
  *   GET  /{locale}/llms.txt      per-locale llms.txt
- *   GET  /llms.txt               root llms.txt
+ *   GET  /llms.txt               root llms.txt (non-localized aggregate)
+ *   GET  /sitemap.xml            cross-locale + cross-collection urlset
  *   POST /api/contact            builtin Procedure (CAPTCHA-gated)
  *   GET  /api/views/<name>       per-View public REST (ADR-0012)
  *   ALL  /mcp                    MCP JSON-RPC dispatcher
@@ -53,6 +54,35 @@ function getApp(env: Env): { app: Hono; cms: CmsRuntimeRef } {
   // otherwise Hono's trie matches `/llms.txt` as `:locale = "llms.txt"`
   // and the locale check 404s before the literal handler ever sees it.
   app.get("/llms.txt", async () => readKv(env, `llms:root`, "text/plain"));
+  app.get("/sitemap.xml", async () => {
+    const runtime = await cms.get();
+    const xml = await runtime.composeSitemap.execute({
+      site: siteConfigFromEnv(env),
+      // Map storage shape (post-translations / page-translations) onto
+      // the starter's public routes (/{locale}/posts/{slug}, etc.).
+      // Skip the language-neutral parents (`posts`, `pages`) — they
+      // never have a public URL of their own.
+      pathFor: (e) => {
+        const data = e.data as { slug?: string };
+        const slug = data.slug;
+        const locale = e.locale?.toLowerCase();
+        if (!slug || !locale) return null;
+        if (e.collection === "post-translations") return `/${locale}/posts/${slug}`;
+        if (e.collection === "page-translations") {
+          if (slug === "home") return `/${locale}`;
+          return `/${locale}/pages/${slug}`;
+        }
+        return null;
+      },
+    });
+    return new Response(xml, {
+      status: 200,
+      headers: {
+        "content-type": "application/xml; charset=utf-8",
+        "cache-control": "public, max-age=300, s-maxage=300",
+      },
+    });
+  });
 
   app.get("/:locale", async (c) => {
     const { locale } = c.req.param();

@@ -18,10 +18,9 @@ import {
   listHtmlKey,
   llmsTxtKey,
 } from "../../domain/service/PublishKeys.js";
-import {
-  serializeEntryAsMarkdown,
-  serializeLlmsTxt,
-} from "../../domain/service/MarkdownSerializer.js";
+import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
+import { serializeEntryAsMarkdown } from "../../domain/service/MarkdownSerializer.js";
+import { ComposeLlmsTxtUseCase } from "../../usecase/render/ComposeLlmsTxtUseCase.js";
 
 /**
  * `HtmlPublishOrchestrator` — the publish pipeline. Renders + writes
@@ -29,24 +28,23 @@ import {
  *   1. Entry HTML (if a template is registered for the collection)
  *   2. Entry `.md` mirror (if the entry has a `content` field)
  *   3. Collection list HTML for the entry's locale
- *   4. `/llms.txt` for the entry's locale
+ *   4. `/llms.txt` for the entry's locale (composed by ComposeLlmsTxtUseCase)
  *
  * Idempotent — invoking twice with the same entry id is safe; KV
  * writes overwrite. Non-localized entries publish under empty-string
  * locale.
- *
- * Lives in `infrastructure/render/` because it orchestrates two
- * adapters (`DatabaseDriver`-backed read of published entries +
- * `KvCache` writes). Pure formatting (markdown serialization, key
- * derivation) lives in `domain/service/`.
  */
 const DEFAULT_DOCTYPE = "<!DOCTYPE html>\n";
 
 export class HtmlPublishOrchestrator implements PublishOrchestrator {
+  private readonly composeLlmsTxt: ComposeLlmsTxtUseCase;
+
   constructor(
     private readonly db: DatabaseDriver,
     private readonly kv: KvCache,
-  ) {}
+  ) {
+    this.composeLlmsTxt = new ComposeLlmsTxtUseCase(db);
+  }
 
   async publish(request: PublishEntryRequest): Promise<void> {
     const entry = await readEntry(this.db, request.entryId);
@@ -67,8 +65,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
 
     await Promise.all([
       this.renderEntry(entry, request.site, request.templates, doctype),
-      this.renderList(this.db, entry.collection, indexLocale, request.site, request.templates, doctype),
-      this.renderLlmsTxt(this.db, indexLocale, request.site),
+      this.renderList(entry.collection, indexLocale, request.site, request.templates, doctype),
+      this.renderLlmsTxt(indexLocale, request.site),
     ]);
   }
 
@@ -90,7 +88,6 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
   }
 
   private async renderList(
-    db: DatabaseDriver,
     collection: string,
     locale: string | null,
     site: SiteConfig,
@@ -99,31 +96,21 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
   ): Promise<void> {
     const tpl = templates.getListTemplate(collection);
     if (!tpl) return;
-    const entries = await readPublishedEntries(db, { locale, collection });
-    const html = doctype + tpl({
-      collection,
-      locale: locale ?? "",
-      entries,
-      site,
-    });
+    const entries = await readPublishedEntries(this.db, { locale, collection });
+    const html =
+      doctype +
+      tpl({
+        collection,
+        locale: locale ?? "",
+        entries,
+        site,
+      });
     await this.kv.put(listHtmlKey(collection, locale ?? ""), html);
   }
 
-  private async renderLlmsTxt(
-    db: DatabaseDriver,
-    locale: string | null,
-    site: SiteConfig,
-  ): Promise<void> {
-    const allLocaleEntries = await readPublishedEntries(db, { locale });
-    const grouped = groupBy(allLocaleEntries, (e) => e.collection);
-    await this.kv.put(
-      llmsTxtKey(locale ?? ""),
-      serializeLlmsTxt({
-        site,
-        locale: locale ?? "",
-        entriesByCollection: grouped,
-      }),
-    );
+  private async renderLlmsTxt(locale: string | null, site: SiteConfig): Promise<void> {
+    const body = await this.composeLlmsTxt.execute({ site, locale });
+    await this.kv.put(llmsTxtKey(locale ?? ""), body);
   }
 }
 
@@ -148,40 +135,6 @@ async function readEntry(db: DatabaseDriver, id: string): Promise<Entry | null> 
   return row ? rowToEntry(row) : null;
 }
 
-/**
- * Locale filter semantics:
- *   - string  → entries where `data.locale = that locale`
- *   - null    → non-localized entries only (`data.locale IS NULL`)
- *   - omitted → no locale filter
- *
- * Distinguishing `null` from omitted matters: publishing a non-
- * localized entry must NOT pull every locale's content into its
- * `llms.txt` — that would overwrite per-locale indexes with cross-
- * locale soup.
- */
-async function readPublishedEntries(
-  db: DatabaseDriver,
-  filter: { locale?: string | null; collection?: string },
-): Promise<Entry[]> {
-  const conditions: string[] = [`status = 'published'`];
-  const binds: unknown[] = [];
-  if (filter.locale === null) {
-    conditions.push(`json_extract(data, '$.locale') IS NULL`);
-  } else if (typeof filter.locale === "string") {
-    conditions.push(`json_extract(data, '$.locale') = ?`);
-    binds.push(filter.locale);
-  }
-  if (filter.collection) {
-    conditions.push(`collection = ?`);
-    binds.push(filter.collection);
-  }
-  const sql =
-    `SELECT id, collection, status, version, data, created_at, updated_at` +
-    ` FROM entries WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC`;
-  const rows = await db.prepare(sql).bind(...binds).all<EntryDbRow>();
-  return rows.map(rowToEntry);
-}
-
 function rowToEntry(row: EntryDbRow): Entry {
   const data = JSON.parse(row.data) as Record<string, unknown>;
   const dataLocale = data["locale"];
@@ -195,15 +148,4 @@ function rowToEntry(row: EntryDbRow): Entry {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-function groupBy<T, K>(items: readonly T[], keyOf: (item: T) => K): Map<K, T[]> {
-  const out = new Map<K, T[]>();
-  for (const item of items) {
-    const k = keyOf(item);
-    const arr = out.get(k);
-    if (arr) arr.push(item);
-    else out.set(k, [item]);
-  }
-  return out;
 }

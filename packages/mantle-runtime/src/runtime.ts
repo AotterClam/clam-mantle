@@ -44,6 +44,10 @@ import {
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
 import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
+import {
+  ComposeLlmsTxtUseCase,
+  ComposeSitemapUseCase,
+} from "./usecase/render/index.js";
 
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
 import { TriggerIndex } from "./domain/service/TriggerIndex.js";
@@ -106,6 +110,8 @@ export interface CmsRuntime {
   readonly deleteEntry: DeleteEntryUseCase;
   readonly invokeProcedure: InvokeProcedureUseCase;
   readonly executeView: ExecuteViewUseCase;
+  readonly composeLlmsTxt: ComposeLlmsTxtUseCase;
+  readonly composeSitemap: ComposeSitemapUseCase;
   readonly validateBoot: ValidateBootUseCase;
   readonly publishOrchestrator: PublishOrchestrator;
   readonly siteConfig: SiteConfigRepository;
@@ -190,6 +196,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const archive = new ArchiveUseCase(entries, schemasByName, clock);
   const deleteEntry = new DeleteEntryUseCase(entries);
   const executeView = new ExecuteViewUseCase(args.db);
+  const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);
+  const composeSitemap = new ComposeSitemapUseCase(args.db);
   const validateBoot = new ValidateBootUseCase();
 
   return {
@@ -209,6 +217,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     deleteEntry,
     invokeProcedure,
     executeView,
+    composeLlmsTxt,
+    composeSitemap,
     validateBoot,
     publishOrchestrator,
     siteConfig,
