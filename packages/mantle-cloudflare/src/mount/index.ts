@@ -9,4 +9,4 @@ export {
   type SlugOverride,
 } from "./mountPublicRoutes.js";
 export { createCmsRef } from "./bootRuntimeOnce.js";
-export type { CmsConfig } from "./cmsConfig.js";
+export type { AdminAuthConfig, CmsConfig } from "./cmsConfig.js";

@@ -29,6 +29,7 @@
   "dependencies": {
     "@aotter/mantle-spec": "workspace:*",
     "@aotter/mantle-runtime": "workspace:*",
+    "@cloudflare/workers-oauth-provider": "^0.4.0",
     "hono": "^4.6.20"
   },
   "devDependencies": {

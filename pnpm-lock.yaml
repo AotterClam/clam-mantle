@@ -18,6 +18,9 @@ importers:
       '@aotter/mantle-spec':
         specifier: workspace:*
         version: link:../mantle-spec
+      '@cloudflare/workers-oauth-provider':
+        specifier: ^0.4.0
+        version: 0.4.0
       hono:
         specifier: ^4.6.20
         version: 4.12.16
@@ -190,6 +193,9 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-oauth-provider@0.4.0':
+    resolution: {integrity: sha512-UtbV8hjC2NloB+Ds6J6v/9HiG8rx8MbdeYGCyFwOACT5vANWzDL6SKo3W5UZymsXiameAgC7jAmtUx4cc+Qpaw==}
 
   '@cloudflare/workers-types@4.20260504.1':
     resolution: {integrity: sha512-x/7BzBXSGBQS0wHdaY0/1bcaRszkkhCjTc5maQvNSHu/pTVdBF2f/L41W8pRSJJSbLL80ynW7O923O7v3PaLtg==}
@@ -1271,6 +1277,8 @@ snapshots:
 
   '@cloudflare/workerd-windows-64@1.20250718.0':
     optional: true
+
+  '@cloudflare/workers-oauth-provider@0.4.0': {}
 
   '@cloudflare/workers-types@4.20260504.1': {}
 
