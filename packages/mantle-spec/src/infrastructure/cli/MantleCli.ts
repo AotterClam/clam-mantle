@@ -2,13 +2,12 @@
 /**
  * `mantle` CLI dispatcher. Subcommands route to their implementing
  * module under `infrastructure/cli/`.
- *
- * v0.1.0 ships `validate` only. OpenAPI emission lives in this package
- * but is not wired to a CLI subcommand; consumers can invoke it via the
- * library API.
  */
 import { argv, exit, stderr, stdout } from "node:process";
 import { run as runValidate } from "./ValidateCommand.js";
+import { run as runIntrospect } from "./IntrospectCommand.js";
+import { run as runEmitOpenapi } from "./EmitOpenapiCommand.js";
+import { run as runEmitTypes } from "./EmitTypesCommand.js";
 
 async function main(): Promise<number> {
   const sub = argv[2];
@@ -18,7 +17,10 @@ async function main(): Promise<number> {
 Usage: mantle <subcommand> [options]
 
 Subcommands:
-  validate   Static manifest + handler-source validation (Loop 1)
+  validate       Static manifest + handler-source validation (Loop 1)
+  introspect     Dump parsed manifest tree as JSON
+  emit-openapi   Emit OpenAPI 3.1 from HTTP Triggers + View REST routes
+  emit-types     Emit TypeScript .d.ts from Schemas / Procedures / Views
 
 Run \`mantle <subcommand> --help\` for subcommand details.
 `);
@@ -30,6 +32,12 @@ Run \`mantle <subcommand> --help\` for subcommand details.
   switch (sub) {
     case "validate":
       return runValidate(rest);
+    case "introspect":
+      return runIntrospect(rest);
+    case "emit-openapi":
+      return runEmitOpenapi(rest);
+    case "emit-types":
+      return runEmitTypes(rest);
     default:
       stderr.write(`Unknown subcommand: ${sub}\n`);
       return 2;

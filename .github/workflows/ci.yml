@@ -40,6 +40,13 @@ jobs:
           pnpm typecheck
           pnpm -C starters/blog typecheck
 
+      - name: Validate starter manifests (Loop 1 — `mantle validate`)
+        # Runs the spec CLI against starters/blog so any v0.1 grammar
+        # regression (DRAFT key creep, dangling Trigger.target, View
+        # filter referencing unknown fields, etc.) breaks the build
+        # before the tests do.
+        run: pnpm -C starters/blog validate
+
       - run: pnpm test
 
   # Heavier integration smoke. Runs wrangler dev against the starter,

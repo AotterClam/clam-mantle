@@ -1,16 +1,12 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { join, resolve, relative } from "node:path";
 import { exit, stdout, stderr, cwd } from "node:process";
-import {
-  parseManifests,
-  ManifestParseError,
-} from "../../domain/service/ManifestParser.js";
-import type { Manifest } from "../../domain/model/ManifestGrammar.js";
 import {
   validateDiagnostic,
   type Diagnostic,
 } from "../../kernel/diagnostic.js";
 import { ValidateManifestsUseCase } from "../../usecase/ValidateManifestsUseCase.js";
+import { loadManifestsFromRoot } from "./loadManifests.js";
 
 /**
  * `mantle validate` — Loop 1 of the SDK authoring contract
@@ -105,7 +101,7 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
   const sourceRoot = args.source ? resolve(cwd(), args.source) : null;
 
   // 1. Load manifests.
-  const { manifests, parseErrors, filePaths } = await loadManifests(manifestsRoot);
+  const { manifests, parseErrors, filePaths } = await loadManifestsFromRoot(args.manifests);
 
   // 2. Concatenate handler source (if any).
   let handlerSource: string | undefined;
@@ -155,98 +151,6 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
   }
 
   return errorCount > 0 ? 1 : 0;
-}
-
-async function loadManifests(root: string): Promise<{
-  manifests: Manifest[];
-  parseErrors: Diagnostic[];
-  filePaths: Map<string, { file: string; docIndex: number }>;
-}> {
-  const manifests: Manifest[] = [];
-  const parseErrors: Diagnostic[] = [];
-  const filePaths = new Map<string, { file: string; docIndex: number }>();
-
-  let entries: string[];
-  try {
-    entries = await collectYamlFiles(root);
-  } catch (err) {
-    parseErrors.push(
-      validateDiagnostic({
-        code: "MANIFEST_ROOT_NOT_FOUND",
-        severity: "error",
-        path: root,
-        expected: "an existing directory containing *.yaml manifest files",
-        message: `Could not read manifest root ${root}: ${err instanceof Error ? err.message : String(err)}`,
-      }),
-    );
-    return { manifests, parseErrors, filePaths };
-  }
-
-  for (const file of entries) {
-    let text: string;
-    try {
-      text = await readFile(file, "utf8");
-    } catch (err) {
-      parseErrors.push(
-        validateDiagnostic({
-          code: "MANIFEST_READ_FAILED",
-          severity: "error",
-          path: file,
-          message: `Failed to read ${file}: ${err instanceof Error ? err.message : String(err)}`,
-        }),
-      );
-      continue;
-    }
-    try {
-      const parsed = parseManifests(text);
-      parseErrors.push(...parsed.diagnostics);
-      parsed.manifests.forEach((m, i) => {
-        manifests.push(m);
-        filePaths.set(`${m.kind}/${m.metadata.name}`, { file, docIndex: i });
-      });
-    } catch (err) {
-      const idx = err instanceof ManifestParseError ? err.docIndex : undefined;
-      const pointer = err instanceof ManifestParseError ? err.pointer : undefined;
-      const path =
-        idx != null
-          ? pointer
-            ? `${file}#/${idx}${pointer}`
-            : `${file}#/${idx}`
-          : file;
-      parseErrors.push(
-        validateDiagnostic({
-          code: "INVALID_MANIFEST_ENVELOPE",
-          severity: "error",
-          path,
-          message: err instanceof Error ? err.message : String(err),
-        }),
-      );
-    }
-  }
-
-  return { manifests, parseErrors, filePaths };
-}
-
-async function collectYamlFiles(root: string): Promise<string[]> {
-  const out: string[] = [];
-  async function walk(dir: string): Promise<void> {
-    const items = await readdir(dir, { withFileTypes: true });
-    for (const it of items) {
-      const full = join(dir, it.name);
-      if (it.isDirectory()) {
-        await walk(full);
-      } else if (it.isFile() && (it.name.endsWith(".yaml") || it.name.endsWith(".yml"))) {
-        out.push(full);
-      }
-    }
-  }
-  const s = await stat(root);
-  if (!s.isDirectory()) {
-    throw new Error(`${root} is not a directory`);
-  }
-  await walk(root);
-  out.sort(); // stable ordering for diagnostic reproducibility
-  return out;
 }
 
 async function loadHandlerSource(root: string): Promise<string> {
