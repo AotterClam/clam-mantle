@@ -16,9 +16,8 @@ describe("UserRepository.upsertByGithub", () => {
     const repo = new InMemoryUserRepository();
     const id = await repo.upsertByGithub(ALICE, 1000);
     const user = await repo.findById(id);
-    expect(user?.githubId).toBe(1001);
-    expect(user?.githubLogin).toBe("alice");
     expect(user?.email).toBe("alice@example.com");
+    expect(user?.name).toBe("Alice");
     expect(user?.createdAt).toBe(1000);
   });
 
@@ -29,12 +28,14 @@ describe("UserRepository.upsertByGithub", () => {
     expect(id1).toBe(id2);
   });
 
-  it("updates github_login on rename", async () => {
+  it("updates name and email on subsequent sign-in", async () => {
     const repo = new InMemoryUserRepository();
     const id = await repo.upsertByGithub(ALICE, 1000);
-    await repo.upsertByGithub({ ...ALICE, login: "alice-renamed" }, 2000);
+    await repo.upsertByGithub({ ...ALICE, email: "new@example.com", name: "Alice B" }, 2000);
     const user = await repo.findById(id);
-    expect(user?.githubLogin).toBe("alice-renamed");
+    expect(user?.email).toBe("new@example.com");
+    expect(user?.name).toBe("Alice B");
+    expect(user?.updatedAt).toBe(2000);
   });
 
   it("treats two different github_ids as two users", async () => {
@@ -93,7 +94,7 @@ describe("StaffRepository.ensureBootstrapOwner", () => {
       adminGithubLogin: "ALICE",
       now: 1000,
     });
-    expect((await repo.listAll())).toHaveLength(1);
+    expect(await repo.listAll()).toHaveLength(1);
   });
 
   it("no-op when login does not match ADMIN_GITHUB_LOGIN", async () => {

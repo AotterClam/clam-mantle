@@ -1,9 +1,5 @@
 import { isStaffRole, type StaffRole } from "@aotter/mantle-spec";
-import type {
-  BootstrapOwnerOpts,
-  StaffListEntry,
-  StaffRepository,
-} from "@aotter/mantle-runtime";
+import type { BootstrapOwnerOpts, StaffListEntry, StaffRepository } from "@aotter/mantle-runtime";
 
 export class D1StaffRepository implements StaffRepository {
   constructor(private readonly db: D1Database) {}
@@ -12,8 +8,10 @@ export class D1StaffRepository implements StaffRepository {
     const rs = await this.db
       .prepare(
         `SELECT s.user_id, s.role, s.granted_by, s.granted_at,
-                u.email, u.name, u.github_login
-         FROM staff s JOIN users u ON u.id = s.user_id
+                u.email, u.name, sl.login AS github_login
+         FROM staff s
+         JOIN users u ON u.id = s.user_id
+         LEFT JOIN social_logins sl ON sl.user_id = s.user_id AND sl.provider = 'github'
          ORDER BY s.granted_at`,
       )
       .all<{
@@ -32,7 +30,7 @@ export class D1StaffRepository implements StaffRepository {
         role: r.role as StaffRole,
         grantedBy: r.granted_by,
         grantedAt: r.granted_at,
-        email: r.email ?? "",
+        email: r.email,
         name: r.name,
         githubLogin: r.github_login,
       }));
@@ -42,14 +40,13 @@ export class D1StaffRepository implements StaffRepository {
     const { userId, githubLogin, adminGithubLogin, now } = opts;
     if (!adminGithubLogin) return;
     if (githubLogin.toLowerCase() !== adminGithubLogin.toLowerCase()) return;
-    const existing = await this.db
-      .prepare(`SELECT 1 FROM staff LIMIT 1`)
-      .first();
-    if (existing) return;
+    // WHERE NOT EXISTS makes the guard atomic — no separate SELECT round trip,
+    // and no TOCTOU window between checking "table empty" and inserting.
     await this.db
       .prepare(
-        `INSERT OR IGNORE INTO staff (user_id, role, granted_by, granted_at)
-         VALUES (?, 'owner', ?, ?)`,
+        `INSERT INTO staff (user_id, role, granted_by, granted_at)
+         SELECT ?, 'owner', ?, ?
+         WHERE NOT EXISTS (SELECT 1 FROM staff)`,
       )
       .bind(userId, userId, now)
       .run();
