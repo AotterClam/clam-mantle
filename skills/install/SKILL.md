@@ -8,7 +8,25 @@ applies_to: mantle@v0.1.0
 
 # Install a mantle project
 
-You (the agent) are bootstrapping a new mantle consumer for the user. Read this entire file before touching the filesystem. The reference starter is `starters/blog` in <https://github.com/aotter/mantle>; it deploys to Cloudflare Workers + D1 + KV.
+You (the agent) are bootstrapping a new mantle consumer for the user. Read this entire file before touching the filesystem. mantle ships two starters in <https://github.com/aotter/mantle>; both deploy to Cloudflare Workers + D1 + KV.
+
+## Pick a starter
+
+Ask the user which surface they need. Don't assume.
+
+| Need | Starter | What ships |
+|---|---|---|
+| Working public site out of the box (HTML chrome, theme stack, i18n, contact form, sitemap, `.md` mirror, llms.txt, SEO + AEO meta) | **`starters/blog`** | Hono server-rendered, neutral baseline + L1–L4 customization stack. Covers most "I want a blog / marketing site / docs landing" requests. |
+| API + MCP backend only (no public HTML); you have your own frontend (Next.js, Astro, SvelteKit, native iOS/Android, partner integration) | **`starters/blank`** | Same SDK, no UI deps, no theme stack. Just `/api/views/*`, `/api/<procedure>`, `/mcp`, `/oauth/*`. |
+
+**Decision shortcuts:**
+
+- If user says "blog" / "marketing site" / "docs site" / "landing page" → `starters/blog`.
+- If user already has a frontend project and asks for "headless CMS" / "API for content" / "backend for my Next.js app" → `starters/blank`.
+- If the user mentions Astro specifically: `starters/astro` is on the v0.1.x roadmap (issue [#2](https://github.com/aotter/mantle/issues/2)). For now use `starters/blank` and have Astro consume `/api/views/*`.
+- If unsure, default to `starters/blog` — easier to grow into; the user can drop `mountPublicRoutes` later if they want headless. Going the other direction (blank → blog) requires re-introducing all the chrome.
+
+The rest of this SKILL is starter-aware: most steps apply to both; sections labeled **(blog only)** or **(blank only)** apply to one starter.
 
 ## Preflight
 
@@ -34,13 +52,14 @@ Confirm with the user **before** writing code:
 ### 1. Clone the starter into the user's repo
 
 ```bash
-# Either clone the upstream and rename:
+# Either clone the upstream and copy your chosen starter:
 git clone --depth 1 https://github.com/aotter/mantle.git .mantle-tmp
-cp -R .mantle-tmp/starters/blog/. .
+cp -R .mantle-tmp/starters/<blog-or-blank>/. .
 rm -rf .mantle-tmp
 
 # Or, when published as a template:
 # pnpm dlx @aotter/create-blog <name>
+# pnpm dlx @aotter/create-blank <name>
 ```
 
 ### 2. Configure for the user's site
@@ -68,16 +87,27 @@ Edit `wrangler.toml`:
 ```bash
 pnpm install
 pnpm validate          # `mantle validate`. Exits 0 with 0 errors.
-pnpm fixture           # seeds local D1 + KV with example content
 pnpm dev               # wrangler dev on :8787
 ```
 
-Visit:
+**(blog only)** Seed example content into local D1 + KV:
+
+```bash
+pnpm fixture
+```
+
+Visit (blog):
 
 - `http://localhost:8787/` (302 → `/{canonicalLocale}`)
 - `http://localhost:8787/{locale}/posts/hello-world`
 - `http://localhost:8787/api/views/recent-posts`
 - `http://localhost:8787/sitemap.xml`
+
+Visit (blank):
+
+- `http://localhost:8787/` (404 — by design; no public HTML routes)
+- `http://localhost:8787/api/views/published-notes` (returns `{ok:true, data:{rows:[]}}` — empty until you create entries)
+- `http://localhost:8787/mcp` (returns `unauthorized` without OAuth bearer; the MCP DCR flow is for client tools)
 
 ### 4. Stamp generated artifacts (optional but recommended)
 
@@ -112,6 +142,14 @@ Add `mantle-types.d.ts` to `tsconfig.json` `include` so handler files get typed.
 
 Tell the user three things:
 
-1. The dev server URL + the four routes worth opening.
+1. The dev server URL + the routes worth opening (different list per starter — see "Visit" above).
 2. The contents of `openapi.json` if they emitted it (1-line summary: "your API has N operations across M paths").
-3. The next typical action: write a Schema for whatever content they actually want, then re-validate. Pointer to `extend` SKILL.
+3. The next typical action — depends on starter:
+   - **blog**: customize the design (`customize-design` SKILL — palette, fonts, header, copy) OR add a Schema for real content (`extend` SKILL).
+   - **blank**: add a Schema for real content (`extend` SKILL), wire your frontend to `/api/views/<name>`.
+
+## See also
+
+- [`customize-design`](../customize-design/SKILL.md) — L1–L4 theme customization for `starters/blog`.
+- [`extend`](../extend/SKILL.md) — adding Schemas / Views / Procedures / Triggers to either starter.
+- [`provision`](../provision/SKILL.md) — production deploy (real OAuth, secrets, prod D1/KV, custom domain).
