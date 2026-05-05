@@ -13,6 +13,7 @@ Records of *why* mantle ended up shaped this way. The numbering preserves POC AD
 | [0009](0009-consumer-supplied-manifests.md) | Consumers ship their own manifest YAML. SDK parses + caches; never embeds. | Accepted (refreshed) |
 | [0010](0010-locale-and-translates.md) | Locale 3-layer (manifest / D1 site_config / data field) + translates pattern. Boot decoupled from `site_config` (issue #60 fix). | Accepted (refreshed) |
 | [0011](0011-adapter-port-spec.md) | Adapter port spec. 5 ports (DB / KV / Session / Assets / OAuth) defined in `mantle-runtime`. CF impl + Netlify stub. | Accepted (new) |
+| [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
 
 ## Reading order
 
@@ -44,7 +45,7 @@ The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accum
 
 ## Contributing a new ADR
 
-1. Pick the next number (currently 0012).
+1. Pick the next number (currently 0013).
 2. File: `docs/adr/<NNNN>-<kebab-title>.md`.
 3. Sections: Status, Date, Context, Decision, Consequences, Alternatives, How to apply, Implementation status.
 4. Link from this README's table.

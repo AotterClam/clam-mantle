@@ -90,7 +90,7 @@ by `phase` (this-loop-only handling). Concrete examples:
 | `HANDLER_NOT_REGISTERED` | `validate`, `boot`, `runtime` | textual grep miss (warning, validate); registry lookup miss (error, boot); dispatch attempt miss (error, runtime, defense-in-depth) |
 | `TRIGGER_TARGET_PROCEDURE_UNKNOWN` | `validate`, `boot` | dangling reference caught by either loop |
 | `TRIGGER_PATH_COLLISION` | `validate`, `boot` | two http Triggers on same method+path |
-| `NOT_FOUND` | `test`, `runtime` | unknown name in queryView / GET /api/v1/v/X |
+| `NOT_FOUND` | `test`, `runtime` | unknown name in queryView / GET /api/views/X |
 | `INPUT_VALIDATION_FAILED` | `runtime`, `test` | zod validation fail (test harness shares the dispatcher path) |
 
 Codes that are loop-exclusive simply never appear with another

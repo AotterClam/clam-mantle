@@ -8,10 +8,13 @@ import {
   API_VERSION,
   BUILTIN_OPS,
   LIFECYCLE_HOOKS,
+  VIEW_PARAMS_RESERVED,
+  isParamRef,
   type AuthPredicate,
   type BuiltinOp,
   type FilterAst,
   type HttpMethod,
+  type JsonSchema,
   type LifecycleHook,
   type Manifest,
   type ManifestKind,
@@ -292,10 +295,14 @@ function validateViewSpec(m: ViewManifest, idx: number): ViewManifest {
   if (typeof s["from"] !== "string" || (s["from"] as string).length === 0) {
     throw new ManifestParseError("View.spec.from is required (non-empty string)", idx, "/spec/from");
   }
-  if ("filter" in s && s["filter"] != null) {
-    validateFilterAst(s["filter"], idx, "View.spec.filter");
+  let paramSchema: JsonSchema | undefined;
+  if ("params" in s && s["params"] != null) {
+    paramSchema = validateViewParams(s["params"], idx);
   }
-  for (const draft of ["recursive", "params", "gatedBy", "join", "policies"] as const) {
+  if ("filter" in s && s["filter"] != null) {
+    validateFilterAst(s["filter"], idx, "View.spec.filter", "/spec/filter", paramSchema);
+  }
+  for (const draft of ["recursive", "gatedBy", "join", "policies"] as const) {
     if (draft in s) {
       throw new ManifestParseError(
         `View.spec.${draft} is DRAFT (see ADR-0001 § "What's DRAFT" / View); not supported in v0.1`,
@@ -308,9 +315,56 @@ function validateViewSpec(m: ViewManifest, idx: number): ViewManifest {
   return m;
 }
 
-function validateFilterAst(node: unknown, idx: number, path: string): void {
+function validateViewParams(raw: unknown, idx: number): JsonSchema {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new ManifestParseError(
+      "View.spec.params must be a JSON Schema object",
+      idx,
+      "/spec/params",
+      "VIEW_PARAMS_INVALID_SHAPE",
+    );
+  }
+  const p = raw as Record<string, unknown>;
+  if (p["type"] !== "object") {
+    throw new ManifestParseError(
+      `View.spec.params.type must be "object"; got ${JSON.stringify(p["type"])}`,
+      idx,
+      "/spec/params/type",
+      "VIEW_PARAMS_INVALID_SHAPE",
+    );
+  }
+  const props = p["properties"];
+  if (typeof props !== "object" || props === null || Array.isArray(props)) {
+    throw new ManifestParseError(
+      "View.spec.params.properties is required (declare each accepted query-string param)",
+      idx,
+      "/spec/params/properties",
+      "VIEW_PARAMS_INVALID_SHAPE",
+    );
+  }
+  const propNames = Object.keys(props as Record<string, unknown>);
+  for (const reserved of VIEW_PARAMS_RESERVED) {
+    if (propNames.includes(reserved)) {
+      throw new ManifestParseError(
+        `View.spec.params.properties.${reserved} is reserved (the runtime owns ${VIEW_PARAMS_RESERVED.join(", ")} for pagination); rename the param.`,
+        idx,
+        `/spec/params/properties/${reserved}`,
+        "VIEW_PARAMS_RESERVED_NAME",
+      );
+    }
+  }
+  return raw as JsonSchema;
+}
+
+function validateFilterAst(
+  node: unknown,
+  idx: number,
+  path: string,
+  jsonPointer: string,
+  paramSchema: JsonSchema | undefined,
+): void {
   if (typeof node !== "object" || node === null || Array.isArray(node)) {
-    throw new ManifestParseError(`${path} must be an object node (eq | and | or)`, idx);
+    throw new ManifestParseError(`${path} must be an object node (eq | and | or)`, idx, jsonPointer);
   }
   const n = node as Record<string, unknown>;
   const keys = Object.keys(n);
@@ -318,30 +372,34 @@ function validateFilterAst(node: unknown, idx: number, path: string): void {
     throw new ManifestParseError(
       `${path} must have exactly one key (eq | and | or); got ${JSON.stringify(keys)}`,
       idx,
+      jsonPointer,
     );
   }
   const op = keys[0]!;
   if (op === "eq") {
     const eq = n["eq"];
     if (typeof eq !== "object" || eq === null) {
-      throw new ManifestParseError(`${path}.eq must be an object`, idx);
+      throw new ManifestParseError(`${path}.eq must be an object`, idx, `${jsonPointer}/eq`);
     }
     const e = eq as Record<string, unknown>;
     if (typeof e["field"] !== "string" || (e["field"] as string).length === 0) {
-      throw new ManifestParseError(`${path}.eq.field is required (non-empty string)`, idx);
+      throw new ManifestParseError(`${path}.eq.field is required (non-empty string)`, idx, `${jsonPointer}/eq/field`);
     }
     if (!("value" in e)) {
-      throw new ManifestParseError(`${path}.eq.value is required`, idx);
+      throw new ManifestParseError(`${path}.eq.value is required`, idx, `${jsonPointer}/eq/value`);
+    }
+    if (isParamRef(e["value"])) {
+      validateParamRef(e["value"].$param, idx, `${jsonPointer}/eq/value/$param`, paramSchema);
     }
     return;
   }
   if (op === "and" || op === "or") {
     const arr = n[op];
     if (!Array.isArray(arr) || arr.length === 0) {
-      throw new ManifestParseError(`${path}.${op} must be a non-empty array`, idx);
+      throw new ManifestParseError(`${path}.${op} must be a non-empty array`, idx, `${jsonPointer}/${op}`);
     }
     for (let i = 0; i < arr.length; i++) {
-      validateFilterAst(arr[i], idx, `${path}.${op}[${i}]`);
+      validateFilterAst(arr[i], idx, `${path}.${op}[${i}]`, `${jsonPointer}/${op}/${i}`, paramSchema);
     }
     return;
   }
@@ -350,14 +408,56 @@ function validateFilterAst(node: unknown, idx: number, path: string): void {
     throw new ManifestParseError(
       `${path} operator '${op}' is DRAFT (see ADR-0001 § "What's DRAFT" / View); not supported in v0.1`,
       idx,
-      undefined,
+      jsonPointer,
       "DRAFT_KEY_USED",
     );
   }
   throw new ManifestParseError(
     `${path} operator must be one of eq, and, or; got '${op}'`,
     idx,
+    jsonPointer,
   );
+}
+
+function validateParamRef(
+  name: string,
+  idx: number,
+  pointer: string,
+  paramSchema: JsonSchema | undefined,
+): void {
+  if (name.length === 0) {
+    throw new ManifestParseError(
+      "filter param ref { $param: '' } is invalid; supply a non-empty param name.",
+      idx,
+      pointer,
+    );
+  }
+  if (!paramSchema) {
+    throw new ManifestParseError(
+      `filter references param '${name}' but View.spec.params is not declared. Add a params JSON Schema or use a literal value.`,
+      idx,
+      pointer,
+      "VIEW_FILTER_PARAM_REF_UNKNOWN",
+    );
+  }
+  const props = (paramSchema.properties ?? {}) as Record<string, unknown>;
+  if (!Object.prototype.hasOwnProperty.call(props, name)) {
+    throw new ManifestParseError(
+      `filter references unknown param '${name}'; declare it under View.spec.params.properties.`,
+      idx,
+      pointer,
+      "VIEW_FILTER_PARAM_REF_UNKNOWN",
+    );
+  }
+  const required = paramSchema.required ?? [];
+  if (!required.includes(name)) {
+    throw new ManifestParseError(
+      `filter references optional param '${name}'; v0.1.0 requires every param-ref'd name to appear in View.spec.params.required (optional-skip semantics are reserved for v0.1.x).`,
+      idx,
+      pointer,
+      "VIEW_FILTER_PARAM_REF_NOT_REQUIRED",
+    );
+  }
 }
 
 function validateProcedureSpec(m: ProcedureManifest, idx: number): ProcedureManifest {

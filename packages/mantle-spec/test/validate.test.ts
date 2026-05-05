@@ -227,3 +227,131 @@ spec:
     expect(messages).toMatch(/abort.*after_/);
   });
 });
+
+describe("parseManifests() — View.params + filter param-ref grammar (v0.1.0)", () => {
+  const acceptYaml = (yaml: string) => {
+    const r = parseManifests(yaml);
+    expect(r.diagnostics).toEqual([]);
+    return r;
+  };
+
+  it("accepts a View with no params (static query)", () => {
+    acceptYaml(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: postsPublished }
+spec:
+  from: posts
+  filter:
+    eq: { field: status, value: published }
+`);
+  });
+
+  it("accepts a View with required params + filter param-ref sentinel", () => {
+    const r = acceptYaml(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: postsByLocale }
+spec:
+  from: posts
+  params:
+    type: object
+    properties:
+      locale: { type: string }
+    required: [locale]
+  filter:
+    and:
+      - eq: { field: status, value: published }
+      - eq: { field: locale, value: { $param: locale } }
+`);
+    const v = r.manifests[0] as ViewManifest;
+    expect(v.spec.params?.required).toEqual(["locale"]);
+  });
+
+  it("rejects View.spec.params when type !== object", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  params:
+    type: string
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_PARAMS_INVALID_SHAPE");
+  });
+
+  it("rejects View.spec.params with reserved name 'page'", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  params:
+    type: object
+    properties:
+      page: { type: integer }
+    required: [page]
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_PARAMS_RESERVED_NAME");
+  });
+
+  it("rejects View.spec.params with reserved name 'show'", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  params:
+    type: object
+    properties:
+      show: { type: integer }
+    required: [show]
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_PARAMS_RESERVED_NAME");
+  });
+
+  it("rejects filter param-ref pointing at undeclared params", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  filter:
+    eq: { field: locale, value: { $param: locale } }
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_FILTER_PARAM_REF_UNKNOWN");
+  });
+
+  it("rejects filter param-ref to a param not in required (v0.1.0 required-only)", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  params:
+    type: object
+    properties:
+      locale: { type: string }
+  filter:
+    eq: { field: locale, value: { $param: locale } }
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain(
+      "VIEW_FILTER_PARAM_REF_NOT_REQUIRED",
+    );
+  });
+
+  it("rejects filter param-ref naming a property the params schema does not declare", () => {
+    const r = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: bad }
+spec:
+  from: posts
+  params:
+    type: object
+    properties:
+      locale: { type: string }
+    required: [locale]
+  filter:
+    eq: { field: tag, value: { $param: tag } }
+`);
+    expect(r.diagnostics.map((d) => d.code)).toContain("VIEW_FILTER_PARAM_REF_UNKNOWN");
+  });
+});

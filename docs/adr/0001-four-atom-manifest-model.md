@@ -76,7 +76,7 @@ the `cms.mantle.aotter.net/v1` API group:
 | Atom | Postgres equivalent | Externally exposed by itself? | Has user code? |
 |---|---|---|---|
 | `Schema` | `CREATE TABLE` | no | no |
-| `View` | `CREATE VIEW` | yes (auto-mounted at `/api/v1/v/<name>`) | no |
+| `View` | `CREATE VIEW` | yes (auto-mounted at `GET /api/views/<name>`; see ADR-0012) | no |
 | `Procedure` | `CREATE FUNCTION ... LANGUAGE plpgsql` | **no** (transport-agnostic; needs a Trigger to bind) | **yes — handler ref to consumer's TS** |
 | `Trigger` | `CREATE TRIGGER` + `pg_cron` + PostgREST route + `LISTEN/NOTIFY` | yes (the binding atom) | no |
 

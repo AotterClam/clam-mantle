@@ -1,7 +1,10 @@
 import type { Context, Hono } from "hono";
 import {
   HTTP_STATUS_BY_CODE,
+  runtimeDiagnostic,
   type Diagnostic,
+  type JsonSchema,
+  type ViewManifest,
 } from "@aotter/mantle-spec";
 import {
   matchPath,
@@ -41,6 +44,19 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       const runtime = await ref.get();
       const waitUntil = readWaitUntil(c);
       return handleHttpTrigger(c.req.raw, runtime, triggerName, path, waitUntil);
+    });
+  }
+  // Per ADR-0012, every parsed View auto-exposes a public read endpoint
+  // at `GET /api/views/<name>`. Pagination knobs `page` / `show` are
+  // reserved query-string names; remaining params are coerced against
+  // `View.spec.params` (declared scalar JSON Schema; required entries
+  // enforced at parse time).
+  for (const v of ref.manifests) {
+    if (v.kind !== "View") continue;
+    const viewName = v.metadata.name;
+    app.get(`/api/views/${viewName}`, async (c) => {
+      const runtime = await ref.get();
+      return handleViewRequest(c.req.raw, runtime, viewName);
     });
   }
 }
@@ -84,6 +100,131 @@ async function handleHttpTrigger(
   }
   const status = HTTP_STATUS_BY_CODE[result.diagnostic.code] ?? 500;
   return jsonResponse(status, { ok: false, diagnostic: result.diagnostic });
+}
+
+async function handleViewRequest(
+  req: Request,
+  runtime: CmsRuntime,
+  viewName: string,
+): Promise<Response> {
+  const view = runtime.viewsByName.get(viewName);
+  if (!view) {
+    return jsonError({ status: 500, code: "INTERNAL_ERROR", message: `View '${viewName}' missing post-boot.` });
+  }
+
+  const url = new URL(req.url);
+  const viewPath = `GET /api/views/${viewName}`;
+
+  const page = parsePagination(url.searchParams.get("page"));
+  const show = parsePagination(url.searchParams.get("show"));
+
+  let params: Record<string, unknown>;
+  try {
+    params = coerceViewParams(view, url.searchParams);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return jsonResponse(400, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "INPUT_VALIDATION_FAILED",
+        severity: "error",
+        path: viewPath,
+        expected: "query string conforms to View.spec.params",
+        message,
+      }),
+    });
+  }
+
+  const result = await runtime.executeView.execute({
+    view,
+    params,
+    page,
+    show,
+    pathPrefix: viewPath,
+  });
+
+  if (result.ok) {
+    return jsonResponse(200, { ok: true, data: result.result });
+  }
+  const status = HTTP_STATUS_BY_CODE[result.diagnostic.code] ?? 500;
+  return jsonResponse(status, { ok: false, diagnostic: result.diagnostic });
+}
+
+function parsePagination(raw: string | null): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Coerce + validate the public query string against `View.spec.params`.
+ * v0.1 grammar covers scalar leaf types (string / integer / number /
+ * boolean), with `required` enforced. Unknown query keys are silently
+ * ignored (lenient v0.1.0; strict mode is a v0.1.x option). Throws
+ * with a human-readable message on missing-required or coercion error.
+ */
+function coerceViewParams(
+  view: ViewManifest,
+  query: URLSearchParams,
+): Record<string, unknown> {
+  const declared = view.spec.params;
+  if (!declared) return {};
+  const props = declared.properties ?? {};
+  const required = declared.required ?? [];
+  const out: Record<string, unknown> = {};
+  for (const [name, schema] of Object.entries(props) as Array<[string, JsonSchema]>) {
+    const raw = query.get(name);
+    if (raw == null) {
+      if (required.includes(name)) {
+        throw new Error(
+          `View '${view.metadata.name}' requires query param '${name}' (declared in View.spec.params.required).`,
+        );
+      }
+      continue;
+    }
+    out[name] = coerceScalar(raw, schema, name);
+  }
+  return out;
+}
+
+function coerceScalar(raw: string, schema: JsonSchema, name: string): unknown {
+  const type = schema.type;
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    if (!schema.enum.includes(raw)) {
+      throw new Error(
+        `query param '${name}' must be one of ${schema.enum.join(", ")}; got ${JSON.stringify(raw)}.`,
+      );
+    }
+    return raw;
+  }
+  switch (type) {
+    case "integer": {
+      const n = Number.parseInt(raw, 10);
+      if (!Number.isFinite(n) || String(n) !== raw.trim()) {
+        throw new Error(`query param '${name}' expected integer; got ${JSON.stringify(raw)}.`);
+      }
+      return n;
+    }
+    case "number": {
+      const n = Number(raw);
+      if (!Number.isFinite(n)) {
+        throw new Error(`query param '${name}' expected number; got ${JSON.stringify(raw)}.`);
+      }
+      return n;
+    }
+    case "boolean": {
+      if (raw === "true") return true;
+      if (raw === "false") return false;
+      throw new Error(`query param '${name}' expected boolean (true|false); got ${JSON.stringify(raw)}.`);
+    }
+    case "string":
+    case undefined:
+      return raw;
+    default:
+      throw new Error(
+        `View param '${name}' declares unsupported type '${String(type)}' for the public REST surface (v0.1 covers string / integer / number / boolean / enum).`,
+      );
+  }
 }
 
 async function readBody(req: Request): Promise<Record<string, unknown>> {

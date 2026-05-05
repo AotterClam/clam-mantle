@@ -59,8 +59,17 @@ metadata:
 spec:
   from: post-translations
   fields: [slug, locale, title]
+  params:
+    type: object
+    properties:
+      locale:
+        type: string
+        description: BCP 47 locale tag. Pulled from the public REST query string at request time.
+    required: [locale]
   filter:
-    eq: { field: status, value: published }
+    and:
+      - eq: { field: status, value: published }
+      - eq: { field: locale, value: { $param: locale } }
   orderBy:
     - { field: slug, direction: asc }
   limit: 100

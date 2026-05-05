@@ -77,6 +77,13 @@ curl -i http://localhost:8787/en/posts
 curl -i http://localhost:8787/llms.txt
 curl -i http://localhost:8787/en/llms.txt
 
+# Public View REST surface (ADR-0012). Every parsed View auto-mounts:
+#   - recent-posts: static (no params)
+#   - posts-by-locale: required ?locale= param
+curl -s http://localhost:8787/api/views/recent-posts | jq '.data | {rows: .rows | length, page, show, hasMore}'
+curl -s 'http://localhost:8787/api/views/posts-by-locale?locale=zh-TW' | jq '.data.rows[] | {slug, title}'
+curl -s 'http://localhost:8787/api/views/posts-by-locale?locale=en&page=1&show=2' | jq '.data | {page, show, hasMore, count: .rows | length}'
+
 # Contact form happy path (CAPTCHA passes):
 curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \

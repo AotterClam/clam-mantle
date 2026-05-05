@@ -141,22 +141,59 @@ export type ViewManifest = ManifestEnvelope<"View", ViewManifestSpec>;
 export interface ViewManifestSpec {
   /** Source Schema name (bare; no namespace). */
   readonly from: string;
-  /** Filter AST. v0.1 grammar: eq | and | or only. */
+  /** Filter AST. v0.1 grammar: eq | and | or. `eq.value` may be a literal
+   *  or a `{ $param: <name> }` sentinel referencing `spec.params`. */
   readonly filter?: FilterAst;
   /** Projection. */
   readonly fields?: readonly string[];
   /** Order. */
   readonly orderBy?: ReadonlyArray<{ readonly field: string; readonly direction?: "asc" | "desc" }>;
-  /** Hard cap on returned rows. */
+  /** Server-enforced cap on rows returned per call. The public REST
+   *  surface accepts `?show=<n>`; the runtime trims to `min(show, limit)`.
+   *  Defaults to a runtime-internal value (50) when absent. */
   readonly limit?: number;
+  /** Caller-supplied parameter shape for the public REST surface
+   *  (`GET /api/views/<name>`). MUST be `type: "object"` with declared
+   *  `properties`. Reserved names (`page`, `show`, `cursor`) are rejected
+   *  by the parser since the runtime owns those for pagination. */
+  readonly params?: JsonSchema;
 }
 
 /** v0.1 filter AST. Anything beyond eq/and/or is DRAFT (`contains`, `not`,
  *  `in`, `like`, `recursive`, `gatedBy`, `join.aggregate`). */
 export type FilterAst = FilterEq | FilterAnd | FilterOr;
 export interface FilterEq {
-  readonly eq: { readonly field: string; readonly value: unknown };
+  readonly eq: {
+    readonly field: string;
+    /** Comparison value. Either a literal or a `ParamRef` sentinel
+     *  (`{ $param: <name> }`) substituted at request time from
+     *  `View.spec.params`. See `isParamRef`. */
+    readonly value: unknown;
+  };
 }
+
+/** Sentinel object form for filter values that pull from caller-supplied
+ *  params at request time. The discriminator key `$param` was chosen to
+ *  match the JSON Schema `$ref` convention; future sentinels for `now`,
+ *  `ctx.user`, etc. follow the same `$<name>` shape. */
+export interface ParamRef {
+  readonly $param: string;
+}
+
+export function isParamRef(v: unknown): v is ParamRef {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    typeof (v as Record<string, unknown>)["$param"] === "string"
+  );
+}
+
+/** Reserved query-string names on the public View REST surface
+ *  (`/api/views/<name>?...`). The runtime owns these for pagination; a
+ *  View manifest that declares `params.<name>` for any of them is
+ *  rejected at parse time (`VIEW_PARAMS_RESERVED_NAME`). */
+export const VIEW_PARAMS_RESERVED: ReadonlyArray<string> = ["page", "show", "cursor"];
 export interface FilterAnd {
   readonly and: readonly FilterAst[];
 }

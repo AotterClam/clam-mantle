@@ -328,9 +328,10 @@ function runCompiledViewQuery(
   const fromIdx = sql.indexOf(" FROM entries");
   const projection = sql.slice("SELECT".length, fromIdx).trim();
   const afterFrom = sql.slice(fromIdx + " FROM entries".length).trim();
-  // afterFrom: WHERE collection = ? [AND (filter)] [ORDER BY …] LIMIT N
+  // afterFrom: WHERE collection = ? [AND (filter)] [ORDER BY …] LIMIT N OFFSET M
   const whereIdx = afterFrom.indexOf("WHERE ");
   const limitIdx = afterFrom.lastIndexOf(" LIMIT ");
+  const offsetIdx = afterFrom.lastIndexOf(" OFFSET ");
   const orderIdx = afterFrom.indexOf(" ORDER BY ");
   const whereTail = afterFrom.slice(
     whereIdx + "WHERE ".length,
@@ -339,7 +340,12 @@ function runCompiledViewQuery(
   const orderClause = orderIdx >= 0
     ? afterFrom.slice(orderIdx + " ORDER BY ".length, limitIdx)
     : null;
-  const limit = parseInt(afterFrom.slice(limitIdx + " LIMIT ".length).trim(), 10);
+  const limitEnd = offsetIdx > limitIdx ? offsetIdx : afterFrom.length;
+  const limit = parseInt(afterFrom.slice(limitIdx + " LIMIT ".length, limitEnd).trim(), 10);
+  const offset =
+    offsetIdx > limitIdx
+      ? parseInt(afterFrom.slice(offsetIdx + " OFFSET ".length).trim(), 10)
+      : 0;
 
   // collection = ? is always first; everything after AND is a filter.
   const collectionMatch = whereTail.match(/^collection = \?/);
@@ -350,29 +356,44 @@ function runCompiledViewQuery(
     ? remaining.slice("AND ".length).trim()
     : "";
 
-  let consumed = 1;
+  // Walk the filter AST once to collect the positional params each
+  // atom consumes — this is independent of the row being matched. The
+  // earlier impl mutated a shared `consumed` counter inside `.filter()`,
+  // so atom #2 for row #2 would read params[3] (off-the-end) instead of
+  // params[2]. Pre-resolving the (atom → param) mapping eliminates the
+  // cross-row leak and lets per-row eval be a pure read.
   const matchFilter = (row: EntryRecord, expr: string): boolean => {
     if (!expr) return true;
-    return evalExpr(row, expr.replace(/^\((.*)\)$/, "$1"));
+    const ctx = { atomIndex: 0 };
+    return evalExpr(row, expr.replace(/^\((.*)\)$/, "$1"), ctx);
   };
 
-  const evalExpr = (row: EntryRecord, expr: string): boolean => {
-    // Strip outer parens.
+  const atomParams = collectAtomParams(filterExpr, params, 1);
+
+  const evalExpr = (
+    row: EntryRecord,
+    expr: string,
+    ctx: { atomIndex: number },
+  ): boolean => {
     let cleaned = expr.trim();
     while (cleaned.startsWith("(") && matchClose(cleaned, 0) === cleaned.length - 1) {
       cleaned = cleaned.slice(1, -1).trim();
     }
     const top = splitTopLevel(cleaned);
-    if (top.op === "AND") return top.parts.every((part) => evalExpr(row, part));
-    if (top.op === "OR") return top.parts.some((part) => evalExpr(row, part));
-    return evalAtom(row, cleaned);
+    if (top.op === "AND") return top.parts.every((part) => evalExpr(row, part, ctx));
+    if (top.op === "OR") return top.parts.some((part) => evalExpr(row, part, ctx));
+    return evalAtom(row, cleaned, ctx);
   };
 
-  const evalAtom = (row: EntryRecord, atom: string): boolean => {
+  const evalAtom = (
+    row: EntryRecord,
+    atom: string,
+    ctx: { atomIndex: number },
+  ): boolean => {
     const eqMatch = atom.match(/^(.+?)\s*=\s*\?$/);
     if (!eqMatch) throw new Error(`fake DB: unsupported atom '${atom}'`);
     const lhs = eqMatch[1]!.trim();
-    const value = params[consumed++];
+    const value = atomParams[ctx.atomIndex++];
     return readValue(row, lhs) === value;
   };
 
@@ -397,7 +418,7 @@ function runCompiledViewQuery(
     });
   }
 
-  return filtered.slice(0, limit).map((r) => projectRow(r, projection));
+  return filtered.slice(offset, offset + limit).map((r) => projectRow(r, projection));
 }
 
 function readValue(row: EntryRecord, ref: string): unknown {
@@ -438,6 +459,25 @@ function projectRow(row: EntryRecord, projection: string): Record<string, unknow
     }
   }
   return out;
+}
+
+/**
+ * Pre-compute the positional value each `?` placeholder consumes, in
+ * left-to-right order. Lets `evalAtom` look up its slot by atom-index
+ * instead of mutating a shared "consumed" counter (which leaked across
+ * rows when `.filter()` reused the eval closure).
+ */
+function collectAtomParams(
+  expr: string,
+  params: readonly unknown[],
+  startAt: number,
+): unknown[] {
+  if (!expr) return [];
+  let count = 0;
+  for (const ch of expr) {
+    if (ch === "?") count++;
+  }
+  return params.slice(startAt, startAt + count) as unknown[];
 }
 
 function matchClose(s: string, openIdx: number): number {

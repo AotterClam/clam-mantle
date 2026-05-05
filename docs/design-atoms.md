@@ -31,7 +31,7 @@ primitives Postgres has shipped for 30 years.
 | Our atom | Postgres equivalent | Externally exposed by itself? | Has user code? |
 |---|---|---|---|
 | **`Schema`** | `CREATE TABLE` | no (manipulated via View / Procedure) | no |
-| **`View`** | `CREATE VIEW` | **yes** (auto-mounted at `/api/v1/v/<name>` — `SELECT FROM` analogue) | no |
+| **`View`** | `CREATE VIEW` | **yes** (auto-mounted at `GET /api/views/<name>` — `SELECT FROM` analogue, see ADR-0012) | no |
 | **`Procedure`** | `CREATE FUNCTION ... LANGUAGE plpgsql` | **no** (transport-agnostic; needs a `Trigger` to bind it) | **yes — handler ref to consumer's TS file** |
 | **`Trigger`** | `CREATE TRIGGER` + `pg_cron` + PostgREST route + `LISTEN/NOTIFY` | yes (the binding atom — turns Procedures into HTTP endpoints, cron jobs, MCP tools, lifecycle hooks) | no |
 
@@ -268,8 +268,9 @@ UNIQUE (slug, locale));`
 ### 2. `View` — the read surface (auto-exposed)
 
 A named, declarative read over Schemas. **Auto-mounted** at
-`/api/v1/v/<name>` by the SDK — no Trigger required, just like `SELECT
-FROM view_name` in Postgres works without a separate route declaration.
+`GET /api/views/<name>` by the SDK — no Trigger required, just like
+`SELECT FROM view_name` in Postgres works without a separate route
+declaration. See ADR-0012 for the full design rationale.
 
 ```yaml
 apiVersion: cms.mantle.aotter.net/v1
@@ -285,9 +286,48 @@ spec:
   limit: 20
 ```
 
-**v0.1 filter AST**: `eq`, `and`, `or` only. Anything else (`contains`,
-`recursive`, `params`, `gatedBy`, `join.aggregate`, `policies.skip`)
-is DRAFT.
+**Param-driven Views** declare `spec.params` (a JSON Schema with
+`type: object`); filter values reference them via the
+`{ $param: <name> }` sentinel:
+
+```yaml
+apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: posts-by-locale }
+spec:
+  from: post-translations
+  params:
+    type: object
+    properties:
+      locale: { type: string }
+    required: [locale]
+  filter:
+    and:
+      - eq: { field: status, value: published }
+      - eq: { field: locale, value: { $param: locale } }
+  limit: 100
+```
+
+Public callers paginate via reserved query-string knobs `?page=&show=`
+(1-indexed page, server caps `show` at `View.spec.limit`). Reserved
+names — `page` / `show` / `cursor` — must NOT appear in
+`spec.params.properties` (the parser rejects with
+`VIEW_PARAMS_RESERVED_NAME`).
+
+Response envelope:
+
+```json
+{ "ok": true, "data": { "rows": [...], "page": 1, "show": 20, "hasMore": true } }
+```
+
+`hasMore` is the lazy form: `rows.length === show` ⇒ `true`. No COUNT
+query, no `LIMIT n+1` probe.
+
+**v0.1 filter AST**: `eq`, `and`, `or` only. `eq.value` may be a
+literal or a `{ $param: <name> }` sentinel. v0.1.0 enforces required-only
+param refs; optional-with-skip semantics are reserved for v0.1.x.
+Anything else (`contains`, `recursive`, `gatedBy`, `join.aggregate`,
+`policies.skip`) is DRAFT.
 
 **Postgres analogue**: `CREATE VIEW recent_published AS SELECT ...
 FROM posts WHERE status = 'published' ORDER BY updated_at DESC LIMIT
@@ -473,7 +513,7 @@ different constraints.
 | `INPUT_VALIDATION_FAILED` | `400` | Procedure input fails zod-converted schema |
 | `UNAUTHENTICATED` | `401` | no active session (admin API: missing/expired session cookie) |
 | `AUTH_DENIED` | `403` | `requires.auth` predicate evaluated false (or admin: caller lacks required staff role) |
-| `NOT_FOUND` | `404` | resource not found — admin: approval id; runtime: View name at `/api/v1/v/<name>` |
+| `NOT_FOUND` | `404` | resource not found — admin: approval id; runtime: View name at `/api/views/<name>` |
 | `HANDLER_NOT_REGISTERED` | `500` | `handler.ref` key not registered at boot |
 | `DISPATCHER_NOT_BUILT` | `501` | runtime feature not implemented in this SDK build |
 | `INTERNAL_ERROR` | `500` | uncaught handler exception |

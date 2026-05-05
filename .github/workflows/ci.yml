@@ -127,6 +127,25 @@ jobs:
           # Missing bearer: 401 — verifies the OAuth verifier wires.
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8787/mcp)" = "401"
 
+      - name: Smoke — public View REST surface
+        run: |
+          set -euo pipefail
+          # Static View (no params) — ADR-0012.
+          BODY=$(curl -s http://localhost:8787/api/views/recent-posts)
+          echo "$BODY" | grep -q '"ok":true'
+          echo "$BODY" | grep -q '"rows"'
+          echo "$BODY" | grep -q '"page":1'
+
+          # Param-driven View — required ?locale=
+          ENBODY=$(curl -s 'http://localhost:8787/api/views/posts-by-locale?locale=en')
+          echo "$ENBODY" | grep -q '"ok":true'
+          echo "$ENBODY" | grep -q '"rows"'
+
+          # Missing required param → 400 INPUT_VALIDATION_FAILED
+          STATUS=$(curl -s -o /tmp/vbody -w '%{http_code}' http://localhost:8787/api/views/posts-by-locale)
+          test "$STATUS" = "400"
+          grep -q 'INPUT_VALIDATION_FAILED' /tmp/vbody
+
       - name: Smoke — MCP integration (12 tool calls)
         # initialize → tools/list → tools/call for each of the 6 v0.1.0
         # tools, plus lifecycle hook firing on contact-messages create
