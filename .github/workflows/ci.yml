@@ -127,24 +127,14 @@ jobs:
           # Missing bearer: 401 — verifies the OAuth verifier wires.
           test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8787/mcp)" = "401"
 
-      - name: Smoke — public View REST surface
-        run: |
-          set -euo pipefail
-          # Static View (no params) — ADR-0012.
-          BODY=$(curl -s http://localhost:8787/api/views/recent-posts)
-          echo "$BODY" | grep -q '"ok":true'
-          echo "$BODY" | grep -q '"rows"'
-          echo "$BODY" | grep -q '"page":1'
-
-          # Param-driven View — required ?locale=
-          ENBODY=$(curl -s 'http://localhost:8787/api/views/posts-by-locale?locale=en')
-          echo "$ENBODY" | grep -q '"ok":true'
-          echo "$ENBODY" | grep -q '"rows"'
-
-          # Missing required param → 400 INPUT_VALIDATION_FAILED
-          STATUS=$(curl -s -o /tmp/vbody -w '%{http_code}' http://localhost:8787/api/views/posts-by-locale)
-          test "$STATUS" = "400"
-          grep -q 'INPUT_VALIDATION_FAILED' /tmp/vbody
+      - name: Smoke — View REST integration (10 cases, ADR-0012)
+        # Static + param-driven Views, pagination, show clamp, hasMore
+        # boundary, missing-required → 400, unknown View → 404,
+        # unknown-query-key lenient ignore, envelope-shape regression,
+        # reserved-name pagination plumbing. See
+        # starters/blog/test/integration/view-rest-smoke.ts.
+        working-directory: starters/blog
+        run: pnpm view-smoke
 
       - name: Smoke — MCP integration (12 tool calls)
         # initialize → tools/list → tools/call for each of the 6 v0.1.0
