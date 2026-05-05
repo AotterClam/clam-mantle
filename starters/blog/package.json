@@ -8,6 +8,7 @@
     "dev": "wrangler dev",
     "fixture": "tsx test/fixture/apply.ts",
     "mcp-smoke": "tsx test/integration/mcp-smoke.ts",
+    "view-smoke": "tsx test/integration/view-rest-smoke.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "deploy": "wrangler deploy"
   },
