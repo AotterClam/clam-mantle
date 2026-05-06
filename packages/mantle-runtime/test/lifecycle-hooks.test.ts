@@ -66,7 +66,7 @@ function harness(opts: {
     proceduresByName,
     calls,
     createDraft: new CreateDraftUseCase(hookedRepo, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(hookedRepo, clock),
+    updateDraft: new UpdateDraftUseCase(hookedRepo, schemas, clock),
     deleteEntry: new DeleteEntryUseCase(hookedRepo),
     requestPublish: new RequestPublishUseCase(hookedRepo, schemas, clock),
   };

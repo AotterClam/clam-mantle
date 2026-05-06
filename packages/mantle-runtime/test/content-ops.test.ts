@@ -15,6 +15,23 @@ import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
+const postsSchemaWithBindings: SchemaManifest = {
+  ...postsSchema(),
+  spec: {
+    ...postsSchema().spec,
+    schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        slug: { type: "string" },
+        authorId: { type: "string", "x-mantle-bind": "ctx.user" },
+        publishedAt: { type: "number", "x-mantle-bind": "now" },
+      },
+      required: ["title"],
+    },
+  },
+};
+
 interface Harness {
   store: InMemoryEntryRepository;
   schemas: ReadonlyMap<string, SchemaManifest>;
@@ -42,7 +59,7 @@ function harness(opts: { schemas?: ReadonlyMap<string, SchemaManifest> } = {}): 
     clock,
     idgen,
     createDraft: new CreateDraftUseCase(store, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(store, clock),
+    updateDraft: new UpdateDraftUseCase(store, schemas, clock),
     getEntry: new GetEntryUseCase(store),
     listEntries: new ListEntriesUseCase(store, schemas),
     requestPublish: new RequestPublishUseCase(store, schemas, clock),
@@ -93,6 +110,29 @@ describe("CreateDraftUseCase", () => {
     expect(row.status).toBe("draft");
     expect(row.version).toBe(1);
     expect(row.data).toEqual({ title: "Hello" });
+  });
+
+  it("projects Schema fields and stamps x-mantle-bind values", async () => {
+    const h = harness({
+      schemas: new Map([[postsSchemaWithBindings.metadata.name, postsSchemaWithBindings]]),
+    });
+    const row = await h.createDraft.execute({
+      collection: "posts",
+      data: {
+        title: "Hello",
+        slug: "hello",
+        unknown: "drop-me",
+        authorId: "spoofed-author",
+        publishedAt: 123,
+      },
+      authorId: "user-1",
+    });
+    expect(row.data).toEqual({
+      title: "Hello",
+      slug: "hello",
+      authorId: "user-1",
+      publishedAt: 1_000_000_000_000,
+    });
   });
 });
 
@@ -167,6 +207,32 @@ describe("UpdateDraftUseCase", () => {
     expect(updated.status).toBe("draft");
     expect(updated.version).toBe(2);
     expect(updated.data).toEqual({ title: "v2" });
+  });
+
+  it("preserves existing x-mantle-bind values on update", async () => {
+    const h = harness({
+      schemas: new Map([[postsSchemaWithBindings.metadata.name, postsSchemaWithBindings]]),
+    });
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "v1", slug: "v1" },
+      authorId: "user-1",
+    });
+    const updated = await h.updateDraft.execute({
+      id: created.id,
+      expectedVersion: 1,
+      data: {
+        title: "v2",
+        authorId: "spoofed-author",
+        publishedAt: 123,
+      },
+    });
+    expect(updated.data).toEqual({
+      title: "v2",
+      slug: "v1",
+      authorId: "user-1",
+      publishedAt: 1_000_000_000_000,
+    });
   });
 });
 
