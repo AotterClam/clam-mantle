@@ -63,6 +63,7 @@ export class StubAssetServer implements AssetServer {
 
 export class StubUserRepository implements UserRepository {
   async findById(_id: string): Promise<User | null> { return null; }
+  async findGithubLogin(_userId: string): Promise<string | null> { return null; }
   async upsertByGithub(_profile: GithubProfile, _now: number): Promise<string> { return "stub-user"; }
   async storeGithubToken(_userId: string, _accessToken: string, _scope: string, _now: number): Promise<void> {}
   async readGithubToken(_userId: string): Promise<GithubToken | null> { return null; }

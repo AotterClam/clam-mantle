@@ -19,6 +19,13 @@ export interface UserRepository {
    * Returns the `users.id` (uuid) for the resolved row.
    */
   upsertByGithub(profile: GithubProfile, now: number): Promise<string>;
+  /**
+   * Read the GitHub login (handle) for a user by their internal id.
+   * Returns null when the user has no `github` social-login row —
+   * possible only in non-OAuth bootstraps. The admin SPA's
+   * `/admin/api/me` uses this to render the avatar URL.
+   */
+  findGithubLogin(userId: string): Promise<string | null>;
   /** Persist (or replace) the GitHub access token for a user. */
   storeGithubToken(
     userId: string,
