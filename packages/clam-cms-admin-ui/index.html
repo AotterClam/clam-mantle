@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin · clam-cms</title>
+    <meta name="theme-color" content="#1a3062" />
+    <meta name="theme-color" content="#071127" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Inline blocking script — applies `class="dark"` to <html> BEFORE
+      first paint to avoid FOUC. Storage key is `cms.theme`.
+    -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem("cms.theme");
+          if (
+            pref === "dark" ||
+            (!pref && matchMedia("(prefers-color-scheme: dark)").matches)
+          ) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (_) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

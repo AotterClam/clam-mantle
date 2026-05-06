@@ -30,10 +30,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build dist (typecheck + emit) for spec / runtime / cloudflare
-        # Vitest tests for cloudflare import the runtime via dist/, so
-        # build before test. Spec + runtime tests use src/ directly.
-        run: pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runtime' --filter '@aotterclam/clam-cms-cloudflare' build
+      - name: Build dist (typecheck + emit) for spec / runtime / admin-ui / cloudflare
+        # Vitest tests for cloudflare import runtime/admin UI via dist/,
+        # so build before test. Spec + runtime tests use src/ directly.
+        run: pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runtime' --filter '@aotterclam/clam-cms-admin-ui' --filter '@aotterclam/clam-cms-cloudflare' build
 
       - name: Re-link bins now that dist/ exists
         # First `pnpm install` runs before SDK build, so spec's
@@ -131,7 +131,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runtime' --filter '@aotterclam/clam-cms-cloudflare' build
+      - run: pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runtime' --filter '@aotterclam/clam-cms-admin-ui' --filter '@aotterclam/clam-cms-cloudflare' build
 
       # The starter-smoke runs against the wrangler test profile
       # (`[env.test]` in wrangler.toml — port 8788, persist-to
