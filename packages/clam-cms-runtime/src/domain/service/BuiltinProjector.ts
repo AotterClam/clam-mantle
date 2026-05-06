@@ -55,6 +55,41 @@ export function projectAndStamp(args: ProjectAndStampArgs): Record<string, unkno
   return out;
 }
 
+export interface ProjectUpdateAndStampArgs {
+  readonly schema: SchemaManifest;
+  readonly existing: Record<string, unknown>;
+  readonly patch: Record<string, unknown>;
+  readonly ctx: HandlerContext;
+  readonly clockNow: number;
+}
+
+/**
+ * Project update data through the same Schema-declared field allowlist
+ * while preserving existing server-stamped values. This keeps direct
+ * authoring paths (MCP/admin) from accepting arbitrary blob keys, but
+ * avoids turning `x-clam-bind: now` fields into "update timestamp"
+ * fields on every draft edit.
+ */
+export function projectUpdateAndStamp(args: ProjectUpdateAndStampArgs): Record<string, unknown> {
+  const properties =
+    (args.schema.spec.schema as { properties?: Record<string, unknown> }).properties ?? {};
+  const merged = { ...args.existing, ...args.patch };
+  const out: Record<string, unknown> = {};
+  for (const [key, propDef] of Object.entries(properties)) {
+    const bind = bindValueOf(propDef);
+    if (bind) {
+      out[key] = key in args.existing
+        ? args.existing[key]
+        : computeBind(bind, args.ctx, args.clockNow);
+      continue;
+    }
+    if (key in merged) {
+      out[key] = merged[key];
+    }
+  }
+  return out;
+}
+
 function bindValueOf(propDef: unknown): ClamBindValue | undefined {
   if (typeof propDef !== "object" || propDef === null) return undefined;
   const v = (propDef as Record<string, unknown>)[CLAM_BIND_KEYWORD];

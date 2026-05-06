@@ -1,14 +1,16 @@
 import {
   DiagnosticError,
   runtimeDiagnostic,
+  type SchemaManifest,
 } from "@aotterclam/clam-cms-spec";
+import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
+import { projectUpdateAndStamp } from "../../domain/service/BuiltinProjector.js";
 import type { UpdateDraftRequest } from "../dto/content/index.js";
 import {
   notFoundDiagnostic,
-  stripReservedDataKeys,
   withConflictDiagnostic,
 } from "./diagnostics.js";
 
@@ -20,6 +22,7 @@ import {
 export class UpdateDraftUseCase {
   constructor(
     private readonly entries: EntryRepository,
+    private readonly schemas: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
   ) {}
 
@@ -41,16 +44,48 @@ export class UpdateDraftUseCase {
         }),
       );
     }
+    const schema = this.schemas.get(existing.collection);
+    if (!schema) {
+      throw new DiagnosticError(
+        runtimeDiagnostic({
+          code: "BUILTIN_HANDLER_SCHEMA_UNKNOWN",
+          severity: "error",
+          path: `${opPath}#/collection`,
+          value: existing.collection,
+          expected: "name of a declared Schema",
+          candidates: [...this.schemas.keys()],
+          message: `Entry '${request.id}' belongs to unknown Schema '${existing.collection}'.`,
+        }),
+      );
+    }
+    const now = this.clock.now();
+    const ctx = authoringContext(request.ctx, existing.authorId);
+    const data = projectUpdateAndStamp({
+      schema,
+      existing: existing.data,
+      patch: request.data,
+      ctx,
+      clockNow: now,
+    });
     return withConflictDiagnostic(opPath, () =>
       this.entries.update({
         id: request.id,
         collection: existing.collection,
         expectedVersion: request.expectedVersion,
-        data: stripReservedDataKeys({ ...existing.data, ...request.data }),
-        now: this.clock.now(),
-        hookContext: request.ctx,
+        data,
+        now,
+        hookContext: ctx,
         originalInput: request.originalInput,
       }),
     );
   }
+}
+
+function authoringContext(ctx: HandlerContext | undefined, authorId: string | null): HandlerContext {
+  if (ctx) return ctx;
+  return {
+    user: authorId ? { id: authorId } : null,
+    staff: null,
+    env: {},
+  };
 }

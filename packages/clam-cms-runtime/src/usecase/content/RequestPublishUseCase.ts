@@ -11,6 +11,10 @@ import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { RequestPublishRequest } from "../dto/content/index.js";
 import {
+  publishCache,
+  type ContentPublishEffects,
+} from "./ContentPublishEffects.js";
+import {
   illegalTransitionDiagnostic,
   notFoundDiagnostic,
   withConflictDiagnostic,
@@ -33,6 +37,7 @@ export class RequestPublishUseCase {
     private readonly entries: EntryRepository,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
+    private readonly effects?: ContentPublishEffects,
   ) {}
 
   async execute(request: RequestPublishRequest): Promise<EntryRow> {
@@ -60,7 +65,7 @@ export class RequestPublishUseCase {
         illegalTransitionDiagnostic(opPath, existing.status, "published"),
       );
     }
-    return withConflictDiagnostic(opPath, () =>
+    const published = await withConflictDiagnostic(opPath, () =>
       this.entries.transitionStatus({
         id: request.id,
         collection: existing.collection,
@@ -71,5 +76,7 @@ export class RequestPublishUseCase {
         originalInput: request.originalInput,
       }),
     );
+    await publishCache(this.effects, published.id);
+    return published;
   }
 }

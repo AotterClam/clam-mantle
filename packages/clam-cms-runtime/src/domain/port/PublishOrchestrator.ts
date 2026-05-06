@@ -15,6 +15,7 @@ import type { TemplateRegistry } from "../model/TemplateRegistry.js";
  */
 export interface PublishOrchestrator {
   publish(request: PublishEntryRequest): Promise<void>;
+  unpublish(request: PublishEntryRequest): Promise<void>;
 }
 
 export interface PublishEntryRequest {

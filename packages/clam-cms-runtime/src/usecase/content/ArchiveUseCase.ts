@@ -8,6 +8,10 @@ import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { ArchiveRequest } from "../dto/content/index.js";
 import {
+  unpublishCache,
+  type ContentPublishEffects,
+} from "./ContentPublishEffects.js";
+import {
   illegalTransitionDiagnostic,
   notFoundDiagnostic,
   withConflictDiagnostic,
@@ -23,6 +27,7 @@ export class ArchiveUseCase {
     private readonly entries: EntryRepository,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
+    private readonly effects?: ContentPublishEffects,
   ) {}
 
   async execute(request: ArchiveRequest): Promise<EntryRow> {
@@ -37,7 +42,7 @@ export class ArchiveUseCase {
         illegalTransitionDiagnostic(opPath, existing.status, "archived"),
       );
     }
-    return withConflictDiagnostic(opPath, () =>
+    const archived = await withConflictDiagnostic(opPath, () =>
       this.entries.archive({
         id: request.id,
         collection: existing.collection,
@@ -47,5 +52,7 @@ export class ArchiveUseCase {
         originalInput: request.originalInput,
       }),
     );
+    await unpublishCache(this.effects, archived.id);
+    return archived;
   }
 }
