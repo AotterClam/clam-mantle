@@ -96,9 +96,12 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/admin/api/me", async (c) => {
     const runtime = await ref.get();
     const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminAuthDenied(c, "/admin/api/me");
+    if (!session) return adminUnauthenticated(c, "/admin/api/me");
     const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) return adminAuthDenied(c, "/admin/api/me");
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/me", login);
+    }
     const login = await runtime.users.findGithubLogin(session.userId);
     return jsonResponse(200, { login, role: staff.role, userId: session.userId });
   });
@@ -106,9 +109,12 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/admin/api/collections", async (c) => {
     const runtime = await ref.get();
     const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminAuthDenied(c, "/admin/api/collections");
+    if (!session) return adminUnauthenticated(c, "/admin/api/collections");
     const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) return adminAuthDenied(c, "/admin/api/collections");
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/collections", login);
+    }
     const schemas = ref.manifests.filter(
       (m): m is SchemaManifest => m.kind === "Schema",
     );
@@ -125,9 +131,12 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/admin/api/entries", async (c) => {
     const runtime = await ref.get();
     const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminAuthDenied(c, "/admin/api/entries");
+    if (!session) return adminUnauthenticated(c, "/admin/api/entries");
     const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) return adminAuthDenied(c, "/admin/api/entries");
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/entries", login);
+    }
     const collection = c.req.query("collection");
     if (!collection) {
       return jsonResponse(400, {
@@ -588,15 +597,35 @@ async function readSessionForAdmin(
   return runtime.sessions.read(token);
 }
 
-function adminAuthDenied(c: Context, path: string): Response {
+function adminUnauthenticated(c: Context, path: string): Response {
   return jsonResponse(401, {
     ok: false,
     diagnostic: runtimeDiagnostic({
       code: "UNAUTHENTICATED",
       severity: "error",
       path: `${c.req.method} ${path}`,
-      expected: "active staff session cookie",
-      message: "Not signed in as staff. Sign in via /admin/auth/github first.",
+      expected: "active session cookie",
+      message: "Not signed in. Sign in via /admin/auth/github first.",
+    }),
+  });
+}
+
+// Distinct from UNAUTHENTICATED so the SPA can render an "access
+// denied" view for users who DID sign in but lack a staff row,
+// instead of bouncing them back to /admin/sign-in (which the OAuth
+// re-auth then silently fast-forwards through, producing a visible
+// 5-step redirect chain that looks like an infinite loop).
+function adminNotStaff(c: Context, path: string, login: string | null): Response {
+  return jsonResponse(403, {
+    ok: false,
+    login,
+    diagnostic: runtimeDiagnostic({
+      code: "AUTH_DENIED",
+      severity: "error",
+      path: `${c.req.method} ${path}`,
+      expected: "staff role for the signed-in user",
+      message:
+        "Signed in, but this account isn't on the admin staff list. Contact a site owner to be added.",
     }),
   });
 }
