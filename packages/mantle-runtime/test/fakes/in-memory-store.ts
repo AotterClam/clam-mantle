@@ -10,6 +10,7 @@ import type {
   CreateEntryArgs,
   DeleteEntryArgs,
   EntryRepository,
+  FindEntryByDataFieldArgs,
   ListEntriesArgs,
   TransitionStatusArgs,
   UpdateEntryArgs,
@@ -113,6 +114,15 @@ export class InMemoryEntryRepository implements EntryRepository {
     }
     filtered.sort((a, b) => b.updatedAt - a.updatedAt);
     return filtered.slice(0, limit);
+  }
+
+  async findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {
+    const matches = [...this.rows.values()]
+      .filter((row) => row.collection === args.collection)
+      .filter((row) => (args.status ? row.status === args.status : true))
+      .filter((row) => row.data[args.field] === args.value)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return matches[0] ?? null;
   }
 
   /** Test helper — directly insert/replace rows without going through

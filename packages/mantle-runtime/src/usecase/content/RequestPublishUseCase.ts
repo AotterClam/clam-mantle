@@ -65,6 +65,8 @@ export class RequestPublishUseCase {
         illegalTransitionDiagnostic(opPath, existing.status, "published"),
       );
     }
+    await this.assertTranslatesParentPublished(opPath, existing, schema);
+
     const published = await withConflictDiagnostic(opPath, () =>
       this.entries.transitionStatus({
         id: request.id,
@@ -79,4 +81,50 @@ export class RequestPublishUseCase {
     await publishCache(this.effects, published.id);
     return published;
   }
+
+  private async assertTranslatesParentPublished(
+    path: string,
+    entry: EntryRow,
+    schema: SchemaManifest | undefined,
+  ): Promise<void> {
+    const translates = schema?.spec.translates;
+    if (!translates) return;
+
+    const value = entry.data[translates.on];
+    if (value === undefined || value === null || value === "") {
+      throw missingTranslatesParentDiagnostic(path, entry, translates, value);
+    }
+    const parent = await this.entries.findByDataField({
+      collection: translates.parent,
+      status: "published",
+      field: translates.on,
+      value,
+    });
+    if (parent) return;
+
+    throw missingTranslatesParentDiagnostic(path, entry, translates, value);
+  }
+}
+
+function missingTranslatesParentDiagnostic(
+  path: string,
+  entry: EntryRow,
+  translates: { readonly parent: string; readonly on: string },
+  value: unknown,
+): DiagnosticError {
+  return new DiagnosticError(
+    runtimeDiagnostic({
+      code: "TRANSLATES_PARENT_UNKNOWN",
+      severity: "error",
+      path: `${path}/translates`,
+      value: {
+        child: entry.collection,
+        parent: translates.parent,
+        field: translates.on,
+        value,
+      },
+      expected: `published parent entry in '${translates.parent}' where data.${translates.on} === ${JSON.stringify(value)}`,
+      message: `Cannot publish '${entry.collection}' translation '${entry.id}' because no published parent '${translates.parent}' entry has ${translates.on}=${JSON.stringify(value)}. Publish the parent first.`,
+    }),
+  );
 }

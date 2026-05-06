@@ -32,6 +32,9 @@ export interface EntryRepository {
   transitionStatus(args: TransitionStatusArgs): Promise<EntryRow>;
   /** List entries in a collection, optionally filtered by status. */
   list(args: ListEntriesArgs): Promise<readonly EntryRow[]>;
+  /** Find one entry by a top-level JSON data field. Used for runtime
+   *  referential checks such as `Schema.spec.translates`. */
+  findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null>;
 }
 
 /**
@@ -96,4 +99,11 @@ export interface ListEntriesArgs {
   readonly collection: string;
   readonly status?: ContentState;
   readonly limit?: number;
+}
+
+export interface FindEntryByDataFieldArgs {
+  readonly collection: string;
+  readonly status?: ContentState;
+  readonly field: string;
+  readonly value: unknown;
 }
