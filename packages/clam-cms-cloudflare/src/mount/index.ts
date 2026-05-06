@@ -5,7 +5,6 @@ export {
   type CollectionRouteConfig,
   type MountPublicRoutesOptions,
   type PublicRouteContext,
-  type SiteAccessor,
   type SlugOverride,
 } from "./mountPublicRoutes.js";
 export { createCmsRef } from "./bootRuntimeOnce.js";
