@@ -1,18 +1,30 @@
 import * as React from "react";
 import { Separator } from "../ui/separator";
 import { SidebarTrigger } from "../ui/sidebar";
+import { ProfileDropdown } from "./profile-dropdown";
 import { cn } from "../lib/utils";
 
 interface HeaderProps {
   fixed?: boolean;
   className?: string;
+  /** Toolbar items rendered between the sidebar trigger and the
+   *  trailing ProfileDropdown — `me-auto` on the first child pushes
+   *  the dropdown to the far right (mirrors satnaing's pattern of
+   *  `<TopNav className="me-auto" /> <Search /> <ProfileDropdown />`). */
   children?: React.ReactNode;
+  /** Identity for the trailing ProfileDropdown. `null`s render the
+   *  initial-fallback avatar. */
+  user?: {
+    login: string | null;
+    role: "owner" | "editor" | "contributor" | null;
+  };
 }
 
 export function Header({
   fixed = false,
   className,
   children,
+  user,
 }: HeaderProps): React.ReactElement {
   const [scrolled, setScrolled] = React.useState(false);
   React.useEffect(() => {
@@ -38,8 +50,17 @@ export function Header({
       )}
     >
       <SidebarTrigger className="-ms-1" />
-      <Separator orientation="vertical" className="me-2 h-4 md:hidden" />
+      <Separator orientation="vertical" className="me-2 h-4" />
       {children}
+      {user ? (
+        // `flex items-center` on the wrapper kills the inline-flex
+        // baseline descent gap — without it the wrap div is taller
+        // than the trigger by ~8px (line-height carry) and the
+        // avatar lands above center.
+        <div className={cn("flex items-center", children ? "" : "ms-auto")}>
+          <ProfileDropdown login={user.login} role={user.role} />
+        </div>
+      ) : null}
     </header>
   );
 }

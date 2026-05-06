@@ -89,28 +89,19 @@ export function AuthenticatedLayout({
           }}
         />
         <SidebarInset>
-          <Header fixed />
+          <Header
+            fixed
+            user={{
+              login: me.data?.login ?? null,
+              role: me.data?.role ?? null,
+            }}
+          />
           <Main fixed={fixed} fluid={fluid}>
             {children}
           </Main>
-          <BrandFooter brand={brand} />
         </SidebarInset>
       </SidebarProvider>
     </LayoutProvider>
-  );
-}
-
-function BrandFooter({ brand }: { brand: AdminBrand }): React.ReactElement {
-  return (
-    <footer className="glass-strip flex h-7 items-center justify-end gap-2 px-4 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/70">
-      <span className="font-display normal-case tracking-normal text-[11px] text-foreground/70">
-        {brand.title}
-      </span>
-      <span className="text-foreground/30" aria-hidden>
-        ·
-      </span>
-      <span>admin</span>
-    </footer>
   );
 }
 
@@ -130,8 +121,13 @@ function buildNavGroups(
   const contentGroup: NavGroupData = {
     title: "Content",
     items: collections.map<NavItem>((c) => ({
-      title: c.localized ? `${c.title}` : c.title,
-      icon: c.localized ? Globe : Folder,
+      title: c.title,
+      // Leading icon is always Folder so every content row reads the
+      // same. The Globe sits in the trailing `marker` slot to mark
+      // collections that fold a translation-child schema underneath
+      // — POC sidebar contract.
+      icon: Folder,
+      marker: c.hasTranslations ? Globe : undefined,
       items: statusesFor(c).map<NavLink>((status) => ({
         title: STATUS_LABELS[status],
         url: `/admin/c/${c.name}?status=${status}`,

@@ -7,7 +7,13 @@ const VARIANT_COOKIE = "layout_variant";
 const COLLAPSIBLE_COOKIE = "layout_collapsible";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
-const DEFAULT_VARIANT: SidebarVariant = "inset";
+// `inset` looks great against a light/neutral body background (satnaing's
+// demo). Our admin SPA paints a dark `--app-bg` gradient on body, which
+// turns the `m-2` gap around the inset main into an unwanted dark border.
+// `sidebar` is the flush variant — sidebar + main share the viewport with
+// no outer margin. Switch back to `inset` once we either lighten the body
+// bg or expose a UI toggle that lets the operator pick.
+const DEFAULT_VARIANT: SidebarVariant = "sidebar";
 const DEFAULT_COLLAPSIBLE: SidebarCollapsible = "icon";
 
 interface LayoutContextValue {
