@@ -7,7 +7,12 @@ export interface Collection {
   title: string;
   description: string | null;
   lifecycle: Lifecycle;
-  localized: boolean;
+  /** `true` when some other Schema lists this collection as the
+   *  `translates.parent` — i.e. it is the i18n parent in a parent +
+   *  translations pair. Translation-child Schemas (those with
+   *  `spec.translates`) are filtered out of `/admin/api/collections`
+   *  entirely; they fold into their parent in the sidebar. */
+  hasTranslations: boolean;
 }
 
 export interface AdminUser {

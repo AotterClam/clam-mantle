@@ -118,13 +118,23 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     const schemas = ref.manifests.filter(
       (m): m is SchemaManifest => m.kind === "Schema",
     );
-    const collections = schemas.map((s) => ({
-      name: s.metadata.name,
-      title: s.spec.title,
-      description: s.spec.description ?? null,
-      lifecycle: s.spec.lifecycle ?? "simple",
-      localized: s.spec.localized === true || s.spec.translates !== undefined,
-    }));
+    // POC sidebar contract: translation children (those with
+    // `spec.translates`) never appear in the sidebar — they fold into
+    // their parent. The parent gets a `hasTranslations: true` flag so
+    // the SPA can mark it with a globe icon.
+    const translatedParents = new Set<string>();
+    for (const s of schemas) {
+      if (s.spec.translates) translatedParents.add(s.spec.translates.parent);
+    }
+    const collections = schemas
+      .filter((s) => !s.spec.translates)
+      .map((s) => ({
+        name: s.metadata.name,
+        title: s.spec.title,
+        description: s.spec.description ?? null,
+        lifecycle: s.spec.lifecycle ?? "simple",
+        hasTranslations: translatedParents.has(s.metadata.name),
+      }));
     return jsonResponse(200, { collections });
   });
 

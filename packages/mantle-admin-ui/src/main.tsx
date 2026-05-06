@@ -333,9 +333,9 @@ function CollectionView({
               {status}
             </span>
           )}
-          {collection?.localized && (
+          {collection?.hasTranslations && (
             <span className="badge-status bg-accent text-accent-foreground">
-              localized
+              i18n
             </span>
           )}
         </div>

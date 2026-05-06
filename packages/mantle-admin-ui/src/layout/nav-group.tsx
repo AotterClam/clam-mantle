@@ -118,7 +118,13 @@ function NavLinkItem({
             : null)}
         >
           {item.icon && <item.icon aria-hidden />}
-          <span>{item.title}</span>
+          <span className="flex-1 truncate">{item.title}</span>
+          {item.marker && (
+            <item.marker
+              aria-hidden
+              className="size-3.5 text-muted-foreground"
+            />
+          )}
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
         </a>
       </SidebarMenuButton>
@@ -147,10 +153,16 @@ function NavCollapsibleExpanded({
           <SidebarMenuButton isActive={groupActive}>
             {item.icon && <item.icon aria-hidden />}
             <span className="flex-1 truncate">{item.title}</span>
+            {item.marker && (
+              <item.marker
+                aria-hidden
+                className="size-3.5 text-muted-foreground"
+              />
+            )}
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
             <ChevronRight
               aria-hidden
-              className="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:rotate-180 rtl:group-data-[state=open]/collapsible:-rotate-90"
+              className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:rotate-180 rtl:group-data-[state=open]/collapsible:-rotate-90"
             />
           </SidebarMenuButton>
         </CollapsibleTrigger>
