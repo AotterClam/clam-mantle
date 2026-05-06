@@ -15,12 +15,15 @@ import {
 } from "../src/usecase/content/index.js";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
+import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
 interface Harness {
   store: InMemoryEntryRepository;
   dispatcher: McpJsonRpcDispatcher;
+  publishCalls: string[];
+  unpublishCalls: string[];
 }
 
 function buildHarness(): Harness {
@@ -29,19 +32,45 @@ function buildHarness(): Harness {
   let i = 1;
   const clock: Clock = { now: () => 1_000_000 };
   const idgen: IdGenerator = { next: () => `mcp-${i++}` };
+  const publishCalls: string[] = [];
+  const unpublishCalls: string[] = [];
+  const templates = new TemplateRegistry();
+  const effects = {
+    templates,
+    siteConfig: {
+      load: async () => ({
+        title: "Test",
+        brand: "Test",
+        description: "",
+        origin: "https://example.com",
+        locales: ["en"],
+        canonicalLocale: "en",
+      }),
+    },
+    publishOrchestrator: {
+      publish: async ({ entryId }: { entryId: string }) => {
+        publishCalls.push(entryId);
+      },
+      unpublish: async ({ entryId }: { entryId: string }) => {
+        unpublishCalls.push(entryId);
+      },
+    },
+  };
   const useCases: McpUseCases = {
     listEntries: new ListEntriesUseCase(store, schemas),
     getEntry: new GetEntryUseCase(store),
     createDraft: new CreateDraftUseCase(store, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(store, clock),
-    requestPublish: new RequestPublishUseCase(store, schemas, clock),
-    unpublish: new UnpublishUseCase(store, clock),
-    archive: new ArchiveUseCase(store, schemas, clock),
+    updateDraft: new UpdateDraftUseCase(store, schemas, clock),
+    requestPublish: new RequestPublishUseCase(store, schemas, clock, effects),
+    unpublish: new UnpublishUseCase(store, clock, effects),
+    archive: new ArchiveUseCase(store, schemas, clock, effects),
     deleteEntry: new DeleteEntryUseCase(store),
   };
   return {
     store,
     dispatcher: new McpJsonRpcDispatcher(useCases, [postsSchema()]),
+    publishCalls,
+    unpublishCalls,
   };
 }
 
@@ -72,6 +101,7 @@ describe("McpJsonRpcDispatcher", () => {
     expect(names).toContain("list_entries");
     expect(names).toContain("get_entry");
     expect(names).toContain("request_publish");
+    expect(names).toContain("unpublish_entry");
     expect(names).toContain("archive_entry");
     // Per-collection authoring tools.
     expect(names).toContain("create_draft_posts");
@@ -100,7 +130,7 @@ describe("McpJsonRpcDispatcher", () => {
   });
 
   it("tools/call request_publish flips draft → published", async () => {
-    const { dispatcher, store } = buildHarness();
+    const { dispatcher, store, publishCalls } = buildHarness();
     const created = await store.create({
       id: "p1",
       collection: "posts",
@@ -119,6 +149,30 @@ describe("McpJsonRpcDispatcher", () => {
     const body = (await res.json()) as { result: { content: { text: string }[] } };
     const result = JSON.parse(body.result.content[0]!.text) as { status: string };
     expect(result.status).toBe("published");
+    expect(publishCalls).toEqual([created.id]);
+  });
+
+  it("tools/call unpublish_entry flips published → draft", async () => {
+    const { dispatcher, store, unpublishCalls } = buildHarness();
+    const created = await store.create({
+      id: "p1",
+      collection: "posts",
+      status: "published",
+      data: {},
+      authorId: "u1",
+      now: 0,
+    });
+    const res = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", {
+        name: "unpublish_entry",
+        arguments: { id: created.id },
+      }),
+      { userId: "u1" },
+    );
+    const body = (await res.json()) as { result: { content: { text: string }[] } };
+    const result = JSON.parse(body.result.content[0]!.text) as { status: string };
+    expect(result.status).toBe("draft");
+    expect(unpublishCalls).toEqual([created.id]);
   });
 
   it("unknown tool returns -32601", async () => {

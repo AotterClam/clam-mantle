@@ -21,6 +21,9 @@ export class WorkersOAuthVerifier implements OAuthVerifier {
   constructor(kv: KVNamespace) {
     this.api = getOAuthApi(
       {
+        // See `createOAuthProvider`: token verification uses helpers only;
+        // `/mcp` dispatch stays owned by `mountMcp`.
+        apiHandlers: {},
         defaultHandler: { fetch() { throw new Error("not reached"); } } as never,
         authorizeEndpoint: OAUTH_AUTHORIZE_PATH,
         tokenEndpoint: OAUTH_TOKEN_PATH,

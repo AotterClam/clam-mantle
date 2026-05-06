@@ -220,12 +220,18 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // Content / view / boot use cases. They see `entries` only as the
   // chokepoint port — hook firing is invisible to them.
   const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen);
-  const updateDraft = new UpdateDraftUseCase(entries, clock);
+  const updateDraft = new UpdateDraftUseCase(entries, schemasByName, clock);
   const getEntry = new GetEntryUseCase(entries);
   const listEntries = new ListEntriesUseCase(entries, schemasByName);
-  const requestPublish = new RequestPublishUseCase(entries, schemasByName, clock);
-  const unpublish = new UnpublishUseCase(entries, clock);
-  const archive = new ArchiveUseCase(entries, schemasByName, clock);
+  const contentPublishEffects = { publishOrchestrator, siteConfig, templates };
+  const requestPublish = new RequestPublishUseCase(
+    entries,
+    schemasByName,
+    clock,
+    contentPublishEffects,
+  );
+  const unpublish = new UnpublishUseCase(entries, clock, contentPublishEffects);
+  const archive = new ArchiveUseCase(entries, schemasByName, clock, contentPublishEffects);
   const deleteEntry = new DeleteEntryUseCase(entries);
   const executeView = new ExecuteViewUseCase(args.db);
   const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);

@@ -81,6 +81,31 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     ]);
   }
 
+  async unpublish(request: PublishEntryRequest): Promise<void> {
+    const entry = await readEntryById(this.db, request.entryId);
+    if (!entry) {
+      throw new DiagnosticError(
+        runtimeDiagnostic({
+          code: "NOT_FOUND",
+          severity: "error",
+          path: `usecase/UnpublishEntryCache/${request.entryId}`,
+          value: request.entryId,
+          expected: "id of an existing entry",
+          message: `Entry not found: ${request.entryId}.`,
+        }),
+      );
+    }
+    const indexLocale = entry.locale ?? null;
+    const doctype = request.htmlDoctype ?? DEFAULT_DOCTYPE;
+
+    await Promise.all([
+      this.kv.delete(entryHtmlKey(entry)),
+      this.kv.delete(entryMarkdownKey(entry)),
+      this.renderList(entry.collection, indexLocale, request.site, request.templates, doctype),
+      this.renderLlmsTxt(indexLocale, request.site),
+    ]);
+  }
+
   private async renderEntry(
     entry: Entry,
     site: SiteConfig,
@@ -124,4 +149,3 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     await this.kv.put(llmsTxtKey(locale ?? ""), body);
   }
 }
-

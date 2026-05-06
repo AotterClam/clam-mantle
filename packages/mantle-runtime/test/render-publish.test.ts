@@ -79,4 +79,33 @@ describe("HtmlPublishOrchestrator", () => {
       }),
     ).rejects.toMatchObject({ diagnostic: { code: "NOT_FOUND" } });
   });
+
+  it("unpublish removes entry blobs and rewrites derived list/llms caches", async () => {
+    const db = new InMemoryDatabase();
+    const kv = new InMemoryKv();
+    seedEntry(db, { id: "p1", data: { title: "Hi", slug: "hi", content: "Hello." } });
+    const templates = new TemplateRegistry();
+    templates.registerEntryTemplate("posts", ({ entry }) => `<h1>${entry.data["title"] as string}</h1>`);
+    templates.registerListTemplate("posts", ({ entries }) => `<ul>${entries.length}</ul>`);
+
+    const orchestrator = new HtmlPublishOrchestrator(db, kv, null, new ComposeEntrySeoMetaUseCase(db));
+    await orchestrator.publish({ entryId: "p1", site, templates });
+    db.entries.set("p1", {
+      ...db.entries.get("p1")!,
+      status: "draft",
+      version: 2,
+      updated_at: 3,
+    });
+    await orchestrator.unpublish({ entryId: "p1", site, templates });
+
+    const snap = kv._snapshot();
+    expect(
+      snap.get(entryHtmlKey({ id: "p1", collection: "posts", status: "draft", version: 2, data: { slug: "hi" }, createdAt: 1, updatedAt: 3 })),
+    ).toBeUndefined();
+    expect(
+      snap.get(entryMarkdownKey({ id: "p1", collection: "posts", status: "draft", version: 2, data: { slug: "hi" }, createdAt: 1, updatedAt: 3 })),
+    ).toBeUndefined();
+    expect(snap.get(listHtmlKey("posts", ""))).toContain("<ul>0</ul>");
+    expect(snap.get(llmsTxtKey(""))).not.toContain("Hi");
+  });
 });

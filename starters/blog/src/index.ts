@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import type { Entry } from "@aotter/mantle-spec";
-import { siteConfigFromDefaults } from "@aotter/mantle-runtime";
 import {
   createCmsRef,
   mountMcp,
@@ -37,7 +36,6 @@ function getApp(env: Env): Hono {
   const config = buildCmsConfig(env);
   const cms = createCmsRef(config);
   const app = new Hono();
-  const site = siteConfigFromDefaults(config.siteDefaults!);
 
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
@@ -46,7 +44,6 @@ function getApp(env: Env): Hono {
       { collection: "post-translations", segment: "posts", listRoute: true },
       { collection: "page-translations", segment: "pages", homeSlug: "home" },
     ],
-    site: () => site,
     homeRenderer: renderHome,
     notFoundRenderer: renderNotFound,
     slugOverrides: [
