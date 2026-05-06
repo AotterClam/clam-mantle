@@ -30,10 +30,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build dist (typecheck + emit) for spec / runtime / cloudflare
-        # Vitest tests for cloudflare import the runtime via dist/, so
-        # build before test. Spec + runtime tests use src/ directly.
-        run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-cloudflare' build
+      - name: Build dist (typecheck + emit) for spec / runtime / admin-ui / cloudflare
+        # Vitest tests for cloudflare import runtime/admin UI via dist/,
+        # so build before test. Spec + runtime tests use src/ directly.
+        run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-admin-ui' --filter '@aotter/mantle-cloudflare' build
 
       - name: Re-link bins now that dist/ exists
         # First `pnpm install` runs before SDK build, so spec's
@@ -131,7 +131,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-cloudflare' build
+      - run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-admin-ui' --filter '@aotter/mantle-cloudflare' build
 
       # The starter-smoke runs against the wrangler test profile
       # (`[env.test]` in wrangler.toml — port 8788, persist-to
