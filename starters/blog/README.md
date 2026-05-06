@@ -51,6 +51,7 @@ pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runt
 
 # Then in starters/blog/:
 cd starters/blog
+cp .dev.vars.example .dev.vars
 
 # Option A: local demo fixture for development/testing.
 pnpm fixture       # seeds dev D1/KV with demo content (no staff row)
@@ -59,11 +60,29 @@ pnpm fixture       # seeds dev D1/KV with demo content (no staff row)
 pnpm dev
 ```
 
-After `pnpm dev`, sign in at <http://localhost:8787/admin> with the
-GitHub account whose login matches `ADMIN_GITHUB_LOGIN` in your
-`.dev.vars` — the runtime's `ensureBootstrapOwner` will promote that
-first user to `owner` automatically. The dev fixture intentionally
-does not pre-seed any staff row so this bootstrap path stays clean.
+The public site (rendered blog routes, contact form, MCP transport
+auth) is already runnable at this point — no OAuth setup required.
+
+### Signing in at /admin
+
+`/admin` uses real GitHub OAuth even locally — there is no stub for the
+browser redirect flow. One-time setup:
+
+1. **Create a GitHub OAuth App** at <https://github.com/settings/developers>:
+   - **Homepage URL**: `http://localhost:8787`
+   - **Callback URL**: `http://localhost:8787/admin/auth/github/callback`
+2. **Edit `.dev.vars`** (created above from `.dev.vars.example`):
+   ```
+   GITHUB_CLIENT_ID=<the_client_id>
+   GITHUB_CLIENT_SECRET=<the_client_secret>
+   ADMIN_GITHUB_LOGIN=<your_github_login>
+   ```
+3. **Restart `pnpm dev`** so wrangler picks up the new vars.
+4. Visit <http://localhost:8787/admin> and sign in with the GitHub
+   account whose login matches `ADMIN_GITHUB_LOGIN`. The runtime's
+   `ensureBootstrapOwner` promotes that first user to `owner`
+   automatically — the dev fixture intentionally leaves the staff
+   table empty so this bootstrap fires.
 
 The fixture re-runs cleanly while `wrangler dev` is up too — the
 migrations are `IF NOT EXISTS` and inserts use `OR IGNORE`, so
@@ -76,12 +95,17 @@ fixture data, every page returns 404.
 ### Integration smokes
 
 ```bash
-# Spawns wrangler on port 8788 with --env test --persist-to .wrangler-test,
-# applies the test fixture (which DOES seed staff(u-staff-1, editor) so
-# `Bearer dev-u-staff-1` reaches the role-gated MCP/View paths), runs
-# both smokes, then tears wrangler down.
+cp .dev.vars.test.example .dev.vars.test   # one-time, gitignored
 pnpm test:integration
 ```
+
+`pnpm test:integration` orchestrates the test profile end-to-end:
+spawns wrangler with `--env test --persist-to .wrangler-test --port 8788`,
+applies the test fixture (which **does** pre-seed
+`staff(u-staff-1, editor)` so `Bearer dev-u-staff-1` reaches the
+role-gated MCP/View paths — that's exactly what should NOT happen on
+the dev profile), runs both smokes against port 8788, then tears
+wrangler down.
 
 The test profile has its own miniflare state (`.wrangler-test/`) and
 its own port (8788), so it never collides with `pnpm dev` running on
@@ -133,7 +157,12 @@ curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
   -d '{"name":"Bot","email":"b@example.com","message":"spam","turnstileToken":"fail"}'
 
-# MCP /mcp:
+# MCP /mcp transport handshake. `Bearer dev-<user_id>` is StubOAuthVerifier's
+# happy path; `initialize` is role-free so it works on the dev profile.
+# Anything that touches a role-gated tool (tools/call) requires either
+# (a) running against the test profile via `pnpm test:integration` (which
+# pre-seeds u-staff-1 as editor), or (b) manually inserting a staff row
+# for the user_id you embed in the Bearer token.
 curl -i -X POST http://localhost:8787/mcp \
   -H 'authorization: Bearer dev-u-staff-1' \
   -H 'content-type: application/json' \
@@ -159,6 +188,8 @@ src/
   theme.default/  # hono/jsx HTML for entry/list/home/contact + chrome
 scripts/
   seed-initial-content.ts # renders initial-seed.json into D1 SQL + KV bulk puts
+  run-integration.mjs     # spawns wrangler --env test --persist-to .wrangler-test,
+                          # applies test fixture, runs smokes, tears down
 test/fixture/
   data.ts            # fixture posts + translations + site config
   apply-shared.ts    # SQL/KV builder + applyFixture(opts) entrypoint
@@ -169,14 +200,10 @@ test/fixture/
 test/integration/
   mcp-smoke.ts       # MCP JSON-RPC smoke (Bearer dev-u-staff-1)
   view-rest-smoke.ts # public-read smoke
-scripts/
-  run-integration.mjs# spawns `wrangler --env test --persist-to .wrangler-test`,
-                     # applies test fixture, runs smokes, tears down
-wrangler.toml        # default env: local D1 + KV bindings; CLAM_ALLOW_STUB_OAUTH=1
-                     # [env.test]: separate bindings, port 8788
+wrangler.toml          # default env: local D1 + KV bindings; CLAM_ALLOW_STUB_OAUTH=1
+                       # [env.test]: separate bindings, port 8788
 .dev.vars.example      # committed; .dev.vars itself stays gitignored
-.dev.vars.test.example # committed; .dev.vars.test loaded by `wrangler dev --env test`
-.dev.vars.example # committed; .dev.vars itself stays gitignored
+.dev.vars.test.example # committed; .dev.vars.test loaded by wrangler --env test
 ```
 
 ## Production checklist
