@@ -16,6 +16,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm validate && pnpm typecheck",
     "deploy": "wrangler deploy",
+    "setup:site": "node scripts/setup-site.mjs",
+    "provision:plan": "node scripts/provision.mjs plan",
+    "provision:up": "node scripts/provision.mjs up",
+    "seed:initial": "tsx scripts/seed-initial-content.ts",
     "theme:fork": "node scripts/theme-fork.mjs",
     "theme:reset": "node scripts/theme-reset.mjs"
   },

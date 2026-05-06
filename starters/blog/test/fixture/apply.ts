@@ -293,7 +293,7 @@ async function main(): Promise<void> {
   // populated.
   process.stdout.write("\nApplying D1 fixtures (migrations + inserts)...\n");
   execSync(
-    "wrangler d1 execute mantle-blog-local --local --file=.fixture.sql",
+    "wrangler d1 execute DB --local --file=.fixture.sql",
     { stdio: "inherit" },
   );
 
