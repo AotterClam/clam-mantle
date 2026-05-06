@@ -53,11 +53,17 @@ pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filte
 cd starters/blog
 
 # Option A: local demo fixture for development/testing.
-pnpm fixture
+pnpm fixture       # seeds dev D1/KV with demo content (no staff row)
 
 # Then run wrangler dev:
 pnpm dev
 ```
+
+After `pnpm dev`, sign in at <http://localhost:8787/admin> with the
+GitHub account whose login matches `ADMIN_GITHUB_LOGIN` in your
+`.dev.vars` — the runtime's `ensureBootstrapOwner` will promote that
+first user to `owner` automatically. The dev fixture intentionally
+does not pre-seed any staff row so this bootstrap path stays clean.
 
 The fixture re-runs cleanly while `wrangler dev` is up too — the
 migrations are `IF NOT EXISTS` and inserts use `OR IGNORE`, so
@@ -66,6 +72,21 @@ edits to fixture text or templates land on subsequent applies.
 Run order matters because `wrangler dev`'s D1 lives in memory
 unless the fixture has populated `.wrangler/state` first; without
 fixture data, every page returns 404.
+
+### Integration smokes
+
+```bash
+# Spawns wrangler on port 8788 with --env test --persist-to .wrangler-test,
+# applies the test fixture (which DOES seed staff(u-staff-1, editor) so
+# `Bearer dev-u-staff-1` reaches the role-gated MCP/View paths), runs
+# both smokes, then tears wrangler down.
+pnpm test:integration
+```
+
+The test profile has its own miniflare state (`.wrangler-test/`) and
+its own port (8788), so it never collides with `pnpm dev` running on
+the default profile (`.wrangler/`, port 8787). Both can run in
+parallel.
 
 For production onboarding, do not run the fixture. The install Skill
 asks for public copy, writes `initial-seed.json`, and provision applies
@@ -139,10 +160,22 @@ src/
 scripts/
   seed-initial-content.ts # renders initial-seed.json into D1 SQL + KV bulk puts
 test/fixture/
-  data.ts         # fixture posts + translations + site config
-  apply.ts        # renders templates, emits .fixture.sql + .fixture.kv.json,
-                  # runs `wrangler d1 execute` + `wrangler kv bulk put`
-wrangler.toml     # local D1 + KV bindings; MANTLE_ALLOW_STUB_OAUTH=1
+  data.ts            # fixture posts + translations + site config
+  apply-shared.ts    # SQL/KV builder + applyFixture(opts) entrypoint
+  apply-dev.ts       # `pnpm fixture` — dev seed (no staff row;
+                     # `ensureBootstrapOwner` fires for first OAuth login)
+  apply-test.ts      # `pnpm test:integration` setup — same content +
+                     # staff(u-staff-1, editor) row, targets test profile
+test/integration/
+  mcp-smoke.ts       # MCP JSON-RPC smoke (Bearer dev-u-staff-1)
+  view-rest-smoke.ts # public-read smoke
+scripts/
+  run-integration.mjs# spawns `wrangler --env test --persist-to .wrangler-test`,
+                     # applies test fixture, runs smokes, tears down
+wrangler.toml        # default env: local D1 + KV bindings; MANTLE_ALLOW_STUB_OAUTH=1
+                     # [env.test]: separate bindings, port 8788
+.dev.vars.example      # committed; .dev.vars itself stays gitignored
+.dev.vars.test.example # committed; .dev.vars.test loaded by `wrangler dev --env test`
 .dev.vars.example # committed; .dev.vars itself stays gitignored
 ```
 

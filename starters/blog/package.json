@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "fixture": "tsx test/fixture/apply.ts",
+    "fixture": "tsx test/fixture/apply-dev.ts",
+    "test:integration": "node scripts/run-integration.mjs",
     "mcp-smoke": "tsx test/integration/mcp-smoke.ts",
     "view-smoke": "tsx test/integration/view-rest-smoke.ts",
     "validate": "mantle validate",

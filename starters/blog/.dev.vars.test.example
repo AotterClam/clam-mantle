@@ -1,0 +1,22 @@
+# Test profile env vars — loaded by `wrangler dev --env test`.
+#
+# Copy to `.dev.vars.test` (gitignored) before running
+# `pnpm test:integration`. The test profile uses StubOAuthVerifier
+# (no real GitHub round-trip), and integration smokes authenticate via
+# `Authorization: Bearer dev-<user_id>` so no real OAuth client is
+# needed.
+
+MANTLE_ALLOW_STUB_OAUTH=1
+TURNSTILE_SECRET_KEY=dev-stub
+MANTLE_LOCAL_DEV=1
+
+# Used by ensureBootstrapOwner when a real OAuth flow is exercised.
+# Tests don't OAuth-login, so this can be any string — but it must be
+# present so the runtime doesn't blow up reading the env var.
+ADMIN_GITHUB_LOGIN=test-admin
+
+# OAuth client creds — unused in test profile (StubOAuthVerifier
+# bypasses the real GitHub round-trip) but the runtime still reads
+# them at boot. Stub values are fine.
+GITHUB_CLIENT_ID=test-stub-client-id
+GITHUB_CLIENT_SECRET=test-stub-client-secret
