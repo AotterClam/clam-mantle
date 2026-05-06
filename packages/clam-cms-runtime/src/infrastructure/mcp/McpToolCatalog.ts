@@ -70,6 +70,15 @@ export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
     },
   },
   {
+    name: "unpublish_entry",
+    description: "Unpublish a published or archived entry back to draft before editing.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+    },
+  },
+  {
     name: "archive_entry",
     description: "Archive an entry. Requires expected_version (OCC).",
     inputSchema: {

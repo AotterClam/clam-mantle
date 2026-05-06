@@ -39,7 +39,8 @@ import type { Staff } from "../../domain/model/Staff.js";
  * (`create_draft_<collection>`, `update_draft_<collection>` for each
  * Schema in the manifest set, with the Schema's properties inlined
  * into the tool's `inputSchema`) plus generic read/status tools
- * (`list_entries`, `get_entry`, `request_publish`, `archive_entry`).
+ * (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`,
+ * `archive_entry`).
  * Boot validation refuses Schemas whose names mangle to the same
  * tool-name suffix.
  *
@@ -175,6 +176,11 @@ export class McpJsonRpcDispatcher {
         const id = args["id"];
         if (typeof id !== "string") return MISSING_ARG;
         return this.useCases.requestPublish.execute({ id });
+      }
+      case "unpublish_entry": {
+        const id = args["id"];
+        if (typeof id !== "string") return MISSING_ARG;
+        return this.useCases.unpublish.execute({ id });
       }
       case "archive_entry": {
         const id = args["id"];

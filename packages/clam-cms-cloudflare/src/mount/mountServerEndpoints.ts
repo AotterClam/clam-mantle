@@ -67,6 +67,29 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   if (!adminAuth) return;
   const { oauthProvider } = adminAuth;
 
+  // ── Minimal admin console landing ───────────────────────────────────
+  app.get("/admin", async (c) => {
+    const runtime = await ref.get();
+    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
+    const session = sessionToken ? await runtime.sessions.read(sessionToken) : null;
+    if (!session) {
+      return htmlResponse(renderAdminLanding({
+        origin: new URL(c.req.url).origin,
+        signedIn: false,
+      }));
+    }
+    const [user, staff] = await Promise.all([
+      runtime.users.findById(session.userId),
+      runtime.staff.readByUserId(session.userId),
+    ]);
+    return htmlResponse(renderAdminLanding({
+      origin: new URL(c.req.url).origin,
+      signedIn: true,
+      displayName: user?.name ?? "Owner",
+      staffRole: staff?.role ?? null,
+    }));
+  });
+
   // ── GitHub admin sign-in ─────────────────────────────────────────────
   app.get("/admin/auth/github", async (c) => {
     const runtime = await ref.get();
@@ -203,7 +226,16 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/oauth/authorize", consentHandler);
   app.post("/oauth/authorize", consentHandler);
 
-  // ── OAuth provider passthrough (token / register) ────────────────────
+  // ── OAuth provider passthrough (discovery / token / register) ─────────
+  //
+  // MCP clients discover the authorization server and protected resource
+  // metadata through /.well-known before they can open the consent screen.
+  const providerFetch = (c: Context) =>
+    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c));
+  app.all("/.well-known/oauth-authorization-server", providerFetch);
+  app.all("/.well-known/oauth-authorization-server/*", providerFetch);
+  app.all("/.well-known/oauth-protected-resource", providerFetch);
+  app.all("/.well-known/oauth-protected-resource/*", providerFetch);
   app.all("/oauth/token", (c) =>
     oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
   );
@@ -463,6 +495,98 @@ function jsonResponse(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function htmlResponse(html: string, status = 200): Response {
+  return new Response(html, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+function renderAdminLanding(args: {
+  readonly origin: string;
+  readonly signedIn: boolean;
+  readonly displayName?: string;
+  readonly staffRole?: string | null;
+}): string {
+  const mcpUrl = `${args.origin}/mcp`;
+  const siteUrl = `${args.origin}/`;
+  const authUrl = `${args.origin}/admin/auth/github`;
+  const status = args.signedIn && args.staffRole
+    ? `Signed in as ${escapeHtml(args.displayName ?? "staff")} (${escapeHtml(args.staffRole)})`
+    : args.signedIn
+      ? "Signed in, but this GitHub account is not staff yet."
+      : "Sign in with GitHub to finish owner setup.";
+  const action = args.signedIn && args.staffRole
+    ? `
+      <section class="card">
+        <h2>Your site is live</h2>
+        <p>Open the public site first. If the title, tone, color, or first content feels wrong, tell your installer agent what to change.</p>
+        <p><a class="button" href="${escapeAttr(siteUrl)}">Open public site</a></p>
+      </section>
+      <section class="card">
+        <h2>Let an AI agent manage content</h2>
+        <p>Give this MCP URL to Claude Code, Cursor, Codex, or another MCP-capable agent:</p>
+        <code>${escapeHtml(mcpUrl)}</code>
+        <p>The first connection opens a consent screen. Approve it with the same GitHub account.</p>
+      </section>
+      <section class="card muted">
+        <h2>Good next prompts</h2>
+        <ul>
+          <li>"Write and publish my first post."</li>
+          <li>"Make the site feel warmer and less technical."</li>
+          <li>"Change the homepage copy for my audience."</li>
+        </ul>
+      </section>
+    `
+    : `
+      <section class="card">
+        <h2>Finish setup</h2>
+        <p>Use the GitHub account configured as the site owner. After sign-in, this page will show your MCP instructions.</p>
+        <p><a class="button" href="${escapeAttr(authUrl)}">Sign in with GitHub</a></p>
+      </section>
+    `;
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clam CMS Admin</title>
+  <style>
+    body { margin: 0; font-family: ui-serif, Georgia, serif; color: #172018; background: #f4efe4; }
+    main { max-width: 760px; margin: 0 auto; padding: 56px 20px; }
+    h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 0.95; margin: 0 0 16px; }
+    h2 { margin: 0 0 10px; font-size: 1.25rem; }
+    p, li { font-size: 1rem; line-height: 1.6; }
+    code { display: block; padding: 14px; border-radius: 12px; background: #172018; color: #f7f0df; overflow-wrap: anywhere; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; color: #6f6a5f; }
+    .card { background: #fffaf0; border: 1px solid #ded4bf; border-radius: 22px; padding: 22px; margin-top: 18px; box-shadow: 0 16px 45px rgba(55, 40, 10, .08); }
+    .muted { background: #ede4d0; }
+    .button { display: inline-block; background: #172018; color: #fffaf0; padding: 12px 16px; border-radius: 999px; text-decoration: none; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Clam CMS Admin</div>
+    <h1>Your AI-operable site console.</h1>
+    <p>${escapeHtml(status)}</p>
+    ${action}
+  </main>
+</body>
+</html>`;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function escapeAttr(value: string): string {
+  return escapeHtml(value);
 }
 
 function jsonError(args: { status: number; code: string; message: string }): Response {

@@ -8,9 +8,9 @@
  *     + HTTP Triggers from Procedure manifests.
  *   - `mountMcp` — Hono factory mounting the MCP JSON-RPC dispatcher
  *     at `/mcp`. Bearer-token gated via the runtime `OAuthVerifier`
- *     port; no `/oauth/{authorize,token,register}` route mount in
- *     v0.1.0 (deferred to a `@cloudflare/workers-oauth-provider`
- *     integration in v0.1.x).
+ *     port. When `adminAuth` is supplied, `mountServerEndpoints`
+ *     also mounts GitHub sign-in plus OAuth discovery, DCR, token, and
+ *     consent routes backed by `@cloudflare/workers-oauth-provider`.
  *   - `mountPublicRoutes` — Hono factory mounting the rendered-blog
  *     surface (`/{locale}/{collection}/{slug}`, `/sitemap.xml`,
  *     `.md` mirror, `llms.txt`). Opt-in; `starters/blank` skips it.

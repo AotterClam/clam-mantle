@@ -4,6 +4,12 @@ Reference starter for clam-cms v0.1.0. Wraps the runtime + Cloudflare
 adapter into a runnable Worker with three Schemas (posts, post-translations,
 contact-messages) and a public read path served from KV.
 
+This starter is intentionally fixed-manifest during bootstrap. The
+first-run installer should ask for public copy and seed home/about/
+contact/welcome content, not redesign the Schema/View/Procedure/
+Trigger model. Custom workflow design belongs in `starters/blank` or
+a later dedicated starter.
+
 ## What it exercises
 
 - **Localized posts via `translates`** — `posts` is language-neutral
@@ -32,8 +38,9 @@ contact-messages) and a public read path served from KV.
   simple` only. Editorial runtime lands in v0.1.x.
 - **R2 media uploads**. `posts.coverUrl` is a hand-supplied URL string
   for now. UI picker + R2 upload land in v0.1.x.
-- **Admin SPA** (commit 5). Until that ships, content is seeded via
-  `pnpm seed`.
+- **Full admin SPA**. v0.1.0 ships a minimal owner landing at `/admin`.
+  First public content is seeded by `pnpm run seed:initial`; ongoing
+  content operations use MCP after owner bootstrap.
 
 ## Quickstart
 
@@ -45,10 +52,7 @@ pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runt
 # Then in starters/blog/:
 cd starters/blog
 
-# Apply the test fixture FIRST. It runs canonical migrations,
-# writes site_config + 3 posts × 2 locales to D1, plus pre-rendered
-# HTML + per-locale llms.txt to KV so the public read path works
-# without an admin publish flow:
+# Option A: local demo fixture for development/testing.
 pnpm fixture
 
 # Then run wrangler dev:
@@ -62,6 +66,19 @@ edits to fixture text or templates land on subsequent applies.
 Run order matters because `wrangler dev`'s D1 lives in memory
 unless the fixture has populated `.wrangler/state` first; without
 fixture data, every page returns 404.
+
+For production onboarding, do not run the fixture. The install Skill
+asks for public copy, writes `initial-seed.json`, and provision applies
+it directly to remote D1/KV:
+
+```bash
+pnpm run seed:initial -- --seed-file initial-seed.json --origin "<worker_url>" --remote
+```
+
+The seed writes home/about/contact/welcome entries to D1 and rendered
+HTML, markdown mirrors, post lists, and `llms.txt` to KV. It is the
+only first-run direct-D1 content path; after owner sign-in, MCP handles
+normal content operations.
 
 ## Smoke test (curl)
 
@@ -118,7 +135,9 @@ src/
   clamConfig.ts   # builds CmsConfig from env
   loadManifests.ts# parses YAML at module-load (Wrangler [[rules]] type=Text)
   handlers/       # ref handlers (CAPTCHA stub, Slack stub)
-  templates/      # hono/jsx HTML for entry + list + binding
+  theme.default/  # hono/jsx HTML for entry/list/home/contact + chrome
+scripts/
+  seed-initial-content.ts # renders initial-seed.json into D1 SQL + KV bulk puts
 test/fixture/
   data.ts         # fixture posts + translations + site config
   apply.ts        # renders templates, emits .fixture.sql + .fixture.kv.json,
@@ -131,9 +150,9 @@ wrangler.toml     # local D1 + KV bindings; CLAM_ALLOW_STUB_OAUTH=1
 
 Before deploying THIS starter as-is:
 
-1. Replace `StubOAuthVerifier` with a real `@cloudflare/workers-oauth-provider` verifier and remove `CLAM_ALLOW_STUB_OAUTH` from vars.
+1. Remove `CLAM_ALLOW_STUB_OAUTH` from deployable vars; production uses GitHub OAuth + Workers OAuth Provider.
 2. Replace `captchaCheck` with a real Turnstile / hCaptcha siteverify call.
 3. Replace `slackNotify` with your Slack webhook (or a different sink).
-4. Replace `posts.coverUrl` images with assets you own (the fixture uses Unsplash for demo).
-5. Bind a real D1 database + KV namespace in `wrangler.toml` and run migrations against it (boot does this automatically on first request, but pre-creating the tables via `wrangler d1 migrations apply` is also fine).
-6. Don't ship `test/fixture/` to production — it's demo content for local dev.
+4. Replace demo Unsplash cover images with assets you own when appropriate.
+5. Bind real D1, render KV, and OAuth KV namespaces in `wrangler.toml`; boot applies runtime migrations on first request.
+6. Don't run `test/fixture/` against production — it is demo content for local dev.

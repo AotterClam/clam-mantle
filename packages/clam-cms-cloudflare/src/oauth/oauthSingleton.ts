@@ -22,6 +22,11 @@ import {
  */
 export function createOAuthProvider(): OAuthProvider {
   return new OAuthProvider({
+    // v0.1 mounts `/mcp` itself via `mountMcp` so it can build the
+    // runtime context and enforce staff membership. workers-oauth-provider
+    // v0.4 still requires API handler config even when the provider is
+    // only used for OAuth endpoints/helpers.
+    apiHandlers: {},
     defaultHandler: {
       fetch() {
         throw new BypassToConsent();

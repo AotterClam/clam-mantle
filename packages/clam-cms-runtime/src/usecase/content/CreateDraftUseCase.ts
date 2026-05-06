@@ -2,14 +2,15 @@ import {
   DiagnosticError,
   type SchemaManifest,
 } from "@aotterclam/clam-cms-spec";
+import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { IdGenerator } from "../../domain/port/IdGenerator.js";
+import { projectAndStamp } from "../../domain/service/BuiltinProjector.js";
 import type { CreateDraftRequest } from "../dto/content/index.js";
 import {
   schemaUnknownDiagnostic,
-  stripReservedDataKeys,
   withConflictDiagnostic,
 } from "./diagnostics.js";
 
@@ -28,24 +29,36 @@ export class CreateDraftUseCase {
 
   async execute(request: CreateDraftRequest): Promise<EntryRow> {
     const opPath = `usecase/CreateDraft/${request.collection}`;
-    if (!this.schemas.has(request.collection)) {
+    const schema = this.schemas.get(request.collection);
+    if (!schema) {
       throw new DiagnosticError(
         schemaUnknownDiagnostic(opPath, request.collection, [...this.schemas.keys()]),
       );
     }
     const id = this.idgen.next();
     const now = this.clock.now();
+    const ctx = authoringContext(request.ctx, request.authorId);
+    const data = projectAndStamp({ schema, input: request.data, ctx, clockNow: now });
     return withConflictDiagnostic(opPath, () =>
       this.entries.create({
         id,
         collection: request.collection,
         status: "draft",
-        data: stripReservedDataKeys(request.data),
+        data,
         authorId: request.authorId,
         now,
-        hookContext: request.ctx,
+        hookContext: ctx,
         originalInput: request.originalInput,
       }),
     );
   }
+}
+
+function authoringContext(ctx: HandlerContext | undefined, authorId: string | null): HandlerContext {
+  if (ctx) return ctx;
+  return {
+    user: authorId ? { id: authorId } : null,
+    staff: null,
+    env: {},
+  };
 }

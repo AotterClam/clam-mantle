@@ -68,7 +68,12 @@ export {
   type PublicPathResolverConfig,
   type CollectionRoute,
 } from "./domain/service/PublicPathResolver.js";
-export { renderSeoTagsHtml } from "./domain/service/SeoMetaComposer.js";
+export {
+  composeEntrySeoMeta,
+  renderSeoTagsHtml,
+  type ComposeEntrySeoMetaArgs,
+  type SiblingTranslation,
+} from "./domain/service/SeoMetaComposer.js";
 
 // Public route / starter fixture helpers. These are intentionally
 // exported one-by-one instead of exposing the whole service barrel.
@@ -81,6 +86,7 @@ export {
   llmsTxtKey,
 } from "./domain/service/PublishKeys.js";
 export { serializeEntryAsMarkdown } from "./domain/service/MarkdownSerializer.js";
+export { readEntryBySlug } from "./domain/service/PublishedEntries.js";
 export {
   inferLocaleFromPath,
   isKnownLocale,

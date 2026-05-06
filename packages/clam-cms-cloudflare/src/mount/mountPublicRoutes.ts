@@ -7,6 +7,8 @@ import {
   isKnownLocale,
   listHtmlKey,
   llmsTxtKey,
+  readEntryBySlug,
+  serializeEntryAsMarkdown,
   toUrlLocale,
   type CmsRuntime,
   type KvCache,
@@ -63,8 +65,6 @@ export interface CollectionRouteConfig {
   readonly homeSlug?: string;
 }
 
-export type SiteAccessor = (env: unknown) => SiteConfig;
-
 export interface PublicRouteContext {
   readonly c: Context;
   readonly runtime: CmsRuntime;
@@ -80,9 +80,6 @@ export interface SlugOverride {
 
 export interface MountPublicRoutesOptions {
   readonly collectionRoutes: ReadonlyArray<CollectionRouteConfig>;
-  /** Reads the site config off the worker env. The starter typically
-   *  memoizes this. */
-  readonly site: SiteAccessor;
   /** Renderer for `/{locale}` — typically composes home page +
    *  recent posts across collections. Optional; without it `/` and
    *  `/{locale}` are not registered. */
@@ -136,9 +133,8 @@ export function mountPublicRoutes(
   });
 
   app.get("/sitemap.xml", async (c) => {
-    const env = c.env as Record<string, unknown> | undefined;
     const runtime = await ref.get();
-    const site = options.site(env);
+    const site = await runtime.siteConfig.load();
     if (!runtime.publicPathResolver) {
       return new Response("sitemap unavailable: no publicPathResolver configured", {
         status: 500,
@@ -152,17 +148,16 @@ export function mountPublicRoutes(
   });
 
   if (options.homeRenderer) {
-    app.get("/", (c) => {
-      const env = c.env as Record<string, unknown> | undefined;
-      const site = options.site(env);
+    app.get("/", async (c) => {
+      const runtime = await ref.get();
+      const site = await runtime.siteConfig.load();
       const canonical = site.canonicalLocale ?? site.locales[0] ?? "en";
-      return Promise.resolve(c.redirect(`/${toUrlLocale(canonical)}`));
+      return c.redirect(`/${toUrlLocale(canonical)}`);
     });
     app.get("/:locale", async (c) => {
-      const env = c.env as Record<string, unknown> | undefined;
-      const site = options.site(env);
-      const locale = c.req.param("locale");
       const runtime = await ref.get();
+      const site = await runtime.siteConfig.load();
+      const locale = c.req.param("locale");
       const ctx = buildCtx(c, runtime, site, locale);
       if (!isKnownLocale(locale, site)) return options.notFoundRenderer(ctx);
       return options.homeRenderer!(ctx);
@@ -180,10 +175,9 @@ export function mountPublicRoutes(
   }
 
   app.notFound(async (c) => {
-    const env = c.env as Record<string, unknown> | undefined;
-    const site = options.site(env);
-    const locale = inferLocaleFromPath(c.req.path, site);
     const runtime = await ref.get();
+    const site = await runtime.siteConfig.load();
+    const locale = inferLocaleFromPath(c.req.path, site);
     return options.notFoundRenderer(buildCtx(c, runtime, site, locale));
   });
 }
@@ -200,10 +194,9 @@ function mountCollection(
 
   if (route.listRoute) {
     app.get(`/:locale${segPath}`, async (c) => {
-      const env = c.env as Record<string, unknown> | undefined;
-      const site = options.site(env);
-      const locale = c.req.param("locale");
       const runtime = await ref.get();
+      const site = await runtime.siteConfig.load();
+      const locale = c.req.param("locale");
       const ctx = buildCtx(c, runtime, site, locale);
       const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
       if (!isKnownLocale(locale, site)) return notFound();
@@ -216,7 +209,12 @@ function mountCollection(
         if (html === null) return notFound();
         return new Response(html, { status: 200, headers: HTML_NO_STORE });
       }
-      return readKvHtmlOrFallback(runtime.kv, listHtmlKey(route.collection, locale), notFound);
+      return readThroughCache(runtime.kv, listHtmlKey(route.collection, locale), HTML_PUBLIC, async () =>
+        runtime.renderListLive.execute({
+          collection: route.collection,
+          locale,
+          site,
+        }), notFound);
     });
   }
 
@@ -229,24 +227,31 @@ function mountCollection(
     // reads — the `:slug` group stays single-segment.
     app.get(`/:locale${segPath}/:slug{[^/]+\\.md}`, async (c) => {
       const runtime = await ref.get();
+      const site = await runtime.siteConfig.load();
       const locale = c.req.param("locale");
       const slugParam = c.req.param("slug") ?? "";
       const slug = slugParam.endsWith(".md") ? slugParam.slice(0, -3) : slugParam;
+      const notFound = (): Response => new Response("not found", { status: 404, headers: TEXT_PUBLIC });
+      if (!isKnownLocale(locale, site)) return notFound();
       const key = entryMarkdownKeyFromParts(route.collection, locale, slug);
-      const body = await runtime.kv.get(key);
-      if (body === null) {
-        return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
-      }
-      return new Response(body, { status: 200, headers: MD_PUBLIC });
+      return readThroughCache(runtime.kv, key, MD_PUBLIC, async () => {
+        const entry = await readEntryBySlug(runtime.db, {
+          collection: route.collection,
+          slug,
+          locale,
+          status: "published",
+        });
+        if (!entry) return null;
+        return serializeEntryAsMarkdown(entry);
+      }, notFound);
     });
   }
 
   app.get(`/:locale${segPath}/:slug`, async (c) => {
-    const env = c.env as Record<string, unknown> | undefined;
-    const site = options.site(env);
+    const runtime = await ref.get();
+    const site = await runtime.siteConfig.load();
     const locale = c.req.param("locale");
     const slug = c.req.param("slug");
-    const runtime = await ref.get();
     const ctx = buildCtx(c, runtime, site, locale);
     const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
 
@@ -276,7 +281,15 @@ function mountCollection(
     }
 
     const key = entryHtmlKeyFromParts(route.collection, locale, slug);
-    return readKvHtmlOrFallback(runtime.kv, key, notFound);
+    return readThroughCache(runtime.kv, key, HTML_PUBLIC, async () => {
+      const html = await runtime.renderEntryLive.execute({
+        collection: route.collection,
+        slug,
+        locale,
+        site,
+      });
+      return html;
+    }, notFound);
   });
 
   if (route.homeSlug && options.homeRenderer == null) {
@@ -302,14 +315,21 @@ async function readKvText(
   return new Response(body, { status: 200, headers });
 }
 
-async function readKvHtmlOrFallback(
+async function readThroughCache(
   kv: KvCache,
   key: string,
+  headers: Record<string, string>,
+  populate: () => Promise<string | null>,
   fallback: () => Promise<Response> | Response,
 ): Promise<Response> {
-  const body = await kv.get(key);
-  if (body === null) return fallback();
-  return new Response(body, { status: 200, headers: HTML_PUBLIC });
+  const cached = await kv.get(key);
+  if (cached !== null) return new Response(cached, { status: 200, headers });
+
+  const rendered = await populate();
+  if (rendered === null) return fallback();
+
+  await kv.put(key, rendered);
+  return new Response(rendered, { status: 200, headers });
 }
 
 function buildCtx(
@@ -330,7 +350,7 @@ function buildOverrideIndex(
 }
 
 function overrideKey(collection: string, slug: string): string {
-  return `${collection} ${slug}`;
+  return `${collection}\u0000${slug}`;
 }
 
 export type { ContentState };
