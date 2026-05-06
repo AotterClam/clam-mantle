@@ -28,12 +28,36 @@ clam_cms_request:
   skill_url: "https://raw.githubusercontent.com/AotterClam/clam-cms/<ref>/skills/install/SKILL.md"
   starter: "blog" # blog | blank
   github_username: "<verified-by-website>"
-  locales: ["en", "zh-TW"]
+  locales: ["en", "zh-TW"] # site content locales; keep codes in payload
   project_name: "<worker-safe-name>"
   brand: "<public brand name>"
   description: "<one-line site description>"
   origin: "https://example.com" # optional placeholder is OK before deploy
 ```
+
+Website UI rules for `locales`:
+
+- Render locale choices with full native labels, not raw codes or abbreviations.
+- Keep the handoff payload as locale codes in `locales`; do not add a separate `prompt_language`.
+- The selected state, chips, preview, and any later locale picker should use the same full labels.
+- If the user selected only two locales, later selectors must show only those two choices.
+
+Supported website locale options, in display order:
+
+| value | label |
+| --- | --- |
+| `en` | English |
+| `de` | Deutsch |
+| `es` | Español |
+| `fr` | Français |
+| `it` | Italiano |
+| `ja` | 日本語 |
+| `ko` | 한국어 |
+| `pt-BR` | Português (BR) |
+| `ru` | Русский |
+| `zh-CN` | 简体中文 |
+| `zh-TW` | 繁體中文 |
+| `id` | Bahasa Indonesia |
 
 If `starter`, `github_username`, and `locales` are present, do not re-run a long intake interview. Confirm only the values that affect resource names or public copy:
 

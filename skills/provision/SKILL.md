@@ -29,7 +29,7 @@ Use values from the website-generated starting prompt or the install Skill hando
 project_name: "<worker-safe-name>"
 starter: "blog" # blog | blank
 github_username: "<verified-by-website>"
-locales: ["en", "zh-TW"]
+locales: ["en", "zh-TW"] # site content locale codes from the install handoff
 origin: "https://example.com" # may be replaced after deploy
 seed_file: "initial-seed.json"
 ```
