@@ -32,3 +32,40 @@ id = "kv-mantle-blog-oauth-local"
 type = "Text"
 globs = ["**/*.yaml"]
 fallthrough = true
+
+# ── Test profile ──────────────────────────────────────────────────────
+# Activated by `wrangler dev --env test`. Used by integration smoke
+# tests (`pnpm test:integration`). Keeps dev (.wrangler/) and test
+# (.wrangler-test/) miniflare state separate so a `pnpm dev` browsing
+# session never pollutes test fixture data and vice versa.
+#
+# Bindings are duplicated rather than inherited because wrangler does
+# NOT merge env-scoped bindings with the top-level ones (top-level
+# bindings disappear once any [env.*] block exists for that resource).
+# IDs match the dev profile — same miniflare-simulated D1/KV — but
+# state is isolated by `--persist-to .wrangler-test`.
+[env.test]
+
+[env.test.vars]
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "mantle-blog-test"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[env.test.kv_namespaces]]
+binding = "KV"
+id = "kv-mantle-blog-test"
+
+[[env.test.kv_namespaces]]
+binding = "OAUTH_KV"
+id = "kv-mantle-blog-oauth-test"
+
+[[env.test.rules]]
+type = "Text"
+globs = ["**/*.yaml"]
+fallthrough = true
+
+[env.test.dev]
+port = 8788

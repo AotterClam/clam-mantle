@@ -133,24 +133,31 @@ jobs:
 
       - run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-cloudflare' build
 
-      - name: Apply fixture
+      # The starter-smoke runs against the wrangler test profile
+      # (`[env.test]` in wrangler.toml — port 8788, persist-to
+      # `.wrangler-test`). Keeps test miniflare state separate from
+      # `pnpm dev`'s default profile and seeds the staff(u-staff-1,
+      # editor) row that mcp-smoke (Bearer dev-u-staff-1) requires —
+      # the dev fixture deliberately omits it so the operator's
+      # first OAuth login can run `ensureBootstrapOwner`.
+      - name: Provision test profile .dev.vars.test
         working-directory: starters/blog
-        run: pnpm fixture
+        run: cp .dev.vars.test.example .dev.vars.test
 
-      - name: Prepare local dev vars
-        working-directory: starters/blog
-        run: cp .dev.vars.example .dev.vars
-
-      - name: Start wrangler dev in background
+      - name: Start wrangler dev (test profile) in background
         working-directory: starters/blog
         run: |
-          npx wrangler dev --local --port 8787 > wrangler.log 2>&1 &
+          npx wrangler dev \
+            --env=test \
+            --persist-to=.wrangler-test \
+            --local \
+            --port 8788 > wrangler.log 2>&1 &
           echo "WRANGLER_PID=$!" >> $GITHUB_ENV
 
       - name: Wait for wrangler dev to be ready
         run: |
           for i in $(seq 1 30); do
-            if curl -sf -o /dev/null http://localhost:8787/; then
+            if curl -sf -o /dev/null http://localhost:8788/; then
               echo "wrangler dev ready (attempt $i)"
               exit 0
             fi
@@ -160,41 +167,45 @@ jobs:
           cat starters/blog/wrangler.log
           exit 1
 
+      - name: Apply test fixture
+        working-directory: starters/blog
+        run: pnpm exec tsx test/fixture/apply-test.ts
+
       - name: Smoke — public reads
         run: |
           set -euo pipefail
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/)" = "302"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts/hello-world)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW/posts/translates-by-slug)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/pages/about)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zh-TW/pages/contact)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/llms.txt)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/llms.txt)" = "200"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/en/posts/does-not-exist)" = "404"
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/zz)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/)" = "302"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/zh-TW)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en/posts/hello-world)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/zh-TW/posts/translates-by-slug)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en/posts)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en/pages/about)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/zh-TW/pages/contact)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en/llms.txt)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/llms.txt)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/en/posts/does-not-exist)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8788/zz)" = "404"
 
       - name: Smoke — contact form
         run: |
           set -euo pipefail
           # Happy path: 200 + ok:true
-          OK=$(curl -s -X POST http://localhost:8787/api/contact \
+          OK=$(curl -s -X POST http://localhost:8788/api/contact \
             -H 'content-type: application/json' \
             -d '{"name":"CI","email":"ci@example.com","message":"hi","turnstileToken":"tok-pass"}')
           grep -q '"ok":true' <<< "$OK"
 
           # CAPTCHA fail: 403 + AUTH_DENIED (handler in dev-stub mode
           # rejects the literal `"fail"` token).
-          STATUS=$(curl -s -o /tmp/body -w '%{http_code}' -X POST http://localhost:8787/api/contact \
+          STATUS=$(curl -s -o /tmp/body -w '%{http_code}' -X POST http://localhost:8788/api/contact \
             -H 'content-type: application/json' \
             -d '{"name":"Bot","email":"b@example.com","message":"spam","turnstileToken":"fail"}')
           test "$STATUS" = "403"
           grep -q '"AUTH_DENIED"' /tmp/body
 
           # Contact page renders the Turnstile widget + form
-          PAGE=$(curl -s http://localhost:8787/en/pages/contact)
+          PAGE=$(curl -s http://localhost:8788/en/pages/contact)
           grep -q 'cf-turnstile' <<< "$PAGE"
           grep -q 'data-sitekey=' <<< "$PAGE"
           grep -q '<form class="contact-form"' <<< "$PAGE"
@@ -203,7 +214,7 @@ jobs:
         run: |
           set -euo pipefail
           # Missing bearer: 401 — verifies the OAuth verifier wires.
-          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8787/mcp)" = "401"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8788/mcp)" = "401"
 
       - name: Smoke — View REST integration (10 cases, ADR-0012)
         # Static + param-driven Views, pagination, show clamp, hasMore
@@ -212,6 +223,8 @@ jobs:
         # reserved-name pagination plumbing. See
         # starters/blog/test/integration/view-rest-smoke.ts.
         working-directory: starters/blog
+        env:
+          WRANGLER_BASE_URL: http://localhost:8788
         run: pnpm view-smoke
 
       - name: Smoke — MCP integration (12 tool calls)
@@ -220,6 +233,8 @@ jobs:
         # and error paths (stale OCC, unknown collection). See
         # starters/blog/test/integration/mcp-smoke.ts for the script.
         working-directory: starters/blog
+        env:
+          WRANGLER_BASE_URL: http://localhost:8788
         run: pnpm mcp-smoke
 
       - name: Tail wrangler log on success (debugging aid)

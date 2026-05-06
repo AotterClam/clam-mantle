@@ -1,25 +1,24 @@
 /**
- * Fixture applier. Renders pre-published HTML for the seeded posts +
- * per-locale lists, then applies both D1 inserts and KV puts so the
- * starter's public read path (`GET /{locale}/posts/{slug}` + `GET
- * /{locale}/posts`) returns rendered pages immediately after fixture
- * apply — no admin UI publish flow needed.
+ * Shared fixture builder + applier. Two callers pick the mode:
  *
- * Usage (from starters/blog/):
- *   pnpm fixture
+ *   apply-dev.ts   → `pnpm fixture` — seeds the dev profile with demo
+ *                    posts/pages so a fresh `pnpm dev` admin SPA has
+ *                    something to render. Does NOT seed the `staff`
+ *                    table; the OAuth callback's `ensureBootstrapOwner`
+ *                    fires for the first admin login.
  *
- * That runs this script which:
- *   1. Generates D1 SQL → `.fixture.sql`
- *   2. Renders templates against fixture entries → `.fixture.kv.json`
- *      (wrangler kv-bulk format)
- *   3. Executes both via `wrangler d1 execute` + `wrangler kv bulk put`
- *      against the local D1 + KV bindings declared in wrangler.toml.
+ *   apply-test.ts  → `pnpm test:integration` (via globalSetup) — seeds
+ *                    the test profile with the same demo content PLUS
+ *                    a `staff(u-staff-1, editor)` row that mcp-smoke /
+ *                    view-smoke depend on for role-gated write paths.
+ *                    Targets the test profile's wrangler env
+ *                    (`--env test --persist-to .wrangler-test`).
  *
- * Idempotent: SQL inserts are `OR IGNORE`; KV puts overwrite.
- *
- * NOT a production seed. The starter's README points consumers at
- * the admin UI for real content; this script is for local dev + the
- * starter's integration tests.
+ * The split exists because dev and test cannot share the same staff
+ * seed: a pre-seeded staff row makes `ensureBootstrapOwner`'s
+ * `WHERE NOT EXISTS (SELECT 1 FROM staff)` guard a no-op, locking the
+ * dev's first OAuth login out of the admin. See issue #43 for the
+ * structural rationale.
  */
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -37,10 +36,6 @@ import {
   postTemplate,
   postListTemplate,
 } from "../../src/theme.default/templates/index.js";
-
-// Match HtmlPublishOrchestrator: registered templates return body
-// without a doctype prefix; whoever ships HTML to KV adds one.
-const DOCTYPE = "<!doctype html>";
 import {
   FIXTURE_AUTHOR_ID,
   FIXTURE_NOW,
@@ -48,6 +43,36 @@ import {
   FIXTURE_POSTS,
   FIXTURE_SITE,
 } from "./data.js";
+
+// Match HtmlPublishOrchestrator: registered templates return body
+// without a doctype prefix; whoever ships HTML to KV adds one.
+const DOCTYPE = "<!doctype html>";
+
+export interface ApplyFixtureOptions {
+  /**
+   * When true, seeds `staff(u-staff-1, editor)`. Required for the
+   * test profile (mcp-smoke / view-smoke authenticate as
+   * `Bearer dev-u-staff-1`); MUST be false for the dev profile so
+   * `ensureBootstrapOwner` can fire on the operator's first OAuth
+   * login.
+   */
+  readonly seedStaffEditor: boolean;
+  /**
+   * Wrangler env name (`--env <name>`) for `wrangler d1` /
+   * `wrangler kv` commands. Pass undefined for the default env.
+   */
+  readonly wranglerEnv?: string;
+  /**
+   * Wrangler `--persist-to <dir>` argument. Without it, miniflare
+   * uses `.wrangler/`; pass `.wrangler-test` for test isolation.
+   */
+  readonly persistTo?: string;
+  /**
+   * Filename prefix for the generated artefacts. Lets dev and test
+   * runs produce side-by-side files for debugging.
+   */
+  readonly artefactPrefix: string;
+}
 
 interface KvEntry {
   readonly key: string;
@@ -58,9 +83,9 @@ function escape(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-function buildSql(): string {
+function buildSql(opts: ApplyFixtureOptions): string {
   const lines: string[] = [];
-  lines.push("-- starter-blog test fixture (idempotent).");
+  lines.push(`-- starter-blog fixture (${opts.artefactPrefix}, idempotent).`);
   lines.push("-- 1. Run canonical migrations (wrangler dev runs them in-memory");
   lines.push("--    only — `wrangler d1 execute --local` opens an isolated DB");
   lines.push("--    so the fixture must apply migrations itself before inserts).");
@@ -86,9 +111,11 @@ function buildSql(): string {
   lines.push(
     `INSERT OR IGNORE INTO users (id, email, name, created_at) VALUES ('${FIXTURE_AUTHOR_ID}', 'editor@example.com', 'Demo Editor', ${FIXTURE_NOW});`,
   );
-  lines.push(
-    `INSERT OR IGNORE INTO staff (user_id, role, granted_by, granted_at) VALUES ('${FIXTURE_AUTHOR_ID}', 'editor', NULL, ${FIXTURE_NOW});`,
-  );
+  if (opts.seedStaffEditor) {
+    lines.push(
+      `INSERT OR IGNORE INTO staff (user_id, role, granted_by, granted_at) VALUES ('${FIXTURE_AUTHOR_ID}', 'editor', NULL, ${FIXTURE_NOW});`,
+    );
+  }
 
   let postIndex = 1;
   for (const post of FIXTURE_POSTS) {
@@ -165,8 +192,6 @@ function buildEntry(args: {
 
 function buildKvEntries(): readonly KvEntry[] {
   const out: KvEntry[] = [];
-  // Render each translation as `entry:html:<locale>/post-translations/<slug>`.
-  // Render per-locale lists as `list:html:<locale>/post-translations`.
   const byLocale = new Map<string, Entry[]>();
   for (const post of FIXTURE_POSTS) {
     for (const tr of post.translations) {
@@ -179,10 +204,6 @@ function buildKvEntries(): readonly KvEntry[] {
           locale: tr.locale,
           title: tr.title,
           body: tr.body,
-          // Surface the parent fields so the template can use them
-          // even though the storage row only carries language-specific
-          // data — same shape an admin-UI publish flow eventually
-          // produces by joining post-translations to its parent.
           coverUrl: post.coverUrl,
           publishedAt: FIXTURE_NOW,
           authorId: FIXTURE_AUTHOR_ID,
@@ -216,17 +237,11 @@ function buildKvEntries(): readonly KvEntry[] {
       value: renderLlmsTxt(locale, entries),
     });
   }
-  // Root /llms.txt aggregates every locale.
   out.push({
     key: llmsTxtKey(""),
     value: renderLlmsTxt("", [...byLocale.values()].flat()),
   });
 
-  // page-translations: render entry HTML for static pages (about,
-  // contact, etc.). The home page composes at request time and is
-  // NOT pre-rendered to KV — we still render the slug=home entry
-  // here so admin previews / future surfaces can link to a stable
-  // URL, but the worker's `/{locale}` route never reads it.
   for (const page of FIXTURE_PAGES) {
     for (const tr of page.translations) {
       const entry = buildEntry({
@@ -252,13 +267,6 @@ function buildKvEntries(): readonly KvEntry[] {
   return out;
 }
 
-/**
- * Render `llms.txt` content for a locale. The runtime's
- * `serializeLlmsTxt` helper expects entries with a `content` field;
- * the starter uses `body` (markdown) instead, so we render in a
- * matching shape locally — title + URL + first-line excerpt — so the
- * file is still useful to LLM agents crawling the site.
- */
 function renderLlmsTxt(locale: string, entries: readonly Entry[]): string {
   const urlLocale = locale ? `/${locale.toLowerCase()}` : "";
   let out = `# ${FIXTURE_SITE.title}\n\n`;
@@ -276,39 +284,37 @@ function renderLlmsTxt(locale: string, entries: readonly Entry[]): string {
   return out + "\n";
 }
 
-async function main(): Promise<void> {
-  const sql = buildSql();
-  const kv = buildKvEntries();
-  writeFileSync(".fixture.sql", sql);
-  writeFileSync(".fixture.kv.json", JSON.stringify(kv, null, 2));
-  process.stdout.write(`Wrote .fixture.sql (${sql.split("\n").length} lines)\n`);
-  process.stdout.write(`Wrote .fixture.kv.json (${kv.length} entries)\n`);
+function wranglerArgs(opts: ApplyFixtureOptions): string {
+  const parts: string[] = [];
+  if (opts.wranglerEnv) parts.push(`--env=${opts.wranglerEnv}`);
+  if (opts.persistTo) parts.push(`--persist-to=${opts.persistTo}`);
+  return parts.join(" ");
+}
 
-  // Wrangler dev's D1 + KV state lives in `.wrangler/state` (the
-  // default persist root). `wrangler d1 execute` and `wrangler kv
-  // bulk put` use the same default, so the three commands see the
-  // same miniflare-backed sqlite. The fixture SQL re-runs canonical
-  // migrations (CREATE TABLE IF NOT EXISTS) before inserts, so it
-  // works against either a cold DB or one wrangler dev already
-  // populated.
-  process.stdout.write("\nApplying D1 fixtures (migrations + inserts)...\n");
+export async function applyFixture(opts: ApplyFixtureOptions): Promise<void> {
+  const sql = buildSql(opts);
+  const kv = buildKvEntries();
+  const sqlPath = `.fixture.${opts.artefactPrefix}.sql`;
+  const kvPath = `.fixture.${opts.artefactPrefix}.kv.json`;
+  writeFileSync(sqlPath, sql);
+  writeFileSync(kvPath, JSON.stringify(kv, null, 2));
+  process.stdout.write(`Wrote ${sqlPath} (${sql.split("\n").length} lines)\n`);
+  process.stdout.write(`Wrote ${kvPath} (${kv.length} entries)\n`);
+
+  const flags = wranglerArgs(opts);
+  process.stdout.write(
+    `\nApplying D1 fixtures (migrations + inserts)${flags ? ` [${flags}]` : ""}...\n`,
+  );
   execSync(
-    "wrangler d1 execute DB --local --file=.fixture.sql",
+    `wrangler d1 execute DB --local --file=${sqlPath} ${flags}`.trim(),
     { stdio: "inherit" },
   );
 
   process.stdout.write("\nApplying KV fixtures...\n");
   execSync(
-    "wrangler kv bulk put --local --binding=KV .fixture.kv.json",
+    `wrangler kv bulk put --local --binding=KV ${kvPath} ${flags}`.trim(),
     { stdio: "inherit" },
   );
 
-  process.stdout.write("\nFixture applied. Try:\n");
-  process.stdout.write("  curl http://localhost:8787/en\n");
-  process.stdout.write("  curl http://localhost:8787/en/posts/hello-world\n");
-  process.stdout.write("  curl http://localhost:8787/en/pages/about\n");
-  process.stdout.write("  curl http://localhost:8787/zh-TW/posts\n");
-  process.stdout.write("  curl http://localhost:8787/en/llms.txt\n");
+  process.stdout.write("\nFixture applied.\n");
 }
-
-main();
