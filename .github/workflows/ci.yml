@@ -137,6 +137,10 @@ jobs:
         working-directory: starters/blog
         run: pnpm fixture
 
+      - name: Prepare local dev vars
+        working-directory: starters/blog
+        run: cp .dev.vars.example .dev.vars
+
       - name: Start wrangler dev in background
         working-directory: starters/blog
         run: |
@@ -179,7 +183,7 @@ jobs:
           OK=$(curl -s -X POST http://localhost:8787/api/contact \
             -H 'content-type: application/json' \
             -d '{"name":"CI","email":"ci@example.com","message":"hi","turnstileToken":"tok-pass"}')
-          echo "$OK" | grep -q '"ok":true'
+          grep -q '"ok":true' <<< "$OK"
 
           # CAPTCHA fail: 403 + AUTH_DENIED (handler in dev-stub mode
           # rejects the literal `"fail"` token).
@@ -191,9 +195,9 @@ jobs:
 
           # Contact page renders the Turnstile widget + form
           PAGE=$(curl -s http://localhost:8787/en/pages/contact)
-          echo "$PAGE" | grep -q 'cf-turnstile'
-          echo "$PAGE" | grep -q 'data-sitekey='
-          echo "$PAGE" | grep -q '<form class="contact-form"'
+          grep -q 'cf-turnstile' <<< "$PAGE"
+          grep -q 'data-sitekey=' <<< "$PAGE"
+          grep -q '<form class="contact-form"' <<< "$PAGE"
 
       - name: Smoke — MCP transport (auth guard)
         run: |
