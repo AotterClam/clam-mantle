@@ -28,6 +28,13 @@ export class InMemoryUserRepository implements UserRepository {
     return r ? { ...r } : null;
   }
 
+  async findGithubLogin(userId: string): Promise<string | null> {
+    const sl = this.socialLogins.find(
+      (s) => s.provider === "github" && s.userId === userId,
+    );
+    return sl?.login ?? null;
+  }
+
   async upsertByGithub(profile: GithubProfile, now: number): Promise<string> {
     const providerUid = String(profile.id);
     const existing = this.socialLogins.find(
