@@ -137,6 +137,10 @@ jobs:
         working-directory: starters/blog
         run: pnpm fixture
 
+      - name: Prepare local dev vars
+        working-directory: starters/blog
+        run: cp .dev.vars.example .dev.vars
+
       - name: Start wrangler dev in background
         working-directory: starters/blog
         run: |
