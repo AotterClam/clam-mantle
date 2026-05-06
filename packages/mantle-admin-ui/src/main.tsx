@@ -2,7 +2,7 @@ import { StrictMode, useEffect } from "react";
 import * as React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { AdminShell } from "./admin-shell";
+import { AuthenticatedLayout } from "./layout/authenticated-layout";
 import { api, ApiError } from "./lib/api";
 import type { Collection, EntryRow, ListEntriesResult } from "./lib/types";
 import { Button } from "./ui/button";
@@ -62,24 +62,24 @@ function App(): React.ReactElement {
   const collectionMatch = path.match(/^\/admin\/c\/([^/]+)\/?$/);
   if (collectionMatch) {
     return (
-      <AdminShell>
+      <AuthenticatedLayout>
         <CollectionView collectionName={collectionMatch[1]!} />
-      </AdminShell>
+      </AuthenticatedLayout>
     );
   }
 
   if (path === "/admin" || path === "/admin/") {
     return (
-      <AdminShell>
+      <AuthenticatedLayout>
         <HomeView />
-      </AdminShell>
+      </AuthenticatedLayout>
     );
   }
 
   return (
-    <AdminShell>
+    <AuthenticatedLayout>
       <NotFoundView path={path} />
-    </AdminShell>
+    </AuthenticatedLayout>
   );
 }
 
