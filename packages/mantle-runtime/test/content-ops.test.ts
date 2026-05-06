@@ -279,7 +279,93 @@ describe("RequestPublishUseCase (simple lifecycle)", () => {
       diagnostic: { code: "LIFECYCLE_NOT_IN_V010" },
     });
   });
+
+  it("rejects publishing a translated child without a published parent", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "ghost", locale: "en", title: "Ghost", body: "Missing parent" },
+      authorId: null,
+    });
+
+    await expect(h.requestPublish.execute({ id: child.id })).rejects.toMatchObject({
+      diagnostic: {
+        code: "TRANSLATES_PARENT_UNKNOWN",
+        value: {
+          child: "post-translations",
+          parent: "posts",
+          field: "slug",
+          value: "ghost",
+        },
+      },
+    });
+  });
+
+  it("requires the translated parent to be published, not just drafted", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "Parent", slug: "draft-parent" },
+      authorId: null,
+    });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "draft-parent", locale: "en", title: "Draft parent", body: "Body" },
+      authorId: null,
+    });
+
+    await expect(h.requestPublish.execute({ id: child.id })).rejects.toMatchObject({
+      diagnostic: { code: "TRANSLATES_PARENT_UNKNOWN" },
+    });
+  });
+
+  it("publishes a translated child once its parent is published", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    const parent = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "Parent", slug: "hello" },
+      authorId: null,
+    });
+    await h.requestPublish.execute({ id: parent.id });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "hello", locale: "en", title: "Hello", body: "World" },
+      authorId: null,
+    });
+
+    const published = await h.requestPublish.execute({ id: child.id });
+    expect(published.status).toBe("published");
+  });
 });
+
+function translatedSchemas(): ReadonlyMap<string, SchemaManifest> {
+  const parent = postsSchema();
+  const child: SchemaManifest = {
+    apiVersion: "cms.mantle.aotter.net/v1",
+    kind: "Schema",
+    metadata: { name: "post-translations" },
+    spec: {
+      title: "Post translations",
+      localized: true,
+      translates: { parent: "posts", on: "slug" },
+      schema: {
+        type: "object",
+        properties: {
+          slug: { type: "string" },
+          locale: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string" },
+        },
+        required: ["slug", "locale", "title", "body"],
+      },
+      lifecycle: "simple",
+    },
+  };
+  return new Map([
+    [parent.metadata.name, parent],
+    [child.metadata.name, child],
+  ]);
+}
 
 describe("UnpublishUseCase", () => {
   it("flips published back to draft", async () => {

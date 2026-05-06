@@ -194,6 +194,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     archive: (a) => entries.archive(a),
     transitionStatus: (a) => entries.transitionStatus(a),
     list: (a) => entries.list(a),
+    findByDataField: (a) => entries.findByDataField(a),
   };
   const invokeBuiltin = new InvokeBuiltinUseCase(entriesProxy, schemasByName, clock, idgen);
   const invokeProcedure = new InvokeProcedureUseCase(registry, invokeBuiltin);

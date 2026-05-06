@@ -4,6 +4,7 @@ import type {
   CreateEntryArgs,
   DeleteEntryArgs,
   EntryRepository,
+  FindEntryByDataFieldArgs,
   ListEntriesArgs,
   TransitionStatusArgs,
   UpdateEntryArgs,
@@ -163,6 +164,29 @@ export class DatabaseEntryRepository implements EntryRepository {
     return rows.map(rowFromDb);
   }
 
+  async findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {
+    const path = jsonPathForTopLevelField(args.field);
+    const stmt = args.status
+      ? this.db
+          .prepare(
+            `SELECT id, collection, status, version, data, author_id, created_at, updated_at
+             FROM entries
+             WHERE collection = ? AND status = ? AND json_extract(data, ?) = ?
+             ORDER BY updated_at DESC LIMIT 1`,
+          )
+          .bind(args.collection, args.status, path, args.value)
+      : this.db
+          .prepare(
+            `SELECT id, collection, status, version, data, author_id, created_at, updated_at
+             FROM entries
+             WHERE collection = ? AND json_extract(data, ?) = ?
+             ORDER BY updated_at DESC LIMIT 1`,
+          )
+          .bind(args.collection, path, args.value);
+    const row = await stmt.first<EntryDbRow>();
+    return row ? rowFromDb(row) : null;
+  }
+
   private async versionConflict(
     id: string,
     expected: number,
@@ -199,4 +223,8 @@ function rowFromDb(row: EntryDbRow): EntryRow {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function jsonPathForTopLevelField(field: string): string {
+  return `$."${field.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
