@@ -3,7 +3,9 @@ import {
   HTTP_STATUS_BY_CODE,
   VIEW_PARAMS_RESERVED,
   runtimeDiagnostic,
+  type ContentState,
   type Diagnostic,
+  type SchemaManifest,
 } from "@aotter/mantle-spec";
 import {
   DEFAULT_SESSION_COOKIE,
@@ -15,6 +17,7 @@ import {
   type HandlerContext,
   type Session,
 } from "@aotter/mantle-runtime";
+import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
@@ -67,27 +70,106 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   if (!adminAuth) return;
   const { oauthProvider } = adminAuth;
 
-  // ── Minimal admin console landing ───────────────────────────────────
-  app.get("/admin", async (c) => {
+  // ── Admin SPA: shell + JSON API ─────────────────────────────────────
+  //
+  // Routing model: every path under `/admin` (except auth + api + the
+  // static logout endpoint) returns the same `indexHtml` string. The
+  // SPA reads `window.location.pathname` to choose a view, so the
+  // server is just a path-agnostic asset server here.
+  //
+  // The HTML shell ships unauthenticated — the SPA fetches `/admin/api/me`
+  // on mount and redirects to `/admin/sign-in` on 401. JSON endpoints
+  // are gated server-side; non-staff bearers get 403 + AUTH_DENIED.
+  const spa = (): Response =>
+    new Response(indexHtml, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+
+  app.get("/admin", spa);
+  app.get("/admin/", spa);
+  app.get("/admin/sign-in", spa);
+  app.get("/admin/c/:collection", spa);
+  app.get("/admin/approvals", spa);
+  app.get("/admin/settings", spa);
+
+  // ── /admin/api/* — JSON endpoints consumed by the SPA ───────────────
+  app.get("/admin/api/me", async (c) => {
     const runtime = await ref.get();
-    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
-    const session = sessionToken ? await runtime.sessions.read(sessionToken) : null;
-    if (!session) {
-      return htmlResponse(renderAdminLanding({
-        origin: new URL(c.req.url).origin,
-        signedIn: false,
-      }));
-    }
-    const [user, staff] = await Promise.all([
-      runtime.users.findById(session.userId),
-      runtime.staff.readByUserId(session.userId),
-    ]);
-    return htmlResponse(renderAdminLanding({
-      origin: new URL(c.req.url).origin,
-      signedIn: true,
-      displayName: user?.name ?? "Owner",
-      staffRole: staff?.role ?? null,
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminAuthDenied(c, "/admin/api/me");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) return adminAuthDenied(c, "/admin/api/me");
+    const login = await runtime.users.findGithubLogin(session.userId);
+    return jsonResponse(200, { login, role: staff.role, userId: session.userId });
+  });
+
+  app.get("/admin/api/collections", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminAuthDenied(c, "/admin/api/collections");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) return adminAuthDenied(c, "/admin/api/collections");
+    const schemas = ref.manifests.filter(
+      (m): m is SchemaManifest => m.kind === "Schema",
+    );
+    const collections = schemas.map((s) => ({
+      name: s.metadata.name,
+      title: s.spec.title,
+      description: s.spec.description ?? null,
+      lifecycle: s.spec.lifecycle ?? "simple",
+      localized: s.spec.localized === true || s.spec.translates !== undefined,
     }));
+    return jsonResponse(200, { collections });
+  });
+
+  app.get("/admin/api/entries", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminAuthDenied(c, "/admin/api/entries");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) return adminAuthDenied(c, "/admin/api/entries");
+    const collection = c.req.query("collection");
+    if (!collection) {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: "GET /admin/api/entries",
+          expected: "?collection=<name> query parameter",
+          message: "Missing `collection` query parameter.",
+        }),
+      });
+    }
+    const status = c.req.query("status");
+    const rows = await runtime.listEntries.execute({
+      collection,
+      status: status as ContentState | undefined,
+    });
+    const items = rows.map((row) => ({
+      id: row.id,
+      collection: row.collection,
+      locale: row.locale ?? null,
+      status: row.status,
+      version: row.version,
+      title: row.data.title,
+      updated_at: row.updatedAt,
+    }));
+    return jsonResponse(200, { items, next_cursor: null });
+  });
+
+  // ── /admin/logout — POST clears session cookie + 302s to sign-in ────
+  app.post("/admin/logout", async (c) => {
+    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
+    if (sessionToken) {
+      const runtime = await ref.get();
+      await runtime.sessions.invalidate(sessionToken);
+    }
+    const expired = `${DEFAULT_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+    return new Response(null, {
+      status: 302,
+      headers: { location: "/admin/sign-in", "set-cookie": expired },
+    });
   });
 
   // ── GitHub admin sign-in ─────────────────────────────────────────────
@@ -497,96 +579,26 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-function htmlResponse(html: string, status = 200): Response {
-  return new Response(html, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8" },
+async function readSessionForAdmin(
+  c: Context,
+  runtime: CmsRuntime,
+): Promise<Session | null> {
+  const token = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
+  if (!token) return null;
+  return runtime.sessions.read(token);
+}
+
+function adminAuthDenied(c: Context, path: string): Response {
+  return jsonResponse(401, {
+    ok: false,
+    diagnostic: runtimeDiagnostic({
+      code: "UNAUTHENTICATED",
+      severity: "error",
+      path: `${c.req.method} ${path}`,
+      expected: "active staff session cookie",
+      message: "Not signed in as staff. Sign in via /admin/auth/github first.",
+    }),
   });
-}
-
-function renderAdminLanding(args: {
-  readonly origin: string;
-  readonly signedIn: boolean;
-  readonly displayName?: string;
-  readonly staffRole?: string | null;
-}): string {
-  const mcpUrl = `${args.origin}/mcp`;
-  const siteUrl = `${args.origin}/`;
-  const authUrl = `${args.origin}/admin/auth/github`;
-  const status = args.signedIn && args.staffRole
-    ? `Signed in as ${escapeHtml(args.displayName ?? "staff")} (${escapeHtml(args.staffRole)})`
-    : args.signedIn
-      ? "Signed in, but this GitHub account is not staff yet."
-      : "Sign in with GitHub to finish owner setup.";
-  const action = args.signedIn && args.staffRole
-    ? `
-      <section class="card">
-        <h2>Your site is live</h2>
-        <p>Open the public site first. If the title, tone, color, or first content feels wrong, tell your installer agent what to change.</p>
-        <p><a class="button" href="${escapeAttr(siteUrl)}">Open public site</a></p>
-      </section>
-      <section class="card">
-        <h2>Let an AI agent manage content</h2>
-        <p>Give this MCP URL to Claude Code, Cursor, Codex, or another MCP-capable agent:</p>
-        <code>${escapeHtml(mcpUrl)}</code>
-        <p>The first connection opens a consent screen. Approve it with the same GitHub account.</p>
-      </section>
-      <section class="card muted">
-        <h2>Good next prompts</h2>
-        <ul>
-          <li>"Write and publish my first post."</li>
-          <li>"Make the site feel warmer and less technical."</li>
-          <li>"Change the homepage copy for my audience."</li>
-        </ul>
-      </section>
-    `
-    : `
-      <section class="card">
-        <h2>Finish setup</h2>
-        <p>Use the GitHub account configured as the site owner. After sign-in, this page will show your MCP instructions.</p>
-        <p><a class="button" href="${escapeAttr(authUrl)}">Sign in with GitHub</a></p>
-      </section>
-    `;
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mantle CMS Admin</title>
-  <style>
-    body { margin: 0; font-family: ui-serif, Georgia, serif; color: #172018; background: #f4efe4; }
-    main { max-width: 760px; margin: 0 auto; padding: 56px 20px; }
-    h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 0.95; margin: 0 0 16px; }
-    h2 { margin: 0 0 10px; font-size: 1.25rem; }
-    p, li { font-size: 1rem; line-height: 1.6; }
-    code { display: block; padding: 14px; border-radius: 12px; background: #172018; color: #f7f0df; overflow-wrap: anywhere; }
-    .eyebrow { text-transform: uppercase; letter-spacing: .14em; font-size: .75rem; color: #6f6a5f; }
-    .card { background: #fffaf0; border: 1px solid #ded4bf; border-radius: 22px; padding: 22px; margin-top: 18px; box-shadow: 0 16px 45px rgba(55, 40, 10, .08); }
-    .muted { background: #ede4d0; }
-    .button { display: inline-block; background: #172018; color: #fffaf0; padding: 12px 16px; border-radius: 999px; text-decoration: none; font-weight: 700; }
-  </style>
-</head>
-<body>
-  <main>
-    <div class="eyebrow">Mantle CMS Admin</div>
-    <h1>Your AI-operable site console.</h1>
-    <p>${escapeHtml(status)}</p>
-    ${action}
-  </main>
-</body>
-</html>`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-function escapeAttr(value: string): string {
-  return escapeHtml(value);
 }
 
 function jsonError(args: { status: number; code: string; message: string }): Response {

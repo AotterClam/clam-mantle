@@ -14,6 +14,17 @@ export class D1UserRepository implements UserRepository {
     return row ?? null;
   }
 
+  async findGithubLogin(userId: string): Promise<string | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT login FROM social_logins
+         WHERE user_id = ? AND provider = 'github' LIMIT 1`,
+      )
+      .bind(userId)
+      .first<{ login: string }>();
+    return row?.login ?? null;
+  }
+
   async upsertByGithub(profile: GithubProfile, now: number): Promise<string> {
     const providerUid = String(profile.id);
     // ON CONFLICT DO UPDATE + RETURNING collapses the select-then-insert into a single
