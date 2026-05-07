@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { cn } from "../lib/utils";
+import { usePreferences } from "../app/preferences";
 import {
   isCollapsible,
   type NavCollapsible,
@@ -118,14 +119,15 @@ function NavLinkItem({
             : null)}
         >
           {item.icon && <item.icon aria-hidden />}
-          <span className="flex-1 truncate">{item.title}</span>
+          <span data-sidebar-label className="flex-1 truncate">{item.title}</span>
           {item.marker && (
             <item.marker
               aria-hidden
+              data-sidebar-label
               className="size-3.5 text-muted-foreground"
             />
           )}
-          {item.badge && <NavBadge>{item.badge}</NavBadge>}
+          {item.badge && <NavBadge sidebarLabel>{item.badge}</NavBadge>}
         </a>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -152,16 +154,18 @@ function NavCollapsibleExpanded({
         <CollapsibleTrigger asChild>
           <SidebarMenuButton isActive={groupActive}>
             {item.icon && <item.icon aria-hidden />}
-            <span className="flex-1 truncate">{item.title}</span>
+            <span data-sidebar-label className="flex-1 truncate">{item.title}</span>
             {item.marker && (
               <item.marker
                 aria-hidden
+                data-sidebar-label
                 className="size-3.5 text-muted-foreground"
               />
             )}
-            {item.badge && <NavBadge>{item.badge}</NavBadge>}
+            {item.badge && <NavBadge sidebarLabel>{item.badge}</NavBadge>}
             <ChevronRight
               aria-hidden
+              data-sidebar-label
               className="transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:rotate-180 rtl:group-data-[state=open]/collapsible:-rotate-90"
             />
           </SidebarMenuButton>
@@ -217,17 +221,22 @@ function NavCollapsibleDropdown({
   search: string;
 }): React.ReactElement {
   const groupActive = isGroupActive(item, pathname, search);
+  const { direction } = usePreferences();
   return (
     <SidebarMenuItem>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton isActive={groupActive}>
             {item.icon && <item.icon aria-hidden />}
-            <span>{item.title}</span>
-            <ChevronRight aria-hidden className="ms-auto" />
+            <span data-sidebar-label>{item.title}</span>
+            <ChevronRight aria-hidden data-sidebar-label className="ms-auto" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start" sideOffset={4}>
+        <DropdownMenuContent
+          side={direction === "rtl" ? "left" : "right"}
+          align="start"
+          sideOffset={4}
+        >
           <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {item.items.map((sub) => (
@@ -250,11 +259,16 @@ function NavCollapsibleDropdown({
 
 function NavBadge({
   children,
+  sidebarLabel = false,
 }: {
   children: React.ReactNode;
+  sidebarLabel?: boolean;
 }): React.ReactElement {
   return (
-    <span className="ms-auto rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">
+    <span
+      data-sidebar-label={sidebarLabel || undefined}
+      className="ms-auto rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground"
+    >
       {children}
     </span>
   );

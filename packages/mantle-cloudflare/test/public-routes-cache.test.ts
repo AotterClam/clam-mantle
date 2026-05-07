@@ -39,7 +39,7 @@ function manifests(): Manifest[] {
   ];
 }
 
-function harness() {
+function harness(locales: readonly string[] = ["en"]) {
   const db = new InMemoryDatabase();
   const kv = new InMemoryKv();
   const templates = new TemplateRegistry();
@@ -52,7 +52,7 @@ function harness() {
       title: "Blog",
       brand: "Blog",
       origin: "https://example.com",
-      locales: ["en"],
+      locales,
     },
     bindings: {
       db,
@@ -72,15 +72,16 @@ function harness() {
   return { app, db, kv };
 }
 
-function seedPublishedPost(db: InMemoryDatabase): void {
-  db.entries.set("p1", {
-    id: "p1",
+function seedPublishedPost(db: InMemoryDatabase, locale = "en"): void {
+  const id = `p1-${locale}`;
+  db.entries.set(id, {
+    id,
     collection: "posts",
     status: "published",
     version: 1,
     data: JSON.stringify({
       slug: "hello",
-      locale: "en",
+      locale,
       title: "Hello",
       body: "World",
     }),
@@ -109,6 +110,21 @@ describe("mountPublicRoutes read-through cache", () => {
     expect(res.status).toBe(200);
     await expect(res.text()).resolves.toContain("<h1>Hello</h1>");
     await expect(h.kv.get("entry:html:en/posts/hello")).resolves.toContain("<h1>Hello</h1>");
+  });
+
+  it("canonicalizes locale casing before D1 lookup and KV population", async () => {
+    const h = harness(["en", "zh-TW"]);
+    seedPublishedPost(h.db, "zh-TW");
+
+    const list = await h.app.request("/zh-tw/posts");
+    expect(list.status).toBe(200);
+    await expect(list.text()).resolves.toContain("<section data-brand=\"Blog\">Hello</section>");
+    await expect(h.kv.get("list:html:zh-tw/posts")).resolves.toContain("<section data-brand=\"Blog\">Hello</section>");
+
+    const entry = await h.app.request("/zh-tw/posts/hello");
+    expect(entry.status).toBe(200);
+    await expect(entry.text()).resolves.toContain("<h1>Hello</h1>");
+    await expect(h.kv.get("entry:html:zh-tw/posts/hello")).resolves.toContain("<h1>Hello</h1>");
   });
 
   it("uses operator-edited site_config for read-through renders", async () => {

@@ -1,25 +1,24 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { cn } from "../lib/utils";
+import { usePreferences } from "../app/preferences";
+import { t } from "../app/i18n";
 
 /**
  * Compact avatar-only profile dropdown for the top-right of the
  * Header. Mirrors satnaing's `<ProfileDropdown>` shape — the larger
  * NavUser in the sidebar footer carries the full identity card; this
- * one is the always-visible escape hatch for theme switch + sign-out.
+ * one is the always-visible escape hatch for account-level actions.
  *
- * The Avatar / ThemeRadio / signOut helpers are duplicated with
+ * The Avatar / signOut helpers are duplicated with
  * NavUser by design at v0.1 — neither file is large, and the two
  * components have different ergonomic constraints (size, alignment).
  * Dedupe into a shared `lib/profile` if a third caller appears.
@@ -33,6 +32,7 @@ export function ProfileDropdown({
   login,
   role,
 }: ProfileDropdownProps): React.ReactElement {
+  const { language } = usePreferences();
   const initial = (login ?? "?").charAt(0).toUpperCase();
   const avatarUrl = login
     ? `https://github.com/${encodeURIComponent(login)}.png?size=80`
@@ -52,7 +52,7 @@ export function ProfileDropdown({
         <Avatar avatarUrl={avatarUrl} initial={initial} />
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" sideOffset={6} className="w-64">
+      <DropdownMenuContent align="end" sideOffset={6} className="w-56">
         <DropdownMenuLabel className="flex items-center gap-3 py-2">
           <Avatar avatarUrl={avatarUrl} initial={initial} large />
           <div className="flex min-w-0 flex-col">
@@ -60,17 +60,19 @@ export function ProfileDropdown({
               {login ?? "—"}
             </span>
             <span className="label-eyebrow truncate">
-              {role ?? "Signed in"}
+              {role ?? t(language, "common.signedIn")}
             </span>
           </div>
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuLabel className="label-eyebrow opacity-70">
-          Appearance
-        </DropdownMenuLabel>
-        <ThemeRadio />
+        <DropdownMenuItem asChild>
+          <a href="/admin/preferences" className="flex items-center gap-2">
+            <Settings className="size-4" aria-hidden />
+            {t(language, "preferences.page.open")}
+          </a>
+        </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
@@ -84,7 +86,7 @@ export function ProfileDropdown({
             className="flex w-full cursor-pointer items-center gap-2"
           >
             <LogOut className="size-4" aria-hidden />
-            Sign out
+            {t(language, "common.signOut")}
           </button>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -124,47 +126,6 @@ function Avatar({
       )}
     </span>
   );
-}
-
-const THEME_STORAGE_KEY = "cms.theme";
-type Theme = "light" | "dark";
-
-function ThemeRadio(): React.ReactElement {
-  const [theme, setTheme] = useState<Theme>(readInitialTheme);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      /* ignore: private mode / disabled storage */
-    }
-  }, [theme]);
-
-  return (
-    <DropdownMenuRadioGroup
-      value={theme}
-      onValueChange={(v) => setTheme(v as Theme)}
-    >
-      <DropdownMenuRadioItem value="light">
-        <span className="flex items-center gap-2">
-          <Sun className="size-4" aria-hidden />
-          Light
-        </span>
-      </DropdownMenuRadioItem>
-      <DropdownMenuRadioItem value="dark">
-        <span className="flex items-center gap-2">
-          <Moon className="size-4" aria-hidden />
-          Dark
-        </span>
-      </DropdownMenuRadioItem>
-    </DropdownMenuRadioGroup>
-  );
-}
-
-function readInitialTheme(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
 function signOut(): void {

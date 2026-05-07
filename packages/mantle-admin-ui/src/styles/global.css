@@ -219,20 +219,20 @@
 }
 
 @theme {
-  --text-xs:                0.875rem;
-  --text-xs--line-height:   1.75;
-  --text-sm:                1rem;
-  --text-sm--line-height:   1.7;
-  --text-base:              1.125rem;
-  --text-base--line-height: 1.6;
-  --text-lg:                1.25rem;
+  --text-xs:                0.75rem;
+  --text-xs--line-height:   1rem;
+  --text-sm:                0.875rem;
+  --text-sm--line-height:   1.45;
+  --text-base:              1rem;
+  --text-base--line-height: 1.5;
+  --text-lg:                1.125rem;
   --text-lg--line-height:   1.45;
-  --text-xl:                1.5rem;
+  --text-xl:                1.25rem;
   --text-xl--line-height:   1.35;
-  --text-2xl:               1.875rem;
+  --text-2xl:               1.5rem;
   --text-2xl--line-height:  1.25;
-  --text-3xl:               2.5rem;
-  --text-3xl--line-height:  1.1;
+  --text-3xl:               1.875rem;
+  --text-3xl--line-height:  1.15;
 
   --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-display: "Fraunces", "IBM Plex Sans", Georgia, serif;
@@ -252,7 +252,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--foreground);
-  line-height: 1.7;
+  line-height: 1.5;
   transition: color 0.2s;
 }
 
@@ -280,6 +280,33 @@ body::before {
   height: 1rem;
   border-radius: 0 2px 2px 0;
   background: var(--primary);
+}
+
+[dir="rtl"] [data-sidebar="menu-button"][data-active="true"]::before {
+  left: auto;
+  right: 0;
+  border-radius: 2px 0 0 2px;
+}
+
+[dir="rtl"] [data-sidebar="trigger"] svg {
+  transform: scaleX(-1);
+}
+
+[data-state="collapsed"] [data-sidebar="group-label"],
+[data-state="collapsed"] [data-sidebar-label],
+[data-state="collapsed"] [data-sidebar="separator"] {
+  display: none;
+}
+
+[data-state="collapsed"] [data-sidebar="header"],
+[data-state="collapsed"] [data-sidebar="footer"],
+[data-state="collapsed"] [data-sidebar="group"] {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+[data-state="collapsed"] [data-sidebar="menu-button"] {
+  justify-content: center;
 }
 
 h1, h2, h3, h4 {

@@ -7,6 +7,7 @@ import {
   SidebarSeparator,
 } from "../ui/sidebar";
 import { useLayout } from "../context/layout-provider";
+import { usePreferences } from "../app/preferences";
 import { AppTitle } from "./app-title";
 import { NavGroup } from "./nav-group";
 import { NavUser } from "./nav-user";
@@ -28,8 +29,12 @@ export function AppSidebar({
   user,
 }: AppSidebarProps): React.ReactElement {
   const { variant } = useLayout();
+  const { direction } = usePreferences();
   return (
-    <Sidebar variant={variant === "floating" ? "sidebar" : variant}>
+    <Sidebar
+      side={direction === "rtl" ? "right" : "left"}
+      variant={variant === "floating" ? "sidebar" : variant}
+    >
       <SidebarHeader>
         <AppTitle brand={brand} />
       </SidebarHeader>

@@ -21,7 +21,12 @@ import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
-import { detectConsentLocale, renderConsentHtml, type ConsentModel } from "../oauth/consentHtml.js";
+import {
+  detectConsentLocale,
+  renderConsentHtml,
+  type ConsentLocale,
+  type ConsentModel,
+} from "../oauth/consentHtml.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
@@ -90,6 +95,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/admin/sign-in", spa);
   app.get("/admin/c/:collection", spa);
   app.get("/admin/approvals", spa);
+  app.get("/admin/preferences", spa);
   app.get("/admin/settings", spa);
 
   // ── /admin/api/* — JSON endpoints consumed by the SPA ───────────────
@@ -136,6 +142,25 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
         hasTranslations: translatedParents.has(s.metadata.name),
       }));
     return jsonResponse(200, { collections });
+  });
+
+  app.get("/admin/api/site", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminUnauthenticated(c, "/admin/api/site");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/site", login);
+    }
+    const site = await runtime.siteConfig.load();
+    const url = new URL(c.req.url);
+    const publicUrl = site.origin || url.origin;
+    return jsonResponse(200, {
+      ...site,
+      publicUrl,
+      mcpUrl: `${url.origin}/mcp`,
+    });
   });
 
   app.get("/admin/api/entries", async (c) => {
@@ -360,7 +385,7 @@ type OAuthHelpers = {
 async function handleConsentGet(
   c: Context,
   runtime: CmsRuntime,
-  locale: "zh-TW" | "en",
+  locale: ConsentLocale,
   oauthHelpers: OAuthHelpers,
 ): Promise<Response> {
   let model: ConsentModel | null = null;

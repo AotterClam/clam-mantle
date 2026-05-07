@@ -3,6 +3,10 @@ import { Separator } from "../ui/separator";
 import { SidebarTrigger } from "../ui/sidebar";
 import { ProfileDropdown } from "./profile-dropdown";
 import { cn } from "../lib/utils";
+import {
+  LanguagePreferenceDropdown,
+  ThemePreferenceDropdown,
+} from "./preference-controls";
 
 interface HeaderProps {
   fixed?: boolean;
@@ -57,7 +61,14 @@ export function Header({
         // baseline descent gap — without it the wrap div is taller
         // than the trigger by ~8px (line-height carry) and the
         // avatar lands above center.
-        <div className={cn("flex items-center", children ? "" : "ms-auto")}>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            children ? "" : "ms-auto",
+          )}
+        >
+          <LanguagePreferenceDropdown />
+          <ThemePreferenceDropdown />
           <ProfileDropdown login={user.login} role={user.role} />
         </div>
       ) : null}

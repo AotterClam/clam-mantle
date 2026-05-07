@@ -1,18 +1,10 @@
 import * as React from "react";
-import { useEffect, useState } from "react";
-import {
-  ChevronsUpDown,
-  LogOut,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
@@ -23,6 +15,8 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { cn } from "../lib/utils";
+import { usePreferences } from "../app/preferences";
+import { t } from "../app/i18n";
 
 export interface NavUserProps {
   login: string | null;
@@ -31,6 +25,7 @@ export interface NavUserProps {
 
 export function NavUser({ login, role }: NavUserProps): React.ReactElement {
   const { isMobile } = useSidebar();
+  const { language } = usePreferences();
   const initial = (login ?? "?").charAt(0).toUpperCase();
   const avatarUrl = login
     ? `https://github.com/${encodeURIComponent(login)}.png?size=80`
@@ -46,13 +41,14 @@ export function NavUser({ login, role }: NavUserProps): React.ReactElement {
               className="data-[state=open]:bg-accent/40"
             >
               <Avatar avatarUrl={avatarUrl} initial={initial} />
-              <div className="grid flex-1 text-start text-sm leading-tight">
+              <div data-sidebar-label className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-semibold">{login ?? "—"}</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {role ?? "Signed in"}
+                  {role ?? t(language, "common.signedIn")}
                 </span>
               </div>
               <ChevronsUpDown
+                data-sidebar-label
                 className="ms-auto size-4 text-muted-foreground"
                 aria-hidden
               />
@@ -71,17 +67,19 @@ export function NavUser({ login, role }: NavUserProps): React.ReactElement {
                   {login ?? "—"}
                 </span>
                 <span className="label-eyebrow truncate">
-                  {role ?? "Signed in"}
+                  {role ?? t(language, "common.signedIn")}
                 </span>
               </div>
             </DropdownMenuLabel>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuLabel className="label-eyebrow opacity-70">
-              Appearance
-            </DropdownMenuLabel>
-            <ThemeRadio />
+            <DropdownMenuItem asChild>
+              <a href="/admin/preferences" className="flex items-center gap-2">
+                <Settings className="size-4" aria-hidden />
+                {t(language, "preferences.page.open")}
+              </a>
+            </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
@@ -95,7 +93,7 @@ export function NavUser({ login, role }: NavUserProps): React.ReactElement {
                 className="flex w-full cursor-pointer items-center gap-2"
               >
                 <LogOut className="size-4" aria-hidden />
-                Sign out
+                {t(language, "common.signOut")}
               </button>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -137,47 +135,6 @@ function Avatar({
       )}
     </span>
   );
-}
-
-const THEME_STORAGE_KEY = "cms.theme";
-type Theme = "light" | "dark";
-
-function ThemeRadio(): React.ReactElement {
-  const [theme, setTheme] = useState<Theme>(readInitialTheme);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
-    } catch {
-      /* ignore: private mode / disabled storage */
-    }
-  }, [theme]);
-
-  return (
-    <DropdownMenuRadioGroup
-      value={theme}
-      onValueChange={(v) => setTheme(v as Theme)}
-    >
-      <DropdownMenuRadioItem value="light">
-        <span className="flex items-center gap-2">
-          <Sun className="size-4" aria-hidden />
-          Light
-        </span>
-      </DropdownMenuRadioItem>
-      <DropdownMenuRadioItem value="dark">
-        <span className="flex items-center gap-2">
-          <Moon className="size-4" aria-hidden />
-          Dark
-        </span>
-      </DropdownMenuRadioItem>
-    </DropdownMenuRadioGroup>
-  );
-}
-
-function readInitialTheme(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
 function signOut(): void {
