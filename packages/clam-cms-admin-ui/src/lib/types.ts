@@ -1,6 +1,14 @@
 export type Lifecycle = "simple" | "editorial";
 
-export type SidebarStatus = "draft" | "review" | "approved" | "scheduled" | "published";
+export type ContentStatus =
+  | "draft"
+  | "review"
+  | "approved"
+  | "scheduled"
+  | "published"
+  | "archived";
+
+export type SidebarStatus = "draft" | "review" | "published" | "archived";
 
 export interface Collection {
   name: string;
@@ -36,11 +44,21 @@ export interface ListEntriesResult {
   next_cursor: string | null;
 }
 
+export interface SiteInfo {
+  title: string;
+  description: string;
+  origin: string;
+  brand: string;
+  locales: string[];
+  canonicalLocale: string | null;
+  publicUrl: string;
+  mcpUrl: string;
+}
+
 export const EDITORIAL_STATUSES: SidebarStatus[] = [
   "draft",
   "review",
-  "approved",
-  "scheduled",
   "published",
+  "archived",
 ];
-export const SIMPLE_STATUSES: SidebarStatus[] = ["published"];
+export const SIMPLE_STATUSES: SidebarStatus[] = ["draft", "published", "archived"];

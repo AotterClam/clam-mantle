@@ -4,6 +4,7 @@ import { PanelLeftIcon } from "lucide-react";
 import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "../lib/utils";
+import { writeSidebarOpenCookie } from "../context/layout-provider";
 import { Button } from "./button";
 import {
   Sheet,
@@ -14,6 +15,7 @@ import {
 } from "./sheet";
 
 const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH_ICON = "3.25rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
@@ -53,10 +55,16 @@ function SidebarProvider({
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
   const [open, setOpen] = React.useState(defaultOpen);
+  const setOpenPersisted = React.useCallback((next: boolean) => {
+    writeSidebarOpenCookie(next);
+    setOpen(next);
+  }, []);
 
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((o) => !o) : setOpen((o) => !o);
-  }, [isMobile]);
+    return isMobile
+      ? setOpenMobile((o) => !o)
+      : setOpenPersisted(!open);
+  }, [isMobile, open, setOpenPersisted]);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -78,13 +86,13 @@ function SidebarProvider({
     () => ({
       state,
       open,
-      setOpen,
+      setOpen: setOpenPersisted,
       isMobile,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, isMobile, openMobile, toggleSidebar],
+    [state, open, setOpenPersisted, isMobile, openMobile, toggleSidebar],
   );
 
   return (
@@ -94,6 +102,7 @@ function SidebarProvider({
         style={
           {
             "--sidebar-width": SIDEBAR_WIDTH,
+            "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
             ...style,
           } as React.CSSProperties
         }
@@ -165,12 +174,12 @@ function Sidebar({
     >
       <div
         data-slot="sidebar-gap"
-        className="relative w-(--sidebar-width) bg-transparent"
+        className="relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 group-data-[state=collapsed]:w-(--sidebar-width-icon)"
       />
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[width] duration-200 md:flex group-data-[state=collapsed]:w-(--sidebar-width-icon)",
           side === "left" ? "left-0" : "right-0",
           variant === "inset" ? "p-2" : "",
           className,
@@ -201,7 +210,7 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7 md:hidden", className)}
+      className={cn("size-7", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
@@ -346,7 +355,7 @@ const sidebarMenuButtonVariants = cva(
       size: {
         default: "h-8 text-sm",
         sm: "h-7 text-xs",
-        lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
+        lg: "h-12 text-sm",
       },
     },
     defaultVariants: {
