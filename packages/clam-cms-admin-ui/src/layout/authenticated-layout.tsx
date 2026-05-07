@@ -16,12 +16,19 @@ import {
   SIMPLE_STATUSES,
   type AdminUser,
   type Collection,
+  type SiteInfo,
   type SidebarStatus,
 } from "../lib/types";
+import { useAdminLocation } from "../app/router";
+import { usePreferences, type AdminLanguage } from "../app/preferences";
 import { AppSidebar } from "./app-sidebar";
 import { Header } from "./header";
 import { Main } from "./main";
 import { SkipToMain } from "./skip-to-main";
+import { statusLabel } from "../features/content/status";
+import { readSidebarOpenCookie } from "../context/layout-provider";
+import { t } from "../app/i18n";
+import { AdminAttribution } from "../brand/aotter-clam";
 import type { AdminBrand, NavGroupData, NavItem, NavLink } from "./types";
 
 interface AuthenticatedLayoutProps {
@@ -30,14 +37,6 @@ interface AuthenticatedLayoutProps {
   fluid?: boolean;
   children: React.ReactNode;
 }
-
-const STATUS_LABELS: Record<SidebarStatus, string> = {
-  draft: "Drafts",
-  review: "In Review",
-  approved: "Approved",
-  scheduled: "Scheduled",
-  published: "Published",
-};
 
 const DEFAULT_BRAND: AdminBrand = {
   title: "CMS",
@@ -51,10 +50,8 @@ export function AuthenticatedLayout({
   fluid = false,
   children,
 }: AuthenticatedLayoutProps): React.ReactElement {
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "/admin";
-  const search =
-    typeof window !== "undefined" ? window.location.search : "";
+  const { pathname, search } = useAdminLocation();
+  const { language } = usePreferences();
 
   const me = useQuery<AdminUser>({
     queryKey: ["me"],
@@ -68,18 +65,31 @@ export function AuthenticatedLayout({
       return res.collections;
     },
   });
+  const site = useQuery<SiteInfo>({
+    queryKey: ["site"],
+    queryFn: () => api.get<SiteInfo>("/site"),
+  });
+
+  const resolvedBrand = React.useMemo<AdminBrand>(
+    () => ({
+      ...brand,
+      title: site.data?.brand ?? brand.title,
+      subtitle: site.data?.canonicalLocale ?? brand.subtitle,
+    }),
+    [brand, site.data],
+  );
 
   const groups = React.useMemo<ReadonlyArray<NavGroupData>>(
-    () => buildNavGroups(collectionsQuery.data ?? []),
-    [collectionsQuery.data],
+    () => buildNavGroups(collectionsQuery.data ?? [], language),
+    [collectionsQuery.data, language],
   );
 
   return (
     <LayoutProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={readSidebarOpenCookie() ?? true}>
         <SkipToMain />
         <AppSidebar
-          brand={brand}
+          brand={resolvedBrand}
           groups={groups}
           pathname={pathname}
           search={search}
@@ -100,6 +110,7 @@ export function AuthenticatedLayout({
             {children}
           </Main>
         </SidebarInset>
+        <AdminAttribution />
       </SidebarProvider>
     </LayoutProvider>
   );
@@ -107,11 +118,12 @@ export function AuthenticatedLayout({
 
 function buildNavGroups(
   collections: ReadonlyArray<Collection>,
+  language: AdminLanguage,
 ): ReadonlyArray<NavGroupData> {
   const homeGroup: NavGroupData = {
     items: [
       {
-        title: "Home",
+        title: t(language, "nav.home"),
         url: "/admin",
         icon: Home,
       },
@@ -119,7 +131,7 @@ function buildNavGroups(
   };
 
   const contentGroup: NavGroupData = {
-    title: "Content",
+    title: t(language, "nav.content"),
     items: collections.map<NavItem>((c) => ({
       title: c.title,
       // Leading icon is always Folder so every content row reads the
@@ -129,17 +141,17 @@ function buildNavGroups(
       icon: Folder,
       marker: c.hasTranslations ? Globe : undefined,
       items: statusesFor(c).map<NavLink>((status) => ({
-        title: STATUS_LABELS[status],
+        title: statusLabel(language, status),
         url: `/admin/c/${c.name}?status=${status}`,
       })),
     })),
   };
 
   const moreGroup: NavGroupData = {
-    title: "More",
+    title: t(language, "nav.more"),
     items: [
-      { title: "Approvals", url: "/admin/approvals", icon: ClipboardList },
-      { title: "Settings", url: "/admin/settings", icon: SettingsIcon },
+      { title: t(language, "nav.approvals"), url: "/admin/approvals", icon: ClipboardList },
+      { title: t(language, "nav.settings"), url: "/admin/settings", icon: SettingsIcon },
     ],
   };
 

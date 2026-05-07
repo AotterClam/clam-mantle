@@ -157,16 +157,18 @@ export function mountPublicRoutes(
     app.get("/:locale", async (c) => {
       const runtime = await ref.get();
       const site = await runtime.siteConfig.load();
-      const locale = c.req.param("locale");
-      const ctx = buildCtx(c, runtime, site, locale);
-      if (!isKnownLocale(locale, site)) return options.notFoundRenderer(ctx);
+      const locale = canonicalLocaleParam(c.req.param("locale"), site);
+      const ctx = buildCtx(c, runtime, site, locale ?? inferLocaleFromPath(c.req.path, site));
+      if (locale === null) return options.notFoundRenderer(ctx);
       return options.homeRenderer!(ctx);
     });
   }
 
   app.get("/:locale/llms.txt", async (c) => {
     const runtime = await ref.get();
-    const locale = c.req.param("locale");
+    const site = await runtime.siteConfig.load();
+    const locale = canonicalLocaleParam(c.req.param("locale"), site);
+    if (locale === null) return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
     return readKvText(runtime.kv, llmsTxtKey(locale), TEXT_PUBLIC);
   });
 
@@ -196,10 +198,10 @@ function mountCollection(
     app.get(`/:locale${segPath}`, async (c) => {
       const runtime = await ref.get();
       const site = await runtime.siteConfig.load();
-      const locale = c.req.param("locale");
-      const ctx = buildCtx(c, runtime, site, locale);
+      const locale = canonicalLocaleParam(c.req.param("locale"), site);
+      const ctx = buildCtx(c, runtime, site, locale ?? inferLocaleFromPath(c.req.path, site));
       const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
-      if (!isKnownLocale(locale, site)) return notFound();
+      if (locale === null) return notFound();
       if (liveDev) {
         const html = await runtime.renderListLive.execute({
           collection: route.collection,
@@ -228,11 +230,11 @@ function mountCollection(
     app.get(`/:locale${segPath}/:slug{[^/]+\\.md}`, async (c) => {
       const runtime = await ref.get();
       const site = await runtime.siteConfig.load();
-      const locale = c.req.param("locale");
+      const locale = canonicalLocaleParam(c.req.param("locale"), site);
       const slugParam = c.req.param("slug") ?? "";
       const slug = slugParam.endsWith(".md") ? slugParam.slice(0, -3) : slugParam;
       const notFound = (): Response => new Response("not found", { status: 404, headers: TEXT_PUBLIC });
-      if (!isKnownLocale(locale, site)) return notFound();
+      if (locale === null) return notFound();
       const key = entryMarkdownKeyFromParts(route.collection, locale, slug);
       return readThroughCache(runtime.kv, key, MD_PUBLIC, async () => {
         const entry = await readEntryBySlug(runtime.db, {
@@ -250,10 +252,11 @@ function mountCollection(
   app.get(`/:locale${segPath}/:slug`, async (c) => {
     const runtime = await ref.get();
     const site = await runtime.siteConfig.load();
-    const locale = c.req.param("locale");
+    const locale = canonicalLocaleParam(c.req.param("locale"), site);
     const slug = c.req.param("slug");
-    const ctx = buildCtx(c, runtime, site, locale);
+    const ctx = buildCtx(c, runtime, site, locale ?? inferLocaleFromPath(c.req.path, site));
     const notFound = (): Promise<Response> | Response => options.notFoundRenderer(ctx);
+    if (locale === null) return notFound();
 
     const override = overrides.get(overrideKey(route.collection, slug));
     if (override) return override.render(ctx);
@@ -339,6 +342,11 @@ function buildCtx(
   locale: string,
 ): PublicRouteContext {
   return { c, runtime, site, locale };
+}
+
+function canonicalLocaleParam(locale: string, site: SiteConfig): string | null {
+  if (!isKnownLocale(locale, site)) return null;
+  return inferLocaleFromPath(`/${locale}`, site);
 }
 
 function buildOverrideIndex(
