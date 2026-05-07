@@ -138,6 +138,25 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     return jsonResponse(200, { collections });
   });
 
+  app.get("/admin/api/site", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminUnauthenticated(c, "/admin/api/site");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/site", login);
+    }
+    const site = await runtime.siteConfig.load();
+    const url = new URL(c.req.url);
+    const publicUrl = site.origin || url.origin;
+    return jsonResponse(200, {
+      ...site,
+      publicUrl,
+      mcpUrl: `${url.origin}/mcp`,
+    });
+  });
+
   app.get("/admin/api/entries", async (c) => {
     const runtime = await ref.get();
     const session = await readSessionForAdmin(c, runtime);
