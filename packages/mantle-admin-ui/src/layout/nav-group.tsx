@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "../ui/sidebar";
 import { cn } from "../lib/utils";
+import { usePreferences } from "../app/preferences";
 import {
   isCollapsible,
   type NavCollapsible,
@@ -220,6 +221,7 @@ function NavCollapsibleDropdown({
   search: string;
 }): React.ReactElement {
   const groupActive = isGroupActive(item, pathname, search);
+  const { direction } = usePreferences();
   return (
     <SidebarMenuItem>
       <DropdownMenu>
@@ -230,7 +232,11 @@ function NavCollapsibleDropdown({
             <ChevronRight aria-hidden data-sidebar-label className="ms-auto" />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" align="start" sideOffset={4}>
+        <DropdownMenuContent
+          side={direction === "rtl" ? "left" : "right"}
+          align="start"
+          sideOffset={4}
+        >
           <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {item.items.map((sub) => (

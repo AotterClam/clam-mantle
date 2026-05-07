@@ -3,6 +3,8 @@ import { AlertCircle, Check, Copy, ExternalLink, type LucideIcon } from "lucide-
 import { ApiError } from "../lib/api";
 import { cn } from "../lib/utils";
 import { Button } from "./button";
+import { usePreferences } from "../app/preferences";
+import { t } from "../app/i18n";
 
 export function PageHeader({
   eyebrow,
@@ -69,6 +71,7 @@ export function EmptyState({
 }
 
 export function ErrorBox({ error }: { error: unknown }): React.ReactElement | null {
+  const { language } = usePreferences();
   const is401 = error instanceof ApiError && error.status === 401;
   React.useEffect(() => {
     if (!is401 || typeof window === "undefined") return;
@@ -79,7 +82,7 @@ export function ErrorBox({ error }: { error: unknown }): React.ReactElement | nu
   const message = error instanceof Error ? error.message : "Unknown error.";
   return (
     <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-      Failed to load: {message}
+      {t(language, "common.failedToLoad")}: {message}
     </div>
   );
 }
@@ -93,6 +96,7 @@ export function CopyField({
   value: string;
   href?: string;
 }): React.ReactElement {
+  const { language } = usePreferences();
   const [copied, setCopied] = React.useState(false);
 
   async function copy(): Promise<void> {
@@ -112,7 +116,12 @@ export function CopyField({
         <div className="flex items-center gap-1">
           {href ? (
             <Button asChild variant="ghost" size="icon" className="size-7">
-              <a href={href} target="_blank" rel="noreferrer" aria-label={`Open ${label}`}>
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`${t(language, "common.open")} ${label}`}
+              >
                 <ExternalLink className="size-3.5" aria-hidden />
               </a>
             </Button>
@@ -123,7 +132,7 @@ export function CopyField({
             size="icon"
             className="size-7"
             onClick={copy}
-            aria-label={`Copy ${label}`}
+            aria-label={`${t(language, "common.copy")} ${label}`}
           >
             {copied ? (
               <Check className="size-3.5 text-[color:var(--success)]" aria-hidden />

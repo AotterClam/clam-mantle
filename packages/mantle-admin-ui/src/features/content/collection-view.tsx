@@ -8,7 +8,9 @@ import { cn } from "../../lib/utils";
 import { TableCell, TableHeadCell, TableShell } from "../../ui/admin-table";
 import { EmptyState, ErrorBox, PageHeader } from "../../ui/page";
 import { StatusBadge } from "../../ui/status-badge";
-import { STATUS_LABELS } from "./status";
+import { statusLabel } from "./status";
+import { usePreferences, type AdminLanguage } from "../../app/preferences";
+import { t } from "../../app/i18n";
 
 const TIMESTAMP_FMT = new Intl.DateTimeFormat(undefined, {
   dateStyle: "short",
@@ -20,6 +22,7 @@ export function CollectionView({
 }: {
   collectionName: string;
 }): React.ReactElement {
+  const { language } = usePreferences();
   const location = useAdminLocation();
   const status = new URLSearchParams(location.search).get("status") ?? undefined;
 
@@ -48,14 +51,14 @@ export function CollectionView({
         eyebrow={
           <>
             <a href="/admin" className="hover:underline">
-              Collections
+              {t(language, "collection.breadcrumb")}
             </a>
             <span className="mx-2 text-foreground/30">/</span>
             <span className="text-foreground/70">{collectionName}</span>
           </>
         }
         title={heading}
-        description={collection?.description ?? "Entries in this collection."}
+        description={collection?.description ?? t(language, "collection.defaultDescription")}
         actions={
           <div className="flex flex-wrap items-center justify-end gap-2">
             {status ? <StatusBadge status={status} /> : null}
@@ -67,7 +70,11 @@ export function CollectionView({
       />
 
       {collection ? (
-        <StatusFilter collection={collection} activeStatus={status} />
+        <StatusFilter
+          collection={collection}
+          activeStatus={status}
+          language={language}
+        />
       ) : null}
 
       {entries.isLoading && <EntriesSkeleton />}
@@ -75,8 +82,12 @@ export function CollectionView({
       {entries.data && entries.data.items.length === 0 && (
         <EmptyState
           icon={FileText}
-          title="No entries yet"
-          description={status ? `No ${status} entries in this collection.` : "This collection has no entries yet."}
+          title={t(language, "collection.empty.title")}
+          description={
+            status
+              ? t(language, "collection.empty.withStatus", { status })
+              : t(language, "collection.empty.all")
+          }
         />
       )}
       {entries.data && entries.data.items.length > 0 && (
@@ -84,23 +95,23 @@ export function CollectionView({
           <TableShell>
             <thead>
               <tr className="border-b border-[var(--glass-border)]">
-                <TableHeadCell>ID</TableHeadCell>
-                <TableHeadCell>Title</TableHeadCell>
-                <TableHeadCell>Status</TableHeadCell>
-                <TableHeadCell>Locale</TableHeadCell>
-                <TableHeadCell>Version</TableHeadCell>
-                <TableHeadCell>Updated</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.id")}</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.title")}</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.status")}</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.locale")}</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.version")}</TableHeadCell>
+                <TableHeadCell>{t(language, "collection.table.updated")}</TableHeadCell>
               </tr>
             </thead>
             <tbody>
               {entries.data.items.map((row) => (
-                <EntryRowDisplay key={row.id} row={row} />
+                <EntryRowDisplay key={row.id} row={row} language={language} />
               ))}
             </tbody>
           </TableShell>
           {entries.data.next_cursor ? (
             <p className="mt-3 text-xs text-muted-foreground">
-              More rows are available, but cursor pagination is not wired in this admin shell yet.
+              {t(language, "collection.moreRows")}
             </p>
           ) : null}
         </>
@@ -112,9 +123,11 @@ export function CollectionView({
 function StatusFilter({
   collection,
   activeStatus,
+  language,
 }: {
   collection: Collection;
   activeStatus: string | undefined;
+  language: AdminLanguage;
 }): React.ReactElement {
   const statuses = collection.lifecycle === "editorial"
     ? (["draft", "review", "published", "archived"] as const)
@@ -126,7 +139,7 @@ function StatusFilter({
         href={`/admin/c/${encodeURIComponent(collection.name)}`}
         active={!activeStatus}
       >
-        All
+        {t(language, "collection.filter.all")}
       </StatusFilterLink>
       {statuses.map((s) => (
         <StatusFilterLink
@@ -134,7 +147,7 @@ function StatusFilter({
           href={`/admin/c/${encodeURIComponent(collection.name)}?status=${s}`}
           active={activeStatus === s}
         >
-          {STATUS_LABELS[s]}
+          {statusLabel(language, s)}
         </StatusFilterLink>
       ))}
     </div>
@@ -184,13 +197,21 @@ function EntriesSkeleton(): React.ReactElement {
   );
 }
 
-function EntryRowDisplay({ row }: { row: EntryRow }): React.ReactElement {
+function EntryRowDisplay({
+  row,
+  language,
+}: {
+  row: EntryRow;
+  language: AdminLanguage;
+}): React.ReactElement {
   return (
     <tr className="border-t border-[var(--glass-border)] hover:bg-accent/40">
       <TableCell className="font-mono text-xs text-muted-foreground">
         {String(row.id).slice(0, 8)}
       </TableCell>
-      <TableCell className="max-w-[24rem] truncate">{renderTitle(row.title)}</TableCell>
+      <TableCell className="max-w-[24rem] truncate">
+        {renderTitle(row.title, language)}
+      </TableCell>
       <TableCell>
         <StatusBadge status={row.status} />
       </TableCell>
@@ -205,9 +226,16 @@ function EntryRowDisplay({ row }: { row: EntryRow }): React.ReactElement {
   );
 }
 
-function renderTitle(title: unknown): React.ReactNode {
+function renderTitle(
+  title: unknown,
+  language: AdminLanguage,
+): React.ReactNode {
   if (title == null || title === "") {
-    return <span className="text-muted-foreground">(untitled)</span>;
+    return (
+      <span className="text-muted-foreground">
+        {t(language, "collection.untitled")}
+      </span>
+    );
   }
   if (typeof title === "string") return title;
   return <span className="font-mono text-xs">{JSON.stringify(title)}</span>;

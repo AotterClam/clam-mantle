@@ -5,9 +5,12 @@ import { api } from "../../lib/api";
 import type { Collection, SiteInfo } from "../../lib/types";
 import { Button } from "../../ui/button";
 import { CopyField, EmptyState, ErrorBox, PageHeader, SectionCard } from "../../ui/page";
-import { STATUS_LABELS } from "../content/status";
+import { statusLabel } from "../content/status";
+import { usePreferences } from "../../app/preferences";
+import { t } from "../../app/i18n";
 
 export function HomeView(): React.ReactElement {
+  const { language } = usePreferences();
   const site = useQuery<SiteInfo>({
     queryKey: ["site"],
     queryFn: () => api.get<SiteInfo>("/site"),
@@ -25,19 +28,19 @@ export function HomeView(): React.ReactElement {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Owner console"
+        eyebrow={t(language, "console.eyebrow")}
         title={siteInfo?.brand ?? "Mantle CMS"}
         description={
           siteInfo
-            ? `${siteInfo.title} is deployed. Use this console for orientation; use an MCP-capable agent for content operations.`
-            : "Use this console for orientation; use an MCP-capable agent for content operations."
+            ? t(language, "console.description", { title: siteInfo.title })
+            : t(language, "console.descriptionFallback")
         }
         actions={
           siteInfo?.publicUrl ? (
             <Button asChild variant="outline">
               <a href={siteInfo.publicUrl} target="_blank" rel="noreferrer">
                 <Globe className="size-4" aria-hidden />
-                View site
+                {t(language, "common.viewSite")}
               </a>
             </Button>
           ) : null
@@ -51,11 +54,9 @@ export function HomeView(): React.ReactElement {
               <Bot className="size-5" aria-hidden />
             </div>
             <div>
-              <h2 className="text-lg">Next: connect an agent</h2>
+              <h2 className="text-lg">{t(language, "console.agent.title")}</h2>
               <p className="text-sm text-muted-foreground">
-                Give this MCP URL to Claude Code, Codex, Cursor, or another MCP
-                client. It will open a consent screen, then the agent can manage
-                this site's content with your staff permission.
+                {t(language, "console.agent.body")}
               </p>
             </div>
           </div>
@@ -68,8 +69,12 @@ export function HomeView(): React.ReactElement {
             <ErrorBox error={site.error} />
           ) : siteInfo ? (
             <div className="grid gap-3">
-              <CopyField label="MCP URL" value={siteInfo.mcpUrl} />
-              <CopyField label="Public URL" value={siteInfo.publicUrl} href={siteInfo.publicUrl} />
+              <CopyField label={t(language, "console.mcpUrl")} value={siteInfo.mcpUrl} />
+              <CopyField
+                label={t(language, "console.publicUrl")}
+                value={siteInfo.publicUrl}
+                href={siteInfo.publicUrl}
+              />
             </div>
           ) : null}
         </SectionCard>
@@ -80,27 +85,25 @@ export function HomeView(): React.ReactElement {
               <PlugZap className="size-5" aria-hidden />
             </div>
             <div>
-              <h2 className="text-lg">Operational loop</h2>
+              <h2 className="text-lg">{t(language, "console.loop.title")}</h2>
               <p className="text-sm text-muted-foreground">
-                Ask your content agent to list entries, create drafts, publish,
-                unpublish, or adjust copy. Then refresh this console if you want
-                a human-readable inventory.
+                {t(language, "console.loop.body")}
               </p>
             </div>
           </div>
           <ol className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex gap-2"><span className="text-primary">1.</span>Open the public site and inspect the result.</li>
-            <li className="flex gap-2"><span className="text-primary">2.</span>Connect a second agent through MCP.</li>
-            <li className="flex gap-2"><span className="text-primary">3.</span>Tell the agent what content or workflow to change.</li>
+            <li className="flex gap-2"><span className="text-primary">1.</span>{t(language, "console.loop.step1")}</li>
+            <li className="flex gap-2"><span className="text-primary">2.</span>{t(language, "console.loop.step2")}</li>
+            <li className="flex gap-2"><span className="text-primary">3.</span>{t(language, "console.loop.step3")}</li>
           </ol>
         </SectionCard>
       </div>
 
       <section>
         <PageHeader
-          eyebrow="Content model"
-          title="Collections"
-          description="These collections come from your 4-atom manifest set. Translation child schemas are folded into their parent."
+          eyebrow={t(language, "console.collections.eyebrow")}
+          title={t(language, "console.collections.title")}
+          description={t(language, "console.collections.body")}
         />
 
         {collectionsQuery.isLoading && (
@@ -114,8 +117,8 @@ export function HomeView(): React.ReactElement {
         {collectionsQuery.data && collections.length === 0 && (
           <EmptyState
             icon={Database}
-            title="No collections defined yet"
-            description="A blank project can add Schema manifests later; a starter should normally seed at least one collection."
+            title={t(language, "console.collections.emptyTitle")}
+            description={t(language, "console.collections.emptyBody")}
           />
         )}
         {collections.length > 0 && (
@@ -138,7 +141,9 @@ export function HomeView(): React.ReactElement {
                     {c.description}
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No description.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {t(language, "console.collections.noDescription")}
+                  </p>
                 )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <span className="badge-status bg-accent text-accent-foreground">{c.lifecycle}</span>
@@ -148,7 +153,7 @@ export function HomeView(): React.ReactElement {
                     </span>
                   ) : null}
                   <span className="badge-status bg-muted text-muted-foreground">
-                    {STATUS_LABELS.published}
+                    {statusLabel(language, "published")}
                   </span>
                 </div>
               </a>

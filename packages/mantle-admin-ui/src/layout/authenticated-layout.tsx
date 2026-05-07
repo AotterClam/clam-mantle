@@ -20,12 +20,15 @@ import {
   type SidebarStatus,
 } from "../lib/types";
 import { useAdminLocation } from "../app/router";
+import { usePreferences, type AdminLanguage } from "../app/preferences";
 import { AppSidebar } from "./app-sidebar";
 import { Header } from "./header";
 import { Main } from "./main";
 import { SkipToMain } from "./skip-to-main";
-import { STATUS_LABELS } from "../features/content/status";
+import { statusLabel } from "../features/content/status";
 import { readSidebarOpenCookie } from "../context/layout-provider";
+import { t } from "../app/i18n";
+import { AdminAttribution } from "../brand/aotter-mantle";
 import type { AdminBrand, NavGroupData, NavItem, NavLink } from "./types";
 
 interface AuthenticatedLayoutProps {
@@ -48,6 +51,7 @@ export function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps): React.ReactElement {
   const { pathname, search } = useAdminLocation();
+  const { language } = usePreferences();
 
   const me = useQuery<AdminUser>({
     queryKey: ["me"],
@@ -76,8 +80,8 @@ export function AuthenticatedLayout({
   );
 
   const groups = React.useMemo<ReadonlyArray<NavGroupData>>(
-    () => buildNavGroups(collectionsQuery.data ?? []),
-    [collectionsQuery.data],
+    () => buildNavGroups(collectionsQuery.data ?? [], language),
+    [collectionsQuery.data, language],
   );
 
   return (
@@ -106,6 +110,7 @@ export function AuthenticatedLayout({
             {children}
           </Main>
         </SidebarInset>
+        <AdminAttribution />
       </SidebarProvider>
     </LayoutProvider>
   );
@@ -113,11 +118,12 @@ export function AuthenticatedLayout({
 
 function buildNavGroups(
   collections: ReadonlyArray<Collection>,
+  language: AdminLanguage,
 ): ReadonlyArray<NavGroupData> {
   const homeGroup: NavGroupData = {
     items: [
       {
-        title: "Home",
+        title: t(language, "nav.home"),
         url: "/admin",
         icon: Home,
       },
@@ -125,7 +131,7 @@ function buildNavGroups(
   };
 
   const contentGroup: NavGroupData = {
-    title: "Content",
+    title: t(language, "nav.content"),
     items: collections.map<NavItem>((c) => ({
       title: c.title,
       // Leading icon is always Folder so every content row reads the
@@ -135,17 +141,17 @@ function buildNavGroups(
       icon: Folder,
       marker: c.hasTranslations ? Globe : undefined,
       items: statusesFor(c).map<NavLink>((status) => ({
-        title: STATUS_LABELS[status],
+        title: statusLabel(language, status),
         url: `/admin/c/${c.name}?status=${status}`,
       })),
     })),
   };
 
   const moreGroup: NavGroupData = {
-    title: "More",
+    title: t(language, "nav.more"),
     items: [
-      { title: "Approvals", url: "/admin/approvals", icon: ClipboardList },
-      { title: "Settings", url: "/admin/settings", icon: SettingsIcon },
+      { title: t(language, "nav.approvals"), url: "/admin/approvals", icon: ClipboardList },
+      { title: t(language, "nav.settings"), url: "/admin/settings", icon: SettingsIcon },
     ],
   };
 

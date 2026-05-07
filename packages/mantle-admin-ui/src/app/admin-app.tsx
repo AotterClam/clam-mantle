@@ -9,6 +9,7 @@ import { AccessDeniedView, GateError, GateLoading, SignInView } from "../feature
 import { HomeView } from "../features/console/home-view";
 import { CollectionView } from "../features/content/collection-view";
 import { NotFoundView } from "../features/system/not-found-view";
+import { PreferencesView } from "../features/system/preferences-view";
 
 export function AdminApp(): React.ReactElement {
   const location = useAdminLocation();
@@ -63,10 +64,22 @@ function Gate({ path }: { path: string }): React.ReactElement {
     );
   }
 
+  if (path === "/admin/preferences") {
+    return (
+      <AuthenticatedLayout>
+        <PreferencesView />
+      </AuthenticatedLayout>
+    );
+  }
+
   if (path === "/admin/approvals" || path === "/admin/settings") {
     return (
       <AuthenticatedLayout>
-        <NotFoundView path={path} intent="planned" />
+        <NotFoundView
+          path={path}
+          intent="planned"
+          kind={path === "/admin/settings" ? "settings" : "route"}
+        />
       </AuthenticatedLayout>
     );
   }

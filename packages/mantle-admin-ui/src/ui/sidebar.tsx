@@ -107,7 +107,7 @@ function SidebarProvider({
           } as React.CSSProperties
         }
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar rtl:flex-row-reverse",
           className,
         )}
         {...props}
@@ -229,7 +229,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
       data-slot="sidebar-inset"
       className={cn(
         "relative flex w-full flex-1 flex-col bg-background",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm rtl:md:peer-data-[variant=inset]:ml-2 rtl:md:peer-data-[variant=inset]:mr-0",
         className,
       )}
       {...props}
@@ -278,7 +278,12 @@ function SidebarSeparator({ className, ...props }: React.ComponentProps<"hr">) {
     <hr
       data-slot="sidebar-separator"
       data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
+      className={cn(
+        "mx-4 my-1 h-px w-auto border-0",
+        "bg-linear-to-r from-transparent via-[color-mix(in_srgb,var(--primary)_24%,transparent)] to-transparent",
+        "opacity-70 dark:via-[color-mix(in_srgb,var(--palette-teal-light)_18%,transparent)]",
+        className,
+      )}
       {...props}
     />
   );
@@ -394,7 +399,7 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
       data-slot="sidebar-menu-sub"
       data-sidebar="menu-sub"
       className={cn(
-        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5 rtl:-translate-x-px rtl:border-l-0 rtl:border-r",
         className,
       )}
       {...props}
@@ -437,6 +442,7 @@ function SidebarMenuSubButton({
       data-active={isActive}
       className={cn(
         "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:font-medium [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+        "rtl:translate-x-px",
         size === "sm" && "text-xs",
         size === "md" && "text-sm",
         className,
