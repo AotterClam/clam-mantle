@@ -21,7 +21,12 @@ import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
-import { detectConsentLocale, renderConsentHtml, type ConsentModel } from "../oauth/consentHtml.js";
+import {
+  detectConsentLocale,
+  renderConsentHtml,
+  type ConsentLocale,
+  type ConsentModel,
+} from "../oauth/consentHtml.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
@@ -90,6 +95,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.get("/admin/sign-in", spa);
   app.get("/admin/c/:collection", spa);
   app.get("/admin/approvals", spa);
+  app.get("/admin/preferences", spa);
   app.get("/admin/settings", spa);
 
   // ── /admin/api/* — JSON endpoints consumed by the SPA ───────────────
@@ -379,7 +385,7 @@ type OAuthHelpers = {
 async function handleConsentGet(
   c: Context,
   runtime: CmsRuntime,
-  locale: "zh-TW" | "en",
+  locale: ConsentLocale,
   oauthHelpers: OAuthHelpers,
 ): Promise<Response> {
   let model: ConsentModel | null = null;
