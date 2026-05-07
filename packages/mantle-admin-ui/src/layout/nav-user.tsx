@@ -46,13 +46,14 @@ export function NavUser({ login, role }: NavUserProps): React.ReactElement {
               className="data-[state=open]:bg-accent/40"
             >
               <Avatar avatarUrl={avatarUrl} initial={initial} />
-              <div className="grid flex-1 text-start text-sm leading-tight">
+              <div data-sidebar-label className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-semibold">{login ?? "—"}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {role ?? "Signed in"}
                 </span>
               </div>
               <ChevronsUpDown
+                data-sidebar-label
                 className="ms-auto size-4 text-muted-foreground"
                 aria-hidden
               />

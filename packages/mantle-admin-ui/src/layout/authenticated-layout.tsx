@@ -16,12 +16,16 @@ import {
   SIMPLE_STATUSES,
   type AdminUser,
   type Collection,
+  type SiteInfo,
   type SidebarStatus,
 } from "../lib/types";
+import { useAdminLocation } from "../app/router";
 import { AppSidebar } from "./app-sidebar";
 import { Header } from "./header";
 import { Main } from "./main";
 import { SkipToMain } from "./skip-to-main";
+import { STATUS_LABELS } from "../features/content/status";
+import { readSidebarOpenCookie } from "../context/layout-provider";
 import type { AdminBrand, NavGroupData, NavItem, NavLink } from "./types";
 
 interface AuthenticatedLayoutProps {
@@ -30,14 +34,6 @@ interface AuthenticatedLayoutProps {
   fluid?: boolean;
   children: React.ReactNode;
 }
-
-const STATUS_LABELS: Record<SidebarStatus, string> = {
-  draft: "Drafts",
-  review: "In Review",
-  approved: "Approved",
-  scheduled: "Scheduled",
-  published: "Published",
-};
 
 const DEFAULT_BRAND: AdminBrand = {
   title: "CMS",
@@ -51,10 +47,7 @@ export function AuthenticatedLayout({
   fluid = false,
   children,
 }: AuthenticatedLayoutProps): React.ReactElement {
-  const pathname =
-    typeof window !== "undefined" ? window.location.pathname : "/admin";
-  const search =
-    typeof window !== "undefined" ? window.location.search : "";
+  const { pathname, search } = useAdminLocation();
 
   const me = useQuery<AdminUser>({
     queryKey: ["me"],
@@ -68,6 +61,19 @@ export function AuthenticatedLayout({
       return res.collections;
     },
   });
+  const site = useQuery<SiteInfo>({
+    queryKey: ["site"],
+    queryFn: () => api.get<SiteInfo>("/site"),
+  });
+
+  const resolvedBrand = React.useMemo<AdminBrand>(
+    () => ({
+      ...brand,
+      title: site.data?.brand ?? brand.title,
+      subtitle: site.data?.canonicalLocale ?? brand.subtitle,
+    }),
+    [brand, site.data],
+  );
 
   const groups = React.useMemo<ReadonlyArray<NavGroupData>>(
     () => buildNavGroups(collectionsQuery.data ?? []),
@@ -76,10 +82,10 @@ export function AuthenticatedLayout({
 
   return (
     <LayoutProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={readSidebarOpenCookie() ?? true}>
         <SkipToMain />
         <AppSidebar
-          brand={brand}
+          brand={resolvedBrand}
           groups={groups}
           pathname={pathname}
           search={search}
