@@ -1,5 +1,5 @@
 {
-  "label": "EN",
+  "label": "English",
   "header": {
     "posts": "Posts",
     "about": "About",
@@ -15,17 +15,17 @@
     "ariaLabel": "Language"
   },
   "home": {
-    "eyebrow": "the dispatch",
+    "eyebrow": "Welcome",
     "recent": "Recent posts"
   },
   "postList": {
     "title": "Posts",
-    "eyebrow": "the index"
+    "eyebrow": "All posts"
   },
   "notFound": {
-    "title": "Lost at sea",
-    "body": "The page you sought is unwritten — or unpublished, or unremembered.",
-    "back": "Return to the homepage"
+    "title": "Page not found",
+    "body": "This page doesn't exist, or hasn't been published yet.",
+    "back": "Back to home"
   },
   "contact": {
     "title": "Contact",
@@ -35,7 +35,7 @@
     "captchaLabel": "Anti-bot check",
     "send": "Send",
     "sending": "Sending…",
-    "success": "Thanks — your message landed.",
+    "success": "Message sent. Thanks.",
     "fallbackPrefix": "Could not send: "
   }
 }

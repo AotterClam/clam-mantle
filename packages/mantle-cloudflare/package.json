@@ -1,7 +1,7 @@
 {
   "name": "@aotter/mantle-cloudflare",
-  "version": "0.0.0",
-  "description": "Cloudflare Workers adapter for mantle. Hono-based mountAdmin / mountServerEndpoints. Implements the 5 runtime ports against D1 / KV / ASSETS / Workers OAuth. Bundles mantle-admin-ui dist for the admin SPA static surface.",
+  "version": "0.0.6-alpha",
+  "description": "Cloudflare Workers adapter for mantle. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Implements the 5 runtime ports against D1 / KV / ASSETS / bearer-token OAuth verification.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-cloudflare",
   "repository": {
@@ -11,12 +11,20 @@
   },
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./cf": {
+      "types": "./dist/cf.d.ts",
+      "import": "./dist/cf.js"
     }
   },
   "files": ["dist", "README.md"],
@@ -27,8 +35,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@aotter/mantle-admin-ui": "workspace:*",
     "@aotter/mantle-spec": "workspace:*",
     "@aotter/mantle-runtime": "workspace:*",
+    "@cloudflare/workers-oauth-provider": "^0.4.0",
     "hono": "^4.6.20"
   },
   "devDependencies": {

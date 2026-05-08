@@ -27,6 +27,7 @@ import {
   jsonRpcOk,
   jsonRpcOkRaw,
 } from "./McpResponses.js";
+import type { Staff } from "../../domain/model/Staff.js";
 
 /**
  * `McpJsonRpcDispatcher` — JSON-RPC dispatcher for the MCP transport.
@@ -38,7 +39,8 @@ import {
  * (`create_draft_<collection>`, `update_draft_<collection>` for each
  * Schema in the manifest set, with the Schema's properties inlined
  * into the tool's `inputSchema`) plus generic read/status tools
- * (`list_entries`, `get_entry`, `request_publish`, `archive_entry`).
+ * (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`,
+ * `archive_entry`).
  * Boot validation refuses Schemas whose names mangle to the same
  * tool-name suffix.
  *
@@ -47,6 +49,9 @@ import {
  */
 export interface McpAuthContext {
   readonly userId: string;
+  /** Resolved staff row for the authenticated user. Null when the user
+   *  is not staff (e.g. a service-account token with no staff row). */
+  readonly staff: Staff | null;
 }
 
 /**
@@ -106,7 +111,7 @@ export class McpJsonRpcDispatcher {
         return jsonRpcOk(id, {
           protocolVersion: "2025-03-26",
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "@aotter/mantle-runtime/mcp", version: "0.0.0" },
+          serverInfo: { name: "@aotter/mantle-runtime/mcp", version: "0.0.6-alpha" },
         });
       case "tools/list":
         return jsonRpcOkRaw(id, this.catalogWireJson);
@@ -172,6 +177,11 @@ export class McpJsonRpcDispatcher {
         if (typeof id !== "string") return MISSING_ARG;
         return this.useCases.requestPublish.execute({ id });
       }
+      case "unpublish_entry": {
+        const id = args["id"];
+        if (typeof id !== "string") return MISSING_ARG;
+        return this.useCases.unpublish.execute({ id });
+      }
       case "archive_entry": {
         const id = args["id"];
         const expected = args["expected_version"];
@@ -185,7 +195,11 @@ export class McpJsonRpcDispatcher {
         // `hookCtx` plumbs the authenticated MCP user into lifecycle
         // hook context so consumers can branch on `ctx.user` (e.g.
         // bypass captcha checks for authenticated agents).
-        const hookCtx = { user: { id: auth.userId }, staff: null, env: {} };
+        const hookCtx = {
+          user: { id: auth.userId },
+          staff: auth.staff ? { id: auth.staff.userId, role: auth.staff.role } : null,
+          env: {},
+        };
         const createSegment = extractCollectionSegment(name, CREATE_DRAFT_PREFIX);
         if (createSegment) {
           const collection = this.schemaBySegment.get(createSegment);

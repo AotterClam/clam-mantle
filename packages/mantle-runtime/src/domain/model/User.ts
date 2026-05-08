@@ -9,7 +9,8 @@
  */
 export interface User {
   readonly id: string;
-  readonly email: string;
+  readonly email: string | null;
   readonly name: string | null;
   readonly createdAt: number;
+  readonly updatedAt: number;
 }

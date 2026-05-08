@@ -1,8 +1,8 @@
 {
   "name": "mantle-monorepo",
   "private": true,
-  "version": "0.0.0",
-  "description": "MCP-native headless CMS for Cloudflare Workers. v0.1.0 rebuild — see issue #1.",
+  "version": "0.0.6-alpha",
+  "description": "MCP-native headless CMS for Cloudflare Workers.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle",
   "repository": {
@@ -17,7 +17,11 @@
   "scripts": {
     "build": "pnpm -r --filter '@aotter/mantle-*' build",
     "typecheck": "pnpm -r --filter '@aotter/mantle-*' typecheck",
-    "test": "pnpm -r --filter '@aotter/mantle-*' test"
+    "test": "pnpm -r --filter '@aotter/mantle-*' test",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:starters": "pnpm -C starters/blog validate && pnpm -C starters/blog typecheck && pnpm -C starters/blank validate && pnpm -C starters/blank typecheck",
+    "check:starter-theme": "cd starters/blog && pnpm theme:fork tokens.ts && pnpm typecheck && pnpm theme:reset tokens.ts && pnpm typecheck",
+    "check": "pnpm run check:boundaries && pnpm build && pnpm install --frozen-lockfile && pnpm typecheck && pnpm run check:starters && pnpm test"
   },
   "packageManager": "pnpm@9.15.0"
 }

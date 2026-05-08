@@ -55,10 +55,28 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
         ON approvals (entry_id);
 
       CREATE TABLE IF NOT EXISTS users (
-        id          TEXT PRIMARY KEY,
-        email       TEXT NOT NULL UNIQUE,
-        name        TEXT,
-        created_at  INTEGER NOT NULL
+        id         TEXT PRIMARY KEY,
+        email      TEXT,
+        name       TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS social_logins (
+        user_id      TEXT NOT NULL,
+        provider     TEXT NOT NULL,
+        provider_uid TEXT NOT NULL,
+        login        TEXT,
+        updated_at   INTEGER NOT NULL,
+        PRIMARY KEY (user_id, provider),
+        UNIQUE (provider, provider_uid)
+      );
+
+      CREATE TABLE IF NOT EXISTS github_tokens (
+        user_id      TEXT PRIMARY KEY,
+        access_token TEXT NOT NULL,
+        scope        TEXT NOT NULL,
+        updated_at   INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS staff (

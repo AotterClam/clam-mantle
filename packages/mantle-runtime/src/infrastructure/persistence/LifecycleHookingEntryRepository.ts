@@ -6,6 +6,7 @@ import type {
   CreateEntryArgs,
   DeleteEntryArgs,
   EntryRepository,
+  FindEntryByDataFieldArgs,
   ListEntriesArgs,
   MutationHookFields,
   TransitionStatusArgs,
@@ -153,6 +154,10 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
 
   list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {
     return this.inner.list(args);
+  }
+
+  findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {
+    return this.inner.findByDataField(args);
   }
 
   /**

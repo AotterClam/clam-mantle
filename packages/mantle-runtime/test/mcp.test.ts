@@ -15,33 +15,62 @@ import {
 } from "../src/usecase/content/index.js";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
+import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
 interface Harness {
   store: InMemoryEntryRepository;
   dispatcher: McpJsonRpcDispatcher;
+  publishCalls: string[];
+  unpublishCalls: string[];
 }
 
-function buildHarness(): Harness {
+function buildHarness(schemas = [postsSchema()]): Harness {
   const store = new InMemoryEntryRepository();
-  const schemas = new Map([[postsSchema().metadata.name, postsSchema()]]);
+  const schemasByName = new Map(schemas.map((s) => [s.metadata.name, s]));
   let i = 1;
   const clock: Clock = { now: () => 1_000_000 };
   const idgen: IdGenerator = { next: () => `mcp-${i++}` };
+  const publishCalls: string[] = [];
+  const unpublishCalls: string[] = [];
+  const templates = new TemplateRegistry();
+  const effects = {
+    templates,
+    siteConfig: {
+      load: async () => ({
+        title: "Test",
+        brand: "Test",
+        description: "",
+        origin: "https://example.com",
+        locales: ["en"],
+        canonicalLocale: "en",
+      }),
+    },
+    publishOrchestrator: {
+      publish: async ({ entryId }: { entryId: string }) => {
+        publishCalls.push(entryId);
+      },
+      unpublish: async ({ entryId }: { entryId: string }) => {
+        unpublishCalls.push(entryId);
+      },
+    },
+  };
   const useCases: McpUseCases = {
-    listEntries: new ListEntriesUseCase(store, schemas),
+    listEntries: new ListEntriesUseCase(store, schemasByName),
     getEntry: new GetEntryUseCase(store),
-    createDraft: new CreateDraftUseCase(store, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(store, clock),
-    requestPublish: new RequestPublishUseCase(store, schemas, clock),
-    unpublish: new UnpublishUseCase(store, clock),
-    archive: new ArchiveUseCase(store, schemas, clock),
+    createDraft: new CreateDraftUseCase(store, schemasByName, clock, idgen),
+    updateDraft: new UpdateDraftUseCase(store, schemasByName, clock),
+    requestPublish: new RequestPublishUseCase(store, schemasByName, clock, effects),
+    unpublish: new UnpublishUseCase(store, clock, effects),
+    archive: new ArchiveUseCase(store, schemasByName, clock, effects),
     deleteEntry: new DeleteEntryUseCase(store),
   };
   return {
     store,
-    dispatcher: new McpJsonRpcDispatcher(useCases, [postsSchema()]),
+    dispatcher: new McpJsonRpcDispatcher(useCases, schemas),
+    publishCalls,
+    unpublishCalls,
   };
 }
 
@@ -72,6 +101,7 @@ describe("McpJsonRpcDispatcher", () => {
     expect(names).toContain("list_entries");
     expect(names).toContain("get_entry");
     expect(names).toContain("request_publish");
+    expect(names).toContain("unpublish_entry");
     expect(names).toContain("archive_entry");
     // Per-collection authoring tools.
     expect(names).toContain("create_draft_posts");
@@ -100,7 +130,7 @@ describe("McpJsonRpcDispatcher", () => {
   });
 
   it("tools/call request_publish flips draft → published", async () => {
-    const { dispatcher, store } = buildHarness();
+    const { dispatcher, store, publishCalls } = buildHarness();
     const created = await store.create({
       id: "p1",
       collection: "posts",
@@ -119,6 +149,62 @@ describe("McpJsonRpcDispatcher", () => {
     const body = (await res.json()) as { result: { content: { text: string }[] } };
     const result = JSON.parse(body.result.content[0]!.text) as { status: string };
     expect(result.status).toBe("published");
+    expect(publishCalls).toEqual([created.id]);
+  });
+
+  it("tools/call unpublish_entry flips published → draft", async () => {
+    const { dispatcher, store, unpublishCalls } = buildHarness();
+    const created = await store.create({
+      id: "p1",
+      collection: "posts",
+      status: "published",
+      data: {},
+      authorId: "u1",
+      now: 0,
+    });
+    const res = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", {
+        name: "unpublish_entry",
+        arguments: { id: created.id },
+      }),
+      { userId: "u1" },
+    );
+    const body = (await res.json()) as { result: { content: { text: string }[] } };
+    const result = JSON.parse(body.result.content[0]!.text) as { status: string };
+    expect(result.status).toBe("draft");
+    expect(unpublishCalls).toEqual([created.id]);
+  });
+
+  it("tools/call request_publish rejects orphan translated children", async () => {
+    const { dispatcher } = buildHarness(translatedSchemas());
+    const createdRes = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", {
+        name: "create_draft_post_translations",
+        arguments: { slug: "ghost", locale: "en", title: "Ghost", body: "Missing parent" },
+      }),
+      { userId: "u1" },
+    );
+    const createdBody = (await createdRes.json()) as { result: { content: { text: string }[] } };
+    const created = JSON.parse(createdBody.result.content[0]!.text) as { id: string };
+
+    const publishRes = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", {
+        name: "request_publish",
+        arguments: { id: created.id },
+      }),
+      { userId: "u1" },
+    );
+    const body = (await publishRes.json()) as {
+      error: { code: number; data: { code: string; value: Record<string, unknown> } };
+    };
+    expect(body.error.code).toBe(-32000);
+    expect(body.error.data.code).toBe("TRANSLATES_PARENT_UNKNOWN");
+    expect(body.error.data.value).toMatchObject({
+      child: "post-translations",
+      parent: "posts",
+      field: "slug",
+      value: "ghost",
+    });
   });
 
   it("unknown tool returns -32601", async () => {
@@ -153,3 +239,31 @@ describe("McpJsonRpcDispatcher", () => {
     expect(res.status).toBe(405);
   });
 });
+
+function translatedSchemas() {
+  const parent = postsSchema();
+  return [
+    parent,
+    {
+      apiVersion: "cms.mantle.aotter.net/v1" as const,
+      kind: "Schema" as const,
+      metadata: { name: "post-translations" },
+      spec: {
+        title: "Post translations",
+        localized: true,
+        translates: { parent: "posts", on: "slug" },
+        schema: {
+          type: "object" as const,
+          properties: {
+            slug: { type: "string" as const },
+            locale: { type: "string" as const },
+            title: { type: "string" as const },
+            body: { type: "string" as const },
+          },
+          required: ["slug", "locale", "title", "body"],
+        },
+        lifecycle: "simple" as const,
+      },
+    },
+  ];
+}

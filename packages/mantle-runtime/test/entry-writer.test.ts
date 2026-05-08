@@ -199,4 +199,38 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
     const published = await repo.list({ collection: "posts", status: "published" });
     expect(published.map((r) => r.id)).toEqual(["p3", "p1"]);
   });
+
+  it("findByDataField finds a matching row with optional status filter", async () => {
+    const db = new InMemoryDatabase();
+    const repo = new DatabaseEntryRepository(db);
+    await repo.create({
+      id: "p1",
+      collection: "posts",
+      status: "draft",
+      data: { slug: "hello" },
+      authorId: null,
+      now: 1,
+    });
+    await repo.create({
+      id: "p2",
+      collection: "posts",
+      status: "published",
+      data: { slug: "hello" },
+      authorId: null,
+      now: 2,
+    });
+
+    await expect(repo.findByDataField({
+      collection: "posts",
+      status: "published",
+      field: "slug",
+      value: "hello",
+    })).resolves.toMatchObject({ id: "p2" });
+    await expect(repo.findByDataField({
+      collection: "posts",
+      status: "published",
+      field: "slug",
+      value: "ghost",
+    })).resolves.toBeNull();
+  });
 });

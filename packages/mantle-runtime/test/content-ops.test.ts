@@ -15,6 +15,23 @@ import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
+const postsSchemaWithBindings: SchemaManifest = {
+  ...postsSchema(),
+  spec: {
+    ...postsSchema().spec,
+    schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        slug: { type: "string" },
+        authorId: { type: "string", "x-mantle-bind": "ctx.user" },
+        publishedAt: { type: "number", "x-mantle-bind": "now" },
+      },
+      required: ["title"],
+    },
+  },
+};
+
 interface Harness {
   store: InMemoryEntryRepository;
   schemas: ReadonlyMap<string, SchemaManifest>;
@@ -42,7 +59,7 @@ function harness(opts: { schemas?: ReadonlyMap<string, SchemaManifest> } = {}): 
     clock,
     idgen,
     createDraft: new CreateDraftUseCase(store, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(store, clock),
+    updateDraft: new UpdateDraftUseCase(store, schemas, clock),
     getEntry: new GetEntryUseCase(store),
     listEntries: new ListEntriesUseCase(store, schemas),
     requestPublish: new RequestPublishUseCase(store, schemas, clock),
@@ -93,6 +110,29 @@ describe("CreateDraftUseCase", () => {
     expect(row.status).toBe("draft");
     expect(row.version).toBe(1);
     expect(row.data).toEqual({ title: "Hello" });
+  });
+
+  it("projects Schema fields and stamps x-mantle-bind values", async () => {
+    const h = harness({
+      schemas: new Map([[postsSchemaWithBindings.metadata.name, postsSchemaWithBindings]]),
+    });
+    const row = await h.createDraft.execute({
+      collection: "posts",
+      data: {
+        title: "Hello",
+        slug: "hello",
+        unknown: "drop-me",
+        authorId: "spoofed-author",
+        publishedAt: 123,
+      },
+      authorId: "user-1",
+    });
+    expect(row.data).toEqual({
+      title: "Hello",
+      slug: "hello",
+      authorId: "user-1",
+      publishedAt: 1_000_000_000_000,
+    });
   });
 });
 
@@ -168,6 +208,32 @@ describe("UpdateDraftUseCase", () => {
     expect(updated.version).toBe(2);
     expect(updated.data).toEqual({ title: "v2" });
   });
+
+  it("preserves existing x-mantle-bind values on update", async () => {
+    const h = harness({
+      schemas: new Map([[postsSchemaWithBindings.metadata.name, postsSchemaWithBindings]]),
+    });
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "v1", slug: "v1" },
+      authorId: "user-1",
+    });
+    const updated = await h.updateDraft.execute({
+      id: created.id,
+      expectedVersion: 1,
+      data: {
+        title: "v2",
+        authorId: "spoofed-author",
+        publishedAt: 123,
+      },
+    });
+    expect(updated.data).toEqual({
+      title: "v2",
+      slug: "v1",
+      authorId: "user-1",
+      publishedAt: 1_000_000_000_000,
+    });
+  });
 });
 
 describe("RequestPublishUseCase (simple lifecycle)", () => {
@@ -213,7 +279,93 @@ describe("RequestPublishUseCase (simple lifecycle)", () => {
       diagnostic: { code: "LIFECYCLE_NOT_IN_V010" },
     });
   });
+
+  it("rejects publishing a translated child without a published parent", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "ghost", locale: "en", title: "Ghost", body: "Missing parent" },
+      authorId: null,
+    });
+
+    await expect(h.requestPublish.execute({ id: child.id })).rejects.toMatchObject({
+      diagnostic: {
+        code: "TRANSLATES_PARENT_UNKNOWN",
+        value: {
+          child: "post-translations",
+          parent: "posts",
+          field: "slug",
+          value: "ghost",
+        },
+      },
+    });
+  });
+
+  it("requires the translated parent to be published, not just drafted", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "Parent", slug: "draft-parent" },
+      authorId: null,
+    });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "draft-parent", locale: "en", title: "Draft parent", body: "Body" },
+      authorId: null,
+    });
+
+    await expect(h.requestPublish.execute({ id: child.id })).rejects.toMatchObject({
+      diagnostic: { code: "TRANSLATES_PARENT_UNKNOWN" },
+    });
+  });
+
+  it("publishes a translated child once its parent is published", async () => {
+    const h = harness({ schemas: translatedSchemas() });
+    const parent = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "Parent", slug: "hello" },
+      authorId: null,
+    });
+    await h.requestPublish.execute({ id: parent.id });
+    const child = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "hello", locale: "en", title: "Hello", body: "World" },
+      authorId: null,
+    });
+
+    const published = await h.requestPublish.execute({ id: child.id });
+    expect(published.status).toBe("published");
+  });
 });
+
+function translatedSchemas(): ReadonlyMap<string, SchemaManifest> {
+  const parent = postsSchema();
+  const child: SchemaManifest = {
+    apiVersion: "cms.mantle.aotter.net/v1",
+    kind: "Schema",
+    metadata: { name: "post-translations" },
+    spec: {
+      title: "Post translations",
+      localized: true,
+      translates: { parent: "posts", on: "slug" },
+      schema: {
+        type: "object",
+        properties: {
+          slug: { type: "string" },
+          locale: { type: "string" },
+          title: { type: "string" },
+          body: { type: "string" },
+        },
+        required: ["slug", "locale", "title", "body"],
+      },
+      lifecycle: "simple",
+    },
+  };
+  return new Map([
+    [parent.metadata.name, parent],
+    [child.metadata.name, child],
+  ]);
+}
 
 describe("UnpublishUseCase", () => {
   it("flips published back to draft", async () => {

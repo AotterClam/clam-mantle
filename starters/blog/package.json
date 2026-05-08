@@ -1,12 +1,13 @@
 {
   "name": "@aotter/starter-blog",
-  "version": "0.0.0",
+  "version": "0.0.6-alpha",
   "private": true,
   "description": "Reference starter for mantle v0.1.0. Localized posts (translates demo) + contact form (builtin + lifecycle hooks). Runs on wrangler dev with local D1 + KV.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "fixture": "tsx test/fixture/apply.ts",
+    "fixture": "tsx test/fixture/apply-dev.ts",
+    "test:integration": "node scripts/run-integration.mjs",
     "mcp-smoke": "tsx test/integration/mcp-smoke.ts",
     "view-smoke": "tsx test/integration/view-rest-smoke.ts",
     "validate": "mantle validate",
@@ -15,7 +16,13 @@
     "emit-types": "mantle emit-types --namespace BlogCms > mantle-types.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm validate && pnpm typecheck",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "setup:site": "node scripts/setup-site.mjs",
+    "provision:plan": "node scripts/provision.mjs plan",
+    "provision:up": "node scripts/provision.mjs up",
+    "seed:initial": "tsx scripts/seed-initial-content.ts",
+    "theme:fork": "node scripts/theme-fork.mjs",
+    "theme:reset": "node scripts/theme-reset.mjs"
   },
   "dependencies": {
     "@aotter/mantle-spec": "workspace:*",

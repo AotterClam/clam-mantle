@@ -5,7 +5,7 @@
  *   - `pnpm fixture` has been applied (3 posts × 2 locales seeded)
  *
  * Exercises the full MCP JSON-RPC surface against a real worker:
- * initialize → tools/list → tools/call for each of the 6 v0.1.0
+ * initialize → tools/list → tools/call for the v0.1.0 authoring
  * tools, plus a few error paths. Each call hits the runtime's
  * chokepoint, so lifecycle hooks fire alongside (verified by the
  * contact-messages create case).
@@ -93,6 +93,7 @@ async function main(): Promise<void> {
       "get_entry",
       "list_entries",
       "request_publish",
+      "unpublish_entry",
       "update_draft_contact_messages",
       "update_draft_page_translations",
       "update_draft_pages",
@@ -101,7 +102,7 @@ async function main(): Promise<void> {
     ];
     assert.deepEqual(names, expected, `tools/list mismatch: got ${names.join(",")}`);
     console.log(
-      `[mcp]  2/12  tools/list → ${names.length} tools (4 generic + 10 per-collection)`,
+      `[mcp]  2/12  tools/list → ${names.length} tools (5 generic + 10 per-collection)`,
     );
   }
 

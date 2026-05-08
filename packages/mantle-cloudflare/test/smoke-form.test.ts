@@ -10,6 +10,8 @@ import {
   InMemoryKv,
   StubAssetServer,
   StubSessionRepository,
+  StubStaffRepository,
+  StubUserRepository,
 } from "./fakes/runtime-bindings.js";
 
 /**
@@ -151,6 +153,8 @@ function harness(opts: { captchaPasses: boolean }): Harness {
       db,
       kv: new InMemoryKv(),
       sessions: new StubSessionRepository(),
+      users: new StubUserRepository(),
+      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
       oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
     },
@@ -159,6 +163,37 @@ function harness(opts: { captchaPasses: boolean }): Harness {
   mountServerEndpoints(app, ref);
   mountMcp(app, ref);
   return { app, db, captchaCalls, slackCalls };
+}
+
+function oauthDiscoveryHarness(): Hono {
+  const oauthProvider = {
+    fetch: async (req: Request) =>
+      new Response(JSON.stringify({ path: new URL(req.url).pathname }), {
+        headers: { "content-type": "application/json" },
+      }),
+  };
+  const ref = createCmsRef({
+    manifests: [],
+    bindings: {
+      db: new InMemoryDatabase(),
+      kv: new InMemoryKv(),
+      sessions: new StubSessionRepository(),
+      users: new StubUserRepository(),
+      staff: new StubStaffRepository(),
+      assets: new StubAssetServer(),
+      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
+    },
+    adminAuth: {
+      oauthProvider: oauthProvider as never,
+      oauthKv: new InMemoryKv() as unknown as KVNamespace,
+      githubClientId: "client-id",
+      githubClientSecret: "client-secret",
+      adminGithubLogin: "owner",
+    },
+  });
+  const app = new Hono();
+  mountServerEndpoints(app, ref);
+  return app;
 }
 
 describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
@@ -253,5 +288,19 @@ describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { result: { serverInfo: { name: string } } };
     expect(body.result.serverInfo.name).toContain("mantle");
+  });
+
+  it("passes OAuth discovery routes through to the provider", async () => {
+    const app = oauthDiscoveryHarness();
+    const paths = [
+      "/.well-known/oauth-authorization-server",
+      "/.well-known/oauth-protected-resource",
+      "/.well-known/oauth-protected-resource/mcp",
+    ];
+    for (const path of paths) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ path });
+    }
   });
 });

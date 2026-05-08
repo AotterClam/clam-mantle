@@ -9,6 +9,8 @@ import {
   InMemoryKv,
   StubAssetServer,
   StubSessionRepository,
+  StubStaffRepository,
+  StubUserRepository,
 } from "./fakes/runtime-bindings.js";
 
 /**
@@ -80,6 +82,8 @@ function harness(seed?: (db: InMemoryDatabase) => void) {
       db,
       kv: new InMemoryKv(),
       sessions: new StubSessionRepository(),
+      users: new StubUserRepository(),
+      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
       oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
     },

@@ -8,8 +8,8 @@
  * dispatcher-internal ports `Clock`, `IdGenerator`, `HandlerRegistry`,
  * and the chokepoint `EntryRepository`.
  *
- * Per the Aotter naming convention (rmn-r / trek-dmp / mantle-core), no
- * `*Port` suffix; ports are discoverable by the package alone.
+ * Per the Aotter clean-architecture convention, no `*Port` suffix;
+ * ports are discoverable by the package alone.
  */
 export type {
   DatabaseDriver,
@@ -34,6 +34,15 @@ export type {
   MutationHookFields,
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";
+export type {
+  UserRepository,
+  GithubToken,
+} from "./UserRepository.js";
+export type {
+  StaffRepository,
+  StaffListEntry,
+  BootstrapOwnerOpts,
+} from "./StaffRepository.js";
 export type {
   PublishOrchestrator,
   PublishEntryRequest,

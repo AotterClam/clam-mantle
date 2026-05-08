@@ -26,6 +26,6 @@ export interface Staff {
 export interface StaffMembership {
   readonly userId: string;
   readonly role: StaffRole;
-  readonly email: string;
+  readonly email: string | null;
   readonly name: string | null;
 }
