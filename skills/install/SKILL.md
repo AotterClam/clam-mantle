@@ -24,7 +24,8 @@ The official-site prompt should include these fields. Parse them before asking t
 
 ```yaml
 mantle_request:
-  sdk_ref: "<tag-or-commit-sha>"
+  mantle_version: "0.0.6-alpha"
+  template_ref: "main"
   skill_url: "https://raw.githubusercontent.com/aotter/mantle/<ref>/skills/install/SKILL.md"
   starter: "blog" # blog | blank
   github_username: "<verified-by-website>"
@@ -176,23 +177,23 @@ Run these checks:
 ```bash
 node --version
 pnpm --version
-gh auth status
+git --version
 ```
 
 Requirements:
 
 - Node.js >= 20.
 - pnpm >= 9.
-- GitHub CLI authenticated as the same account as `github_username`, or the user explicitly confirms the mismatch.
+- Git available for copying the public starter template.
 - Wrangler does not need to be globally installed before scaffold. The copied starter installs Wrangler as a dev dependency; after `pnpm install`, use `pnpm exec wrangler --version`.
 
-If the prompt says the website already verified GitHub identity, still check local `gh auth status`. The website identity proves intent; local `gh` identity controls repository access and GitHub OAuth setup.
+GitHub CLI is not required for the npm-first install path. If the website already verified GitHub identity, treat `github_username` as the owner bootstrap value; provision will set it as the `ADMIN_GITHUB_LOGIN` Worker secret.
 
 If the user does not have GitHub or Cloudflare yet:
 
 - GitHub: send them to `https://github.com/signup`.
 - Cloudflare: send them to `https://dash.cloudflare.com/sign-up` and prefer "Continue with GitHub".
-- After both accounts exist, resume with `gh auth login`. Cloudflare token setup happens in the `provision` Skill.
+- After both accounts exist, continue the install. Cloudflare token setup happens in the `provision` Skill.
 
 ## Step-by-step
 
@@ -204,40 +205,33 @@ Normalize:
 - `starter`: `blog` or `blank`.
 - `locales`: keep order. First locale is canonical.
 - `brand`, `description`, `origin`: pass confirmed public copy to `setup:site`. `origin` may stay `https://example.com` until provision knows the Workers URL.
-- `sdk_ref`: prefer a tag or full commit SHA. Avoid floating `develop` for user installs unless the user is explicitly testing unreleased code.
+- `mantle_version`: npm package version. Default to the version from the website prompt, currently `0.0.6-alpha`.
+- `template_ref`: Git ref used only to copy starter files. For the current npm-first alpha, use `main` unless the website prompt provides a newer release tag. Avoid floating `develop` unless the user is explicitly testing unreleased code.
 
-### 2. Clone the pinned SDK locally
+### 2. Fetch the pinned starter template
 
-Keep the SDK inside the consumer repo so the project works before npm publishing:
-
-```bash
-gh repo clone aotter/mantle .mantle-sdk
-git -C .mantle-sdk checkout <sdk_ref>
-pnpm -C .mantle-sdk install --frozen-lockfile
-pnpm -C .mantle-sdk build
-```
-
-For the private v0.1.0 evaluation path, prefer `gh repo clone` because the user's local GitHub auth is already part of preflight. After the repo is public and `sdk_ref` is a released tag, plain HTTPS clone is also acceptable:
+Use the public GitHub repo only as a starter template source. Do not build this repo inside the consumer project.
 
 ```bash
-git clone https://github.com/aotter/mantle.git .mantle-sdk
+git clone --depth 1 --branch <template_ref> https://github.com/aotter/mantle.git .mantle-template
 ```
 
-Do not require GitHub Packages or npm publishing for v0.1.0.
+If `git` is unavailable, ask the user to install Git or download the tagged source zip. Do not require GitHub CLI or tokens for public starter install.
 
 ### 3. Copy the starter into the consumer root
 
 Run from the empty target directory:
 
 ```bash
-cp -R .mantle-sdk/starters/<starter>/. .
+cp -R .mantle-template/starters/<starter>/. .
+rm -rf .mantle-template
 ```
 
-Do not copy `.mantle-sdk` into itself. If the directory is not empty, inspect first and avoid overwriting user files.
+Do not copy `.mantle-template` into itself. If the directory is not empty, inspect first and avoid overwriting user files.
 
 ### 4. Configure the copied starter
 
-Run the starter-owned setup script. Do not hand-edit standard TS/TOML setup fields.
+Run the starter-owned setup script before `pnpm install`. Do not hand-edit standard TS/TOML/package setup fields.
 
 ```bash
 pnpm run setup:site -- \
@@ -245,20 +239,16 @@ pnpm run setup:site -- \
   --brand "<brand>" \
   --description "<description>" \
   --locales "<canonical>,<secondary>" \
-  --origin "<origin-or-https://example.com>"
+  --origin "<origin-or-https://example.com>" \
+  --mantle-version "<mantle_version>"
 ```
 
 The script:
 
 - Updates `wrangler.toml` worker name and D1 database name.
 - Updates `src/mantleConfig.ts` site defaults.
-- Copies `.mantle-sdk/tsconfig.base.json` to `./tsconfig.base.json` when running from a pre-npm SDK clone.
-- Patches `tsconfig.json` to extend `./tsconfig.base.json`.
-- Creates `pnpm-workspace.yaml` with `.mantle-sdk/packages/*`.
-
-Keep the starter `package.json` dependencies as `workspace:*` during pre-npm evaluation.
-
-This is a v0.1.0 pre-publish bridge. Do not treat it as the long-term distribution model.
+- Rewrites copied starter dependencies from `workspace:*` to `@aotter/*@<mantle_version>`.
+- Keeps `tsconfig.json` standalone by extending `./tsconfig.base.json`.
 
 Keep `ADMIN_GITHUB_LOGIN` out of source code. It is a Worker secret set by the `provision` Skill using `github_username`.
 
@@ -364,7 +354,8 @@ project_name: "<project_name>"
 starter: "<starter>"
 github_username: "<github_username>"
 locales: ["<canonical>", "..."]
-sdk_ref: "<sdk_ref>"
+mantle_version: "<mantle_version>"
+template_ref: "<template_ref>"
 seed_file: "initial-seed.json"
 ```
 
@@ -374,11 +365,11 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `gh auth status` shows a different user | Browser website login and local CLI login differ | Stop and ask whether to continue with the local account or run `gh auth login` again. |
-| `pnpm run setup:site` is missing | Starter was copied from an older SDK ref | Update `.mantle-sdk` to a ref that contains `scripts/setup-site.mjs`. |
-| `pnpm install` cannot resolve `workspace:*` | `pnpm-workspace.yaml` does not include the local SDK packages | Add `.mantle-sdk/packages/*` to the consumer workspace. |
-| `tsc` tries to read `/tsconfig.base.json` or another parent path | Starter `tsconfig.json` still points at monorepo root | Copy `.mantle-sdk/tsconfig.base.json` to consumer root and set `extends` to `./tsconfig.base.json`. |
-| `Cannot find module .../dist/index.js` | SDK was cloned but not built | Run `pnpm -C .mantle-sdk install --frozen-lockfile` then `pnpm -C .mantle-sdk build`. |
+| `git clone` cannot access `github.com/aotter/mantle` | Network or Git installation issue | Confirm Git is installed and the repo is public: `https://github.com/aotter/mantle`. |
+| `pnpm run setup:site` is missing | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag. |
+| `pnpm install` cannot resolve `workspace:*` | `setup:site` was skipped before install | Run `pnpm run setup:site -- ... --mantle-version "<version>"`, then `pnpm install` again. |
+| `tsc` tries to read `../../tsconfig.base.json` | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag, or set `extends` to `./tsconfig.base.json`. |
+| `Cannot find module @aotter/mantle-*` | npm install did not complete or version is unpublished | Verify `mantle_version`, run `pnpm install`, and check `npm view @aotter/mantle-cloudflare@<version>`. |
 | `pnpm validate` exits with `MANIFEST_ROOT_NOT_FOUND` | Not running from consumer root | `cd` to the directory containing `manifests/`. |
 | `wrangler dev` boots but MCP stub fails | `.dev.vars` missing local-only `MANTLE_ALLOW_STUB_OAUTH=1` | Add `.dev.vars` for local smoke only. Never put this in deployable `[vars]`. |
 | Blog `/llms.txt` or post route 404s locally | Fixture data was not applied | Run `pnpm fixture` and restart `pnpm dev`. |
@@ -391,7 +382,7 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 - Don't require admin UI for v0.1.0 validation. Bootstrap owner + MCP OAuth is enough.
 - Don't put `ADMIN_GITHUB_LOGIN`, GitHub client secret, Turnstile secret, or Cloudflare API tokens in git.
 - Don't deploy with `MANTLE_ALLOW_STUB_OAUTH=1` in `wrangler.toml`.
-- Don't keep `.mantle-sdk` forever after npm packages exist; it is a pre-publish bridge.
+- Don't keep `.mantle-template` in the consumer repo after copying the starter.
 - Don't write directly to D1 for normal content operations; use runtime/MCP tools. The starter-owned `seed:initial` script is the v0.1.0 exception for first content only.
 - Don't add public Schema reads. Public reads go through Views.
 - **Don't edit `src/theme.default/`.** It is read-only baseline. Run `pnpm theme:fork <file>` and edit the copy at `src/theme/` instead. Editing `src/theme.default/` directly will be overwritten when the SDK updates and silently diverges from the override system.
@@ -402,6 +393,7 @@ Report:
 
 - Project path and starter used.
 - Confirmed GitHub owner username.
+- mantle npm package version and template ref.
 - Local validation result: `pnpm validate`, `pnpm typecheck`, and starter-specific smoke.
 - Next command: use `skills/provision/SKILL.md` to deploy and get the MCP URL.
 
