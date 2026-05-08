@@ -2,7 +2,7 @@
 
 MCP-native headless CMS for Cloudflare Workers. Declarative manifest, AI-first authoring, multi-locale by default.
 
-> **v0.1.0 in development.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
+> **0.0.6-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
 ## Part of Mantle
 

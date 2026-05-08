@@ -1,6 +1,6 @@
 {
   "name": "@aotter/starter-blog",
-  "version": "0.0.0",
+  "version": "0.0.6-alpha",
   "private": true,
   "description": "Reference starter for mantle v0.1.0. Localized posts (translates demo) + contact form (builtin + lifecycle hooks). Runs on wrangler dev with local D1 + KV.",
   "type": "module",
