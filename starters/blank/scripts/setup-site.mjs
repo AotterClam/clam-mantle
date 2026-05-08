@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const args = parseArgs(process.argv.slice(2));
 const projectName = requireArg(args, "project-name");
@@ -32,20 +32,11 @@ rewriteFile("src/mantleConfig.ts", (text) =>
     .replace(/locales: \[[^\]]*\],/m, `locales: ${JSON.stringify(locales)},`),
 );
 
-if (existsSync(".mantle-sdk/tsconfig.base.json")) {
-  copyFileSync(".mantle-sdk/tsconfig.base.json", "tsconfig.base.json");
-  rewriteJson("tsconfig.json", (json) => ({ ...json, extends: "./tsconfig.base.json" }));
-  writeFileSync(
-    "pnpm-workspace.yaml",
-    'packages:\n  - "."\n  - ".mantle-sdk/packages/*"\n',
-  );
-} else {
-  rewriteJson("package.json", (json) => ({
-    ...json,
-    dependencies: rewriteWorkspaceMantleDeps(json.dependencies ?? {}, mantleVersion),
-  }));
-  rewriteJson("tsconfig.json", (json) => ({ ...json, extends: "./tsconfig.base.json" }));
-}
+rewriteJson("package.json", (json) => ({
+  ...json,
+  dependencies: rewriteWorkspaceMantleDeps(json.dependencies ?? {}, mantleVersion),
+}));
+rewriteJson("tsconfig.json", (json) => ({ ...json, extends: "./tsconfig.base.json" }));
 
 console.log(`Configured ${projectName}`);
 console.log(`Locales: ${locales.join(", ")}`);

@@ -50,7 +50,7 @@ pnpm theme:reset components/Header.tsx
 # - re-comments the line in theme/index.ts
 ```
 
-The npm scripts live in `../../package.json`; they only know about
+The npm scripts live in this starter's `package.json`; they only know about
 this starter's convention (theme.default/ + theme/) and don't reach
 into the SDK CLI.
 
