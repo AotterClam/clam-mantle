@@ -1,4 +1,16 @@
-# `@aotter/starter-blog`
+# Frozen starter snapshot
+
+This directory is a frozen archive of the editorial-typography blog starter as
+of 2026-05-05. Do not copy, install, or run it for new projects.
+
+The archive is excluded from `pnpm-workspace.yaml` and may reference old
+`workspace:*` dependencies or setup assumptions that no longer work outside the
+historical monorepo context. Use [`starters/blog/`](../../blog/) for the
+maintained starter.
+
+# Historical README
+
+## `@aotter/starter-blog`
 
 Reference starter for mantle v0.1.0. Wraps the runtime + Cloudflare
 adapter into a runnable Worker with three Schemas (posts, post-translations,
