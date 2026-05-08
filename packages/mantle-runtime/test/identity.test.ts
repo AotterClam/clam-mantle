@@ -55,19 +55,19 @@ describe("UserRepository github tokens", () => {
   it("round-trips a stored token", async () => {
     const repo = new InMemoryUserRepository();
     const id = await repo.upsertByGithub(ALICE, 1000);
-    await repo.storeGithubToken(id, "ghs_abc", "read:user user:email", 1000);
+    await repo.storeGithubToken(id, "test-github-token-abc", "read:user user:email", 1000);
     const token = await repo.readGithubToken(id);
-    expect(token?.accessToken).toBe("ghs_abc");
+    expect(token?.accessToken).toBe("test-github-token-abc");
     expect(token?.scope).toBe("read:user user:email");
   });
 
   it("overwrites on second store", async () => {
     const repo = new InMemoryUserRepository();
     const id = await repo.upsertByGithub(ALICE, 1000);
-    await repo.storeGithubToken(id, "ghs_old", "read:user", 1000);
-    await repo.storeGithubToken(id, "ghs_new", "read:user user:email", 2000);
+    await repo.storeGithubToken(id, "test-github-token-old", "read:user", 1000);
+    await repo.storeGithubToken(id, "test-github-token-new", "read:user user:email", 2000);
     const token = await repo.readGithubToken(id);
-    expect(token?.accessToken).toBe("ghs_new");
+    expect(token?.accessToken).toBe("test-github-token-new");
   });
 });
 

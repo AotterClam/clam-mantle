@@ -1,6 +1,6 @@
 {
   "name": "@aotter/starter-blank",
-  "version": "0.0.0",
+  "version": "0.0.6-alpha",
   "private": true,
   "description": "Headless CMS starter for mantle — API + MCP only, no public HTML rendering. Bring your own frontend.",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@aotter/mantle-cloudflare",
-  "version": "0.0.0",
+  "version": "0.0.6-alpha",
   "description": "Cloudflare Workers adapter for mantle. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Implements the 5 runtime ports against D1 / KV / ASSETS / bearer-token OAuth verification.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-cloudflare",
@@ -11,6 +11,10 @@
   },
   "type": "module",
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
