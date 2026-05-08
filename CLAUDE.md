@@ -27,6 +27,7 @@ This is the lens for every architectural decision in this codebase.
 | Path | Purpose |
 |---|---|
 | `docs/adr/` | Architecture Decision Records — *why* the system is shaped this way. |
+| `docs/design-references/` | Preserved visual systems from retired starter experiments. Design reference only; not runnable templates. |
 | `docs/design-atoms.md` | The 4-atom manifest reference. (Stubbed during v0.1.0 dev.) |
 | `docs/getting-started.md` | Human Quickstart. (Stubbed during v0.1.0 dev.) |
 | `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / extend / provision flows. Discoverable by URL — no Claude plugin install required. |
@@ -37,7 +38,6 @@ This is the lens for every architectural decision in this codebase.
 | `packages/mantle-netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
 | `starters/blog/` | Reference rendered-blog starter — Hono + theme stack (`theme.default/` + `theme/`) + i18n + contact form + sitemap + SEO/AEO. Use for "I want a website out of the box". |
 | `starters/blank/` | Headless API + MCP starter. No UI, no theme stack — drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
-| `starters/_archive/` | Frozen snapshots of past starter designs. Excluded from workspace; not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
