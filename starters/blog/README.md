@@ -45,12 +45,7 @@ a later dedicated starter.
 ## Quickstart
 
 ```bash
-# From the repo root, install workspace deps + build the runtime:
 pnpm install
-pnpm -r --filter '@aotterclam/clam-cms-spec' --filter '@aotterclam/clam-cms-runtime' --filter '@aotterclam/clam-cms-cloudflare' build
-
-# Then in starters/blog/:
-cd starters/blog
 cp .dev.vars.example .dev.vars
 
 # Option A: local demo fixture for development/testing.

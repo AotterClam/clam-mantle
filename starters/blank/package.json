@@ -12,7 +12,8 @@
     "emit-types": "clam-cms emit-types --namespace BlankCms > clam-types.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm validate && pnpm typecheck",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "setup:site": "node scripts/setup-site.mjs"
   },
   "dependencies": {
     "@aotterclam/clam-cms-spec": "workspace:*",
