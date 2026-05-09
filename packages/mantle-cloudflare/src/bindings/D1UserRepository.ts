@@ -1,7 +1,17 @@
-import type { GithubProfile, GithubToken, User, UserRepository } from "@aotter/mantle-runtime";
+import {
+  RandomUuidGenerator,
+  type GithubProfile,
+  type GithubToken,
+  type IdGenerator,
+  type User,
+  type UserRepository,
+} from "@aotter/mantle-runtime";
 
 export class D1UserRepository implements UserRepository {
-  constructor(private readonly db: D1Database) {}
+  constructor(
+    private readonly db: D1Database,
+    private readonly idgen: IdGenerator = RandomUuidGenerator,
+  ) {}
 
   async findById(id: string): Promise<User | null> {
     const row = await this.db
@@ -41,7 +51,7 @@ export class D1UserRepository implements UserRepository {
            updated_at  = excluded.updated_at
          RETURNING user_id`,
       )
-      .bind(crypto.randomUUID(), providerUid, profile.login, now)
+      .bind(this.idgen.next(), providerUid, profile.login, now)
       .first<{ user_id: string }>();
 
     const userId = row!.user_id;

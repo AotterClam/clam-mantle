@@ -357,7 +357,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     ]);
 
     const session: Session = {
-      token: crypto.randomUUID(),
+      token: runtime.idgen.next(),
       userId,
       createdAt: now,
       expiresAt: now + 30 * 24 * 60 * 60 * 1000,
