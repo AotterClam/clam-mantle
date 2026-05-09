@@ -8,7 +8,9 @@ import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { IdGenerator } from "../../domain/port/IdGenerator.js";
+import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 import { projectAndStamp } from "../../domain/service/BuiltinProjector.js";
+import { assertEntryWritable } from "../content/EntryWriteGuards.js";
 import type { InvokeBuiltinRequest } from "../dto/procedure/index.js";
 
 /**
@@ -39,6 +41,7 @@ export class InvokeBuiltinUseCase {
     private readonly schemasByName: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
     private readonly idgen: IdGenerator,
+    private readonly siteConfig?: SiteConfigRepository,
   ) {}
 
   async run(request: InvokeBuiltinRequest): Promise<unknown> {
@@ -107,7 +110,15 @@ export class InvokeBuiltinUseCase {
     ctx: HandlerContext,
     now: number,
   ): Promise<EntryRow> {
+    const opPath = `usecase/InvokeBuiltin/${schema.metadata.name}/create`;
     const data = projectAndStamp({ schema, input, ctx, clockNow: now });
+    await assertEntryWritable({
+      opPath,
+      entries: this.entries,
+      schema,
+      data,
+      siteConfig: this.siteConfig,
+    });
     return this.entries.create({
       id: this.idgen.next(),
       collection: schema.metadata.name,
@@ -126,9 +137,18 @@ export class InvokeBuiltinUseCase {
     ctx: HandlerContext,
     now: number,
   ): Promise<EntryRow> {
+    const opPath = `usecase/InvokeBuiltin/${schema.metadata.name}/update`;
     const id = requireField(input, "id", "string");
     const expectedVersion = requireField(input, "expectedVersion", "number");
     const data = projectAndStamp({ schema, input, ctx, clockNow: now });
+    await assertEntryWritable({
+      opPath,
+      entries: this.entries,
+      schema,
+      data,
+      excludeId: id,
+      siteConfig: this.siteConfig,
+    });
     return this.entries.update({
       id,
       collection: schema.metadata.name,

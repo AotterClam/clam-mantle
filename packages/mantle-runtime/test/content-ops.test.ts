@@ -12,6 +12,7 @@ import {
 } from "../src/usecase/content/index.js";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
+import type { SiteConfigRepository } from "../src/domain/port/SiteConfigRepository.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
@@ -47,7 +48,10 @@ interface Harness {
   deleteEntry: DeleteEntryUseCase;
 }
 
-function harness(opts: { schemas?: ReadonlyMap<string, SchemaManifest> } = {}): Harness {
+function harness(opts: {
+  schemas?: ReadonlyMap<string, SchemaManifest>;
+  siteConfig?: SiteConfigRepository;
+} = {}): Harness {
   const store = new InMemoryEntryRepository();
   const schemas = opts.schemas ?? new Map([[postsSchema().metadata.name, postsSchema()]]);
   let nextId = 1;
@@ -58,11 +62,11 @@ function harness(opts: { schemas?: ReadonlyMap<string, SchemaManifest> } = {}): 
     schemas,
     clock,
     idgen,
-    createDraft: new CreateDraftUseCase(store, schemas, clock, idgen),
-    updateDraft: new UpdateDraftUseCase(store, schemas, clock),
+    createDraft: new CreateDraftUseCase(store, schemas, clock, idgen, opts.siteConfig),
+    updateDraft: new UpdateDraftUseCase(store, schemas, clock, opts.siteConfig),
     getEntry: new GetEntryUseCase(store),
     listEntries: new ListEntriesUseCase(store, schemas),
-    requestPublish: new RequestPublishUseCase(store, schemas, clock),
+    requestPublish: new RequestPublishUseCase(store, schemas, clock, undefined, opts.siteConfig),
     unpublish: new UnpublishUseCase(store, clock),
     archive: new ArchiveUseCase(store, schemas, clock),
     deleteEntry: new DeleteEntryUseCase(store),
@@ -132,6 +136,136 @@ describe("CreateDraftUseCase", () => {
       slug: "hello",
       authorId: "user-1",
       publishedAt: 1_000_000_000_000,
+    });
+  });
+
+  it("rejects data that fails the Schema after projection", async () => {
+    const schema = {
+      ...postsSchema(),
+      spec: {
+        ...postsSchema().spec,
+        schema: {
+          type: "object" as const,
+          properties: {
+            title: { type: "string" as const },
+            slug: { type: "string" as const, pattern: "^[a-z0-9-]+$" },
+          },
+          required: ["title", "slug"],
+        },
+      },
+    };
+    const h = harness({ schemas: new Map([[schema.metadata.name, schema]]) });
+    await expect(
+      h.createDraft.execute({
+        collection: "posts",
+        data: { title: "Hello", slug: "Not A Slug" },
+        authorId: null,
+      }),
+    ).rejects.toMatchObject({
+      diagnostic: { code: "INPUT_VALIDATION_FAILED", path: "/slug" },
+    });
+  });
+
+  it("rejects invalid email format in Schema-backed authoring paths", async () => {
+    const schema: SchemaManifest = {
+      apiVersion: "cms.mantle.aotter.net/v1",
+      kind: "Schema",
+      metadata: { name: "contact-messages" },
+      spec: {
+        title: "Contact messages",
+        schema: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string", format: "email" },
+            message: { type: "string" },
+          },
+          required: ["name", "email", "message"],
+        },
+        lifecycle: "simple",
+      },
+    };
+    const h = harness({ schemas: new Map([[schema.metadata.name, schema]]) });
+    await expect(
+      h.createDraft.execute({
+        collection: "contact-messages",
+        data: { name: "A", email: "not-email", message: "Hi" },
+        authorId: null,
+      }),
+    ).rejects.toMatchObject({
+      diagnostic: { code: "INPUT_VALIDATION_FAILED", path: "/email" },
+    });
+  });
+
+  it("enforces Schema uniqueIndexes on create", async () => {
+    const schema = {
+      ...postsSchema(),
+      spec: {
+        ...postsSchema().spec,
+        schema: {
+          type: "object" as const,
+          properties: {
+            title: { type: "string" as const },
+            slug: { type: "string" as const, pattern: "^[a-z0-9-]+$" },
+          },
+          required: ["title", "slug"],
+        },
+        uniqueIndexes: [["slug"]],
+      },
+    };
+    const h = harness({ schemas: new Map([[schema.metadata.name, schema]]) });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "One", slug: "same" },
+      authorId: null,
+    });
+    await expect(
+      h.createDraft.execute({
+        collection: "posts",
+        data: { title: "Two", slug: "same" },
+        authorId: null,
+      }),
+    ).rejects.toMatchObject({
+      diagnostic: { code: "CONFLICT", path: "usecase/CreateDraft/posts/uniqueIndexes/0" },
+    });
+  });
+
+  it("rejects localized entries whose locale is not enabled on the site", async () => {
+    const schema: SchemaManifest = {
+      apiVersion: "cms.mantle.aotter.net/v1",
+      kind: "Schema",
+      metadata: { name: "post-translations" },
+      spec: {
+        title: "Post translations",
+        localized: true,
+        schema: {
+          type: "object",
+          properties: {
+            slug: { type: "string" },
+            locale: { type: "string" },
+            title: { type: "string" },
+            body: { type: "string" },
+          },
+          required: ["slug", "locale", "title", "body"],
+        },
+        lifecycle: "simple",
+      },
+    };
+    const h = harness({
+      schemas: new Map([[schema.metadata.name, schema]]),
+      siteConfig: fakeSiteConfig(["en", "zh-TW"]),
+    });
+    await expect(
+      h.createDraft.execute({
+        collection: "post-translations",
+        data: { slug: "hello", locale: "klingon-tlh", title: "Qapla", body: "..." },
+        authorId: null,
+      }),
+    ).rejects.toMatchObject({
+      diagnostic: {
+        code: "INPUT_VALIDATION_FAILED",
+        path: "usecase/CreateDraft/post-translations/locale",
+      },
     });
   });
 });
@@ -234,6 +368,51 @@ describe("UpdateDraftUseCase", () => {
       publishedAt: 1_000_000_000_000,
     });
   });
+
+  it("enforces Schema uniqueIndexes on update while excluding the current row", async () => {
+    const schema = {
+      ...postsSchema(),
+      spec: {
+        ...postsSchema().spec,
+        schema: {
+          type: "object" as const,
+          properties: {
+            title: { type: "string" as const },
+            slug: { type: "string" as const },
+          },
+          required: ["title", "slug"],
+        },
+        uniqueIndexes: [["slug"]],
+      },
+    };
+    const h = harness({ schemas: new Map([[schema.metadata.name, schema]]) });
+    const first = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "One", slug: "one" },
+      authorId: null,
+    });
+    const second = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "Two", slug: "two" },
+      authorId: null,
+    });
+    await expect(
+      h.updateDraft.execute({
+        id: first.id,
+        expectedVersion: 1,
+        data: { title: "One updated", slug: "one" },
+      }),
+    ).resolves.toMatchObject({ data: { slug: "one" } });
+    await expect(
+      h.updateDraft.execute({
+        id: second.id,
+        expectedVersion: 1,
+        data: { slug: "one" },
+      }),
+    ).rejects.toMatchObject({
+      diagnostic: { code: "CONFLICT", path: `usecase/UpdateDraft/${second.id}/uniqueIndexes/0` },
+    });
+  });
 });
 
 describe("RequestPublishUseCase (simple lifecycle)", () => {
@@ -253,7 +432,7 @@ describe("RequestPublishUseCase (simple lifecycle)", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     await h.requestPublish.execute({ id: created.id });
@@ -272,7 +451,7 @@ describe("RequestPublishUseCase (simple lifecycle)", () => {
     });
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     await expect(h.requestPublish.execute({ id: created.id })).rejects.toMatchObject({
@@ -367,12 +546,26 @@ function translatedSchemas(): ReadonlyMap<string, SchemaManifest> {
   ]);
 }
 
+function fakeSiteConfig(locales: readonly string[]): SiteConfigRepository {
+  return {
+    seed: async () => undefined,
+    load: async () => ({
+      brand: "Test",
+      title: "Test",
+      description: "Test",
+      origin: "https://example.com",
+      locales,
+    }),
+    readLocales: async () => locales,
+  };
+}
+
 describe("UnpublishUseCase", () => {
   it("flips published back to draft", async () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     await h.requestPublish.execute({ id: created.id });
@@ -384,7 +577,7 @@ describe("UnpublishUseCase", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     await expect(h.unpublish.execute({ id: created.id })).rejects.toBeInstanceOf(
@@ -398,7 +591,7 @@ describe("ArchiveUseCase", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     const archived = await h.archive.execute({ id: created.id, expectedVersion: 1 });
@@ -409,7 +602,7 @@ describe("ArchiveUseCase", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     const published = await h.requestPublish.execute({ id: created.id });
@@ -437,7 +630,7 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     await expect(
@@ -447,8 +640,8 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
 
   it("ListEntriesUseCase filters by status", async () => {
     const h = harness();
-    const a = await h.createDraft.execute({ collection: "posts", data: {}, authorId: null });
-    await h.createDraft.execute({ collection: "posts", data: {}, authorId: null });
+    const a = await h.createDraft.execute({ collection: "posts", data: { title: "a" }, authorId: null });
+    await h.createDraft.execute({ collection: "posts", data: { title: "b" }, authorId: null });
     await h.requestPublish.execute({ id: a.id });
     const drafts = await h.listEntries.execute({ collection: "posts", status: "draft" });
     expect(drafts).toHaveLength(1);
@@ -477,7 +670,7 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     const h = harness();
     const created = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     const result = await h.deleteEntry.execute({ id: created.id });
