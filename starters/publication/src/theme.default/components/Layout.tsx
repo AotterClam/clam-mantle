@@ -5,17 +5,27 @@ import { html, raw } from "hono/html";
 import overrides from "../../theme/index.js";
 import { HEADER_RUNTIME_JS, SITE_CSS, THEME_BOOTSTRAP_JS } from "../styles.js";
 import { TOKENS_CSS } from "../tokens.js";
-import { Header as BaselineHeader, type HeaderProps } from "./Header.js";
-import { Footer as BaselineFooter } from "./Footer.js";
+import { PageShell as BaselinePageShell } from "./PageShell.js";
+import type { HeaderProps } from "./Header.js";
 
 /**
- * Page chrome (HTML envelope, head, header, footer). Templates
- * compose `<Layout>{children}</Layout>`.
+ * Document envelope (`<html>` / `<head>` / `<body>` + SEO meta +
+ * theme bootstrap script). Templates compose
+ * `<Layout>{children}</Layout>`.
  *
- * Slot resolution at module init: Header and Footer fall through to
- * baseline if `theme/index.ts:components.{Header,Footer}` is unset.
- * Layout itself is NOT a slot — to change the envelope shape, fork
- * the relevant template (L4) or pick a different starter.
+ * Layout itself is NOT a slot — `<head>` shape, SEO emission order,
+ * and theme bootstrap timing are concerns that cross the starter-
+ * family line and shouldn't be redefined per page. Body layout
+ * (Header / `<main>` / Footer arrangement, sticky CTAs, sidebar
+ * variants) is delegated to the `PageShell` slot, which IS
+ * overridable at the L3 layer; chrome-only swaps continue to use
+ * the existing `Header` / `Footer` slots.
+ *
+ * Slot resolution at module init: PageShell falls through to the
+ * baseline if `theme/index.ts:components.PageShell` is unset. The
+ * baseline PageShell in turn resolves Header / Footer overrides —
+ * a consumer-supplied PageShell takes ownership of how (or whether)
+ * to render those.
  *
  * When `seo` is provided (every public entry / list page through
  * `mountPublicRoutes`), the SDK-composed canonical / hreflang /
@@ -35,8 +45,7 @@ export interface LayoutProps {
   readonly children: unknown;
 }
 
-const Header = overrides.components?.Header ?? BaselineHeader;
-const Footer = overrides.components?.Footer ?? BaselineFooter;
+const PageShell = overrides.components?.PageShell ?? BaselinePageShell;
 const SITE_CSS_RESOLVED =
   TOKENS_CSS + (overrides.tokens ?? "") + SITE_CSS + (overrides.extraCss ?? "");
 
@@ -55,9 +64,9 @@ export function Layout(props: LayoutProps) {
         {html`<script>${raw(THEME_BOOTSTRAP_JS)}</script>`}
       </head>
       <body>
-        <Header site={site} locale={locale} current={current} />
-        <main class="site-main">{children}</main>
-        <Footer site={site} locale={locale} />
+        <PageShell site={site} locale={locale} current={current}>
+          {children}
+        </PageShell>
         {html`<script>${raw(HEADER_RUNTIME_JS)}</script>`}
       </body>
     </html>
