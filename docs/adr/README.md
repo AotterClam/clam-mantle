@@ -15,6 +15,7 @@ Records of *why* clam-cms ended up shaped this way. The numbering preserves POC 
 | [0011](0011-adapter-port-spec.md) | Adapter port spec. Required runtime ports plus optional feature ports. CF impl + Netlify stub. | Accepted (new) |
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
 | [0013](0013-agent-provisioned-consumer-projects.md) | Agent-provisioned consumer projects: website prompt → Skill → npm packages → starter setup → first-run provision/seed → owner/MCP handoff. | Accepted (new) |
+| [0014](0014-auth-better-auth-and-multi-tenant-mcp.md) | Better Auth as identity/session/role authority. Drop hand-rolled GitHub OAuth + `staff` table. Split MCP into `/staff/mcp` (write, staff-only, scope `mcp:staff`) and `/mcp` (read + future user writes, scope `mcp:read`); surface partition derives from `Procedure.requires.auth.all` predicate, not config flags. `workers-oauth-provider` retained for DCR. | Accepted (new) |
 
 ## Reading order
 
@@ -48,7 +49,7 @@ The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accum
 
 ## Contributing a new ADR
 
-1. Pick the next number (currently 0014).
+1. Pick the next number (currently 0015).
 2. File: `docs/adr/<NNNN>-<kebab-title>.md`.
 3. Sections: Status, Date, Context, Decision, Consequences, Alternatives, How to apply, Implementation status.
 4. Link from this README's table.
