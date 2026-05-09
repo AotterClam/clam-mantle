@@ -16,6 +16,6 @@ import contactYaml from "../manifests/contact.yaml";
 export function loadManifests(): readonly Manifest[] {
   return parseManifestsOrThrow(
     [postsYaml, postTranslationsYaml, pagesYaml, contactYaml],
-    { context: "starters/blog" },
+    { context: "starters/publication" },
   );
 }

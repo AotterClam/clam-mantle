@@ -71,8 +71,8 @@ export function buildCmsConfig(env: Env): CmsConfig {
     handlers: buildHandlers(env),
     templates: buildTemplates(),
     siteDefaults: {
-      brand: "Mantle Blog",
-      title: "Mantle Blog",
+      brand: "Mantle Publication",
+      title: "Mantle Publication",
       description: "Reference starter for mantle — localized posts + contact form.",
       origin: "https://example.com",
       locales: ["en", "zh-TW"],
