@@ -3,12 +3,6 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-[vars]
-# Stub OAuth verifier — accepts `Bearer dev-<userId>` tokens for local
-# dev / testing. Production: replace with the real DCR-compliant
-# verifier from `@cloudflare/workers-oauth-provider` and remove this.
-MANTLE_ALLOW_STUB_OAUTH = "1"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "mantle-blank-local"

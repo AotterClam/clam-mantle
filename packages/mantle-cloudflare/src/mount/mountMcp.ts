@@ -1,26 +1,39 @@
 import type { Hono } from "hono";
-import { McpJsonRpcDispatcher, type Staff } from "@aotter/mantle-runtime";
+import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
 import type { StaffRole } from "@aotter/mantle-spec";
-import { ADMIN_ROLES, type Auth } from "../auth/createAuth.js";
+import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
-const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
+const UNAUTHORIZED: ResponseInit = {
+  status: 401,
+  headers: { "www-authenticate": 'Bearer realm="mcp"' },
+};
+const FORBIDDEN: ResponseInit = {
+  status: 403,
+  headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
+};
 
-/**
- * Mount MCP `/mcp` (JSON-RPC) on the consumer's Hono app. Validates
- * the bearer via Better Auth's MCP plugin (when `ref.auth` is set) or
- * the legacy `OAuthVerifier` + `StaffRepository` ports (when only
- * `ref.adminAuth` is wired). Returns 401 / 403 at the transport layer
- * — before JSON-RPC parsing — to match MCP spec behavior.
- */
 export function mountMcp(
   app: Hono,
   ref: CmsRuntimeRef,
   options: { path?: string } = {},
 ): void {
+  const auth = ref.auth;
   const path = options.path ?? "/mcp";
   let dispatcher: McpJsonRpcDispatcher | null = null;
-  const buildDispatcher = (runtime: Awaited<ReturnType<CmsRuntimeRef["get"]>>): McpJsonRpcDispatcher => {
+
+  app.all(path, async (c) => {
+    // Boot is independent of auth — fetch concurrently to save one
+    // D1 round-trip on the hot path.
+    const [session, runtime] = await Promise.all([
+      auth.getMcpSession(c.req.raw),
+      ref.get(),
+    ]);
+    if (!session) return new Response("unauthorized", UNAUTHORIZED);
+    const role = await auth.getUserRole(session.userId);
+    if (!role || !ADMIN_ROLE_SET.has(role)) {
+      return new Response("forbidden", FORBIDDEN);
+    }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
         listEntries: runtime.listEntries,
@@ -34,54 +47,9 @@ export function mountMcp(
       },
       [...runtime.schemasByName.values()],
     );
-    return dispatcher;
-  };
-
-  if (ref.auth) {
-    const auth = ref.auth;
-    app.all(path, async (c) => {
-      const session = await auth.getMcpSession(c.req.raw);
-      if (!session) {
-        return new Response("unauthorized", {
-          status: 401,
-          headers: { "www-authenticate": 'Bearer realm="mcp"' },
-        });
-      }
-      const role = await auth.getUserRole(session.userId);
-      if (!role || !ADMIN_ROLE_SET.has(role)) {
-        return new Response("forbidden", {
-          status: 403,
-          headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
-        });
-      }
-      const runtime = await ref.get();
-      const staff: Staff = {
-        userId: session.userId,
-        role: role as StaffRole,
-        grantedBy: null,
-        grantedAt: 0,
-      };
-      return buildDispatcher(runtime).dispatch(c.req.raw, { userId: session.userId, staff });
+    return dispatcher.dispatch(c.req.raw, {
+      userId: session.userId,
+      staff: { userId: session.userId, role: role as StaffRole },
     });
-    return;
-  }
-
-  app.all(path, async (c) => {
-    const runtime = await ref.get();
-    const identity = await runtime.oauth.verifyAccessToken(c.req.raw);
-    if (!identity) {
-      return new Response("unauthorized", {
-        status: 401,
-        headers: { "www-authenticate": 'Bearer realm="mcp"' },
-      });
-    }
-    const staff = await runtime.staff.readByUserId(identity.userId);
-    if (!staff) {
-      return new Response("forbidden", {
-        status: 403,
-        headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
-      });
-    }
-    return buildDispatcher(runtime).dispatch(c.req.raw, { userId: identity.userId, staff });
   });
 }

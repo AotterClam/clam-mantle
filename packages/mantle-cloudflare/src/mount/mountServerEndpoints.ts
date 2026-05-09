@@ -10,47 +10,19 @@ import {
   type SchemaManifest,
 } from "@aotter/mantle-spec";
 import {
-  DEFAULT_SESSION_COOKIE,
   ViewParamCoercionError,
   coerceViewParams,
   matchPath,
-  readCookie,
   type CmsRuntime,
   type HandlerContext,
-  type Session,
 } from "@aotter/mantle-runtime";
 import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
-import { ADMIN_ROLES, type AdminRole, type Auth } from "../auth/createAuth.js";
-import { BypassToConsent } from "../oauth/oauthConstants.js";
-import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
-import {
-  detectConsentLocale,
-  renderConsentHtml,
-  type ConsentLocale,
-  type ConsentModel,
-} from "../oauth/consentHtml.js";
+import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
-/**
- * Mount the http Triggers in `ref.manifests` onto the consumer's Hono
- * app. Each Trigger with `source.kind: 'http'` gets a route at
- * `(method, path)`; the handler resolves the target Procedure,
- * extracts auth context, calls `runtime.invokeProcedure.execute`,
- * and maps the structured response onto an HTTP envelope:
- *
- *   - success → 200, JSON `{ ok: true, data }`
- *   - failure → status from `HTTP_STATUS_BY_CODE` (default 500),
- *               JSON `{ ok: false, diagnostic }`
- *
- * Path params `{name}` from the Trigger path bind to identically-named
- * fields on the Procedure input — POC ADR-0001 grammar.
- *
- * Each parsed View also auto-mounts at `GET /api/views/<name>`
- * (ADR-0012) — query string coerced via `coerceViewParams`,
- * pagination via reserved `?page=&show=`.
- */
+/** Mount HTTP Triggers + Views + the Better Auth admin surface. */
 export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   for (const t of ref.manifests) {
     if (t.kind !== "Trigger") continue;
@@ -73,310 +45,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       return handleViewRequest(c.req.raw, runtime, viewName);
     });
   }
-
-  if (ref.auth) {
-    mountAdminBetterAuth(app, ref, ref.auth);
-    return;
-  }
-
-  const { adminAuth } = ref;
-  if (!adminAuth) return;
-  const { oauthProvider } = adminAuth;
-
-  // ── Admin SPA: shell + JSON API ─────────────────────────────────────
-  //
-  // Routing model: every path under `/admin` (except auth + api + the
-  // static logout endpoint) returns the same `indexHtml` string. The
-  // SPA reads `window.location.pathname` to choose a view, so the
-  // server is just a path-agnostic asset server here.
-  //
-  // The HTML shell ships unauthenticated — the SPA fetches `/admin/api/me`
-  // on mount and redirects to `/admin/sign-in` on 401. JSON endpoints
-  // are gated server-side; non-staff bearers get 403 + AUTH_DENIED.
-  const spa = (): Response =>
-    new Response(indexHtml, {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
-
-  app.get("/admin", spa);
-  app.get("/admin/", spa);
-  app.get("/admin/sign-in", spa);
-  app.get("/admin/c/:collection", spa);
-  app.get("/admin/approvals", spa);
-  app.get("/admin/preferences", spa);
-  app.get("/admin/settings", spa);
-
-  // ── /admin/api/* — JSON endpoints consumed by the SPA ───────────────
-  app.get("/admin/api/me", async (c) => {
-    const runtime = await ref.get();
-    const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminUnauthenticated(c, "/admin/api/me");
-    const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) {
-      const login = await runtime.users.findGithubLogin(session.userId);
-      return adminNotStaff(c, "/admin/api/me", login);
-    }
-    const login = await runtime.users.findGithubLogin(session.userId);
-    return jsonResponse(200, { login, role: staff.role, userId: session.userId });
-  });
-
-  app.get("/admin/api/collections", async (c) => {
-    const runtime = await ref.get();
-    const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminUnauthenticated(c, "/admin/api/collections");
-    const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) {
-      const login = await runtime.users.findGithubLogin(session.userId);
-      return adminNotStaff(c, "/admin/api/collections", login);
-    }
-    const schemas = ref.manifests.filter(
-      (m): m is SchemaManifest => m.kind === "Schema",
-    );
-    // POC sidebar contract: translation children (those with
-    // `spec.translates`) never appear in the sidebar — they fold into
-    // their parent. The parent gets a `hasTranslations: true` flag so
-    // the SPA can mark it with a globe icon.
-    const translatedParents = new Set<string>();
-    for (const s of schemas) {
-      if (s.spec.translates) translatedParents.add(s.spec.translates.parent);
-    }
-    const collections = schemas
-      .filter((s) => !s.spec.translates)
-      .map((s) => ({
-        name: s.metadata.name,
-        title: s.spec.title,
-        description: s.spec.description ?? null,
-        lifecycle: s.spec.lifecycle ?? "simple",
-        hasTranslations: translatedParents.has(s.metadata.name),
-        mediaFields: mediaFieldsForCollection(s, schemas),
-      }));
-    return jsonResponse(200, { collections });
-  });
-
-  app.get("/admin/api/site", async (c) => {
-    const runtime = await ref.get();
-    const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminUnauthenticated(c, "/admin/api/site");
-    const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) {
-      const login = await runtime.users.findGithubLogin(session.userId);
-      return adminNotStaff(c, "/admin/api/site", login);
-    }
-    const site = await runtime.siteConfig.load();
-    const url = new URL(c.req.url);
-    const publicUrl = site.origin || url.origin;
-    return jsonResponse(200, {
-      ...site,
-      publicUrl,
-      mcpUrl: `${url.origin}/mcp`,
-    });
-  });
-
-  app.get("/admin/api/entries", async (c) => {
-    const runtime = await ref.get();
-    const session = await readSessionForAdmin(c, runtime);
-    if (!session) return adminUnauthenticated(c, "/admin/api/entries");
-    const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) {
-      const login = await runtime.users.findGithubLogin(session.userId);
-      return adminNotStaff(c, "/admin/api/entries", login);
-    }
-    const collection = c.req.query("collection");
-    if (!collection) {
-      return jsonResponse(400, {
-        ok: false,
-        diagnostic: runtimeDiagnostic({
-          code: "INPUT_VALIDATION_FAILED",
-          severity: "error",
-          path: "GET /admin/api/entries",
-          expected: "?collection=<name> query parameter",
-          message: "Missing `collection` query parameter.",
-        }),
-      });
-    }
-    const status = c.req.query("status");
-    const rows = await runtime.listEntries.execute({
-      collection,
-      status: status as ContentState | undefined,
-    });
-    const items = rows.map((row) => ({
-      id: row.id,
-      collection: row.collection,
-      locale: row.locale ?? null,
-      status: row.status,
-      version: row.version,
-      title: row.data.title,
-      updated_at: row.updatedAt,
-    }));
-    return jsonResponse(200, { items, next_cursor: null });
-  });
-
-  // ── /admin/logout — POST clears session cookie + 302s to sign-in ────
-  app.post("/admin/logout", async (c) => {
-    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
-    if (sessionToken) {
-      const runtime = await ref.get();
-      await runtime.sessions.invalidate(sessionToken);
-    }
-    const expired = `${DEFAULT_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
-    return new Response(null, {
-      status: 302,
-      headers: { location: "/admin/sign-in", "set-cookie": expired },
-    });
-  });
-
-  // ── GitHub admin sign-in ─────────────────────────────────────────────
-  app.get("/admin/auth/github", async (c) => {
-    const runtime = await ref.get();
-    const url = new URL(c.req.url);
-    const returnTo = c.req.query("return_to") ?? "/admin";
-    let redirectUrl: string;
-    try {
-      redirectUrl = await startAuthorize({
-        kv: runtime.kv,
-        origin: url.origin,
-        githubClientId: adminAuth.githubClientId,
-        returnTo,
-      });
-    } catch (err) {
-      return jsonError({ status: 500, code: "INTERNAL_ERROR", message: String(err) });
-    }
-    return new Response(null, { status: 302, headers: { location: redirectUrl } });
-  });
-
-  app.get("/admin/auth/github/callback", async (c) => {
-    const runtime = await ref.get();
-    const url = new URL(c.req.url);
-    let cbResult: Awaited<ReturnType<typeof handleCallback>>;
-    try {
-      cbResult = await handleCallback(
-        {
-          kv: runtime.kv,
-          githubClientId: adminAuth.githubClientId,
-          githubClientSecret: adminAuth.githubClientSecret,
-          origin: url.origin,
-        },
-        url,
-      );
-    } catch (err) {
-      if (err instanceof CallbackError) {
-        return jsonError({ status: err.status, code: "AUTH_DENIED", message: err.message });
-      }
-      throw err;
-    }
-
-    const now = Date.now();
-    const userId = await runtime.users.upsertByGithub(cbResult.profile, now);
-    await Promise.all([
-      runtime.users.storeGithubToken(userId, cbResult.accessToken, cbResult.grantedScope, now),
-      runtime.staff.ensureBootstrapOwner({
-        userId,
-        githubLogin: cbResult.profile.login,
-        adminGithubLogin: adminAuth.adminGithubLogin,
-        now,
-      }),
-    ]);
-
-    const session: Session = {
-      token: crypto.randomUUID(),
-      userId,
-      createdAt: now,
-      expiresAt: now + 30 * 24 * 60 * 60 * 1000,
-    };
-    await runtime.sessions.write(session);
-    const maxAge = Math.floor((session.expiresAt - now) / 1000);
-    const cookie = `${DEFAULT_SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
-    return new Response(null, {
-      status: 302,
-      headers: { location: cbResult.returnTo, "set-cookie": cookie },
-    });
-  });
-
-  // ── OAuth consent UI ─────────────────────────────────────────────────
-  // The OAuthProvider injects per-request OAUTH_PROVIDER helpers onto env
-  // then throws BypassToConsent. We catch that throw and render the consent
-  // UI using those helpers.
-  const oauthEnv = { OAUTH_KV: adminAuth.oauthKv };
-
-  const consentHandler = async (c: Context): Promise<Response> => {
-    const runtime = await ref.get();
-    const locale = detectConsentLocale(c.req.header("accept-language") ?? null);
-
-    const augmented: { OAUTH_KV: KVNamespace; OAUTH_PROVIDER?: OAuthHelpers } = { ...oauthEnv };
-    try {
-      await oauthProvider.fetch(c.req.raw, augmented as never, safeExecutionCtx(c));
-    } catch (e) {
-      if (!(e instanceof BypassToConsent)) throw e;
-    }
-    if (!augmented.OAUTH_PROVIDER) {
-      return jsonError({
-        status: 500,
-        code: "INTERNAL_ERROR",
-        message: "OAUTH_PROVIDER not injected — check OAuthProvider configuration.",
-      });
-    }
-    const oauthHelpers = augmented.OAUTH_PROVIDER;
-
-    const sessionToken = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
-    const session = sessionToken ? await runtime.sessions.read(sessionToken) : null;
-    if (!session) {
-      if (c.req.method !== "GET") {
-        return jsonResponse(401, {
-          ok: false,
-          diagnostic: runtimeDiagnostic({
-            code: "UNAUTHENTICATED",
-            severity: "error",
-            path: `${c.req.method} /oauth/authorize`,
-            expected: "active staff session cookie",
-            message: "Not signed in. Sign in via /admin/sign-in first.",
-          }),
-        });
-      }
-      const u = new URL(c.req.url);
-      const returnTo = encodeURIComponent(u.pathname + u.search);
-      return new Response(null, {
-        status: 302,
-        headers: { location: `/admin/auth/github?return_to=${returnTo}` },
-      });
-    }
-
-    const staff = await runtime.staff.readByUserId(session.userId);
-    if (!staff) {
-      return jsonResponse(403, {
-        ok: false,
-        diagnostic: runtimeDiagnostic({
-          code: "AUTH_DENIED",
-          severity: "error",
-          path: `${c.req.method} /oauth/authorize`,
-          expected: "active staff membership",
-          message: "Only staff members may approve OAuth grants.",
-        }),
-      });
-    }
-
-    if (c.req.method === "POST") return handleConsentPost(c, runtime, session, oauthHelpers);
-    return handleConsentGet(c, runtime, locale, oauthHelpers);
-  };
-
-  app.get("/oauth/authorize", consentHandler);
-  app.post("/oauth/authorize", consentHandler);
-
-  // ── OAuth provider passthrough (discovery / token / register) ─────────
-  //
-  // MCP clients discover the authorization server and protected resource
-  // metadata through /.well-known before they can open the consent screen.
-  const providerFetch = (c: Context) =>
-    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c));
-  app.all("/.well-known/oauth-authorization-server", providerFetch);
-  app.all("/.well-known/oauth-authorization-server/*", providerFetch);
-  app.all("/.well-known/oauth-protected-resource", providerFetch);
-  app.all("/.well-known/oauth-protected-resource/*", providerFetch);
-  app.all("/oauth/token", (c) =>
-    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
-  );
-  app.all("/oauth/register", (c) =>
-    oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
-  );
+  mountAdminBetterAuth(app, ref, ref.auth);
 }
 
 function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
@@ -489,14 +158,12 @@ type AdminGate =
       role: AdminRole;
     };
 
-const ADMIN_ROLES_FOR_GATE: ReadonlySet<string> = new Set(ADMIN_ROLES);
-
 async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
   const session = await auth.getSession(c.req.raw);
   if (!session) return { kind: "unauth" };
   const role = session.user.role ?? null;
   const login = session.user.githubLogin ?? null;
-  if (!role || !ADMIN_ROLES_FOR_GATE.has(role)) {
+  if (!role || !ADMIN_ROLE_SET.has(role)) {
     return { kind: "forbidden", login };
   }
   return {
@@ -507,107 +174,10 @@ async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
   };
 }
 
-type OAuthHelpers = {
-  parseAuthRequest(req: Request): Promise<{ clientId: string; redirectUri: string; scope?: readonly string[] }>;
-  lookupClient(clientId: string): Promise<{ clientName?: string } | null>;
-  completeAuthorization(opts: {
-    request: unknown;
-    userId: string;
-    metadata: Record<string, unknown>;
-    scope: readonly string[];
-    props: Record<string, unknown>;
-  }): Promise<{ redirectTo: string }>;
-};
-
-async function handleConsentGet(
-  c: Context,
-  runtime: CmsRuntime,
-  locale: ConsentLocale,
-  oauthHelpers: OAuthHelpers,
-): Promise<Response> {
-  let model: ConsentModel | null = null;
-  try {
-    const reqInfo = await oauthHelpers.parseAuthRequest(c.req.raw);
-    const clientInfo = await oauthHelpers.lookupClient(reqInfo.clientId);
-    model = {
-      clientName: clientInfo?.clientName ?? "(unknown client)",
-      redirectUri: reqInfo.redirectUri,
-      scopes: reqInfo.scope ?? [],
-      oauthRequestJson: JSON.stringify(reqInfo),
-    };
-  } catch {
-    // parseAuthRequest may throw on malformed requests.
-  }
-  return new Response(renderConsentHtml(locale, model), {
-    headers: { "content-type": "text/html; charset=utf-8" },
-  });
-}
-
-async function handleConsentPost(
-  c: Context,
-  runtime: CmsRuntime,
-  session: Session,
-  oauthHelpers: OAuthHelpers,
-): Promise<Response> {
-  const form = await c.req.raw.formData();
-  const oauthRequestJson = form.get("oauth_request");
-  if (typeof oauthRequestJson !== "string") {
-    return jsonResponse(400, {
-      ok: false,
-      diagnostic: runtimeDiagnostic({
-        code: "INPUT_VALIDATION_FAILED",
-        severity: "error",
-        path: "POST /oauth/authorize#/body/oauth_request",
-        expected: "form-encoded `oauth_request` string",
-        message: "Missing `oauth_request` form field.",
-      }),
-    });
-  }
-  if (form.get("decision") !== "approve") {
-    return jsonResponse(400, {
-      ok: false,
-      diagnostic: runtimeDiagnostic({
-        code: "AUTH_DENIED",
-        severity: "error",
-        path: "POST /oauth/authorize#/body/decision",
-        expected: "decision=approve",
-        message: "Authorization denied by user.",
-      }),
-    });
-  }
-  let reqInfo: { scope?: readonly string[] } & Record<string, unknown>;
-  try {
-    reqInfo = JSON.parse(oauthRequestJson) as typeof reqInfo;
-  } catch {
-    return jsonResponse(400, {
-      ok: false,
-      diagnostic: runtimeDiagnostic({
-        code: "INPUT_VALIDATION_FAILED",
-        severity: "error",
-        path: "POST /oauth/authorize#/body/oauth_request",
-        expected: "valid JSON-encoded OAuth request payload",
-        message: "Could not parse `oauth_request` as JSON.",
-      }),
-    });
-  }
-  const ghToken = await runtime.users.readGithubToken(session.userId);
-  const { redirectTo } = await oauthHelpers.completeAuthorization({
-    request: reqInfo,
-    userId: session.userId,
-    metadata: {},
-    scope: reqInfo.scope ?? [],
-    props: {
-      userId: session.userId,
-      ...(ghToken ? { githubAccessToken: ghToken.accessToken, githubScope: ghToken.scope } : {}),
-    },
-  });
-  return new Response(null, { status: 302, headers: { location: redirectTo } });
-}
-
 async function handleHttpTrigger(
   req: Request,
   runtime: CmsRuntime,
-  auth: Auth | null,
+  auth: Auth,
   triggerName: string,
   triggerPath: string,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
@@ -630,7 +200,7 @@ async function handleHttpTrigger(
   // `id`). Body fields fill in non-path inputs only.
   const input = { ...body, ...params };
 
-  const ctx: HandlerContext = await buildHandlerContext(req, runtime, auth, waitUntil);
+  const ctx: HandlerContext = await buildHandlerContext(req, auth, waitUntil);
 
   const result = await runtime.invokeProcedure.execute({
     procedure,
@@ -716,26 +286,21 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
 
 async function buildHandlerContext(
   req: Request,
-  runtime: CmsRuntime,
-  auth: Auth | null,
+  auth: Auth,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
   const wu = waitUntil ? { waitUntil } : {};
-  if (auth) {
-    const session = await auth.getMcpSession(req);
-    if (!session) return { user: null, staff: null, env: {}, ...wu };
-    const role = await auth.getUserRole(session.userId);
-    const staff =
-      role && ADMIN_ROLES_FOR_GATE.has(role)
-        ? { id: session.userId, role: role as AdminRole }
-        : null;
-    return { user: { id: session.userId }, staff, env: {}, ...wu };
-  }
-  const identity = await runtime.oauth.verifyAccessToken(req);
-  if (!identity) return { user: null, staff: null, env: {}, ...wu };
-  const staffRow = await runtime.staff.readByUserId(identity.userId);
-  const staff = staffRow ? { id: staffRow.userId, role: staffRow.role } : null;
-  return { user: { id: identity.userId }, staff, env: {}, ...wu };
+  const unauth: HandlerContext = { user: null, staff: null, env: {}, ...wu };
+  // Fast path: skip the D1 query for public Triggers (no bearer).
+  if (!req.headers.get("authorization")?.startsWith("Bearer ")) return unauth;
+  const session = await auth.getMcpSession(req);
+  if (!session) return unauth;
+  const role = await auth.getUserRole(session.userId);
+  const staff =
+    role && ADMIN_ROLE_SET.has(role)
+      ? { id: session.userId, role: role as AdminRole }
+      : null;
+  return { user: { id: session.userId }, staff, env: {}, ...wu };
 }
 
 function openApiToHono(path: string): string {
@@ -754,15 +319,6 @@ function readWaitUntil(c: Context): ((p: Promise<unknown>) => void) | undefined 
     return ctx.waitUntil.bind(ctx);
   } catch {
     return undefined;
-  }
-}
-
-/** Safe variant for callers that need the full ExecutionContext (OAuth provider). */
-function safeExecutionCtx(c: Context): ExecutionContext {
-  try {
-    return c.executionCtx;
-  } catch {
-    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
   }
 }
 
@@ -799,15 +355,6 @@ function mediaFieldsForSchema(schema: SchemaManifest): Array<{ name: string; hin
     out.push({ name, hint });
   }
   return out;
-}
-
-async function readSessionForAdmin(
-  c: Context,
-  runtime: CmsRuntime,
-): Promise<Session | null> {
-  const token = readCookie(c.req.raw, DEFAULT_SESSION_COOKIE);
-  if (!token) return null;
-  return runtime.sessions.read(token);
 }
 
 function adminUnauthenticated(c: Context, path: string): Response {
