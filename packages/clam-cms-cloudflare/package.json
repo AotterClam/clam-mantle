@@ -37,6 +37,7 @@
     "@aotterclam/clam-cms-admin-ui": "workspace:*",
     "@aotterclam/clam-cms-runtime": "workspace:*",
     "@aotterclam/clam-cms-spec": "workspace:*",
+    "aws4fetch": "^1.0.20",
     "better-auth": "^1.6.9",
     "hono": "^4.6.20"
   },

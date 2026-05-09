@@ -108,6 +108,12 @@ async function main() {
       ["exec", "tsx", "test/integration/view-rest-smoke.ts"],
       { WRANGLER_BASE_URL: BASE_URL },
     );
+    runStep(
+      "media-smoke",
+      "pnpm",
+      ["exec", "tsx", "test/integration/media-smoke.ts"],
+      { WRANGLER_BASE_URL: BASE_URL },
+    );
 
     log("all smokes passed");
   } finally {

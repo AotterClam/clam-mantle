@@ -44,6 +44,12 @@ export function mountMcp(
         unpublish: runtime.unpublish,
         archive: runtime.archive,
         deleteEntry: runtime.deleteEntry,
+        media: runtime.media
+          ? {
+              createUpload: runtime.media.createUpload,
+              commitUpload: runtime.media.commitUpload,
+            }
+          : undefined,
       },
       [...runtime.schemasByName.values()],
     );

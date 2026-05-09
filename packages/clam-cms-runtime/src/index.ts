@@ -37,19 +37,19 @@ export type { KvCache, KvPutOptions, KvListResult } from "./domain/port/KvCache.
 export type { AssetServer } from "./domain/port/AssetServer.js";
 export type {
   MediaStorage,
-  CreateMediaUploadRequest,
-  CreateMediaUploadResponse,
-  CommitMediaUploadRequest,
-  PutMediaObjectRequest,
-  GetMediaPublicUrlRequest,
-  DeleteMediaAssetRequest,
+  CreateUploadArgs,
+  CreateUploadResult,
+  CommitUploadArgs,
+  GetPublicUrlArgs,
+  DeleteAssetArgs,
   MediaAsset,
 } from "./domain/port/MediaStorage.js";
-export type {
-  RemoteMediaFetcher,
-  FetchAllowedUrlRequest,
-  FetchedMedia,
-} from "./domain/port/RemoteMediaFetcher.js";
+export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
+
+// ID source — adapters wire this into binding-side helpers that need
+// random IDs. Default `RandomUuidGenerator` (`crypto.randomUUID()`)
+// can be swapped in tests with a deterministic counter.
+export { type IdGenerator, RandomUuidGenerator } from "./domain/port/IdGenerator.js";
 
 // Consumer/starter handler and render contracts.
 export type {

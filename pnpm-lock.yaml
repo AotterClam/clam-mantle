@@ -86,9 +86,12 @@ importers:
       '@aotterclam/clam-cms-spec':
         specifier: workspace:*
         version: link:../clam-cms-spec
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
       better-auth:
         specifier: ^1.6.9
-        version: 1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
+        version: 1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
       hono:
         specifier: ^4.6.20
         version: 4.12.16
@@ -104,7 +107,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
+        version: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
       wrangler:
         specifier: ^3.103.2
         version: 3.114.17(@cloudflare/workers-types@4.20260504.1)
@@ -191,6 +194,9 @@ importers:
       '@aotterclam/clam-cms-spec':
         specifier: workspace:*
         version: link:../../packages/clam-cms-spec
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
       hono:
         specifier: ^4.6.20
         version: 4.12.16
@@ -1639,6 +1645,9 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
+
+  aws4fetch@1.0.20:
+    resolution: {integrity: sha512-/djoAN709iY65ETD6LKCtyyEI04XIBP5xVvfmNxsEP0uJB5tyaGBztSryRr4HqMStr9R06PisQE7m9zDTXKu6g==}
 
   baseline-browser-mapping@2.10.27:
     resolution: {integrity: sha512-zEs/ufmZoUd7WftKpKyXaT6RFxpQ5Qm9xytKRHvJfxFV9DFJkZph9RvJ1LcOUi0Z1ZVijMte65JbILeV+8QQEA==}
@@ -3520,6 +3529,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
+  '@vitest/mocker@4.1.5(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))':
+    dependencies:
+      '@vitest/spy': 4.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)
+
   '@vitest/mocker@4.1.5(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))':
     dependencies:
       '@vitest/spy': 4.1.5
@@ -3566,9 +3583,11 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
+  aws4fetch@1.0.20: {}
+
   baseline-browser-mapping@2.10.27: {}
 
-  better-auth@1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))):
+  better-auth@1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))):
     dependencies:
       '@better-auth/core': 1.6.9(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@cloudflare/workers-types@4.20260504.1)(better-call@1.3.5(zod@4.4.2))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.3.0)
       '@better-auth/drizzle-adapter': 1.6.9(@better-auth/core@1.6.9(@better-auth/utils@0.4.0)(@better-fetch/fetch@1.1.21)(@cloudflare/workers-types@4.20260504.1)(better-call@1.3.5(zod@4.4.2))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.3.0))(@better-auth/utils@0.4.0)
@@ -3590,7 +3609,7 @@ snapshots:
     optionalDependencies:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
-      vitest: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
+      vitest: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
       - '@opentelemetry/api'
@@ -4175,6 +4194,21 @@ snapshots:
       tsx: 4.21.0
       yaml: 2.8.4
 
+  vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4):
+    dependencies:
+      lightningcss: 1.32.0
+      picomatch: 4.0.4
+      postcss: 8.5.13
+      rolldown: 1.0.0-rc.17
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      '@types/node': 20.19.39
+      esbuild: 0.17.19
+      fsevents: 2.3.3
+      jiti: 2.7.0
+      tsx: 4.21.0
+      yaml: 2.8.4
+
   vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4):
     dependencies:
       lightningcss: 1.32.0
@@ -4189,6 +4223,33 @@ snapshots:
       jiti: 2.7.0
       tsx: 4.21.0
       yaml: 2.8.4
+
+  vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)):
+    dependencies:
+      '@vitest/expect': 4.1.5
+      '@vitest/mocker': 4.1.5(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@vitest/pretty-format': 4.1.5
+      '@vitest/runner': 4.1.5
+      '@vitest/snapshot': 4.1.5
+      '@vitest/spy': 4.1.5
+      '@vitest/utils': 4.1.5
+      es-module-lexer: 2.1.0
+      expect-type: 1.3.0
+      magic-string: 0.30.21
+      obug: 2.1.1
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.1.2
+      tinyglobby: 0.2.16
+      tinyrainbow: 3.1.0
+      vite: 8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 20.19.39
+    transitivePeerDependencies:
+      - msw
 
   vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)):
     dependencies:
