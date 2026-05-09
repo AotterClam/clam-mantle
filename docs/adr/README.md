@@ -15,7 +15,7 @@ Records of *why* mantle ended up shaped this way. The numbering preserves POC AD
 | [0011](0011-adapter-port-spec.md) | Adapter port spec. Required runtime ports plus optional feature ports. CF impl + Netlify stub. | Accepted (new) |
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
 | [0013](0013-agent-provisioned-consumer-projects.md) | Agent-provisioned consumer projects: website prompt → Skill → npm packages → starter setup → first-run provision/seed → owner/MCP handoff. | Accepted (new) |
-| [0014](0014-auth-better-auth-and-multi-tenant-mcp.md) | Better Auth as identity/session/role authority. Drop hand-rolled GitHub OAuth + `staff` table. Split MCP into `/staff/mcp` (write, staff-only, scope `mcp:staff`) and `/mcp` (read + future user writes, scope `mcp:read`); surface partition derives from `Procedure.requires.auth.all` predicate, not config flags. `workers-oauth-provider` retained for DCR. | Accepted (new) |
+| [0014](0014-auth-better-auth-and-multi-tenant-mcp.md) | Better Auth replaces both hand-rolled GitHub OAuth and `@cloudflare/workers-oauth-provider`. `staff` table → `user.role` via admin plugin. MCP splits into `/staff/mcp` (write, scope `mcp:staff`, admin-role) and `/mcp` (read + future user writes, scope `mcp:read`, any signed-in user); surface partition derives from `Procedure.requires.auth.all` predicate, not config flags. Auth port disappears; runtime takes Better Auth instance directly. Platform-agnostic — Netlify / Bun / Deno adapters get the surface for free. | Accepted (new) |
 
 ## Reading order
 

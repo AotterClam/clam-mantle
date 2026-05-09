@@ -1,4 +1,4 @@
-# ADR-0014: Better Auth + scope-aware multi-tenant MCP
+# ADR-0014: Better Auth as the auth + MCP authorization server, scope-derived multi-tenant MCP
 
 ## Status
 
@@ -10,45 +10,55 @@ Accepted (new)
 
 ## Context
 
-The pre-v0.1.0 auth surface is a hand-rolled GitHub-only flow:
+The pre-v0.1.0 auth surface is a hand-rolled GitHub-only flow stitched out of two libraries:
 
-- `/admin/auth/github` + `/admin/auth/github/callback` — ~110 LOC of upstream OAuth client code in `mantle-cloudflare/src/oauth/githubOAuth.ts`
+- `@cloudflare/workers-oauth-provider` (DCR-compliant authorization server for MCP — `/oauth/{authorize,token,register}`, `.well-known/oauth-authorization-server`, KV-backed token storage)
+- A hand-rolled GitHub upstream OAuth client (`oauth/githubOAuth.ts` ~110 LOC)
 - D1 tables: `users`, `social_logins`, `sessions`, `github_tokens`, `staff` overlay
 - `ensureBootstrapOwner` env-var gated (`ADMIN_GITHUB_LOGIN`)
-- `cms_session` cookie carries the staff-shaped session
-- A separate `@cloudflare/workers-oauth-provider` instance issues tokens for MCP DCR (`/oauth/{authorize,token,register}`, `.well-known/oauth-authorization-server`)
-- Single `/mcp` route mounted by `mountMcp(app, ref)`; gated server-side to staff bearers only
+- `cms_session` cookie carries the staff session
+- Single `/mcp` route gated to staff bearers only
 
-Pre-launch we promised the publication starter family then `community` and `fan-club` (#58 taxonomy). Both require:
+Pre-launch we promised the `publication` family then `community` and `fan-club` (#58 taxonomy). Both require:
 
-1. **Multi-IDP end-user login** — GitHub, Google, Apple, plus magic link / email OTP for users without OAuth accounts.
-2. **End-user MCP access** — let signed-in users grant a Claude / Cursor / Codex agent read access to their own subscriptions, comments, member-only posts.
+1. **Multi-IDP end-user login** — GitHub, Google, Apple, plus magic link / email OTP for users without OAuth accounts
+2. **End-user MCP access via DCR** — let signed-in end-users grant a Claude / Cursor / Codex agent read access to their own subscriptions, comments, member-only posts
 
-Trying to grow the existing hand-rolled stack into that shape — three IDPs, two paths to the magic link, account linking with reauth, scope-based MCP gating, role machinery for both staff and end-user — accumulates fast. A 2024–2026 Workers ecosystem trade-off:
+Trying to grow the existing hand-rolled stack into that shape — three IDPs, two paths to magic link, account linking with reauth, scope-based MCP gating, role machinery for both staff and end-user, end-user DCR through `workers-oauth-provider` — accumulates fast (~1500 LOC of auth code by v0.2). Cloudflare itself does not ship a transactional-email-for-app-auth product (Cloudflare Access's "One-time PIN" gates Zero Trust resources, not public-site users), so the email-OTP path needs an external sender regardless.
 
-- Off-the-shelf libraries cover most of this (arctic, lucia, Better Auth, Auth.js, ...). All are TypeScript-first; most have D1 / Workers adapters.
-- Adding upstream-IDP plumbing one at a time is high boilerplate per IDP (Apple's JWT-signed client secret is the worst).
-- Account linking with email collision detection + reauth flow is non-trivial and easy to get wrong (security implications).
-- Email OTP / magic link adds an EmailSender port + transactional email integration.
+The "single `/mcp` with config flags" pattern explodes combinatorially when scope, role, surface, and feature flags interact. Each new feature multiplies the matrix.
 
-Cloudflare itself does not ship a transactional-email-for-app-auth product. Cloudflare Access's "One-time PIN login" gates Zero Trust resources for org members, not for public-site end-users — wrong product. CF Email Workers exists in dev preview / restricted plans but isn't a general OTP product.
+A 2026 Workers-friendly auth library — [Better Auth](https://better-auth.com) — covers this entire space:
 
-The "single `/mcp` with config flags" pattern (one route, role checks at request time, optional flags to open it to non-staff) explodes combinatorially when scope, role, surface, and feature flags interact. Each new feature multiplies the matrix.
+- Identity / sessions / accounts (the obvious thing every auth library does)
+- Multi-IDP via `socialProviders` (GitHub / Google / Apple / 30+ more)
+- Magic link (`magicLink` plugin) and email OTP (`emailOTP` plugin) with pluggable email sender
+- Role machinery (`admin` plugin, `user.role` field on user table)
+- **OAuth 2.1 provider with DCR (`oauthProvider` plugin)** — full RFC 7591 dynamic client registration, RFC 7662 introspection, RFC 7009 revocation, scope-based access control, custom token claims, consent UI redirect customization
+- **MCP plugin (`mcp`)** — purpose-built on top of the OAuth 2.1 provider for MCP DCR; auto-mounts `.well-known/oauth-authorization-server` + `.well-known/oauth-protected-resource`, exposes `auth.api.getMcpSession()` for protected-resource validation
+- Account linking with policies (verified-email match + reauth requirement)
+
+Better Auth depends on a Kysely / Drizzle / Prisma adapter for the database, not on any Cloudflare-specific service. The auth machinery becomes platform-agnostic — porting to Netlify / Bun / Deno is config-only.
 
 ## Decision
 
-### 1. Better Auth as identity / session / account / role authority
+### 1. Better Auth replaces both layers
 
-Adopt [Better Auth](https://better-auth.com) as the SDK's auth library. It owns:
+Adopt Better Auth as the SDK's full auth surface. It owns:
 
-- `user` / `session` / `account` / `verification` D1 tables (replacing our `users` / `social_logins` / `sessions` / `github_tokens`)
-- Cookie session (replacing `cms_session` with `better-auth.session_token`)
-- Upstream OAuth clients for GitHub, Google, Apple via `socialProviders` (replacing `oauth/githubOAuth.ts`)
-- Magic link plugin (replacing the `email_verifications` / `auth_tokens` table we would otherwise hand-roll)
+- `user` / `session` / `account` / `verification` D1 tables (replaces our `users` / `social_logins` / `sessions` / `github_tokens`)
+- Cookie session (replaces `cms_session` with `better-auth.session_token`)
+- Upstream OAuth clients for GitHub, Google, Apple via `socialProviders` (replaces `oauth/githubOAuth.ts`)
+- Magic link plugin (replaces the `email_verifications` table we would otherwise hand-roll)
 - Email OTP plugin
-- `admin` plugin for role machinery (replacing the `staff` table — `user.role` carries the role string)
+- `admin` plugin for role machinery (replaces the `staff` table — `user.role` carries the role string)
+- **`oauthProvider` (or `mcp`) plugin for DCR-compliant authorization server** (replaces `@cloudflare/workers-oauth-provider`)
 
-Pre-v0.1.0 with no external consumers, the migration is a clean cut-over: drop existing schema, re-emit canonical migrations, replace mount-factory route handlers.
+`@cloudflare/workers-oauth-provider` is removed entirely. The `OAUTH_KV` binding is no longer required. The whole `mantle-cloudflare/src/oauth/` directory disappears (singleton wiring, hand-rolled GitHub OAuth, consent HTML renderer with locale list — Better Auth's consent flow replaces).
+
+The auth runtime stops being an adapter port. `OAuthVerifier` port + `WorkersOAuthVerifier` adapter are deleted. Validating bearer tokens at `/mcp` and `/staff/mcp` becomes `auth.api.getMcpSession(req.raw)` — a direct Better Auth API call, no port indirection.
+
+This makes the runtime more platform-agnostic, not less: Better Auth runs on Workers (D1 via Kysely), Bun (sqlite), Node (postgres) without code changes. Future Netlify / partner adapters get the auth surface for free.
 
 ### 2. `staff` table → `user.role` via Better Auth admin plugin
 
@@ -67,7 +77,7 @@ The manifest grammar predicate `requires.auth.all: [{ "ctx.staff": ["editor"] }]
 
 What we lose: `grantedBy` / `grantedAt` audit trail. v0.1.0 doesn't need this; v0.1.x can re-add via `additionalFields` on user, or via a separate append-only `staff_audit_log` table.
 
-### 3. Two MCP routes, scope-derived
+### 3. Two MCP routes, surface-derived from manifest predicate
 
 `/mcp` and `/staff/mcp` are mounted side-by-side from boot. Surface partition is **automatic**, derived from each Procedure's `requires.auth.all` predicate:
 
@@ -78,82 +88,114 @@ predicate only ctx.user / no predicate → tool exposed on /mcp only
 
 Tool partition rules:
 
-- Per-collection auto-emitted authoring tools (`create_draft_<schema>`, `update_draft_<schema>`) — predicate baked-in to require `ctx.staff: [contributor]`+; route to `/staff/mcp`
+- Per-collection auto-emitted authoring tools (`create_draft_<schema>`, `update_draft_<schema>`) — predicate baked-in to require `ctx.staff: [contributor+]`; route to `/staff/mcp`
 - `list_entries` / `get_entry` / `request_publish` / `archive_entry` / `unpublish_entry` — staff-only (return drafts, mutate state); `/staff/mcp` only
 - `query_view_<name>` (auto-emitted from each parsed View, mirroring the existing `/api/views/<name>` REST shape) — public; `/mcp` only
 - v0.2 community / v0.2.x fan-club user-facing writes (comment, reaction, subscribe, ...) — predicate `ctx.user` or `ctx.user.subscription`; `/mcp`
 
-### 4. Scope-aware DCR consent
+### 4. Scope-aware DCR via Better Auth `oauthProvider`
 
-Single `workers-oauth-provider` mount unchanged at `/oauth/{authorize,token,register}` + `/.well-known/oauth-authorization-server`. The consent UI now examines requested scope:
+Better Auth's `oauthProvider` plugin handles DCR. Configure:
 
-- `mcp:staff` — only staff (admin-role) sessions can approve. Non-staff request returns 403 with `AUTH_DENIED` and an explanation.
-- `mcp:read` — any signed-in user can approve.
-- Mixed request `["mcp:staff", "mcp:read"]` — staff get both; non-staff get only `mcp:read` granted (with notice).
+```ts
+oauthProvider({
+  scopes: ["mcp:staff", "mcp:read"],
+  clientRegistrationDefaultScopes: ["mcp:read"],
+  clientRegistrationAllowedScopes: ["mcp:staff", "mcp:read"],
+  validAudiences: [
+    "https://<worker>/staff/mcp",
+    "https://<worker>/mcp",
+  ],
+  consentPage: "/auth/consent",
+  customAccessTokenClaims: ({ user, scopes }) => ({
+    role: user.role,
+  }),
+})
+```
 
-`workers-oauth-provider` carries scope on the issued token. Each MCP route validates token scope at request time:
+Consent UI semantics:
 
-- `/staff/mcp` requires `mcp:staff` ∈ token.scope
-- `/mcp` requires `mcp:read` ∈ token.scope (`mcp:staff` also accepted as superset)
+- `mcp:staff` requested — only admin-role users can approve. Non-admin sessions see "you need to be staff to grant this scope."
+- `mcp:read` requested — any signed-in user can approve.
+- Mixed `["mcp:staff", "mcp:read"]` — admin-role users grant both; non-admin users grant only `mcp:read` with a notice.
 
-Two protected-resource metadata documents at:
+The consent page (`/auth/consent`) is consumer-rendered; SDK ships a minimal HTML fallback for starters that don't customize.
+
+Each MCP route validates token scope at request time via `auth.api.getMcpSession()`:
+
+- `/staff/mcp` requires `mcp:staff` ∈ session.scopes
+- `/mcp` requires `mcp:read` ∈ session.scopes (`mcp:staff` accepted as superset)
+
+Two RFC 9728 protected-resource metadata documents at:
 
 - `/.well-known/oauth-protected-resource/staff/mcp`
 - `/.well-known/oauth-protected-resource/mcp`
 
-Both reference the same `/.well-known/oauth-authorization-server`. RFC 9728 path-prefix metadata.
+Both reference the same Better Auth authorization server. We mount these via Better Auth's `oAuthProtectedResourceMetadata()` helper called twice with different audience URLs (or hand-roll the JSON if the helper doesn't accept multiple).
 
 ### 5. Role checked dynamically, not embedded in token
 
-Token `props` carry `userId` only. Each MCP request reads `user.role` fresh from Better Auth. Cost: ~1ms D1 lookup per request. Win: a demoted user is locked out immediately, not at token expiry. Same pattern for the consent UI staff gate.
+The token can carry `role` via `customAccessTokenClaims` for caller convenience, but the **MCP route validators always re-read `user.role` fresh** via the session. Cost: ~1ms D1 lookup per request (Better Auth's session cache absorbs most of this). Win: a demoted user is locked out immediately, not at token expiry. Same pattern for the consent UI staff gate.
 
-### 6. workers-oauth-provider stays for DCR; not replaced by Better Auth
+### 6. Single auth surface, no port indirection
 
-Better Auth is an OAuth **client** (consuming GitHub / Google / Apple as upstream IDPs). It is not a DCR-compliant **authorization server** for downstream MCP clients. `workers-oauth-provider` is the right tool for that surface; it's not a duplicated concern.
+Auth is no longer an adapter port. `mantle-runtime` does NOT define an auth port. The runtime accepts a Better Auth instance (or a thin abstraction) directly from the adapter at boot:
 
-The two systems share the user identity (Better Auth `user.id`) — when the consent UI approves an MCP grant, it embeds Better Auth's `user.id` into the OAuth provider's token props. Each MCP request resolves the userId back to a Better Auth user, reads the live role + future fields (subscription tier).
+```ts
+createCmsRuntime({
+  ...,
+  auth: betterAuthInstance,
+})
+```
+
+Adapter packages (`mantle-cloudflare`, future `mantle-netlify`) construct the Better Auth instance with the right database adapter for their platform and pass it in. The runtime calls `auth.api.getSession()` / `auth.api.getMcpSession()` / `auth.api.getUser()` — Better Auth's surface stays the same across adapters.
+
+This is a minor amendment to ADR-0011 (adapter port spec): the auth port disappears, replaced by direct Better Auth dependency. The hard invariant ("`mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved — Better Auth's runtime surface is platform-agnostic.
 
 ## Consequences
 
 ### What gets deleted
 
-- `mantle-cloudflare/src/oauth/githubOAuth.ts` (entire)
-- `mantle-cloudflare/src/bindings/D1UserRepository.ts` (entire — Better Auth owns)
-- `mantle-cloudflare/src/bindings/D1SessionRepository.ts` (entire)
-- `mantle-cloudflare/src/bindings/D1StaffRepository.ts` (entire)
-- `mantle-runtime/src/domain/port/UserRepository.ts` (Better Auth API replaces)
-- `mantle-runtime/src/domain/port/SessionRepository.ts` (Better Auth API replaces)
-- `mantle-runtime/src/domain/port/StaffRepository.ts` (no separate staff layer)
-- `mantle-runtime/src/runtime.ts` `users` / `sessions` / `staff` ports
-- `mountServerEndpoints.ts` `/admin/auth/github` + callback (Better Auth handles), session cookie read/write code, `ensureBootstrapOwner` inline logic (moves to hook)
+- `mantle-cloudflare/src/oauth/` entire directory (`githubOAuth.ts`, `consentHtml.ts`, `oauthSingleton.ts`, `oauthConstants.ts`, `index.ts`)
+- `mantle-cloudflare/src/bindings/D1UserRepository.ts`
+- `mantle-cloudflare/src/bindings/D1SessionRepository.ts`
+- `mantle-cloudflare/src/bindings/D1StaffRepository.ts`
+- `mantle-cloudflare/src/bindings/WorkersOAuthVerifier.ts`
+- `mantle-cloudflare/src/bindings/StubOAuthVerifier.ts`
+- `mantle-runtime/src/domain/port/UserRepository.ts`
+- `mantle-runtime/src/domain/port/SessionRepository.ts`
+- `mantle-runtime/src/domain/port/StaffRepository.ts`
+- `mantle-runtime/src/domain/port/OAuthVerifier.ts`
+- `mantle-runtime/src/runtime.ts` `users` / `sessions` / `staff` / `oauth` ports
+- `mountServerEndpoints.ts` `/admin/auth/github` + callback (Better Auth handles), session cookie read/write code, `ensureBootstrapOwner` inline logic (moves to hook), OAuth consent UI handlers (`/oauth/authorize` GET/POST), OAuth provider passthrough (`/oauth/token`, `/oauth/register`, `.well-known/*`)
 - D1 tables: `users`, `social_logins`, `sessions`, `github_tokens`, `staff`
-- `OAUTH_KV` state-token `oauth_state:` entries (Better Auth does its own state)
+- `OAUTH_KV` binding (no longer required in `wrangler.toml`)
+- `@cloudflare/workers-oauth-provider` dependency
 
 ### What stays
 
-- `workers-oauth-provider` configuration in `oauth/oauthSingleton.ts`
-- `oauth/consentHtml.ts` (consent UI rendering, locale list — handler that mounts it changes)
-- `bindings/WorkersOAuthVerifier.ts` (MCP `/mcp` + `/staff/mcp` bearer validator)
-- `domain/port/OAuthVerifier.ts` (port shape)
-- `mount/mountMcp.ts` — refactored to mount both surfaces
+- `mount/mountMcp.ts` — refactored to mount both `/mcp` + `/staff/mcp`, validates via `auth.api.getMcpSession()`
 - `infrastructure/mcp/McpJsonRpcDispatcher.ts` — refactored to support per-tool surface routing
+- All entries / publish / view machinery (zero auth-related changes)
+- Admin SPA — sign-in view rewritten to redirect to Better Auth route; identity / role queries use Better Auth client
 
 ### What gets added
 
-- Better Auth library + D1 adapter (Kysely-D1 underneath)
-- New `EmailSender` port + `ResendEmailSender` adapter impl (used by Better Auth magic-link / email-OTP plugins)
-- Better Auth's `databaseHooks.user.create.after` for `ensureBootstrapOwner` semantics
-- Two `/.well-known/oauth-protected-resource/*` metadata endpoints (handwritten if `workers-oauth-provider` doesn't natively support multiple)
+- Better Auth library + Kysely + `kysely-d1` packages (or whichever D1 adapter Better Auth recommends current)
+- Better Auth instance at `mantle-cloudflare/src/auth.ts` (factory taking env / D1 binding)
+- New `EmailSender` port + `ResendEmailSender` adapter impl (used by Better Auth `magicLink` / `emailOTP` plugins)
+- `databaseHooks.user.create.after` for `ensureBootstrapOwner` semantics
+- Two `/.well-known/oauth-protected-resource/*` metadata endpoints (Better Auth helpers)
 - Manifest grammar tools: dispatcher reads `Procedure.requires.auth.all` to route tools to `/mcp` or `/staff/mcp`
 - Skills + docs updates for the dual MCP URL handoff
 
 ### Backward compatibility
 
-None. Pre-v0.1.0 has no external consumers. Existing demo deployments (if any) are torn down and re-bootstrapped from the npm packages of the migrated `0.0.x-alpha` release.
+None. Pre-v0.1.0 has no external consumers. Existing demo deployments tear down + re-bootstrap from the migrated `0.0.x-alpha` release.
 
 ### Skills + prompts
 
-`docs/prompts/publication.{en,zh-TW}.md` reference `<worker_url>/staff/mcp` for staff-targeted MCP handoff. `skills/install/SKILL.md` and `skills/provision/SKILL.md` document the dual handoff. The provision Skill's final report distinguishes:
+`docs/prompts/publication.{en,zh-TW}.md` reference `<worker_url>/staff/mcp` for staff-targeted MCP handoff. `skills/install/SKILL.md` and `skills/provision/SKILL.md` document the dual handoff. Provision Skill's final report distinguishes:
 
 ```
 Public site:    https://<worker>.workers.dev/
@@ -174,53 +216,66 @@ The end-user MCP via DCR + role-gated content (community / fan-club) requires no
 
 No config flag flips, no surface migration. The dispatcher partition rule (predicate → surface) handles new tool emission automatically.
 
+### Platform agnosticism
+
+By removing `@cloudflare/workers-oauth-provider` and routing auth through Better Auth, the SDK no longer depends on any CF-specific auth service. A future Netlify adapter constructs a Better Auth instance backed by a Netlify-compatible D1 / postgres / sqlite database; the rest of the runtime + dispatcher + skills + prompts work unchanged. ADR-0011 (adapter port spec) is amended: the `OAuthVerifier` port disappears; auth becomes a direct constructor argument with platform-agnostic Better Auth as the type.
+
 ## Alternatives considered
 
 ### Alt-A: Hand-rolled multi-IDP without a library
 
-Continue the existing `oauth/githubOAuth.ts` pattern, write `googleOAuth.ts` and `appleOAuth.ts`, wire account-linking by hand.
+Continue the existing `oauth/githubOAuth.ts` pattern, write `googleOAuth.ts` and `appleOAuth.ts`, wire account-linking by hand, keep `workers-oauth-provider` for DCR.
 
 **Rejected** — Apple Sign In's JWT-signed client secret rotation (every 6 months) is non-trivial; account-linking with reauth flow has security pitfalls; magic-link / email-OTP adds 200+ LOC of token storage + send + verify per flow. Total scope is ~1500 LOC of auth code for v0.2. Better Auth covers this with config + plugins.
 
-### Alt-B: arctic library only (OAuth client, BYO session)
+### Alt-B: arctic library for upstream IDPs, keep `workers-oauth-provider` for DCR
 
-Use [arctic](https://arcticjs.dev) for upstream IDP clients, keep our existing `users` / `social_logins` / `sessions` / `staff` schema, hand-roll session management + account linking + magic link.
+Use [arctic](https://arcticjs.dev) for upstream IDP clients, keep our existing `users` / `social_logins` / `sessions` / `staff` schema, hand-roll session management + account linking + magic link, retain `workers-oauth-provider`.
 
-**Rejected** — arctic only solves the OAuth client step (~150 LOC saved). Session management, role machinery, account linking with reauth, magic-link plugin — all still hand-rolled. Compared to Better Auth (which solves all of these with a config), arctic forces more glue code.
+**Rejected** — arctic only solves the OAuth client step (~150 LOC saved). Session management, role machinery, account linking with reauth, magic-link plugin — all still hand-rolled. `workers-oauth-provider` retained means we still glue two systems. Compared to Better Auth (which absorbs all of these into one), arctic forces more glue code AND keeps the platform coupling.
 
-### Alt-C: Single `/mcp` with role + scope flags
+### Alt-C: Better Auth for upstream IDPs, keep `workers-oauth-provider` for DCR
+
+Adopt Better Auth as identity / session / role authority. Keep `workers-oauth-provider` because it's a known-good DCR implementation.
+
+**Rejected as of 2026-05-09** — initial draft of this ADR took this position. Web research showed Better Auth's `oauthProvider` and `mcp` plugins cover the DCR concern with full RFC 7591 / 7662 / 7009 / 9728 compliance. Keeping `workers-oauth-provider` would mean two systems sharing user identity but with different cookie / token / session caches — operationally messier than a single auth surface. The platform-agnosticism win (no CF-specific auth lib) tips the balance.
+
+### Alt-D: Single `/mcp` with role + scope flags
 
 Keep one MCP route. Gate with config flags: `mcpRequiresStaff`, `mcpAllowEndUser`, scope checks per tool.
 
 **Rejected** — flag combinatorics explode as we add subscription tiers + per-collection visibility. Two routes derived from manifest predicate eliminates the flag matrix entirely; the rule is reviewable as a single sentence.
 
-### Alt-D: Two separate `workers-oauth-provider` instances
+### Alt-E: Two separate Better Auth `oauthProvider` instances
 
 One DCR provider for staff MCP, one for end-user MCP.
 
-**Rejected** — two consent UIs, two `OAUTH_KV` namespaces, double the configuration burden, no real benefit. Single auth server with scope-based gating achieves the same separation cleanly per the OAuth spec.
+**Rejected** — two consent UIs, two token tables, double the configuration burden, no real benefit. Single auth server with scope-based gating achieves the same separation cleanly per the OAuth spec.
 
-### Alt-E: `staff` table preserved alongside Better Auth user table
+### Alt-F: `staff` table preserved alongside Better Auth user table
 
 Keep our `staff` overlay and `D1StaffRepository`. Use Better Auth only for identity / session / account, route role machinery through staff overlay.
 
-**Rejected** — duplicate role data (Better Auth's `admin` plugin + our staff overlay) is worse than picking one. Audit trail is the only thing the standalone overlay buys, and v0.1.0 doesn't need it.
+**Rejected** — duplicate role data (Better Auth `admin` plugin + our staff overlay) is worse than picking one. Audit trail is the only thing the standalone overlay buys, and v0.1.0 doesn't need it.
 
 ## Implementation status
 
 Phase 0 (spike, 0.5–1d) — pending:
 
-- Confirm Better Auth + `admin` plugin operational on D1 in Workers
-- Confirm `workers-oauth-provider` 0.4.x supports two protected-resource metadata documents (or hand-roll)
+- Confirm Better Auth + `admin` plugin + `oauthProvider` (or `mcp`) plugin operational on D1 in Workers
+- Confirm Better Auth's auto-mounted `.well-known/oauth-authorization-server` is reachable
+- Confirm two `.well-known/oauth-protected-resource/*` metadata documents serve correctly (helper or hand-roll)
 - Confirm DCR clients (Claude Code, Cursor) follow RFC 9728 path-prefix metadata
-- Confirm `auth.api.getSession(req)` works inside the OAuth consent UI handler
-- Bundle size delta on the worker (Better Auth bundles ~50–100 KB)
+- Confirm `auth.api.getMcpSession()` validates bearer tokens at the protected-resource path
+- Confirm `auth.api.getSession()` works inside consumer routes
+- Bundle size delta on the worker
 
 Phase 1 (migration, ~2d) — pending Phase 0:
 
 - Better Auth integration (publication starter + mantle-cloudflare adapter)
-- Schema cut-over (canonical migrations rewrite)
-- Drop hand-rolled OAuth machinery
+- Schema cut-over (canonical migrations rewrite, drop legacy auth tables, add Better Auth tables)
+- Drop `oauth/` directory, all auth ports, `WorkersOAuthVerifier`, `StubOAuthVerifier`
+- Drop `@cloudflare/workers-oauth-provider` dep + `OAUTH_KV` binding
 - Mount factories rewrite (`mountServerEndpoints` for admin gate, `mountMcp` for dual-route)
 - Dispatcher refactor (per-tool surface routing from manifest predicate)
 - Tests update (`mcp-smoke` → `staff-mcp-smoke` + new `public-mcp-smoke`)
@@ -230,7 +285,7 @@ Phase 1 (migration, ~2d) — pending Phase 0:
 Phase 2 (v0.1.x):
 
 - Enable Google + Apple `socialProviders` (config-only — Apple needs Apple Developer cert setup which is consumer-side)
-- Magic-link + email-OTP plugins enabled (need ResendEmailSender wired)
+- Magic-link + email-OTP plugins enabled (need `ResendEmailSender` wired)
 - Account-linking with reauth UI in publication starter
 
 Phase 3 (v0.2+, with community / fan-club):
@@ -245,8 +300,18 @@ Phase 3 (v0.2+, with community / fan-club):
 When reviewing or implementing a change that touches auth, MCP routing, or roles:
 
 1. **Identity / session / account state** — Better Auth API. Don't hand-write D1 reads against `user` / `session` / `account`. Use `auth.api.*`.
-2. **Role check** — read `session.user.role` (from `auth.api.getSession()`) or `user.role` (from `auth.api.getUser({ userId })`). Don't query a `staff` table; it doesn't exist.
+2. **Role check** — read `session.user.role` (from `auth.api.getSession()` or `auth.api.getMcpSession()`). Don't query a `staff` table; it doesn't exist.
 3. **MCP tool routing** — let the dispatcher derive surface from `Procedure.requires.auth.all`. Don't add a per-tool `surface: 'staff' | 'public'` field; the predicate is the source of truth.
-4. **DCR consent gating** — scope-based. `mcp:staff` requires admin role; `mcp:read` accepts any signed-in user. Don't add a separate consent path or config flag.
-5. **Token props** — `userId` only. Don't embed `role`. Read role fresh per request.
+4. **DCR consent gating** — scope-based via Better Auth `oauthProvider` config. `mcp:staff` requires admin role; `mcp:read` accepts any signed-in user. Don't add a separate consent path or config flag.
+5. **Token props** — minimal. If you need role in the token payload for caller convenience, add via `customAccessTokenClaims`, but always re-validate fresh on the server side.
 6. **Email** — call `EmailSender` port. CF adapter binds Resend; consumer can swap.
+7. **Adapter portability** — the auth surface is platform-agnostic. A new adapter (Netlify / Bun / Deno) constructs Better Auth with its preferred DB adapter and passes the instance to the runtime. No port re-implementation needed.
+
+## Sources
+
+- [Better Auth MCP plugin docs](https://better-auth.com/docs/plugins/mcp)
+- [Better Auth OAuth 2.1 Provider plugin docs](https://better-auth.com/docs/plugins/oauth-provider)
+- [Better Auth admin plugin docs](https://better-auth.com/docs/plugins/admin)
+- [Better Auth changelog (1.5+)](https://better-auth.com/blog/1-5)
+- [RFC 7591 — Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)
+- [RFC 9728 — Protected Resource Metadata](https://datatracker.ietf.org/doc/html/rfc9728)
