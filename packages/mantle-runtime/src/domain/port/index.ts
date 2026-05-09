@@ -5,9 +5,9 @@
  *
  * ADR-0011 required adapter ports — `DatabaseDriver`, `KvCache`,
  * `SessionRepository`, `AssetServer`, `OAuthVerifier`,
- * `UserRepository`, `StaffRepository` — plus optional feature ports
- * and dispatcher-internal seams (`Clock`, `IdGenerator`,
- * `HandlerRegistry`, `EntryRepository`, etc.).
+ * `UserRepository`, `StaffRepository`. Optional feature ports —
+ * `MediaStorage` (public-bucket media uploads). Dispatcher-internal
+ * seams — `Clock`, `IdGenerator`, `HandlerRegistry`, `EntryRepository`.
  *
  * Per the Aotter clean-architecture convention, no `*Port` suffix;
  * ports are discoverable by the package alone.

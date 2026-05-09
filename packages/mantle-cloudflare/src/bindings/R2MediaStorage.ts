@@ -24,10 +24,10 @@ import {
  * exposing other origins.
  *
  * Two access modes — both required:
- *   - `bucket` (`R2Bucket` binding) — server-side `head` / `get` /
- *     `put` / `delete`. Used at commit-time to verify the uploaded
- *     object's metadata before stamping `committedAt`, and to clean
- *     up failed uploads.
+ *   - `bucket` (`R2Bucket` binding) — server-side `get` / `put` /
+ *     `delete`. Used at commit-time to read uploaded-object metadata
+ *     and rewrite it with `committedAt`, and to clean up failed
+ *     uploads.
  *   - `s3` (`AwsClient` from `aws4fetch`) — SigV4 presigned PUT URL
  *     generation. The R2 binding cannot issue presigned URLs.
  *
@@ -95,8 +95,8 @@ export class R2MediaStorage implements MediaStorage {
     // forces clients to send EXACTLY that header — browsers will
     // strip mismatches and produce 403s. Pinning Content-Length is
     // pointless because it's a forbidden header. The signature
-    // already constrains key + method + expiry; the rest is
-    // verified at commit-time via `bucket.head`.
+    // already constrains key + method + expiry; mime + size + etag
+    // are re-verified at commit-time via `bucket.get`.
     const target = new URL(`${this.s3Endpoint.replace(/\/+$/, "")}/${storageKey}`);
     target.searchParams.set("X-Amz-Expires", String(ttlSeconds));
     const signed = await this.s3.sign(target.toString(), {

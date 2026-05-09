@@ -250,7 +250,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
         }),
       });
     }
-    return await runUseCase(() =>
+    return await runUseCase("POST /admin/api/media/uploads", () =>
       runtime.media!.createUpload.execute({
         filename: body.filename as string,
         mimeType: body.mimeType as string,
@@ -280,7 +280,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       caption?: unknown;
       checksum?: unknown;
     };
-    return await runUseCase(() =>
+    return await runUseCase("POST /admin/api/media/uploads/:id/commit", () =>
       runtime.media!.commitUpload.execute({
         uploadId,
         alt: typeof body.alt === "string" ? body.alt : undefined,
@@ -711,7 +711,7 @@ function jsonResponse(status: number, body: unknown): Response {
   });
 }
 
-async function runUseCase<T>(fn: () => Promise<T>): Promise<Response> {
+async function runUseCase<T>(opPath: string, fn: () => Promise<T>): Promise<Response> {
   try {
     const result = await fn();
     return jsonResponse(200, result);
@@ -720,13 +720,18 @@ async function runUseCase<T>(fn: () => Promise<T>): Promise<Response> {
       const status = HTTP_STATUS_BY_CODE[e.diagnostic.code] ?? 500;
       return jsonResponse(status, { ok: false, diagnostic: redactForWire(e.diagnostic) });
     }
+    // Don't leak raw exception strings on the wire — R2 / D1 / aws4fetch
+    // errors can carry bucket names, account IDs, or query fragments.
+    // Server-side log captures the real error; the wire envelope stays
+    // structured + opaque.
+    console.error(`[runUseCase ${opPath}] unhandled error`, e);
     return jsonResponse(500, {
       ok: false,
       diagnostic: runtimeDiagnostic({
         code: "INTERNAL_ERROR",
         severity: "error",
-        path: "media",
-        message: (e as Error).message,
+        path: opPath,
+        message: "An internal error occurred.",
       }),
     });
   }

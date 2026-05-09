@@ -160,7 +160,11 @@ export class McpJsonRpcDispatcher {
       if (e instanceof DiagnosticError) {
         return jsonRpcError(reqId, -32000, e.diagnostic.message, redactForWire(e.diagnostic));
       }
-      return jsonRpcError(reqId, -32000, (e as Error).message);
+      // Don't leak raw exception strings to MCP clients — adapter
+      // exceptions can carry binding / driver detail. Real cause goes
+      // to server-side logs; the wire stays opaque.
+      console.error("[McpJsonRpcDispatcher] unhandled tool-call error", e);
+      return jsonRpcError(reqId, -32000, "Internal error.");
     }
   }
 
@@ -288,8 +292,4 @@ function stripReservedArgs(args: Record<string, unknown>): Record<string, unknow
     out[k] = v;
   }
   return out;
-}
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
