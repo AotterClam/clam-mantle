@@ -14,7 +14,7 @@ Records of *why* mantle ended up shaped this way. The numbering preserves POC AD
 | [0010](0010-locale-and-translates.md) | Locale 3-layer (manifest / D1 site_config / data field) + translates pattern. Boot decoupled from `site_config` (issue #60 fix). | Accepted (refreshed) |
 | [0011](0011-adapter-port-spec.md) | Adapter port spec. Required runtime ports plus optional feature ports. CF impl + Netlify stub. | Accepted (new) |
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
-| [0013](0013-media-fields-and-optional-storage.md) | Media fields use URL-first semantics; first-party storage (R2 on Cloudflare) is optional and must not block first-run onboarding. | Accepted (new) |
+| [0013](0013-agent-provisioned-consumer-projects.md) | Agent-provisioned consumer projects: website prompt → Skill → npm packages → starter setup → first-run provision/seed → owner/MCP handoff. | Accepted (new) |
 
 ## Reading order
 
@@ -25,12 +25,13 @@ If you're new to the codebase:
 3. **0007** — what running the SDK feels like as an AI author (and as the operator agent).
 4. **0011** — the boundary between the runtime and the adapter (most load-bearing for the rebuild).
 5. **0010** — how locale flows through the system.
-6. **0013** — why media starts as URL fields and R2 stays opt-in.
+6. **0013** — how the website prompt, Skills, npm packages, starters, seed, provision, and handoff fit together.
 7. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
 
 ## What's NOT here (and why)
 
-POC had 16 ADRs. The rebuild ports 6, writes 1 fresh, and folds / drops the rest:
+POC had 16 ADRs. The rebuild ports the durable ones, writes fresh ADRs
+for new v0.1.0 boundaries, and folds / drops the rest:
 
 - **POC ADR-0003** OpenAPI emission → folded into `mantle-spec` README (the *what* is implementation; the *why* was already captured by ADR-0001's grammar lock).
 - **POC ADR-0004** D1 today, Hyperdrive PG tomorrow → folded into `mantle-cloudflare` README (now a v0.2 roadmap item, not an architectural decision).
@@ -43,7 +44,7 @@ POC had 16 ADRs. The rebuild ports 6, writes 1 fresh, and folds / drops the rest
 - **POC ADR-0015** cms-astro internal seam discipline → POC-specific to a package that no longer exists; replaced by ADR-0011 (adapter port spec).
 - **POC ADR-0029** drop Astro from cms-cloudflare → POC-specific historical record; the rebuild starts post-Astro.
 
-The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accumulated multiple *aspirational* boundaries (POC ADR-0015 was one; references in CLAUDE.md were another) without a single normative spec. ADR-0011 makes the boundary explicit and reviewable.
+The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accumulated multiple *aspirational* boundaries (POC ADR-0015 was one; references in CLAUDE.md were another) without a single normative spec. ADR-0011 makes the boundary explicit and reviewable. ADR-0012 and ADR-0013 capture newer v0.1.0 product/runtime seams that were not present in the POC.
 
 ## Contributing a new ADR
 

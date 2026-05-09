@@ -265,8 +265,7 @@ coverUrl:
 conventional values are exported as `MCP_HINTS` / `MEDIA_MCP_HINTS`.
 MCP tool schemas preserve the hint for agents. Admin surfaces expose
 media-shaped fields but first-party upload hosting is optional and not
-part of first-run provisioning. ADR-0013 records the URL-first media
-decision.
+part of first-run provisioning.
 
 ---
 

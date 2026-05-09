@@ -44,9 +44,7 @@ For v0.1.x media hosting:
 
 These optional ports must not force first-run provisioning to create R2
 resources. Publication starters can carry external image URLs without a
-media storage implementation. See
-[ADR-0013](0013-media-fields-and-optional-storage.md) for the media
-field/storage split.
+media storage implementation.
 
 ### `DatabasePort`
 
@@ -203,9 +201,10 @@ When you're reviewing a PR:
 
 ## Implementation status
 
-- [ ] Port interface files: `mantle-runtime/src/domain/port/*.ts`
-- [ ] Port impls: `mantle-cloudflare/src/bindings/*.ts` plus optional feature impls when a starter enables them
-- [ ] Netlify stub README references this ADR (already done in commit 1)
+- [x] Required port interface files live in `packages/mantle-runtime/src/domain/port/*.ts`.
+- [x] Cloudflare required port implementations live in `packages/mantle-cloudflare/src/bindings/*.ts`.
+- [x] Optional feature ports (`MediaStorage`, `RemoteMediaFetcher`) are declared but not required by first-run adapters.
+- [x] Netlify stub README references this ADR.
 - [ ] CI lint: forbid `@cloudflare/*` / `D1Database` / `KVNamespace` imports in `mantle-runtime/` (post-v0.1.0; manual review until then)
 
 ## See also
