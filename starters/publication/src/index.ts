@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import type { Entry } from "@aotter/mantle-spec";
 import {
+  createAuth,
   createCmsRef,
   mountMcp,
   mountPublicRoutes,
   mountServerEndpoints,
+  type Auth,
+  type CreateAuthConfig,
   type PublicRouteContext,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
@@ -31,11 +34,55 @@ import {
  */
 let appCache: Hono | null = null;
 
+const AUTH_NOT_CONFIGURED = {
+  error: "auth_not_configured",
+  message:
+    "Better Auth requires BETTER_AUTH_SECRET. Run `wrangler secret put BETTER_AUTH_SECRET` and redeploy.",
+} as const;
+
+function buildAuthFromEnv(env: Env): Auth | null {
+  if (!env.BETTER_AUTH_SECRET) return null;
+  const baseURL = env.PUBLIC_ORIGIN ?? "http://localhost:8787";
+  const github: CreateAuthConfig["github"] =
+    env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? {
+          clientId: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          // The existing GitHub OAuth App is registered with the
+          // legacy callback URL — keep it pointed there until the OAuth
+          // App config is updated, then delete this override + the
+          // translator route below.
+          redirectURI: `${baseURL}/admin/auth/github/callback`,
+        }
+      : undefined;
+  return createAuth({
+    database: env.DB,
+    baseURL,
+    secret: env.BETTER_AUTH_SECRET,
+    github,
+    adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+  });
+}
+
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
-  const config = buildCmsConfig(env);
+  const auth = buildAuthFromEnv(env);
+  const config = buildCmsConfig(env, auth ?? undefined);
   const cms = createCmsRef(config);
   const app = new Hono();
+
+  if (auth) {
+    app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+    app.get("/admin/auth/github/callback", (c) => {
+      const url = new URL(c.req.url);
+      url.pathname = "/api/auth/callback/github";
+      return auth.handler(
+        new Request(url.toString(), { method: "GET", headers: c.req.raw.headers }),
+      );
+    });
+  } else {
+    app.all("/api/auth/*", (c) => c.json(AUTH_NOT_CONFIGURED, 503));
+  }
 
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);

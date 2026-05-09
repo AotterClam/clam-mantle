@@ -2,17 +2,17 @@ import type { Migration } from "../../domain/port/DatabaseDriver.js";
 
 /**
  * Canonical migration list — the runtime owns the schema; adapters
- * just execute. Order is the array index. Migration `id` strings are
- * stable forever — never reused, never renamed; the `_migrations`
- * tracking table records them so subsequent boots are idempotent.
- *
- * Keep this list append-only. To change a table's shape, ship a new
- * `ALTER TABLE` migration with a new id.
+ * just execute. `id` strings are stable forever; the `_migrations`
+ * tracking table makes subsequent boots idempotent. Append-only from
+ * v0.1.0 onwards.
  */
 export const CANONICAL_MIGRATIONS: readonly Migration[] = [
   {
     id: "0001-init",
-    description: "initial v0.1.0 schema: entries, revisions, approvals, users, staff, sessions, site_config",
+    description:
+      "v0.1.0 schema: entries / revisions / approvals / site_config + Better Auth tables (ADR-0014)",
+    // SQLite: Better Auth serializes Date → ISO 8601 string and
+    // boolean → 0/1, so date columns are TEXT and booleans INTEGER.
     sql: `
       CREATE TABLE IF NOT EXISTS entries (
         id          TEXT PRIMARY KEY,
@@ -54,51 +54,111 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS approvals_by_entry
         ON approvals (entry_id);
 
-      CREATE TABLE IF NOT EXISTS users (
-        id         TEXT PRIMARY KEY,
-        email      TEXT,
-        name       TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS social_logins (
-        user_id      TEXT NOT NULL,
-        provider     TEXT NOT NULL,
-        provider_uid TEXT NOT NULL,
-        login        TEXT,
-        updated_at   INTEGER NOT NULL,
-        PRIMARY KEY (user_id, provider),
-        UNIQUE (provider, provider_uid)
-      );
-
-      CREATE TABLE IF NOT EXISTS github_tokens (
-        user_id      TEXT PRIMARY KEY,
-        access_token TEXT NOT NULL,
-        scope        TEXT NOT NULL,
-        updated_at   INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS staff (
-        user_id     TEXT PRIMARY KEY,
-        role        TEXT NOT NULL,
-        granted_by  TEXT,
-        granted_at  INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        token       TEXT PRIMARY KEY,
-        user_id     TEXT NOT NULL,
-        created_at  INTEGER NOT NULL,
-        expires_at  INTEGER NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS sessions_by_user
-        ON sessions (user_id);
-
       CREATE TABLE IF NOT EXISTS site_config (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS user (
+        id            TEXT PRIMARY KEY NOT NULL,
+        name          TEXT NOT NULL,
+        email         TEXT NOT NULL UNIQUE,
+        emailVerified INTEGER NOT NULL DEFAULT 0,
+        image         TEXT,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL,
+        role          TEXT,
+        banned        INTEGER DEFAULT 0,
+        banReason     TEXT,
+        banExpires    TEXT,
+        githubLogin   TEXT
+      );
+      -- Partial index keeps ensureBootstrapOwner's role-IN scan off
+      -- the pile of role=NULL rows.
+      CREATE INDEX IF NOT EXISTS user_role_idx ON user (role) WHERE role IS NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS session (
+        id             TEXT PRIMARY KEY NOT NULL,
+        expiresAt      TEXT NOT NULL,
+        token          TEXT NOT NULL UNIQUE,
+        createdAt      TEXT NOT NULL,
+        updatedAt      TEXT NOT NULL,
+        ipAddress      TEXT,
+        userAgent      TEXT,
+        userId         TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        impersonatedBy TEXT
+      );
+      CREATE INDEX IF NOT EXISTS session_userId_idx ON session (userId);
+
+      CREATE TABLE IF NOT EXISTS account (
+        id                       TEXT PRIMARY KEY NOT NULL,
+        accountId                TEXT NOT NULL,
+        providerId               TEXT NOT NULL,
+        userId                   TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        accessToken              TEXT,
+        refreshToken             TEXT,
+        idToken                  TEXT,
+        accessTokenExpiresAt     TEXT,
+        refreshTokenExpiresAt    TEXT,
+        scope                    TEXT,
+        password                 TEXT,
+        createdAt                TEXT NOT NULL,
+        updatedAt                TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS account_userId_idx ON account (userId);
+
+      CREATE TABLE IF NOT EXISTS verification (
+        id         TEXT PRIMARY KEY NOT NULL,
+        identifier TEXT NOT NULL,
+        value      TEXT NOT NULL,
+        expiresAt  TEXT NOT NULL,
+        createdAt  TEXT NOT NULL,
+        updatedAt  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS verification_identifier_idx ON verification (identifier);
+
+      CREATE TABLE IF NOT EXISTS oauthApplication (
+        id            TEXT PRIMARY KEY NOT NULL,
+        name          TEXT NOT NULL,
+        icon          TEXT,
+        metadata      TEXT,
+        clientId      TEXT NOT NULL UNIQUE,
+        clientSecret  TEXT,
+        redirectUrls  TEXT NOT NULL,
+        type          TEXT NOT NULL,
+        disabled      INTEGER DEFAULT 0,
+        userId        TEXT REFERENCES user(id) ON DELETE CASCADE,
+        createdAt     TEXT NOT NULL,
+        updatedAt     TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS oauthApplication_userId_idx ON oauthApplication (userId);
+
+      CREATE TABLE IF NOT EXISTS oauthAccessToken (
+        id                     TEXT PRIMARY KEY NOT NULL,
+        accessToken            TEXT NOT NULL UNIQUE,
+        refreshToken           TEXT NOT NULL UNIQUE,
+        accessTokenExpiresAt   TEXT NOT NULL,
+        refreshTokenExpiresAt  TEXT NOT NULL,
+        clientId               TEXT NOT NULL REFERENCES oauthApplication(clientId) ON DELETE CASCADE,
+        userId                 TEXT REFERENCES user(id) ON DELETE CASCADE,
+        scopes                 TEXT NOT NULL,
+        createdAt              TEXT NOT NULL,
+        updatedAt              TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS oauthAccessToken_clientId_idx ON oauthAccessToken (clientId);
+      CREATE INDEX IF NOT EXISTS oauthAccessToken_userId_idx ON oauthAccessToken (userId);
+
+      CREATE TABLE IF NOT EXISTS oauthConsent (
+        id           TEXT PRIMARY KEY NOT NULL,
+        clientId     TEXT NOT NULL REFERENCES oauthApplication(clientId) ON DELETE CASCADE,
+        userId       TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+        scopes       TEXT NOT NULL,
+        createdAt    TEXT NOT NULL,
+        updatedAt    TEXT NOT NULL,
+        consentGiven INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS oauthConsent_clientId_idx ON oauthConsent (clientId);
+      CREATE INDEX IF NOT EXISTS oauthConsent_userId_idx ON oauthConsent (userId);
     `,
   },
 ];

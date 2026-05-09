@@ -25,9 +25,9 @@
     "theme:reset": "node scripts/theme-reset.mjs"
   },
   "dependencies": {
-    "@aotter/mantle-spec": "workspace:*",
-    "@aotter/mantle-runtime": "workspace:*",
     "@aotter/mantle-cloudflare": "workspace:*",
+    "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-spec": "workspace:*",
     "hono": "^4.6.20",
     "marked": "^14.1.3",
     "yaml": "^2.6.1"

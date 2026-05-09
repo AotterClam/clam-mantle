@@ -27,7 +27,10 @@
       "import": "./dist/cf.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "prebuild": "rm -rf dist .tsbuildinfo",
     "build": "tsc -b tsconfig.lib.json",
@@ -36,9 +39,10 @@
   },
   "dependencies": {
     "@aotter/mantle-admin-ui": "workspace:*",
-    "@aotter/mantle-spec": "workspace:*",
     "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-spec": "workspace:*",
     "@cloudflare/workers-oauth-provider": "^0.4.0",
+    "better-auth": "^1.6.9",
     "hono": "^4.6.20"
   },
   "devDependencies": {

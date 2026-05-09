@@ -6,6 +6,7 @@ import type {
 } from "@aotter/mantle-runtime";
 import type { OAuthProvider } from "@cloudflare/workers-oauth-provider";
 import type { Manifest, SiteDefaults } from "@aotter/mantle-spec";
+import type { Auth } from "../auth/createAuth.js";
 
 /**
  * GitHub OAuth config for the admin sign-in flow and OAuth consent UI.
@@ -62,9 +63,8 @@ export interface CmsConfig {
     CreateCmsRuntimeArgs,
     "db" | "kv" | "sessions" | "assets" | "oauth" | "users" | "staff"
   >;
-  /** Optional. Supply to enable GitHub admin auth + OAuth consent UI +
-   *  DCR endpoints. Without this, the `/admin/auth/*` and `/oauth/*`
-   *  routes are not registered and the MCP endpoint requires a
-   *  `StubOAuthVerifier`-compatible bearer token. */
+  /** @deprecated Superseded by `auth` (ADR-0014). */
   readonly adminAuth?: AdminAuthConfig;
+  /** Better Auth instance — see `createAuth(...)`. */
+  readonly auth?: Auth;
 }
