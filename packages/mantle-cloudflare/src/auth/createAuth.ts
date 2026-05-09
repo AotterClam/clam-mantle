@@ -86,6 +86,21 @@ function buildAuth(config: CreateAuthConfig) {
       }),
       mcp({
         loginPage: "/admin/sign-in",
+        oidcConfig: {
+          loginPage: "/admin/sign-in",
+          scopes: ["mcp:read", "mcp:staff"],
+          defaultScope: "openid profile email mcp:read",
+          metadata: {
+            scopes_supported: [
+              "openid",
+              "profile",
+              "email",
+              "offline_access",
+              "mcp:read",
+              "mcp:staff",
+            ],
+          },
+        },
       }),
     ],
     databaseHooks: {
@@ -152,8 +167,17 @@ export function createAuth(config: CreateAuthConfig): Auth {
     handler: (request) => auth.handler(request),
     getSession: (request) =>
       api.getSession({ headers: request.headers }).then((r: unknown) => r ?? null),
-    getMcpSession: (request) =>
-      api.getMcpSession({ headers: request.headers }).then((r: unknown) => r ?? null),
+    getMcpSession: async (request) => {
+      const r = await api.getMcpSession({ headers: request.headers });
+      if (!r) return null;
+      const raw = r as { userId: string; scopes: string[] | string; clientId: string };
+      return {
+        ...raw,
+        scopes: Array.isArray(raw.scopes)
+          ? raw.scopes
+          : raw.scopes.split(/\s+/).filter(Boolean),
+      };
+    },
     getUserRole: async (userId) => {
       const row = await config.database
         .prepare("SELECT role FROM user WHERE id = ? LIMIT 1")

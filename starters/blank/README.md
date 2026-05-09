@@ -13,7 +13,8 @@ instead.
 ```
 GET  /api/views/<name>            view REST per View atom
 METHOD <trigger path>             manifest-declared HTTP Trigger routes
-ALL  /mcp                         MCP JSON-RPC dispatcher
+ALL  /staff/mcp                   Staff MCP JSON-RPC dispatcher
+ALL  /mcp                         User/read MCP JSON-RPC dispatcher
 ```
 
 No public read routes (`/{locale}/...`, `/sitemap.xml`, `.md` mirrors,
@@ -23,12 +24,12 @@ No public read routes (`/{locale}/...`, `/sitemap.xml`, `.md` mirrors,
 ### Auth
 
 MCP requests must carry a verified bearer token. The runtime's
-`OAuthVerifier` port (`StubOAuthVerifier` for dev,
-`MANTLE_ALLOW_STUB_OAUTH=1` env-gated) does the verification — there is
-no `/oauth/{authorize,token,register}` route mount in v0.1.0. A real
-OAuth 2.1 / DCR endpoint mount via `@cloudflare/workers-oauth-provider`
-is a v0.1.x follow-up; until it lands, MCP clients need an
-out-of-band token.
+Cloudflare adapter now uses Better Auth for browser sign-in and MCP
+OAuth/DCR. `publication` wires the production-ready dual MCP surface
+(`/staff/mcp` for staff authoring, `/mcp` for end-user/read tools).
+`blank` wires the same Better Auth factory and dual mounts, but ships
+no public HTML. Add your own frontend and policy surface before
+claiming a custom production workflow.
 
 ## Layout
 

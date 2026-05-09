@@ -63,7 +63,16 @@ function getApp(env: Env): Hono {
   });
 
   mountServerEndpoints(app, cms);
-  mountMcp(app, cms);
+  mountMcp(app, cms, {
+    path: "/staff/mcp",
+    surface: "staff",
+    requiredScope: "mcp:staff",
+  });
+  mountMcp(app, cms, {
+    path: "/mcp",
+    surface: "public",
+    requiredScope: "mcp:read",
+  });
   mountPublicRoutes(app, cms, {
     collectionRoutes: [
       { collection: "post-translations", segment: "posts", listRoute: true },
