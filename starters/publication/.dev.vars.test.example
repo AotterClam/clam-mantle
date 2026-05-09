@@ -1,22 +1,26 @@
 # Test profile env vars — loaded by `wrangler dev --env test`.
 #
 # Copy to `.dev.vars.test` (gitignored) before running
-# `pnpm test:integration`. The test profile uses StubOAuthVerifier
-# (no real GitHub round-trip), and integration smokes authenticate via
-# `Authorization: Bearer dev-<user_id>` so no real OAuth client is
-# needed.
+# `pnpm test:integration`. Integration smokes authenticate via a
+# fixture-minted Better Auth MCP access token (apply-shared.ts seeds
+# `oauthApplication` + `oauthAccessToken` rows pointed at the test
+# editor when `seedStaffEditor=true`); no real GitHub OAuth round-trip
+# fires during smoke.
 
-CLAM_ALLOW_STUB_OAUTH=1
 TURNSTILE_SECRET_KEY=dev-stub
 CLAM_LOCAL_DEV=1
 
-# Used by ensureBootstrapOwner when a real OAuth flow is exercised.
-# Tests don't OAuth-login, so this can be any string — but it must be
-# present so the runtime doesn't blow up reading the env var.
+# Better Auth signing secret. Any value works for tests — sessions /
+# bearers are pre-minted in fixture SQL, not signed at runtime.
+BETTER_AUTH_SECRET=test-stub-secret-not-for-production-use-zzzzzzzz
+
+# Test profile runs on port 8788 (see [env.test.dev] in wrangler.toml).
+PUBLIC_ORIGIN=http://localhost:8788
+
+# ensureBootstrapOwner reads this. Smokes don't OAuth-login, so the
+# value is unused — but the runtime reads it at boot.
 ADMIN_GITHUB_LOGIN=test-admin
 
-# OAuth client creds — unused in test profile (StubOAuthVerifier
-# bypasses the real GitHub round-trip) but the runtime still reads
-# them at boot. Stub values are fine.
+# OAuth client creds — stubs (sign-in flow not exercised by smokes).
 GITHUB_CLIENT_ID=test-stub-client-id
 GITHUB_CLIENT_SECRET=test-stub-client-secret

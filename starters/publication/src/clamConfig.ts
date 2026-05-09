@@ -7,6 +7,7 @@ import {
   KvCacheBinding,
   StubOAuthVerifier,
   type AdminAuthConfig,
+  type Auth,
   type CmsConfig,
 } from "@aotterclam/clam-cms-cloudflare";
 import {
@@ -41,6 +42,10 @@ export interface Env {
   /** GitHub login that receives the `owner` staff role on first sign-in.
    *  Must match exactly — case-insensitive. Use `wrangler secret put ADMIN_GITHUB_LOGIN`. */
   readonly ADMIN_GITHUB_LOGIN?: string;
+  /** 32+ random bytes; `wrangler secret put BETTER_AUTH_SECRET`. */
+  readonly BETTER_AUTH_SECRET?: string;
+  /** Deployed Worker origin (dev: `http://localhost:8787`). */
+  readonly PUBLIC_ORIGIN?: string;
   /** Public — embedded in the contact form widget. wrangler.toml
    *  ships CF's "always passes" test key as the dev default. */
   readonly TURNSTILE_SITE_KEY?: string;
@@ -59,13 +64,11 @@ export interface Env {
 }
 
 /**
- * Build the per-isolate `CmsConfig` from the worker's `env` bindings.
- * The starter calls this once at module-init time inside `index.ts`
- * (under the `let runtimeRef` guard) so the runtime + decorator
- * chain is built once per isolate.
+ * Build the per-isolate `CmsConfig`. With `auth`, mounts the Better
+ * Auth admin gate; without, falls back to legacy `adminAuth` (slated
+ * for removal alongside the legacy /admin/auth/* + /oauth/* block).
  */
-export function buildCmsConfig(env: Env): CmsConfig {
-  const adminAuth = buildAdminAuth(env);
+export function buildCmsConfig(env: Env, auth?: Auth): CmsConfig {
   return {
     manifests: loadManifests(),
     handlers: buildHandlers(env),
@@ -97,7 +100,7 @@ export function buildCmsConfig(env: Env): CmsConfig {
             return new WorkersOAuthVerifier(env.OAUTH_KV);
           })(),
     },
-    adminAuth,
+    ...(auth ? { auth } : { adminAuth: buildAdminAuth(env) }),
   };
 }
 

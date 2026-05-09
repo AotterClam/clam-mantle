@@ -21,6 +21,7 @@ import {
 } from "@aotterclam/clam-cms-runtime";
 import { indexHtml } from "@aotterclam/clam-cms-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
+import { ADMIN_ROLES, type AdminRole, type Auth } from "../auth/createAuth.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
 import {
@@ -61,7 +62,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     app.on(method, honoPath, async (c) => {
       const runtime = await ref.get();
       const waitUntil = readWaitUntil(c);
-      return handleHttpTrigger(c.req.raw, runtime, triggerName, path, waitUntil);
+      return handleHttpTrigger(c.req.raw, runtime, ref.auth, triggerName, path, waitUntil);
     });
   }
   for (const v of ref.manifests) {
@@ -71,6 +72,11 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       const runtime = await ref.get();
       return handleViewRequest(c.req.raw, runtime, viewName);
     });
+  }
+
+  if (ref.auth) {
+    mountAdminBetterAuth(app, ref, ref.auth);
+    return;
   }
 
   const { adminAuth } = ref;
@@ -322,7 +328,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
             severity: "error",
             path: `${c.req.method} /oauth/authorize`,
             expected: "active staff session cookie",
-            message: "Not signed in. Sign in via /admin/auth/github first.",
+            message: "Not signed in. Sign in via /admin/sign-in first.",
           }),
         });
       }
@@ -371,6 +377,134 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.all("/oauth/register", (c) =>
     oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
   );
+}
+
+function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
+  const spa = (): Response =>
+    new Response(indexHtml, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  for (const path of [
+    "/admin",
+    "/admin/",
+    "/admin/sign-in",
+    "/admin/c/:collection",
+    "/admin/approvals",
+    "/admin/preferences",
+    "/admin/settings",
+  ]) {
+    app.get(path, spa);
+  }
+
+  // Pre-derive the collections projection — `ref.manifests` is
+  // immutable post-boot, so the filter / Set / mediaFields work doesn't
+  // need to repeat per request.
+  const schemas = ref.manifests.filter(
+    (m): m is SchemaManifest => m.kind === "Schema",
+  );
+  const translatedParents = new Set<string>();
+  for (const s of schemas) {
+    if (s.spec.translates) translatedParents.add(s.spec.translates.parent);
+  }
+  const collections = schemas
+    .filter((s) => !s.spec.translates)
+    .map((s) => ({
+      name: s.metadata.name,
+      title: s.spec.title,
+      description: s.spec.description ?? null,
+      lifecycle: s.spec.lifecycle ?? "simple",
+      hasTranslations: translatedParents.has(s.metadata.name),
+      mediaFields: mediaFieldsForCollection(s, schemas),
+    }));
+
+  type AdminGateOk = Extract<AdminGate, { kind: "ok" }>;
+  const guarded = (
+    path: string,
+    body: (c: Context, gate: AdminGateOk) => Response | Promise<Response>,
+  ): void => {
+    app.get(path, async (c) => {
+      const gate = await readAdminGate(c, auth);
+      if (gate.kind === "unauth") return adminUnauthenticated(c, path);
+      if (gate.kind === "forbidden") return adminNotStaff(c, path, gate.login);
+      return body(c, gate);
+    });
+  };
+
+  guarded("/admin/api/me", (_c, gate) =>
+    jsonResponse(200, { login: gate.login, role: gate.role, userId: gate.userId }),
+  );
+
+  guarded("/admin/api/collections", () => jsonResponse(200, { collections }));
+
+  guarded("/admin/api/site", async (c) => {
+    const runtime = await ref.get();
+    const site = await runtime.siteConfig.load();
+    const url = new URL(c.req.url);
+    return jsonResponse(200, {
+      ...site,
+      publicUrl: site.origin || url.origin,
+      mcpUrl: `${url.origin}/mcp`,
+    });
+  });
+
+  guarded("/admin/api/entries", async (c) => {
+    const collection = c.req.query("collection");
+    if (!collection) {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: "GET /admin/api/entries",
+          expected: "?collection=<name> query parameter",
+          message: "Missing `collection` query parameter.",
+        }),
+      });
+    }
+    const runtime = await ref.get();
+    const rows = await runtime.listEntries.execute({
+      collection,
+      status: c.req.query("status") as ContentState | undefined,
+    });
+    const items = rows.map((row) => ({
+      id: row.id,
+      collection: row.collection,
+      locale: row.locale ?? null,
+      status: row.status,
+      version: row.version,
+      title: row.data.title,
+      updated_at: row.updatedAt,
+    }));
+    return jsonResponse(200, { items, next_cursor: null });
+  });
+}
+
+type AdminGate =
+  | { kind: "unauth" }
+  | { kind: "forbidden"; login: string | null }
+  | {
+      kind: "ok";
+      userId: string;
+      login: string | null;
+      role: AdminRole;
+    };
+
+const ADMIN_ROLES_FOR_GATE: ReadonlySet<string> = new Set(ADMIN_ROLES);
+
+async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
+  const session = await auth.getSession(c.req.raw);
+  if (!session) return { kind: "unauth" };
+  const role = session.user.role ?? null;
+  const login = session.user.githubLogin ?? null;
+  if (!role || !ADMIN_ROLES_FOR_GATE.has(role)) {
+    return { kind: "forbidden", login };
+  }
+  return {
+    kind: "ok",
+    userId: session.user.id,
+    login,
+    role: role as AdminRole,
+  };
 }
 
 type OAuthHelpers = {
@@ -473,6 +607,7 @@ async function handleConsentPost(
 async function handleHttpTrigger(
   req: Request,
   runtime: CmsRuntime,
+  auth: Auth | null,
   triggerName: string,
   triggerPath: string,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
@@ -495,7 +630,7 @@ async function handleHttpTrigger(
   // `id`). Body fields fill in non-path inputs only.
   const input = { ...body, ...params };
 
-  const ctx: HandlerContext = await buildHandlerContext(req, runtime, waitUntil);
+  const ctx: HandlerContext = await buildHandlerContext(req, runtime, auth, waitUntil);
 
   const result = await runtime.invokeProcedure.execute({
     procedure,
@@ -582,13 +717,25 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
 async function buildHandlerContext(
   req: Request,
   runtime: CmsRuntime,
+  auth: Auth | null,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
+  const wu = waitUntil ? { waitUntil } : {};
+  if (auth) {
+    const session = await auth.getMcpSession(req);
+    if (!session) return { user: null, staff: null, env: {}, ...wu };
+    const role = await auth.getUserRole(session.userId);
+    const staff =
+      role && ADMIN_ROLES_FOR_GATE.has(role)
+        ? { id: session.userId, role: role as AdminRole }
+        : null;
+    return { user: { id: session.userId }, staff, env: {}, ...wu };
+  }
   const identity = await runtime.oauth.verifyAccessToken(req);
-  if (!identity) return { user: null, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  if (!identity) return { user: null, staff: null, env: {}, ...wu };
   const staffRow = await runtime.staff.readByUserId(identity.userId);
   const staff = staffRow ? { id: staffRow.userId, role: staffRow.role } : null;
-  return { user: { id: identity.userId }, staff, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  return { user: { id: identity.userId }, staff, env: {}, ...wu };
 }
 
 function openApiToHono(path: string): string {
@@ -671,7 +818,7 @@ function adminUnauthenticated(c: Context, path: string): Response {
       severity: "error",
       path: `${c.req.method} ${path}`,
       expected: "active session cookie",
-      message: "Not signed in. Sign in via /admin/auth/github first.",
+      message: "Not signed in. Sign in via /admin/sign-in first.",
     }),
   });
 }

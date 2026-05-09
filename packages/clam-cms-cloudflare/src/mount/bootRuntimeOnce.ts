@@ -3,6 +3,7 @@ import {
   type CmsRuntime,
 } from "@aotterclam/clam-cms-runtime";
 import type { Manifest } from "@aotterclam/clam-cms-spec";
+import type { Auth } from "../auth/createAuth.js";
 import type { AdminAuthConfig, CmsConfig } from "./cmsConfig.js";
 
 /**
@@ -32,11 +33,10 @@ export interface CmsRuntimeRef {
   /** The manifest set this ref's runtime was built from. Mounts use
    *  this to materialize routes statically without awaiting boot. */
   readonly manifests: readonly Manifest[];
-  /** Present when `config.adminAuth` was supplied. Exposes the
-   *  OAuthProvider and GitHub OAuth config to mount factories
-   *  (`mountServerEndpoints` for consent UI / passthrough;
-   *  `mountMcp` in issue #20 for token verification). */
+  /** @deprecated Superseded by `auth` (ADR-0014). Removed once the
+   *  legacy /admin/auth/* + /oauth/* block goes. */
   readonly adminAuth: AdminAuthConfig | null;
+  readonly auth: Auth | null;
 }
 
 export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
@@ -53,6 +53,7 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
   return {
     manifests: config.manifests,
     adminAuth: config.adminAuth ?? null,
+    auth: config.auth ?? null,
     get(): Promise<CmsRuntime> {
       if (booted) return booted;
       booted = runtime
