@@ -1,18 +1,25 @@
-# `@aotter/starter-blog`
+# `@aotter/starter-publication`
 
-Reference publication/site starter for mantle v0.1.0. The package
-name still says `starter-blog` for the alpha, but the intended product
-shape is broader: marketing sites, docs, founder blogs, announcement
-feeds, and simple content-driven landing sites. It wraps the runtime +
-Cloudflare adapter into a runnable Worker with three Schemas (posts,
-post-translations, contact-messages) and a public read path served from
-KV.
+Reference `publication` starter for mantle v0.1.0 — the
+owner-published-content family in the starter taxonomy (#58). Covers
+landing pages, articles, docs-lite, project updates, and basic contact
+capture. Not for inventory / order workflows (`micro-shop`), lead
+qualification pipelines (`leads-inbox`), member-created content
+(`community`), or private/paid creator content (`fan-club`).
+
+It wraps the runtime + Cloudflare adapter into a runnable Worker with
+three Schemas (posts, post-translations, contact-messages) and a
+public read path served from KV. Schema-level names (`posts`,
+`/posts` route, MCP tool names) are intentionally kept stable through
+v0.1.0 even though the family rename happened — runtime route
+behavior, seed scripts, MCP tool names, views, tests, and SEO paths
+all key off these.
 
 This starter is intentionally fixed-manifest during bootstrap. The
 first-run installer should ask for public copy and seed home/about/
 contact/welcome content, not redesign the Schema/View/Procedure/
 Trigger model. Custom workflow design belongs in `starters/blank` or
-a later dedicated starter.
+a later starter family.
 
 ## What it exercises
 
@@ -61,7 +68,7 @@ pnpm fixture       # seeds dev D1/KV with demo content (no staff row)
 pnpm dev
 ```
 
-The public site (rendered blog routes, contact form, MCP transport
+The public site (rendered publication routes, contact form, MCP transport
 auth) is already runnable at this point — no OAuth setup required.
 
 ### Signing in at /admin

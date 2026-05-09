@@ -12,7 +12,7 @@
  *   L4  templates  — replace a whole page's render function
  *
  * Layout shape itself is intentionally NOT a slot: changing it means
- * picking a different starter (e.g. `starters/blog` vs a future docs
+ * picking a different starter (e.g. `starters/publication` vs a future docs
  * starter). Header / Footer cover the actual chrome variation users
  * tend to ask for inside the same content shape.
  */

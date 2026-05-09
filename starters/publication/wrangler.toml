@@ -1,4 +1,4 @@
-name = "mantle-blog"
+name = "mantle-publication"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -15,16 +15,16 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "mantle-blog-local"
+database_name = "mantle-publication-local"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "kv-mantle-blog-local"
+id = "kv-mantle-publication-local"
 
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "kv-mantle-blog-oauth-local"
+id = "kv-mantle-publication-oauth-local"
 
 # Bundle YAML manifests as inline text strings — TS imports them via
 # `?raw` query param, esbuild resolves to a string export at build time.
@@ -51,16 +51,16 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 [[env.test.d1_databases]]
 binding = "DB"
-database_name = "mantle-blog-test"
+database_name = "mantle-publication-test"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[env.test.kv_namespaces]]
 binding = "KV"
-id = "kv-mantle-blog-test"
+id = "kv-mantle-publication-test"
 
 [[env.test.kv_namespaces]]
 binding = "OAUTH_KV"
-id = "kv-mantle-blog-oauth-test"
+id = "kv-mantle-publication-oauth-test"
 
 [[env.test.rules]]
 type = "Text"

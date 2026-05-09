@@ -11,8 +11,8 @@ export const FIXTURE_NOW = 1_730_000_000_000;
 export const FIXTURE_AUTHOR_ID = "u-staff-1";
 
 export const FIXTURE_SITE: SiteConfig = {
-  brand: "Mantle Blog",
-  title: "Mantle Blog",
+  brand: "Mantle Publication",
+  title: "Mantle Publication",
   description: "Reference starter for mantle — localized posts + contact form.",
   origin: "http://localhost:8787",
   locales: ["en", "zh-TW"],
@@ -37,12 +37,12 @@ export const FIXTURE_POSTS: readonly FixturePost[] = [
       {
         locale: "en",
         title: "Hello, world",
-        body: "This is the first post on the Mantle blog. Localized content rendered from KV; the body is plain markdown for v0.1.0 (real markdown rendering arrives in starter v2).",
+        body: "This is the first post on the Mantle publication. Localized content rendered from KV; the body is plain markdown for v0.1.0 (real markdown rendering arrives in starter v2).",
       },
       {
         locale: "zh-TW",
         title: "你好，世界",
-        body: "這是 Mantle blog 的第一篇文章。內容從 KV 渲染、依語系切版；v0.1.0 的 body 暫以純文字呈現，正式 markdown 渲染留給 starter v2。",
+        body: "這是 Mantle publication 的第一篇文章。內容從 KV 渲染、依語系切版；v0.1.0 的 body 暫以純文字呈現，正式 markdown 渲染留給 starter v2。",
       },
     ],
   },
@@ -96,13 +96,13 @@ export const FIXTURE_PAGES: readonly FixturePage[] = [
     translations: [
       {
         locale: "en",
-        title: "Welcome to Mantle Blog",
+        title: "Welcome to Mantle Publication",
         intro: "Localized posts + contact form, served from Cloudflare D1 + KV.",
         body: "This site is the v0.1.0 reference starter for mantle. It exercises every locked grammar feature: posts (language-neutral parent), post-translations (translates demo), pages (this page is one), and a CAPTCHA-gated contact form running on lifecycle hooks. Recent posts are listed below; About + Contact pages are reachable from the header.",
       },
       {
         locale: "zh-TW",
-        title: "歡迎來到 Mantle Blog",
+        title: "歡迎來到 Mantle Publication",
         intro: "多語系文章 + 聯絡表單，跑在 Cloudflare D1 + KV 上。",
         body: "這個網站是 mantle v0.1.0 的範本 starter。Locked grammar 全跑一遍：posts（語系無關的 parent）、post-translations（translates demo）、pages（這頁就是其中一個）、以及一個用 lifecycle hooks 過 CAPTCHA 的聯絡表單。最新文章列在下面；標頭可以連到 About / Contact。",
       },
@@ -115,13 +115,13 @@ export const FIXTURE_PAGES: readonly FixturePage[] = [
         locale: "en",
         title: "About",
         intro: "What this starter is for.",
-        body: "Mantle Blog is a reference deployment of the mantle v0.1.0 manifest engine on Cloudflare Workers. It demonstrates the four locked atoms — Schema, View, Procedure, Trigger — composed into a real, runnable site. Source: github.com/aotter/mantle.",
+        body: "Mantle Publication is a reference deployment of the mantle v0.1.0 manifest engine on Cloudflare Workers. It demonstrates the four locked atoms — Schema, View, Procedure, Trigger — composed into a real, runnable site. Source: github.com/aotter/mantle.",
       },
       {
         locale: "zh-TW",
         title: "關於",
         intro: "這個 starter 的用途。",
-        body: "Mantle Blog 是 mantle v0.1.0 manifest 引擎跑在 Cloudflare Workers 上的範例佈署。它把四個 locked atom（Schema、View、Procedure、Trigger）組成一個真的能跑的網站。原始碼：github.com/aotter/mantle。",
+        body: "Mantle Publication 是 mantle v0.1.0 manifest 引擎跑在 Cloudflare Workers 上的範例佈署。它把四個 locked atom（Schema、View、Procedure、Trigger）組成一個真的能跑的網站。原始碼：github.com/aotter/mantle。",
       },
     ],
   },

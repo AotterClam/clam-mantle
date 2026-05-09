@@ -85,7 +85,7 @@ function escape(s: string): string {
 
 function buildSql(opts: ApplyFixtureOptions): string {
   const lines: string[] = [];
-  lines.push(`-- starter-blog fixture (${opts.artefactPrefix}, idempotent).`);
+  lines.push(`-- starter-publication fixture (${opts.artefactPrefix}, idempotent).`);
   lines.push("-- 1. Run canonical migrations (wrangler dev runs them in-memory");
   lines.push("--    only — `wrangler d1 execute --local` opens an isolated DB");
   lines.push("--    so the fixture must apply migrations itself before inserts).");
