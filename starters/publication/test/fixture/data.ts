@@ -10,6 +10,13 @@ import type { SiteConfig } from "@aotter/mantle-spec";
 export const FIXTURE_NOW = 1_730_000_000_000;
 export const FIXTURE_AUTHOR_ID = "u-staff-1";
 
+/** Pre-minted Better Auth MCP bearer the test fixture seeds into
+ *  `oauthAccessToken`. Smoke tests authenticate as `u-staff-1` (role
+ *  'editor') by sending `Authorization: Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`. */
+export const FIXTURE_MCP_CLIENT_ID = "fixture-mcp-client";
+export const FIXTURE_MCP_ACCESS_TOKEN = "fixture-mcp-access-token";
+export const FIXTURE_MCP_REFRESH_TOKEN = "fixture-mcp-refresh-token";
+
 export const FIXTURE_SITE: SiteConfig = {
   brand: "Mantle Publication",
   title: "Mantle Publication",
