@@ -5,6 +5,7 @@ import { defaultStatements } from "better-auth/plugins/admin/access";
 
 export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
+export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
 
 export interface CreateAuthConfig {
   readonly database: D1Database;

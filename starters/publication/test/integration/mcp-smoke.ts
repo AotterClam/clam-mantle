@@ -18,12 +18,10 @@
  * printed; CI surfaces this as a job failure.
  */
 import { strict as assert } from "node:assert";
+import { FIXTURE_MCP_ACCESS_TOKEN } from "../fixture/data.js";
 
 const BASE = process.env.WRANGLER_BASE_URL ?? "http://localhost:8787";
-// The fixture seeds this token as an `oauthAccessToken` row pointed
-// at the test editor (`u-staff-1`, role='editor'). Better Auth's MCP
-// plugin validates the bearer against `oauthAccessToken.accessToken`.
-const BEARER = "Bearer fixture-mcp-access-token";
+const BEARER = `Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`;
 
 interface JsonRpcResult {
   readonly result?: unknown;

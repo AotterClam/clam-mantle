@@ -21,7 +21,7 @@ import {
 } from "@aotterclam/clam-cms-runtime";
 import { indexHtml } from "@aotterclam/clam-cms-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
-import { ADMIN_ROLES, type AdminRole, type Auth } from "../auth/createAuth.js";
+import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
 import {
@@ -33,24 +33,8 @@ import {
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
-/**
- * Mount the http Triggers in `ref.manifests` onto the consumer's Hono
- * app. Each Trigger with `source.kind: 'http'` gets a route at
- * `(method, path)`; the handler resolves the target Procedure,
- * extracts auth context, calls `runtime.invokeProcedure.execute`,
- * and maps the structured response onto an HTTP envelope:
- *
- *   - success → 200, JSON `{ ok: true, data }`
- *   - failure → status from `HTTP_STATUS_BY_CODE` (default 500),
- *               JSON `{ ok: false, diagnostic }`
- *
- * Path params `{name}` from the Trigger path bind to identically-named
- * fields on the Procedure input — POC ADR-0001 grammar.
- *
- * Each parsed View also auto-mounts at `GET /api/views/<name>`
- * (ADR-0012) — query string coerced via `coerceViewParams`,
- * pagination via reserved `?page=&show=`.
- */
+/** Mount HTTP Triggers + Views from `ref.manifests`, plus the admin
+ *  surface (Better Auth gate when `ref.auth` is set, else legacy). */
 export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   for (const t of ref.manifests) {
     if (t.kind !== "Trigger") continue;
@@ -489,14 +473,12 @@ type AdminGate =
       role: AdminRole;
     };
 
-const ADMIN_ROLES_FOR_GATE: ReadonlySet<string> = new Set(ADMIN_ROLES);
-
 async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
   const session = await auth.getSession(c.req.raw);
   if (!session) return { kind: "unauth" };
   const role = session.user.role ?? null;
   const login = session.user.githubLogin ?? null;
-  if (!role || !ADMIN_ROLES_FOR_GATE.has(role)) {
+  if (!role || !ADMIN_ROLE_SET.has(role)) {
     return { kind: "forbidden", login };
   }
   return {
@@ -721,18 +703,21 @@ async function buildHandlerContext(
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
   const wu = waitUntil ? { waitUntil } : {};
+  const unauth: HandlerContext = { user: null, staff: null, env: {}, ...wu };
   if (auth) {
+    // Fast path: skip the D1 query for public Triggers (no bearer).
+    if (!req.headers.get("authorization")?.startsWith("Bearer ")) return unauth;
     const session = await auth.getMcpSession(req);
-    if (!session) return { user: null, staff: null, env: {}, ...wu };
+    if (!session) return unauth;
     const role = await auth.getUserRole(session.userId);
     const staff =
-      role && ADMIN_ROLES_FOR_GATE.has(role)
+      role && ADMIN_ROLE_SET.has(role)
         ? { id: session.userId, role: role as AdminRole }
         : null;
     return { user: { id: session.userId }, staff, env: {}, ...wu };
   }
   const identity = await runtime.oauth.verifyAccessToken(req);
-  if (!identity) return { user: null, staff: null, env: {}, ...wu };
+  if (!identity) return unauth;
   const staffRow = await runtime.staff.readByUserId(identity.userId);
   const staff = staffRow ? { id: staffRow.userId, role: staffRow.role } : null;
   return { user: { id: identity.userId }, staff, env: {}, ...wu };

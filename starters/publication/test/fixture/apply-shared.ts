@@ -38,6 +38,9 @@ import {
 } from "../../src/theme.default/templates/index.js";
 import {
   FIXTURE_AUTHOR_ID,
+  FIXTURE_MCP_ACCESS_TOKEN,
+  FIXTURE_MCP_CLIENT_ID,
+  FIXTURE_MCP_REFRESH_TOKEN,
   FIXTURE_NOW,
   FIXTURE_PAGES,
   FIXTURE_POSTS,
@@ -117,16 +120,12 @@ function buildSql(opts: ApplyFixtureOptions): string {
 
   // Test profile only: pre-mint a Better Auth MCP access token so
   // mcp-smoke can authenticate without going through GitHub OAuth.
-  // Real deployments mint these via the MCP DCR + authorize flow.
   if (opts.seedStaffEditor) {
-    const clientId = "fixture-mcp-client";
-    const accessToken = "fixture-mcp-access-token";
-    const refreshToken = "fixture-mcp-refresh-token";
     lines.push(
-      `INSERT OR IGNORE INTO oauthApplication (id, name, clientId, redirectUrls, type, createdAt, updatedAt) VALUES ('fx-app-1', 'fixture mcp client', '${clientId}', 'http://localhost:0', 'web', '${fixtureNowIso}', '${fixtureNowIso}');`,
+      `INSERT OR IGNORE INTO oauthApplication (id, name, clientId, redirectUrls, type, createdAt, updatedAt) VALUES ('fx-app-1', 'fixture mcp client', '${FIXTURE_MCP_CLIENT_ID}', 'http://localhost:0', 'web', '${fixtureNowIso}', '${fixtureNowIso}');`,
     );
     lines.push(
-      `INSERT OR IGNORE INTO oauthAccessToken (id, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, clientId, userId, scopes, createdAt, updatedAt) VALUES ('fx-tok-1', '${accessToken}', '${refreshToken}', '${fixturePlus30dIso}', '${fixturePlus30dIso}', '${clientId}', '${FIXTURE_AUTHOR_ID}', 'openid profile email', '${fixtureNowIso}', '${fixtureNowIso}');`,
+      `INSERT OR IGNORE INTO oauthAccessToken (id, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, clientId, userId, scopes, createdAt, updatedAt) VALUES ('fx-tok-1', '${FIXTURE_MCP_ACCESS_TOKEN}', '${FIXTURE_MCP_REFRESH_TOKEN}', '${fixturePlus30dIso}', '${fixturePlus30dIso}', '${FIXTURE_MCP_CLIENT_ID}', '${FIXTURE_AUTHOR_ID}', 'openid profile email', '${fixtureNowIso}', '${fixtureNowIso}');`,
     );
   }
 
