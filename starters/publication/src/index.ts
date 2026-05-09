@@ -40,15 +40,20 @@ function getAuth(env: Env): Auth | null {
   // that haven't set BETTER_AUTH_SECRET yet boot fine without auth —
   // the `/api/auth/*` route just returns 503 (see fetch handler).
   if (!env.BETTER_AUTH_SECRET) return null;
+  const baseURL = env.PUBLIC_ORIGIN ?? "http://localhost:8787";
   authCache = createAuth({
     database: env.DB,
-    baseURL: env.PUBLIC_ORIGIN ?? "http://localhost:8787",
+    baseURL,
     secret: env.BETTER_AUTH_SECRET,
     github:
       env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
         ? {
             clientId: env.GITHUB_CLIENT_ID,
             clientSecret: env.GITHUB_CLIENT_SECRET,
+            // Match the existing GitHub OAuth App's registered
+            // callback URL. The translator route below funnels the
+            // request to Better Auth's actual handler.
+            redirectURI: `${baseURL}/admin/auth/github/callback`,
           }
         : undefined,
     adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
@@ -64,8 +69,6 @@ function getApp(env: Env): Hono {
 
   // Better Auth handler at /api/auth/* — owns sign-in / sign-out /
   // OAuth callbacks / session reads / MCP DCR endpoints (per ADR-0014).
-  // Mounted before the SDK's /admin/auth/* legacy GitHub flow so both
-  // can run side-by-side during the v0.1.0 rebuild's auth migration.
   app.all("/api/auth/*", async (c) => {
     const auth = getAuth(env);
     if (!auth) {
@@ -79,6 +82,28 @@ function getApp(env: Env): Hono {
       );
     }
     return auth.handler(c.req.raw);
+  });
+
+  // Path translator for the legacy GitHub OAuth callback URL. The
+  // existing GitHub OAuth App is registered with
+  // `/admin/auth/github/callback` as its authorization callback URL;
+  // GitHub rejects mismatches with "Invalid Redirect URI". This route
+  // accepts the callback at the legacy path and rewrites the request
+  // URL to Better Auth's expected `/api/auth/callback/github` shape
+  // before delegating to `auth.handler`. Once the GitHub OAuth App
+  // gets its callback URL updated to the canonical Better Auth path,
+  // delete this route.
+  app.get("/admin/auth/github/callback", async (c) => {
+    const auth = getAuth(env);
+    if (!auth) return c.json({ error: "auth_not_configured" }, 503);
+    const url = new URL(c.req.url);
+    url.pathname = "/api/auth/callback/github";
+    const translated = new Request(url.toString(), {
+      method: "GET",
+      headers: c.req.raw.headers,
+      redirect: "manual",
+    });
+    return auth.handler(translated);
   });
 
   mountServerEndpoints(app, cms);
