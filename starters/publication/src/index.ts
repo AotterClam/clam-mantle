@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import type { Entry } from "@aotter/mantle-spec";
 import {
+  createAuth,
   createCmsRef,
   mountMcp,
   mountPublicRoutes,
   mountServerEndpoints,
+  type Auth,
   type PublicRouteContext,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
@@ -30,12 +32,54 @@ import {
  * injection, SEO/AEO meta composition) is SDK-managed.
  */
 let appCache: Hono | null = null;
+let authCache: Auth | null = null;
+
+function getAuth(env: Env): Auth | null {
+  if (authCache) return authCache;
+  // Better Auth runs only when its required env is present. Dev boxes
+  // that haven't set BETTER_AUTH_SECRET yet boot fine without auth —
+  // the `/api/auth/*` route just returns 503 (see fetch handler).
+  if (!env.BETTER_AUTH_SECRET) return null;
+  authCache = createAuth({
+    database: env.DB,
+    baseURL: env.PUBLIC_ORIGIN ?? "http://localhost:8787",
+    secret: env.BETTER_AUTH_SECRET,
+    github:
+      env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+        ? {
+            clientId: env.GITHUB_CLIENT_ID,
+            clientSecret: env.GITHUB_CLIENT_SECRET,
+          }
+        : undefined,
+    adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+  });
+  return authCache;
+}
 
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
   const config = buildCmsConfig(env);
   const cms = createCmsRef(config);
   const app = new Hono();
+
+  // Better Auth handler at /api/auth/* — owns sign-in / sign-out /
+  // OAuth callbacks / session reads / MCP DCR endpoints (per ADR-0014).
+  // Mounted before the SDK's /admin/auth/* legacy GitHub flow so both
+  // can run side-by-side during the v0.1.0 rebuild's auth migration.
+  app.all("/api/auth/*", async (c) => {
+    const auth = getAuth(env);
+    if (!auth) {
+      return c.json(
+        {
+          error: "auth_not_configured",
+          message:
+            "Better Auth requires BETTER_AUTH_SECRET. Run `wrangler secret put BETTER_AUTH_SECRET` and redeploy.",
+        },
+        503,
+      );
+    }
+    return auth.handler(c.req.raw);
+  });
 
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
