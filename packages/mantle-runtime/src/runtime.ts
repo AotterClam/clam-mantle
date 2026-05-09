@@ -13,6 +13,7 @@ import type { AssetServer } from "./domain/port/AssetServer.js";
 import type { DatabaseDriver } from "./domain/port/DatabaseDriver.js";
 import type { EntryRepository } from "./domain/port/EntryRepository.js";
 import type { KvCache } from "./domain/port/KvCache.js";
+import type { MediaStorage } from "./domain/port/MediaStorage.js";
 import type { OAuthVerifier } from "./domain/port/OAuthVerifier.js";
 import type { PublishOrchestrator } from "./domain/port/PublishOrchestrator.js";
 import type { SessionRepository } from "./domain/port/SessionRepository.js";
@@ -54,6 +55,10 @@ import {
   RenderEntryLiveUseCase,
   RenderListLiveUseCase,
 } from "./usecase/render/index.js";
+import {
+  CommitMediaUploadUseCase,
+  CreateMediaUploadUseCase,
+} from "./usecase/media/index.js";
 import type { PublicPathResolver } from "./domain/service/PublicPathResolver.js";
 
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
@@ -100,6 +105,17 @@ export interface CreateCmsRuntimeArgs {
    *  expose request-time render routes should also pass this through
    *  so request-time HTML matches publish-time HTML. */
   readonly publicPathResolver?: PublicPathResolver;
+  /** Optional media storage adapter. When unset, media MCP tools and
+   *  admin upload endpoints are not registered — uploads return 404 /
+   *  `MEDIA_NOT_CONFIGURED`. When set, the runtime wires
+   *  `CreateMediaUpload` + `CommitMediaUpload` use cases backed by
+   *  this adapter. The KV mapping for pending uploads reuses `args.kv`. */
+  readonly mediaStorage?: MediaStorage;
+  /** Whether the SVG mime is allowed in `CreateMediaUpload`. Default
+   *  false; object stores don't sanitize SVG payloads. */
+  readonly mediaAllowSvg?: boolean;
+  /** Optional override of the default 25 MB upload byte ceiling. */
+  readonly mediaMaxBytes?: number;
   /** Optional clock — test seam. Defaults to `SystemClock`. */
   readonly clock?: Clock;
   /** Optional id generator — test seam. Defaults to `RandomUuidGenerator`. */
@@ -140,6 +156,13 @@ export interface CmsRuntime {
    *  supply one. Adapters use this to derive URLs (sitemap, SEO
    *  hreflangs) without rebuilding the mapping. */
   readonly publicPathResolver: PublicPathResolver | null;
+  /** Pre-wired media use cases when `mediaStorage` was supplied; null
+   *  otherwise. Adapters route admin endpoints + MCP tools off this. */
+  readonly media: {
+    readonly storage: MediaStorage;
+    readonly createUpload: CreateMediaUploadUseCase;
+    readonly commitUpload: CommitMediaUploadUseCase;
+  } | null;
 
   /** Adapter-helper bag. */
   readonly registry: HandlerRegistry;
@@ -252,6 +275,24 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   );
   const validateBoot = new ValidateBootUseCase();
 
+  const media = args.mediaStorage
+    ? {
+        storage: args.mediaStorage,
+        createUpload: new CreateMediaUploadUseCase(
+          args.mediaStorage,
+          args.kv,
+          clock,
+          { allowSvg: args.mediaAllowSvg ?? false, maxBytes: args.mediaMaxBytes },
+        ),
+        commitUpload: new CommitMediaUploadUseCase(
+          args.mediaStorage,
+          args.kv,
+          clock,
+          { maxBytes: args.mediaMaxBytes },
+        ),
+      }
+    : null;
+
   return {
     db: args.db,
     kv: args.kv,
@@ -281,6 +322,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     publishOrchestrator,
     siteConfig,
     publicPathResolver,
+    media,
 
     registry,
     templates,

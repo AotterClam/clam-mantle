@@ -48,6 +48,17 @@ fallthrough = true
 
 [env.test.vars]
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
+# Test profile uses StubOAuthVerifier so mcp-smoke can sign-in with
+# `Bearer dev-<userId>` without provisioning a real GitHub OAuth app.
+MANTLE_ALLOW_STUB_OAUTH = "1"
+# Media uploads enabled in test profile so integration smokes can
+# exercise the create/commit lifecycle. Stub credentials — miniflare's
+# local R2 emulation accepts the binding ops; real CF deploy needs
+# real R2 API tokens via `wrangler secret put`.
+MEDIA_PUBLIC_URL_BASE = "http://localhost:8788/__media"
+MEDIA_S3_ENDPOINT = "https://test-bucket.example.r2.cloudflarestorage.com"
+MEDIA_S3_ACCESS_KEY_ID = "test-access-key"
+MEDIA_S3_SECRET_ACCESS_KEY = "test-secret-access-key"
 
 [[env.test.d1_databases]]
 binding = "DB"
@@ -61,6 +72,10 @@ id = "kv-mantle-publication-test"
 [[env.test.kv_namespaces]]
 binding = "OAUTH_KV"
 id = "kv-mantle-publication-oauth-test"
+
+[[env.test.r2_buckets]]
+binding = "MEDIA"
+bucket_name = "mantle-publication-media-test"
 
 [[env.test.rules]]
 type = "Text"

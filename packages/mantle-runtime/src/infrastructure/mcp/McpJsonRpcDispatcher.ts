@@ -14,6 +14,10 @@ import {
   UnpublishUseCase,
   UpdateDraftUseCase,
 } from "../../usecase/content/index.js";
+import {
+  CommitMediaUploadUseCase,
+  CreateMediaUploadUseCase,
+} from "../../usecase/media/index.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 import {
   CREATE_DRAFT_PREFIX,
@@ -68,6 +72,12 @@ export interface McpUseCases {
   readonly unpublish: UnpublishUseCase;
   readonly archive: ArchiveUseCase;
   readonly deleteEntry: DeleteEntryUseCase;
+  /** Optional. When set, `create_media_upload` and `commit_media_upload`
+   *  appear in the catalog and route here. */
+  readonly media?: {
+    readonly createUpload: CreateMediaUploadUseCase;
+    readonly commitUpload: CommitMediaUploadUseCase;
+  };
 }
 
 export class McpJsonRpcDispatcher {
@@ -83,7 +93,9 @@ export class McpJsonRpcDispatcher {
     private readonly useCases: McpUseCases,
     private readonly schemas: ReadonlyArray<SchemaManifest>,
   ) {
-    this.catalog = buildMcpToolCatalog(schemas);
+    this.catalog = buildMcpToolCatalog(schemas, {
+      mediaEnabled: useCases.media !== undefined,
+    });
     this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;
     const map = new Map<string, string>();
     for (const s of schemas) map.set(mcpToolNameSegment(s.metadata.name), s.metadata.name);
@@ -187,6 +199,31 @@ export class McpJsonRpcDispatcher {
         const expected = args["expected_version"];
         if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
         return this.useCases.archive.execute({ id, expectedVersion: expected });
+      }
+      case "create_media_upload": {
+        if (!this.useCases.media) return UNKNOWN_TOOL;
+        const filename = args["filename"];
+        const mimeType = args["mimeType"];
+        if (typeof filename !== "string" || typeof mimeType !== "string") return MISSING_ARG;
+        return this.useCases.media.createUpload.execute({
+          filename,
+          mimeType,
+          byteSize: typeof args["byteSize"] === "number" ? args["byteSize"] : undefined,
+          alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
+          caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
+          purpose: typeof args["purpose"] === "string" ? args["purpose"] : undefined,
+        });
+      }
+      case "commit_media_upload": {
+        if (!this.useCases.media) return UNKNOWN_TOOL;
+        const uploadId = args["uploadId"];
+        if (typeof uploadId !== "string") return MISSING_ARG;
+        return this.useCases.media.commitUpload.execute({
+          uploadId,
+          alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
+          caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
+          checksum: typeof args["checksum"] === "string" ? args["checksum"] : undefined,
+        });
       }
       default: {
         // Per-collection authoring tools: `create_draft_<segment>` /

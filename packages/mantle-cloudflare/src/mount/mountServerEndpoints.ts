@@ -1,9 +1,11 @@
 import type { Context, Hono } from "hono";
 import {
+  DiagnosticError,
   HTTP_STATUS_BY_CODE,
   MCP_HINT_KEYWORD,
   VIEW_PARAMS_RESERVED,
   isMediaMcpHint,
+  redactForWire,
   runtimeDiagnostic,
   type ContentState,
   type Diagnostic,
@@ -203,6 +205,90 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       updated_at: row.updatedAt,
     }));
     return jsonResponse(200, { items, next_cursor: null });
+  });
+
+  // ── /admin/api/media — direct upload lifecycle ──────────────────────
+  //
+  // Three-step flow (browser): POST /uploads (capability) → PUT direct
+  // to R2 S3 endpoint (Worker not in this hop) → POST /uploads/:id/commit.
+  // Tools registered only when the runtime has a `mediaStorage` adapter
+  // bound; missing → 501 with `MEDIA_NOT_CONFIGURED`.
+  app.post("/admin/api/media/uploads", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminUnauthenticated(c, "/admin/api/media/uploads");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/media/uploads", login);
+    }
+    if (!runtime.media) {
+      return mediaNotConfiguredResponse("/admin/api/media/uploads");
+    }
+    let body: { filename?: unknown; mimeType?: unknown; byteSize?: unknown; alt?: unknown; caption?: unknown; purpose?: unknown };
+    try {
+      body = (await c.req.raw.json()) as typeof body;
+    } catch {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: "POST /admin/api/media/uploads",
+          message: "Body must be JSON.",
+        }),
+      });
+    }
+    if (typeof body.filename !== "string" || typeof body.mimeType !== "string") {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: "POST /admin/api/media/uploads",
+          expected: "{ filename: string, mimeType: string, byteSize?: number }",
+        }),
+      });
+    }
+    return await runUseCase(() =>
+      runtime.media!.createUpload.execute({
+        filename: body.filename as string,
+        mimeType: body.mimeType as string,
+        byteSize: typeof body.byteSize === "number" ? body.byteSize : undefined,
+        alt: typeof body.alt === "string" ? body.alt : undefined,
+        caption: typeof body.caption === "string" ? body.caption : undefined,
+        purpose: typeof body.purpose === "string" ? body.purpose : undefined,
+      }),
+    );
+  });
+
+  app.post("/admin/api/media/uploads/:uploadId/commit", async (c) => {
+    const runtime = await ref.get();
+    const session = await readSessionForAdmin(c, runtime);
+    if (!session) return adminUnauthenticated(c, "/admin/api/media/uploads/commit");
+    const staff = await runtime.staff.readByUserId(session.userId);
+    if (!staff) {
+      const login = await runtime.users.findGithubLogin(session.userId);
+      return adminNotStaff(c, "/admin/api/media/uploads/commit", login);
+    }
+    if (!runtime.media) {
+      return mediaNotConfiguredResponse("/admin/api/media/uploads/commit");
+    }
+    const uploadId = c.req.param("uploadId");
+    let body: { alt?: unknown; caption?: unknown; checksum?: unknown };
+    try {
+      body = (await c.req.raw.json().catch(() => ({}))) as typeof body;
+    } catch {
+      body = {};
+    }
+    return await runUseCase(() =>
+      runtime.media!.commitUpload.execute({
+        uploadId,
+        alt: typeof body.alt === "string" ? body.alt : undefined,
+        caption: typeof body.caption === "string" ? body.caption : undefined,
+        checksum: typeof body.checksum === "string" ? body.checksum : undefined,
+      }),
+    );
   });
 
   // ── /admin/logout — POST clears session cookie + 302s to sign-in ────
@@ -623,6 +709,40 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "content-type": "application/json" },
+  });
+}
+
+async function runUseCase<T>(fn: () => Promise<T>): Promise<Response> {
+  try {
+    const result = await fn();
+    return jsonResponse(200, result);
+  } catch (e) {
+    if (e instanceof DiagnosticError) {
+      const status = HTTP_STATUS_BY_CODE[e.diagnostic.code] ?? 500;
+      return jsonResponse(status, { ok: false, diagnostic: redactForWire(e.diagnostic) });
+    }
+    return jsonResponse(500, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "INTERNAL_ERROR",
+        severity: "error",
+        path: "media",
+        message: (e as Error).message,
+      }),
+    });
+  }
+}
+
+function mediaNotConfiguredResponse(path: string): Response {
+  return jsonResponse(501, {
+    ok: false,
+    diagnostic: runtimeDiagnostic({
+      code: "MEDIA_NOT_CONFIGURED",
+      severity: "error",
+      path,
+      message:
+        "Media uploads are not enabled on this deployment. Bind a `mediaStorage` adapter in `createCmsRuntime` to enable.",
+    }),
   });
 }
 

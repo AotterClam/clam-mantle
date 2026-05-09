@@ -5,24 +5,25 @@
  * The port is intentionally object-storage-shaped. Cloudflare R2, S3,
  * filesystem, or a future hosted service can implement it without leaking
  * adapter types into runtime use cases.
+ *
+ * Method-arg shapes use the `*Args` suffix (matching `EntryRepository`)
+ * to leave the `*Request` / `*Response` namespace for use-case DTOs in
+ * `usecase/dto/media/`.
  */
 export interface MediaStorage {
   /** Create a short-lived direct-upload capability for a single object. */
-  createUpload(input: CreateMediaUploadRequest): Promise<CreateMediaUploadResponse>;
+  createUpload(args: CreateUploadArgs): Promise<CreateUploadResult>;
 
   /** Commit a previously-uploaded object after adapter metadata checks. */
-  commitUpload(input: CommitMediaUploadRequest): Promise<MediaAsset>;
-
-  /** Store bytes fetched by a trusted ingestion use case, e.g. URL import. */
-  putObject(input: PutMediaObjectRequest): Promise<MediaAsset>;
+  commitUpload(args: CommitUploadArgs): Promise<MediaAsset>;
 
   /** Resolve the stable public URL for an already committed asset. */
-  getPublicUrl(input: GetMediaPublicUrlRequest): Promise<string>;
+  getPublicUrl(args: GetPublicUrlArgs): Promise<string>;
 
-  deleteAsset(input: DeleteMediaAssetRequest): Promise<void>;
+  deleteAsset(args: DeleteAssetArgs): Promise<void>;
 }
 
-export interface CreateMediaUploadRequest {
+export interface CreateUploadArgs {
   readonly filename: string;
   readonly mimeType: string;
   readonly byteSize?: number;
@@ -33,7 +34,7 @@ export interface CreateMediaUploadRequest {
   readonly metadata?: Readonly<Record<string, string>>;
 }
 
-export interface CreateMediaUploadResponse {
+export interface CreateUploadResult {
   readonly uploadId: string;
   readonly method: "PUT";
   readonly uploadUrl: string;
@@ -44,7 +45,7 @@ export interface CreateMediaUploadResponse {
   readonly publicUrl?: string;
 }
 
-export interface CommitMediaUploadRequest {
+export interface CommitUploadArgs {
   readonly uploadId: string;
   readonly storageKey: string;
   readonly expectedMimeType: string;
@@ -55,23 +56,12 @@ export interface CommitMediaUploadRequest {
   readonly now: number;
 }
 
-export interface PutMediaObjectRequest {
-  readonly filename: string;
-  readonly mimeType: string;
-  readonly bytes: Uint8Array;
-  readonly alt?: string;
-  readonly caption?: string;
-  readonly purpose?: string;
-  readonly now: number;
-  readonly metadata?: Readonly<Record<string, string>>;
-}
-
-export interface GetMediaPublicUrlRequest {
+export interface GetPublicUrlArgs {
   readonly assetId: string;
   readonly storageKey: string;
 }
 
-export interface DeleteMediaAssetRequest {
+export interface DeleteAssetArgs {
   readonly assetId: string;
   readonly storageKey: string;
 }

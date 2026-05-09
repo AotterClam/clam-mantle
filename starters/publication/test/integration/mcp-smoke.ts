@@ -85,11 +85,13 @@ async function main(): Promise<void> {
     const names = result.tools.map((t) => t.name).sort();
     const expected = [
       "archive_entry",
+      "commit_media_upload",
       "create_draft_contact_messages",
       "create_draft_page_translations",
       "create_draft_pages",
       "create_draft_post_translations",
       "create_draft_posts",
+      "create_media_upload",
       "get_entry",
       "list_entries",
       "request_publish",
@@ -102,7 +104,7 @@ async function main(): Promise<void> {
     ];
     assert.deepEqual(names, expected, `tools/list mismatch: got ${names.join(",")}`);
     console.log(
-      `[mcp]  2/12  tools/list → ${names.length} tools (5 generic + 10 per-collection)`,
+      `[mcp]  2/12  tools/list → ${names.length} tools (5 generic + 2 media + 10 per-collection)`,
     );
   }
 

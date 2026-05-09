@@ -5,10 +5,12 @@ import {
   D1StaffRepository,
   D1UserRepository,
   KvCacheBinding,
+  R2MediaStorage,
   StubOAuthVerifier,
   type AdminAuthConfig,
   type CmsConfig,
 } from "@aotter/mantle-cloudflare";
+import { AwsClient } from "aws4fetch";
 import {
   WorkersOAuthVerifier,
   createOAuthProvider,
@@ -56,6 +58,28 @@ export interface Env {
    *  every page immediately, no `pnpm fixture` rebake. Don't set in
    *  production — defeats the publish pipeline's KV cache. */
   readonly MANTLE_LOCAL_DEV?: string;
+  /** Optional R2 media bucket. When bound (in `wrangler.toml`'s
+   *  `[[r2_buckets]] binding = "MEDIA"`), the runtime registers
+   *  `create_media_upload` / `commit_media_upload` MCP tools and the
+   *  `/admin/api/media/uploads` admin lifecycle. Leave unbound to keep
+   *  first-run provisioning R2-free. */
+  readonly MEDIA?: R2Bucket;
+  /** Public read-base URL for media. `https://media.<domain>` for
+   *  custom domain, or `https://pub-<hash>.r2.dev` for the dev-only
+   *  fallback. Required when `MEDIA` is bound. */
+  readonly MEDIA_PUBLIC_URL_BASE?: string;
+  /** R2 S3 endpoint for THIS bucket. Format:
+   *  `https://<bucket>.<account>.r2.cloudflarestorage.com`. Used as
+   *  the host of presigned PUT URLs. Required when `MEDIA` is bound. */
+  readonly MEDIA_S3_ENDPOINT?: string;
+  /** R2 S3 access key id. Generate via R2 dashboard → Manage R2 API
+   *  Tokens. `wrangler secret put MEDIA_S3_ACCESS_KEY_ID`. */
+  readonly MEDIA_S3_ACCESS_KEY_ID?: string;
+  /** R2 S3 secret access key. `wrangler secret put MEDIA_S3_SECRET_ACCESS_KEY`. */
+  readonly MEDIA_S3_SECRET_ACCESS_KEY?: string;
+  /** Opt-in flag for SVG uploads. Defaults off — object stores don't
+   *  sanitize SVG payloads. */
+  readonly MEDIA_ALLOW_SVG?: string;
 }
 
 /**
@@ -96,8 +120,45 @@ export function buildCmsConfig(env: Env): CmsConfig {
             );
             return new WorkersOAuthVerifier(env.OAUTH_KV);
           })(),
+      ...buildMediaStorage(env),
     },
+    mediaAllowSvg: env.MEDIA_ALLOW_SVG === "1",
     adminAuth,
+  };
+}
+
+/** Wire `R2MediaStorage` only when ALL the env requires are present.
+ *  Partial config is a deployment error — fail loudly so the operator
+ *  notices, rather than silently dropping the feature. */
+function buildMediaStorage(env: Env): { mediaStorage?: R2MediaStorage } {
+  if (!env.MEDIA) return {};
+  const required = {
+    MEDIA_PUBLIC_URL_BASE: env.MEDIA_PUBLIC_URL_BASE,
+    MEDIA_S3_ENDPOINT: env.MEDIA_S3_ENDPOINT,
+    MEDIA_S3_ACCESS_KEY_ID: env.MEDIA_S3_ACCESS_KEY_ID,
+    MEDIA_S3_SECRET_ACCESS_KEY: env.MEDIA_S3_SECRET_ACCESS_KEY,
+  };
+  const missing = Object.entries(required)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (missing.length > 0) {
+    throw new Error(
+      `MEDIA bucket is bound but the following env vars are missing: ${missing.join(", ")}.`,
+    );
+  }
+  const s3 = new AwsClient({
+    accessKeyId: required.MEDIA_S3_ACCESS_KEY_ID!,
+    secretAccessKey: required.MEDIA_S3_SECRET_ACCESS_KEY!,
+    service: "s3",
+    region: "auto",
+  });
+  return {
+    mediaStorage: new R2MediaStorage(
+      env.MEDIA,
+      s3,
+      required.MEDIA_S3_ENDPOINT!,
+      required.MEDIA_PUBLIC_URL_BASE!,
+    ),
   };
 }
 

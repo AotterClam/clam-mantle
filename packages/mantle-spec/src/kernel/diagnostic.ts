@@ -76,7 +76,15 @@ export type DiagnosticCode =
   | "INTERNAL_ERROR"
   | "OUTPUT_VALIDATION_FAILED"
   // Locale-data invariants: boot + runtime.
-  | "INVALID_LOCALE";
+  | "INVALID_LOCALE"
+  // Media uploads (runtime-only). Adapter signs presigned PUTs; commit
+  // verifies metadata. Codes surface from Create / Commit use cases.
+  | "MEDIA_NOT_CONFIGURED"
+  | "MEDIA_UPLOAD_EXPIRED"
+  | "MEDIA_OBJECT_NOT_FOUND"
+  | "MEDIA_MIME_REJECTED"
+  | "MEDIA_SIZE_EXCEEDED"
+  | "MEDIA_SVG_REJECTED";
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
@@ -99,7 +107,7 @@ export interface Diagnostic {
  * Narrowed to a status-literal union so adding a code with a status
  * outside the v0.1 set fails compile.
  */
-export type RuntimeHttpStatus = 400 | 401 | 403 | 404 | 405 | 409 | 500 | 501;
+export type RuntimeHttpStatus = 400 | 401 | 403 | 404 | 405 | 409 | 410 | 500 | 501;
 
 export const HTTP_STATUS_BY_CODE: Readonly<Partial<Record<DiagnosticCode, RuntimeHttpStatus>>> = {
   INPUT_VALIDATION_FAILED: 400,
@@ -119,6 +127,12 @@ export const HTTP_STATUS_BY_CODE: Readonly<Partial<Record<DiagnosticCode, Runtim
   // check failed, rate limit hit, etc.); the structured diagnostic
   // includes the failing hook's name for surfacing to the caller.
   LIFECYCLE_HOOK_REJECTED: 409,
+  MEDIA_NOT_CONFIGURED: 501,
+  MEDIA_UPLOAD_EXPIRED: 410,
+  MEDIA_OBJECT_NOT_FOUND: 409,
+  MEDIA_MIME_REJECTED: 400,
+  MEDIA_SIZE_EXCEEDED: 400,
+  MEDIA_SVG_REJECTED: 400,
 };
 
 /** Resolve a Diagnostic's HTTP status for wire egress; unknown codes

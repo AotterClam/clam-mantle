@@ -61,7 +61,16 @@ export interface CmsConfig {
   readonly bindings: Pick<
     CreateCmsRuntimeArgs,
     "db" | "kv" | "sessions" | "assets" | "oauth" | "users" | "staff"
-  >;
+  > & {
+    /** Optional media storage adapter. When set, media MCP tools and
+     *  `/admin/api/media/*` endpoints are registered. Forwarded to the
+     *  runtime as `mediaStorage`. */
+    readonly mediaStorage?: CreateCmsRuntimeArgs["mediaStorage"];
+  };
+  /** Pass-through to runtime: SVG opt-in flag (default false). */
+  readonly mediaAllowSvg?: boolean;
+  /** Pass-through to runtime: byte ceiling for uploads (default 25MB). */
+  readonly mediaMaxBytes?: number;
   /** Optional. Supply to enable GitHub admin auth + OAuth consent UI +
    *  DCR endpoints. Without this, the `/admin/auth/*` and `/oauth/*`
    *  routes are not registered and the MCP endpoint requires a

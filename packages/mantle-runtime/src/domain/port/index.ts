@@ -50,19 +50,13 @@ export type {
 } from "./PublishOrchestrator.js";
 export type {
   MediaStorage,
-  CreateMediaUploadRequest,
-  CreateMediaUploadResponse,
-  CommitMediaUploadRequest,
-  PutMediaObjectRequest,
-  GetMediaPublicUrlRequest,
-  DeleteMediaAssetRequest,
+  CreateUploadArgs,
+  CreateUploadResult,
+  CommitUploadArgs,
+  GetPublicUrlArgs,
+  DeleteAssetArgs,
   MediaAsset,
 } from "./MediaStorage.js";
-export type {
-  RemoteMediaFetcher,
-  FetchAllowedUrlRequest,
-  FetchedMedia,
-} from "./RemoteMediaFetcher.js";
 export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,

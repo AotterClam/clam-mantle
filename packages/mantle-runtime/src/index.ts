@@ -45,19 +45,13 @@ export type {
 } from "./domain/port/StaffRepository.js";
 export type {
   MediaStorage,
-  CreateMediaUploadRequest,
-  CreateMediaUploadResponse,
-  CommitMediaUploadRequest,
-  PutMediaObjectRequest,
-  GetMediaPublicUrlRequest,
-  DeleteMediaAssetRequest,
+  CreateUploadArgs,
+  CreateUploadResult,
+  CommitUploadArgs,
+  GetPublicUrlArgs,
+  DeleteAssetArgs,
   MediaAsset,
 } from "./domain/port/MediaStorage.js";
-export type {
-  RemoteMediaFetcher,
-  FetchAllowedUrlRequest,
-  FetchedMedia,
-} from "./domain/port/RemoteMediaFetcher.js";
 
 // Identity-layer model types consumed by adapters implementing the auth ports.
 export type { User } from "./domain/model/User.js";
