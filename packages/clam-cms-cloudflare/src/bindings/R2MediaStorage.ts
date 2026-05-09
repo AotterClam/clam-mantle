@@ -63,7 +63,10 @@ export class R2MediaStorage implements MediaStorage {
     publicBase: string,
     /** ID source for `uploadId` and the random portion of `storageKey`.
      *  Defaults to `RandomUuidGenerator`; tests inject a deterministic
-     *  fake to assert exact key strings. */
+     *  fake to assert exact key strings. **Production must use a
+     *  CSPRNG-backed generator** — `uploadId` is bearer-token-equivalent
+     *  and a predictable storageKey leaks pre-commit object locations.
+     *  See `IdGenerator`'s "Security invariant". */
     private readonly idgen: IdGenerator = RandomUuidGenerator,
   ) {
     if (!publicBase) {
