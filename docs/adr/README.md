@@ -14,6 +14,7 @@ Records of *why* clam-cms ended up shaped this way. The numbering preserves POC 
 | [0010](0010-locale-and-translates.md) | Locale 3-layer (manifest / D1 site_config / data field) + translates pattern. Boot decoupled from `site_config` (issue #60 fix). | Accepted (refreshed) |
 | [0011](0011-adapter-port-spec.md) | Adapter port spec. Required runtime ports plus optional feature ports. CF impl + Netlify stub. | Accepted (new) |
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
+| [0013](0013-media-fields-and-optional-storage.md) | Media fields use URL-first semantics; first-party storage (R2 on Cloudflare) is optional and must not block first-run onboarding. | Accepted (new) |
 
 ## Reading order
 
@@ -24,7 +25,8 @@ If you're new to the codebase:
 3. **0007** — what running the SDK feels like as an AI author (and as the operator agent).
 4. **0011** — the boundary between the runtime and the adapter (most load-bearing for the rebuild).
 5. **0010** — how locale flows through the system.
-6. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
+6. **0013** — why media starts as URL fields and R2 stays opt-in.
+7. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
 
 ## What's NOT here (and why)
 
@@ -45,7 +47,7 @@ The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accum
 
 ## Contributing a new ADR
 
-1. Pick the next number (currently 0013).
+1. Pick the next number (currently 0014).
 2. File: `docs/adr/<NNNN>-<kebab-title>.md`.
 3. Sections: Status, Date, Context, Decision, Consequences, Alternatives, How to apply, Implementation status.
 4. Link from this README's table.

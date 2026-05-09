@@ -21,7 +21,7 @@ This repo is the OLTP side of that thesis applied to web content.
 
 You're an agent helping a (likely non-technical) user install or extend a clam-cms project.
 
-→ **Install a fresh blog** — start at [`skills/install/SKILL.md`](skills/install/SKILL.md).
+→ **Install a fresh publication/site** — start at [`skills/install/SKILL.md`](skills/install/SKILL.md).
 → **Add a new atom** (Schema / View / Procedure + http Trigger) to an existing starter — start at [`skills/extend/SKILL.md`](skills/extend/SKILL.md).
 → **Provision Cloudflare resources** (D1, KV, OAuth, Turnstile) and deploy — start at [`skills/provision/SKILL.md`](skills/provision/SKILL.md).
 
@@ -43,7 +43,7 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 | Package | Role |
 |---|---|
 | `@aotterclam/clam-cms-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
-| `@aotterclam/clam-cms-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + auth + MCP. Defines 5 adapter ports. |
+| `@aotterclam/clam-cms-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + auth + MCP. Defines required adapter ports plus optional feature ports. |
 | `@aotterclam/clam-cms-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
 | `@aotterclam/clam-cms-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS / Workers OAuth. |
 | `@aotterclam/clam-cms-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `clam-cms-runtime` adapter-agnostic. |
@@ -52,9 +52,10 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 | Starter | Status | What |
 |---|---|---|
-| `starters/blog/` | v0.1.0 | Single-author blog. Multi-locale posts, contact form (Cloudflare Turnstile), per-slug `.md` mirror, llms.txt. |
+| `starters/blog/` | v0.1.0 | Publication/site starter. Multi-locale posts/pages, contact form (Cloudflare Turnstile), per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| `starters/leads-inbox/` | v0.1.0 (planned) | Inquiry capture + lightweight CRM queue. May start as a documented variant before a dedicated directory lands. |
+| `starters/micro-shop/` | v0.1.0 (planned) | Small catalog + order intake for <100 orders/day. May start as a documented variant before a dedicated directory lands. |
 | `starters/social-blog/` | v0.2+ | Likes / comments / private posts. |
-| `starters/micro-shop/` | v0.1.0 (planned) | <100 orders/day. |
 | `starters/paid-feed/` | v0.2+ | Subscribe + per-item unlock (OF-style). |
 
 ## Repo conventions
