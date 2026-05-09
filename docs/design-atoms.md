@@ -397,10 +397,10 @@ Anything beyond this (`any:`, `owns:`, `withinMinutes:`, `contains:`,
 **v0.1.0 `handler.kind`**: `ref` (author-supplied function) or
 `builtin` (SDK-supplied CRUD shortcut). For `builtin`, declare
 `op: <create | update | upsert | delete>` and `schema: <Schema name>`
-in place of `ref`. Full spec in the Roadmap appendix § "Promoted to
-v0.1.0 (commit 4.x)." Until commit 4.3 wires the dispatch path the
-boot validator emits `HANDLER_BUILTIN_NOT_IN_V010` so authors get a
-clear "runtime not yet" instead of silent failure.
+in place of `ref`. The runtime dispatch path is implemented by
+`InvokeBuiltinUseCase`; the feature-named diagnostic remains as a
+defense-in-depth guard if a builtin Procedure reaches an unsupported
+runtime path.
 
 **Postgres analogue**: `CREATE FUNCTION send_contact_message(input
 JSONB) RETURNS JSONB LANGUAGE plpgsql AS $$ ... $$;`. PG functions are
@@ -439,10 +439,8 @@ shared.
 `lifecycle` (entry-writer hook). For `lifecycle`, declare `schema`,
 `on: [<hook>, ...]` from `LifecycleHook`, and optional `errorPolicy`
 (`abort` rejects only on `before_*` hooks; `continue` is the default).
-Full spec in the Roadmap appendix § "Promoted to v0.1.0 (commit 4.x)."
-Until commit 4.2 wires the entry-writer hook decorator the boot
-validator emits `LIFECYCLE_NOT_IN_V010` so a hook never silently
-no-ops.
+Lifecycle hooks are wired through `LifecycleHookingEntryRepository`, so
+MCP, admin, and builtin write paths share the same hook behavior.
 
 - `mcp` / `cron` / `queue` are **DRAFT (v0.2+)** — speculative, gated by
   concrete consumer demand. Same appendix § "DRAFT (v0.2+)."
@@ -473,7 +471,7 @@ tooling (Swagger UI, Redoc, openapi-generator, Stainless, Speakeasy)
 works unchanged:
 
 ```bash
-$ clam-cms openapi --out ./openapi.yaml
+$ clam-cms emit-openapi > ./openapi.json
 ```
 
 Mapping:
@@ -712,11 +710,8 @@ package stays portable across adapters.
 The atoms are locked at 4. Their **inner grammar** is intentionally
 narrow at v0.1.0 and grows in two tiers:
 
-1. **Promoted to v0.1.0 (commit 4.x)** — grammar lives in v0.1.0 and
-   parses; the runtime ships in the runtime-track commits 4.2 / 4.3.
-   Boot validator emits a feature-named code (e.g.
-   `LIFECYCLE_NOT_IN_V010`) until the corresponding runtime piece
-   lands so authors get a clear "not yet" instead of a silent no-op.
+1. **v0.1.0 shipped** — grammar parses and runtime behavior is wired
+   in the current rebuild.
 2. **v0.1.x committed** — on the patch-release roadmap. Spec is
    documented; implementation lands within the v0.1 series. Boot
    validator rejects these keys with a code naming the feature.
@@ -724,37 +719,29 @@ narrow at v0.1.0 and grows in two tiers:
    demand. Boot validator rejects with `DRAFT_KEY_USED`. May or may
    not ship — depends on whether real use cases apply pressure.
 
-### Promoted to v0.1.0 (commit 4.x)
+### v0.1.0 shipped
 
 #### `Trigger.source.kind: lifecycle` — bind a Procedure to a Schema event
 
-Grammar lives in v0.1.0 (commit 4.1 promotion). Runtime — the
-`LifecycleHookingEntryRepository` decorator that wraps the entry-writer
-chokepoint so MCP / admin / builtin paths all fire the same hooks —
-ships in commit 4.2. Until then, boot emits `LIFECYCLE_NOT_IN_V010`.
-Full shape lives further down; nothing about authoring changes between
-4.1 and 4.2.
+Grammar lives in v0.1.0. Runtime is the
+`LifecycleHookingEntryRepository` decorator wrapping the entry-writer
+chokepoint so MCP / admin / builtin paths all fire the same hooks.
+Full shape lives further down.
 
 #### `Procedure.handler.kind: builtin` — SDK-supplied CRUD Procedure
 
-Grammar lives in v0.1.0 (commit 4.1 promotion). Runtime — the
+Grammar lives in v0.1.0. Runtime is the
 `InvokeBuiltinUseCase` that dispatches `op: create | update | upsert
 | delete` against the entry-writer chokepoint with `x-clam-bind`
-stamping and `input ∩ Schema.properties` projection — ships in commit
-4.3. Until then, boot emits `HANDLER_BUILTIN_NOT_IN_V010`. Full shape
-lives further down; nothing about authoring changes between 4.1 and
-4.3.
+stamping and `input ∩ Schema.properties` projection. Full shape lives
+further down.
 
 ### v0.1.x committed
 
-> The two big subsections below — `handler.kind: builtin` and
-> `Trigger.source.kind: lifecycle` — describe shape spec for the
-> features that have been **promoted to v0.1.0 (commit 4.1)**. Spec
-> wording is unchanged from when they were v0.1.x-committed; the only
-> thing that moved is the boot validator's gate (parser accepts now,
-> runtime guard emits the feature-named code until commits 4.2 / 4.3
-> wire the runtime). The third subsection, `Schema.spec.lifecycle:
-> editorial`, remains v0.1.x-committed proper.
+> The `handler.kind: builtin` and `Trigger.source.kind: lifecycle`
+> sections below now describe shipped v0.1.0 behavior. The
+> `Schema.spec.lifecycle: editorial` subsection remains v0.1.x-
+> committed proper.
 
 #### `Schema.spec.lifecycle: editorial` runtime
 

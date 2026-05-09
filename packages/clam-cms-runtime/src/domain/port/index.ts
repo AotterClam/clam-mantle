@@ -3,10 +3,11 @@
  * Concrete implementations live in `infrastructure/` (or in adapter
  * packages like `@aotterclam/clam-cms-cloudflare`).
  *
- * The five ADR-0011 ports — `DatabaseDriver`, `KvCache`,
- * `SessionRepository`, `AssetServer`, `OAuthVerifier` — plus
- * dispatcher-internal ports `Clock`, `IdGenerator`, `HandlerRegistry`,
- * and the chokepoint `EntryRepository`.
+ * ADR-0011 required adapter ports — `DatabaseDriver`, `KvCache`,
+ * `SessionRepository`, `AssetServer`, `OAuthVerifier`,
+ * `UserRepository`, `StaffRepository` — plus optional feature ports
+ * and dispatcher-internal seams (`Clock`, `IdGenerator`,
+ * `HandlerRegistry`, `EntryRepository`, etc.).
  *
  * Per the Aotter clean-architecture convention, no `*Port` suffix;
  * ports are discoverable by the package alone.

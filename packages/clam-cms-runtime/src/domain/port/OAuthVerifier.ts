@@ -12,7 +12,7 @@
  * to unify the wire-level semantics; future adapters need only be
  * compatible at the verify-bearer-token boundary expressed below.
  *
- * See ADR-0011 § OAuthPort for the boundary rationale (and the
+ * See ADR-0011 § OAuthVerifier for the boundary rationale (and the
  * "Refinement (commit 4)" note that drops `mount()`).
  *
  * Renamed from `OAuthPort` per the clean-architecture naming

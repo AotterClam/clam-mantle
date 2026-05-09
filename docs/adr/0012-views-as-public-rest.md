@@ -9,7 +9,7 @@
 clam-cms ships two read-side surfaces and one write-side surface:
 
 - **Templates** (rendered HTML / Markdown / `llms.txt`) — composed by the consumer's `TemplateRegistry` from runtime APIs. The starter blog uses these for `/{locale}/posts/{slug}` etc.
-- **MCP tools** — agent-facing CRUD over the entry chokepoint. Per ADR-0014 (POC carry-forward) every Schema gets `create_draft_<n>` / `update_draft_<n>` per-collection authoring tools plus 4 generic tools (`list_entries`, `get_entry`, `request_publish`, `archive_entry`).
+- **MCP tools** — agent-facing CRUD over the entry chokepoint. Every Schema gets `create_draft_<n>` / `update_draft_<n>` per-collection authoring tools plus generic tools (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`, `archive_entry`).
 - **HTTP Triggers** — write-side endpoints declared by the consumer (`Trigger.source.kind: http`, methods `POST | PUT | PATCH | DELETE` only). Per ADR-0001 grammar, **`GET` is intentionally absent** because read endpoints belong to Views, not Procedures.
 
 What was missing: a stable, consumer-facing **public REST read surface**. The starter blog had no JSON API at all. The CMS needed an answer to "I'm a downstream service that wants `posts` filtered by locale — how do I read?" without forcing every consumer to hand-write a route handler that re-implements filtering.

@@ -46,11 +46,11 @@ These optional ports must not force first-run provisioning to create R2
 resources. Publication starters can carry external image URLs without a
 media storage implementation.
 
-### `DatabasePort`
+### `DatabaseDriver`
 
 ```ts
 // packages/clam-cms-runtime/src/domain/port/DatabaseDriver.ts
-export interface DatabasePort {
+export interface DatabaseDriver {
   /** Run a parameterised query. Returns a typed result-set object — adapters
    *  normalise their native driver into this shape. */
   prepare(sql: string): PreparedStatement;
@@ -65,10 +65,10 @@ The runtime never sees `D1Database`, `Pool` (postgres), or any concrete driver. 
 
 The CF adapter's impl is a thin proxy over `env.DB` (D1). A future Postgres-via-Hyperdrive adapter wraps `pg` to the same shape; a Netlify adapter could wrap Neon, Supabase, or PlanetScale.
 
-### `KvPort`
+### `KvCache`
 
 ```ts
-export interface KvPort {
+export interface KvCache {
   get(key: string): Promise<string | null>;
   put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
@@ -79,24 +79,24 @@ export interface KvPort {
 
 CF adapter: Workers KV. Future: Redis, FS, S3-compatible store.
 
-### `SessionPort`
+### `SessionRepository`
 
 ```ts
-export interface SessionPort {
+export interface SessionRepository {
   read(token: string): Promise<Session | null>;
   write(session: Session): Promise<void>;
   invalidate(token: string): Promise<void>;
 }
 ```
 
-CF adapter: D1-backed session table (same `DatabasePort` instance, but the runtime has its own typed surface so callers don't write SQL). Future: signed JWT (no read-back), Redis, etc.
+CF adapter: D1-backed session table (same `DatabaseDriver` instance, but the runtime has its own typed surface so callers don't write SQL). Future: signed JWT (no read-back), Redis, etc.
 
-`SessionPort` looks like a redundant abstraction over `DatabasePort` for the CF case — it isn't. SessionPort lets adapters use a fast / cheap session store (Redis, signed cookies) without touching the canonical DB. The CF impl happens to use D1 for v0.1.0 simplicity.
+`SessionRepository` looks like a redundant abstraction over `DatabaseDriver` for the CF case — it isn't. It lets adapters use a fast / cheap session store (Redis, signed cookies) without touching the canonical DB. The CF impl happens to use D1 for v0.1.0 simplicity.
 
-### `AssetsPort`
+### `AssetServer`
 
 ```ts
-export interface AssetsPort {
+export interface AssetServer {
   /** Resolve a request to a static asset (typically under `/admin/assets/*`).
    *  Returns null if the asset doesn't exist — the adapter's HTTP layer
    *  then falls back to the SPA catchall. */
@@ -106,12 +106,12 @@ export interface AssetsPort {
 
 CF adapter: wraps `env.ASSETS.fetch(req)`. Future: filesystem read, S3+CDN, Netlify static-publish dir.
 
-The admin SPA itself lives in `@aotterclam/clam-cms-admin-ui` as a pre-built `dist/`. The adapter binds `AssetsPort` to whatever serves that `dist/`; the runtime knows nothing about static asset serving except "ask the port and pass through the response."
+The admin SPA itself lives in `@aotterclam/clam-cms-admin-ui` as a pre-built `dist/`. The adapter binds `AssetServer` to whatever serves that `dist/`; the runtime knows nothing about static asset serving except "ask the port and pass through the response."
 
-### `OAuthPort`
+### `OAuthVerifier`
 
 ```ts
-export interface OAuthPort {
+export interface OAuthVerifier {
   /** Verify an MCP request's bearer token against the provider's state. */
   verifyAccessToken(req: Request): Promise<OAuthIdentity | null>;
 }
@@ -126,28 +126,41 @@ This is the most adapter-shaped port — different runtimes have different OAuth
 ## How adapters wire ports
 
 ```ts
-// (intent — exact shape lands in commit 6)
+// simplified Cloudflare adapter wiring
 import { createCmsRuntime } from "@aotterclam/clam-cms-runtime";
-import { d1DatabasePort } from "./ports/database.js";
-import { kvKvPort } from "./ports/kv.js";
-import { d1SessionPort } from "./ports/session.js";
-import { workersAssetsPort } from "./ports/assets.js";
-import { workersOAuthPort } from "./ports/oauth.js";
+import {
+  AssetsAssetServer,
+  D1DatabaseDriver,
+  D1SessionRepository,
+  D1StaffRepository,
+  D1UserRepository,
+  KvCacheBinding,
+  WorkersOAuthVerifier,
+} from "@aotterclam/clam-cms-cloudflare";
 
 export function mountAdmin(app: Hono, config: CmsConfig): Hono {
   const runtime = createCmsRuntime({
-    db: d1DatabasePort(env.DB),
-    kv: kvKvPort(env.RENDER_KV),
-    session: d1SessionPort(env.DB),
-    assets: workersAssetsPort(env.ASSETS),
-    oauth: workersOAuthPort(env.OAUTH_KV),
+    db: new D1DatabaseDriver(env.DB),
+    kv: new KvCacheBinding(env.KV),
+    sessions: new D1SessionRepository(env.DB),
+    assets: new AssetsAssetServer(env.ASSETS),
+    oauth: new WorkersOAuthVerifier(env.OAUTH_KV),
+    users: new D1UserRepository(env.DB),
+    staff: new D1StaffRepository(env.DB),
+    manifests,
+    handlers,
   });
   // ... wire runtime to Hono routes
   return app;
 }
 ```
 
-The runtime gets the 7 ports as a constructor object. There's no module-global state holding adapter-specific bindings (POC's `db-init.ts > stashedSiteDefaults` was the closest thing to that and survived only because the stash was framework-agnostic; with explicit ports there's no temptation to add module globals).
+The runtime gets the 7 required adapter ports as a constructor object,
+alongside manifests, handlers, templates, and site defaults. There's
+no module-global state holding adapter-specific bindings (POC's
+`db-init.ts > stashedSiteDefaults` was the closest thing to that and
+survived only because the stash was framework-agnostic; with explicit
+ports there's no temptation to add module globals).
 
 ## Consequences
 
@@ -172,7 +185,7 @@ The runtime gets the 7 ports as a constructor object. There's no module-global s
 
 **(b) Concrete CF types in runtime** — Just `import type { D1Database } from "@cloudflare/workers-types"` directly into `clam-cms-runtime`. Treat "CF-only" as a v0.1.0 reality, defer the abstraction. **Rejected**: this is what the POC did (via `cms-server` having implicit assumptions about D1 shape) and it's the trap the rebuild exists to escape. Once concrete CF types land in runtime, removing them is a multi-PR uplift later. Cheaper to do it right at v0.1.0.
 
-**(c) Function-injection (no interfaces, just functions)** — Runtime accepts a record of functions: `{ dbPrepare, kvGet, kvPut, sessionRead, … }`. **Rejected**: TypeScript interfaces are more discoverable (an adapter author IDE-jumps from `DatabasePort` to its surface; jumping from `dbPrepare` is harder). Interfaces also document grouping; functions don't.
+**(c) Function-injection (no interfaces, just functions)** — Runtime accepts a record of functions: `{ dbPrepare, kvGet, kvPut, sessionRead, … }`. **Rejected**: TypeScript interfaces are more discoverable (an adapter author IDE-jumps from `DatabaseDriver` to its surface; jumping from `dbPrepare` is harder). Interfaces also document grouping; functions don't.
 
 **(d) Plugin pattern (each port is a separate package)** — `@aotterclam/clam-cms-port-database`, `@aotterclam/clam-cms-port-kv`, etc., and runtime depends on one package per port. **Rejected**: the port set is too small to warrant per-port packages. The current 5-package structure (spec / runtime / admin-ui / cloudflare / netlify) is already at the boundary of "too many"; splitting further increases the maintenance tax without useful benefit. Ports are TS interfaces in `clam-cms-runtime`'s `src/domain/port/` directory — that's enough.
 
@@ -189,9 +202,9 @@ When you're authoring `@aotterclam/clam-cms-runtime` code:
 When you're authoring an adapter (`@aotterclam/clam-cms-cloudflare` for v0.1.0; future `clam-cms-netlify`, `clam-cms-bun`, …):
 
 1. Read `clam-cms-runtime/src/domain/port/`. Implement each required port against your runtime's primitives.
-2. Compose the runtime via `createCmsRuntime({ db, kv, session, assets, oauth })`.
+2. Compose the runtime via `createCmsRuntime({ db, kv, sessions, assets, oauth, users, staff, manifests, ... })`.
 3. Bind to your HTTP framework — Hono on CF, Netlify Functions handler, raw `fetch` Worker, …
-4. Bundle `@aotterclam/clam-cms-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetsPort` to it.
+4. Bundle `@aotterclam/clam-cms-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetServer` to it.
 
 When you're reviewing a PR:
 

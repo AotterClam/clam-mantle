@@ -243,11 +243,9 @@ export interface ProcedureManifestSpec {
   readonly input: JsonSchema;
   /** JSON Schema for the response body. */
   readonly output: JsonSchema;
-  /** Handler binding. v0.1.0 ships `kind: "ref"` only (consumer registers
-   *  via `sdk.registerHandler(ref, fn)` at boot). `kind: "builtin"`
-   *  (5-op CRUD shortcut over the storage adapter) is v0.1.x-committed
-   *  but not yet implemented; the parser rejects it today with
-   *  HANDLER_BUILTIN_NOT_IN_V010. See ADR-0001 § "What's DRAFT". */
+  /** Handler binding. v0.1.0 ships `kind: "ref"` (consumer supplies
+   *  a handler map) and `kind: "builtin"` (5-op CRUD shortcut over
+   *  the entry-writer chokepoint). */
   readonly handler: HandlerBinding;
 }
 
