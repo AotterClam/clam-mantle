@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SESSION_COOKIE } from "@aotter/mantle-runtime";
 import type {
   CommitUploadArgs,
   CreateUploadArgs,
@@ -136,13 +137,7 @@ async function harness(opts: { withMedia: boolean }): Promise<Harness> {
 }
 
 function adminCookie(token: string): string {
-  return `${getDefaultCookieName()}=${token}`;
-}
-
-// Hard-coded — duplicating the constant here keeps the test fixture
-// readable without depending on a runtime barrel re-export.
-function getDefaultCookieName(): string {
-  return "mantle_session";
+  return `${DEFAULT_SESSION_COOKIE}=${token}`;
 }
 
 describe("smoke: /admin/api/media/uploads", () => {

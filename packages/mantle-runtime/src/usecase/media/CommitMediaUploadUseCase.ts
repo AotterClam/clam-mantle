@@ -10,14 +10,7 @@ import {
   DEFAULT_MAX_BYTES,
   PENDING_UPLOAD_KV_PREFIX,
 } from "./mediaAllowlist.js";
-
-interface PendingUploadRecord {
-  readonly storageKey: string;
-  readonly expectedMimeType: string;
-  readonly expectedSize?: number;
-  readonly expiresAt: number;
-  readonly createdAt: number;
-}
+import type { PendingUploadRecord } from "./PendingUploadRecord.js";
 
 export class CommitMediaUploadUseCase {
   constructor(

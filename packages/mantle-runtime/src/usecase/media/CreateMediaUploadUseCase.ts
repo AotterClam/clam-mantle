@@ -19,14 +19,7 @@ import {
   UPLOAD_URL_TTL_SECONDS,
   isAllowedMime,
 } from "./mediaAllowlist.js";
-
-interface PendingUploadRecord {
-  readonly storageKey: string;
-  readonly expectedMimeType: string;
-  readonly expectedSize?: number;
-  readonly expiresAt: number;
-  readonly createdAt: number;
-}
+import type { PendingUploadRecord } from "./PendingUploadRecord.js";
 
 export class CreateMediaUploadUseCase {
   constructor(
