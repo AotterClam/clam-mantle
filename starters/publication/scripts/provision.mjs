@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Single-shot provision orchestrator for starters/blog.
+ * Single-shot provision orchestrator for starters/publication.
  *
  * Two subcommands:
  *

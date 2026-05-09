@@ -180,7 +180,7 @@ importers:
         specifier: ^3.103.2
         version: 3.114.17(@cloudflare/workers-types@4.20260504.1)
 
-  starters/blog:
+  starters/publication:
     dependencies:
       '@aotterclam/clam-cms-cloudflare':
         specifier: workspace:*

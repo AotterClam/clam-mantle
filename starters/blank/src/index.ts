@@ -20,10 +20,10 @@ import { buildCmsConfig, type Env } from "./clamConfig.js";
  * MCP auth is bearer-token-only via the runtime `OAuthVerifier` port
  * (StubOAuthVerifier behind `CLAM_ALLOW_STUB_OAUTH=1` for dev). No
  * `/oauth/{authorize,token,register}` consent-UI route is mounted here;
- * use `starters/blog` if you need the full admin OAuth consent flow.
+ * use `starters/publication` if you need the full admin OAuth consent flow.
  *
  * If you decide to render HTML on the server later, swap to
- * `starters/blog` (or copy its `mountPublicRoutes` setup back in).
+ * `starters/publication` (or copy its `mountPublicRoutes` setup back in).
  */
 let appCache: Hono | null = null;
 

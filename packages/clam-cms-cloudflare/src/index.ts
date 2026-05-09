@@ -11,9 +11,10 @@
  *     port. When `adminAuth` is supplied, `mountServerEndpoints`
  *     also mounts GitHub sign-in plus OAuth discovery, DCR, token, and
  *     consent routes backed by `@cloudflare/workers-oauth-provider`.
- *   - `mountPublicRoutes` — Hono factory mounting the rendered-blog
- *     surface (`/{locale}/{collection}/{slug}`, `/sitemap.xml`,
- *     `.md` mirror, `llms.txt`). Opt-in; `starters/blank` skips it.
+ *   - `mountPublicRoutes` — Hono factory mounting the rendered
+ *     publication surface (`/{locale}/{collection}/{slug}`,
+ *     `/sitemap.xml`, `.md` mirror, `llms.txt`). Opt-in;
+ *     `starters/blank` skips it.
  *
  * MUST be the only place in the codebase importing `D1Database`,
  * `KVNamespace`, etc. The runtime layer (`@aotterclam/clam-cms-runtime`)

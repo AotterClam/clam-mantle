@@ -50,13 +50,17 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 ## Starters
 
-| Starter | Status | What |
-|---|---|---|
-| `starters/blog/` | v0.1.0 | Publication/site starter. Multi-locale posts/pages, contact form (Cloudflare Turnstile), per-slug `.md` mirror, llms.txt, SEO/AEO. |
-| `starters/leads-inbox/` | v0.1.0 (planned) | Inquiry capture + lightweight CRM queue. May start as a documented variant before a dedicated directory lands. |
-| `starters/micro-shop/` | v0.1.0 (planned) | Small catalog + order intake for <100 orders/day. May start as a documented variant before a dedicated directory lands. |
-| `starters/social-blog/` | v0.2+ | Likes / comments / private posts. |
-| `starters/paid-feed/` | v0.2+ | Subscribe + per-item unlock (OF-style). |
+Six-family taxonomy (#58). v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
+
+| Starter | Family | Status | What |
+|---|---|---|---|
+| `starters/publication/` | publication | v0.1.0 (available) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| `starters/blank/` | — | v0.1.0 (available) | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
+| `starters/leads-inbox/` | leads-inbox | v0.1.0 (planned) | Multi-form intake + lead status (new / qualified / contacted / won / lost) + assignment + agent-operated follow-up. May ship initially as a documented variant of `publication` before a dedicated directory lands. |
+| `starters/micro-shop/` | micro-shop | v0.1.0 (planned) | Small catalog + order intake on pure D1 (~100 orders/day). Stripe Checkout, cookie cart, agent-operated order handling. |
+| `starters/booking/` | booking | v0.2+ | Services / availability / appointment requests / reminders / cancellation. Blocks on DO + Queue infra (issue #21). |
+| `starters/community/` | community | v0.2+ | Member posts, comments, likes, reactions, moderation queue, agent-assisted moderation. Blocks on end-user auth (v0.2). |
+| `starters/fan-club/` | fan-club | v0.2+ | Creator/member content with private posts and membership tiers. Blocks on end-user auth + row-level visibility grammar + Stripe entitlement. |
 
 ## Repo conventions
 

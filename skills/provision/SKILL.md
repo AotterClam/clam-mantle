@@ -16,7 +16,7 @@ End state for this Skill:
 - `wrangler.toml` points at those resource IDs.
 - Worker secrets are set.
 - The Worker deploys without `CLAM_ALLOW_STUB_OAUTH`.
-- For `starter: blog`, initial home/about/contact/welcome content is seeded directly to D1/KV.
+- For `starter: publication`, initial home/about/contact/welcome content is seeded directly to D1/KV.
 - Public URL and MCP URL are printed.
 - Post-deploy smoke proves unauthenticated MCP is rejected.
 - The user has instructions for connecting a second AI agent to MCP.
@@ -27,7 +27,7 @@ Use values from the website-generated starting prompt or the install Skill hando
 
 ```yaml
 project_name: "<worker-safe-name>"
-starter: "blog" # blog | blank
+starter: "publication" # publication | blank
 github_username: "<verified-by-website>"
 locales: ["en", "zh-TW"]
 origin: "https://example.com" # may be replaced after deploy
@@ -36,13 +36,13 @@ seed_file: "initial-seed.json"
 
 If `github_username` was verified by the website, still confirm local `gh auth status`; the Worker secret must match the GitHub login that signs in through OAuth.
 
-For the first v0.1.0 production proof, `starter: blog` is the supported path. It assumes the copied blog manifests stay fixed during bootstrap; provision only deploys infra, applies initial public content, bootstraps the owner, and proves MCP operation.
+For the first v0.1.0 production proof, `starter: publication` is the supported path. It assumes the copied publication manifests stay fixed during bootstrap; provision only deploys infra, applies initial public content, bootstraps the owner, and proves MCP operation.
 
-`starters/blank` is the right surface for bootstrap-time workflow design. If the user wants to define their own Schemas, Views, Procedures, or Triggers before first deploy, switch to the blank/custom-app path instead of mutating `blog`. Blank must have the same real OAuth/DCR wiring as `blog` before claiming production MCP operation.
+`starters/blank` is the right surface for bootstrap-time workflow design. If the user wants to define their own Schemas, Views, Procedures, or Triggers before first deploy, switch to the blank/custom-app path instead of mutating `publication`. Blank must have the same real OAuth/DCR wiring as `publication` before claiming production MCP operation.
 
 ## POC-Proven Flow Invariants
 
-The previous `clam-cms-poc` blog Skill successfully validated this flow. Preserve these details:
+The previous `clam-cms-poc` blog Skill (now `publication`) successfully validated this flow. Preserve these details:
 
 - Talk in user-facing terms: "creating storage for posts" is better than "creating a D1 binding".
 - Use browser auth first for GitHub. For Cloudflare, non-technical users may be better served by a scoped API token copied from the dashboard than an interactive terminal login.
@@ -233,7 +233,7 @@ curl -s -o /dev/null -w '%{http_code}\n' "$BASE/mcp"
 
 Expected: `401`.
 
-For `blog`, also check:
+For `publication`, also check:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' "$BASE/"
@@ -255,13 +255,13 @@ Expected:
 
 Do not submit real contact/order forms as smoke unless the user asked for test records.
 
-Do not treat an empty blog as product success. If public pages are empty, fix `initial-seed.json` and re-run `seed:initial --remote` before handoff.
+Do not treat an empty publication as product success. If public pages are empty, fix `initial-seed.json` and re-run `seed:initial --remote` before handoff.
 
 ### 6. Second-agent operating proof
 
 After MCP OAuth succeeds, ask the second agent to run the starter's core workflow.
 
-For `blog`:
+For `publication`:
 
 - List MCP tools.
 - List existing welcome/home/about content.
@@ -280,7 +280,7 @@ For `blank`:
 - List it through MCP.
 - Confirm the relevant View/API behavior.
 
-Only run the `blank` production proof after its `src/clamConfig.ts` uses `WorkersOAuthVerifier`, `createOAuthProvider`, `OAUTH_KV`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `ADMIN_GITHUB_LOGIN` like `starters/blog`.
+Only run the `blank` production proof after its `src/clamConfig.ts` uses `WorkersOAuthVerifier`, `createOAuthProvider`, `OAUTH_KV`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and `ADMIN_GITHUB_LOGIN` like `starters/publication`.
 
 This second-agent proof is the release gate. Do not call the install production-ready until this works.
 
@@ -313,7 +313,7 @@ Only print the raw MCP URL after explaining that the admin console also shows it
 | Worker boots but `/mcp` returns 500 | OAuth secrets failed to set | Re-pipe the secrets manually: `printf '%s' '<v>' \| pnpm exec wrangler secret put GITHUB_CLIENT_ID` (etc.); redeploy. |
 | Owner signs in but MCP consent returns 403 | `ADMIN_GITHUB_LOGIN` does not match GitHub login | Update with `wrangler secret put ADMIN_GITHUB_LOGIN`; sign in again. |
 | GitHub OAuth callback shows mismatch/error | OAuth App callback URL was registered wrong | Edit the OAuth App callback to exactly `<worker_url>/admin/auth/github/callback`. |
-| Public blog has no posts | Initial seed step failed during provision | Run `pnpm run seed:initial -- --seed-file initial-seed.json --origin "<worker_url>" --remote` directly. Do not run fixture against prod. |
+| Public publication has no posts | Initial seed step failed during provision | Run `pnpm run seed:initial -- --seed-file initial-seed.json --origin "<worker_url>" --remote` directly. Do not run fixture against prod. |
 
 ## Don't
 

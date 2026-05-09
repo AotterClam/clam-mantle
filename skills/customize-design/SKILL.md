@@ -1,14 +1,14 @@
 ---
 name: clam-cms customize-design
-description: Layer custom design over the publication/site starter at starters/blog using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
+description: Layer custom design over the publication/site starter at starters/publication using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
 when_to_invoke: |
-  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to starters/blog only — starters/blank has no UI to customize.
-applies_to: clam-cms@v0.1.0 + starters/blog
+  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to starters/publication only — starters/blank has no UI to customize.
+applies_to: clam-cms@v0.1.0 + starters/publication
 ---
 
 # Customize the design of a clam-cms publication site
 
-You are layering a consumer theme over `starters/blog/`. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
+You are layering a consumer theme over `starters/publication/`. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
 
 ## Layer cheatsheet
 
@@ -160,7 +160,7 @@ pnpm theme:fork templates/post.tsx
 
 Edit `src/theme/templates/post.tsx`. The forked file imports baseline Layout via `../../theme.default/components/Layout.js`. If you also forked Layout (rare — only if you also went L3 on every template), manually rewrite that import to your version.
 
-L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really a blog any more — would you like a docs site (`starters/docs`, v0.2) instead?"
+L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really `publication` any more — it sounds closer to `community` (member posts), `micro-shop` (catalog + orders), or `leads-inbox` (lead pipeline). The publication family covers landing / articles / docs-lite / basic contact; once you cross those lines, switching starter family is cheaper than forking more templates."
 
 Revert: `pnpm theme:reset templates/post.tsx`.
 

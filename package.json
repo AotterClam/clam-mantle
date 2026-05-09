@@ -19,8 +19,8 @@
     "typecheck": "pnpm -r --filter '@aotterclam/clam-cms-*' typecheck",
     "test": "pnpm -r --filter '@aotterclam/clam-cms-*' test",
     "check:boundaries": "node scripts/check-boundaries.mjs",
-    "check:starters": "pnpm -C starters/blog validate && pnpm -C starters/blog typecheck && pnpm -C starters/blank validate && pnpm -C starters/blank typecheck",
-    "check:starter-theme": "cd starters/blog && pnpm theme:fork tokens.ts && pnpm typecheck && pnpm theme:reset tokens.ts && pnpm typecheck",
+    "check:starters": "pnpm -C starters/publication validate && pnpm -C starters/publication typecheck && pnpm -C starters/blank validate && pnpm -C starters/blank typecheck",
+    "check:starter-theme": "cd starters/publication && pnpm theme:fork tokens.ts && pnpm typecheck && pnpm theme:reset tokens.ts && pnpm typecheck",
     "check": "pnpm run check:boundaries && pnpm build && pnpm install --frozen-lockfile && pnpm typecheck && pnpm run check:starters && pnpm test"
   },
   "packageManager": "pnpm@9.15.0"

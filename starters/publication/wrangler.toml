@@ -1,4 +1,4 @@
-name = "clam-blog"
+name = "clam-publication"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
@@ -15,16 +15,16 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "clam-blog-local"
+database_name = "clam-publication-local"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "kv-clam-blog-local"
+id = "kv-clam-publication-local"
 
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "kv-clam-blog-oauth-local"
+id = "kv-clam-publication-oauth-local"
 
 # Bundle YAML manifests as inline text strings — TS imports them via
 # `?raw` query param, esbuild resolves to a string export at build time.
@@ -51,16 +51,16 @@ TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
 
 [[env.test.d1_databases]]
 binding = "DB"
-database_name = "clam-blog-test"
+database_name = "clam-publication-test"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[env.test.kv_namespaces]]
 binding = "KV"
-id = "kv-clam-blog-test"
+id = "kv-clam-publication-test"
 
 [[env.test.kv_namespaces]]
 binding = "OAUTH_KV"
-id = "kv-clam-blog-oauth-test"
+id = "kv-clam-publication-oauth-test"
 
 [[env.test.rules]]
 type = "Text"

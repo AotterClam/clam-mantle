@@ -3,7 +3,7 @@
  *
  * The install/provision Skills ask the site owner for public copy and
  * write `initial-seed.json`; this script applies that seed directly to
- * D1 and KV so the first deployed blog is immediately useful. MCP is
+ * D1 and KV so the first deployed site is immediately useful. MCP is
  * intentionally reserved for ongoing operations after owner bootstrap.
  */
 import { execFileSync } from "node:child_process";

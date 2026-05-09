@@ -71,8 +71,8 @@ export function buildCmsConfig(env: Env): CmsConfig {
     handlers: buildHandlers(env),
     templates: buildTemplates(),
     siteDefaults: {
-      brand: "Clam Blog",
-      title: "Clam Blog",
+      brand: "Clam Publication",
+      title: "Clam Publication",
       description: "Reference starter for clam-cms — localized posts + contact form.",
       origin: "https://example.com",
       locales: ["en", "zh-TW"],

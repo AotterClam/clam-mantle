@@ -1,8 +1,8 @@
 {
-  "name": "@aotterclam/starter-blog",
+  "name": "@aotterclam/starter-publication",
   "version": "0.0.6-alpha",
   "private": true,
-  "description": "Reference starter for clam-cms v0.1.0. Localized posts (translates demo) + contact form (builtin + lifecycle hooks). Runs on wrangler dev with local D1 + KV.",
+  "description": "Reference publication starter for clam-cms v0.1.0 — owner-published content (articles / pages / docs-lite / basic contact form). Localized posts via translates; contact form via builtin + lifecycle hooks. Runs on wrangler dev with local D1 + KV.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
@@ -13,7 +13,7 @@
     "validate": "clam-cms validate",
     "introspect": "clam-cms introspect",
     "emit-openapi": "clam-cms emit-openapi > openapi.json",
-    "emit-types": "clam-cms emit-types --namespace BlogCms > clam-types.d.ts",
+    "emit-types": "clam-cms emit-types --namespace PublicationCms > clam-types.d.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm validate && pnpm typecheck",
     "deploy": "wrangler deploy",
