@@ -189,16 +189,22 @@ change immediately, no `pnpm fixture` rebake.
 Production / CI: leave `MANTLE_LOCAL_DEV` unset so the publish-pipeline
 path is exercised.
 
-## Stale-KV gotcha (when you change Layout / Header / shared chrome)
+## Stale-KV gotcha (when you change Layout / PageShell / Header / shared chrome)
 
 The starter renders **registered templates** (post / postList / page) at
 publish time and caches the HTML in KV. **Request-time templates** (home
 / contact / notFound) compose fresh on each request.
 
-If you change `src/templates/components/Layout.tsx`,
-`Header.tsx`, `styles.ts`, or `src/i18n/*.json` — the new chrome shows
-on home / contact / notFound immediately, but post / postList / page
-keep serving the OLD chrome from KV until you re-publish.
+If you change any module-init resolved chrome —
+`src/theme.default/components/Layout.tsx`, `PageShell.tsx`, `Header.tsx`,
+`Footer.tsx`, `styles.ts`, or `src/i18n/*.json` — or you fork any of
+those into `src/theme/` — the new chrome shows on home / contact /
+notFound immediately, but post / postList / page keep serving the OLD
+chrome from KV until you re-publish. PageShell is on the same module-
+init slot-resolution path as Header/Footer (Layout reads
+`overrides.components?.PageShell ?? BaselinePageShell` once at module
+init), so a forked PageShell triggers the same stale-KV behavior even
+though the override lives at a different layer.
 
 Local dev fix: `pnpm fixture` rebakes everything from seed data.
 

@@ -74,7 +74,7 @@ const overrides: ThemeOverride = {
 };
 ```
 
-`Layout` is intentionally NOT a customization slot — `Theme.ts` only allows Header / Footer overrides. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If you need to change `<head>` content beyond what tokens / extraCss can express, the path is L4 fork on every template (each takes responsibility for its own envelope), or pick another starter.
+`Layout` is intentionally NOT a customization slot — `Theme.ts` accepts Header, Footer, and PageShell overrides only. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If the user wants to reshape body layout (sidebar, sticky CTA, full-bleed sections, alternative Header / `<main>` / Footer arrangement), use the PageShell slot at L3. If they need to change `<head>` content beyond what tokens / extraCss can express, that crosses the starter-family line — switch starter rather than fork every template.
 
 Revert: `pnpm theme:reset tokens.ts`.
 
