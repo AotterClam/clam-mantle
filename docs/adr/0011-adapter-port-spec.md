@@ -10,7 +10,7 @@
 
 `@aotter/mantle-runtime` is adapter-agnostic. It owns dispatcher, entry-writer, view executor, content-ops, render pipeline, auth, and MCP. It depends only on `@aotter/mantle-spec` and a small set of TypeScript interfaces it defines itself.
 
-`@aotter/mantle-cloudflare` is the only adapter shipping in v0.1.0. It binds the runtime's interfaces against Cloudflare Workers' D1, KV, ASSETS, and `@cloudflare/workers-oauth-provider`.
+`@aotter/mantle-cloudflare` is the only adapter shipping in v0.1.0. It binds the runtime's interfaces against Cloudflare Workers' D1, KV, ASSETS, and supplies a Better Auth instance (per ADR-0014) for sign-in + MCP bearer validation.
 
 `@aotter/mantle-netlify` is a v0.2 stub — README only. It exists in the package layout as an engineering forcing function: with N=1 adapter, "adapter-agnostic" silently rots in PR review (a `D1Database` import slips into runtime, then a second, then five). With a second adapter visible in the workspace (even if its impl is a TODO), reviewers have somewhere to point when blocking the slip.
 
@@ -128,40 +128,48 @@ This is the most adapter-shaped port — different runtimes have different OAuth
 ## How adapters wire ports
 
 ```ts
-// simplified Cloudflare adapter wiring
-import { createCmsRuntime } from "@aotter/mantle-runtime";
+// simplified Cloudflare adapter wiring (post-ADR-0014)
+import { createCmsRef, mountServerEndpoints, mountMcp, createAuth } from "@aotter/mantle-cloudflare";
 import {
   AssetsAssetServer,
   D1DatabaseDriver,
-  D1SessionRepository,
-  D1StaffRepository,
-  D1UserRepository,
   KvCacheBinding,
-  WorkersOAuthVerifier,
 } from "@aotter/mantle-cloudflare";
 
-export function mountAdmin(app: Hono, config: CmsConfig): Hono {
-  const runtime = createCmsRuntime({
-    db: new D1DatabaseDriver(env.DB),
-    kv: new KvCacheBinding(env.KV),
-    sessions: new D1SessionRepository(env.DB),
-    assets: new AssetsAssetServer(env.ASSETS),
-    oauth: new WorkersOAuthVerifier(env.OAUTH_KV),
-    users: new D1UserRepository(env.DB),
-    staff: new D1StaffRepository(env.DB),
-    manifests,
-    handlers,
-  });
-  // ... wire runtime to Hono routes
-  return app;
-}
+export default {
+  fetch(req: Request, env: Env, ctx: ExecutionContext) {
+    const auth = createAuth({
+      database: env.DB,
+      baseURL: env.PUBLIC_ORIGIN,
+      secret: env.BETTER_AUTH_SECRET,
+      github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET },
+      adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+    });
+    const cms = createCmsRef({
+      manifests,
+      handlers,
+      bindings: {
+        db: new D1DatabaseDriver(env.DB),
+        kv: new KvCacheBinding(env.KV),
+        assets: new AssetsAssetServer(env.ASSETS),
+      },
+      auth,
+    });
+    const app = new Hono();
+    app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+    mountServerEndpoints(app, cms);
+    mountMcp(app, cms);
+    return app.fetch(req, env, ctx);
+  },
+};
 ```
 
-The runtime gets the 7 required adapter ports as a constructor object,
-alongside manifests, handlers, templates, and site defaults. There's
-no module-global state holding adapter-specific bindings (POC's
-`db-init.ts > stashedSiteDefaults` was the closest thing to that and
-survived only because the stash was framework-agnostic; with explicit
+The runtime gets three required adapter ports (`db`, `kv`, `assets`)
+plus the Better Auth instance, alongside manifests, handlers,
+templates, and site defaults. There's no module-global state holding
+adapter-specific bindings (POC's `db-init.ts > stashedSiteDefaults`
+was the closest thing to that and survived only because the stash was
+framework-agnostic; with explicit
 ports there's no temptation to add module globals).
 
 ## Consequences
