@@ -8,12 +8,26 @@ import type { Migration } from "../../domain/port/DatabaseDriver.js";
  *
  * Keep this list append-only. To change a table's shape, ship a new
  * `ALTER TABLE` migration with a new id.
+ *
+ * Pre-v0.1.0 only: this list is still reshaped freely because nothing
+ * has shipped yet. From v0.1.0 onwards it's strictly append-only.
  */
 export const CANONICAL_MIGRATIONS: readonly Migration[] = [
   {
     id: "0001-init",
-    description: "initial v0.1.0 schema: entries, revisions, approvals, users, staff, sessions, site_config",
+    description:
+      "v0.1.0 schema: content (entries / revisions / approvals / site_config) + Better Auth (user / session / account / verification + admin plugin fields + mcp/oidc-provider plugin tables) per ADR-0014",
+    // Auth tables are owned by Better Auth (per ADR-0014). For SQLite,
+    // Better Auth's adapter sets `supportsDates: false` +
+    // `supportsBooleans: false`, so date values are stored as ISO 8601
+    // strings (TEXT) and booleans as 0/1 (INTEGER). Column types follow
+    // Better Auth's getMigrations type map for the `sqlite` provider.
     sql: `
+      -- =========================================================
+      -- Content tables (clam-cms runtime — entries / revisions /
+      -- approvals / site_config)
+      -- =========================================================
+
       CREATE TABLE IF NOT EXISTS entries (
         id          TEXT PRIMARY KEY,
         collection  TEXT NOT NULL,
@@ -54,66 +68,16 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS approvals_by_entry
         ON approvals (entry_id);
 
-      CREATE TABLE IF NOT EXISTS users (
-        id         TEXT PRIMARY KEY,
-        email      TEXT,
-        name       TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS social_logins (
-        user_id      TEXT NOT NULL,
-        provider     TEXT NOT NULL,
-        provider_uid TEXT NOT NULL,
-        login        TEXT,
-        updated_at   INTEGER NOT NULL,
-        PRIMARY KEY (user_id, provider),
-        UNIQUE (provider, provider_uid)
-      );
-
-      CREATE TABLE IF NOT EXISTS github_tokens (
-        user_id      TEXT PRIMARY KEY,
-        access_token TEXT NOT NULL,
-        scope        TEXT NOT NULL,
-        updated_at   INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS staff (
-        user_id     TEXT PRIMARY KEY,
-        role        TEXT NOT NULL,
-        granted_by  TEXT,
-        granted_at  INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        token       TEXT PRIMARY KEY,
-        user_id     TEXT NOT NULL,
-        created_at  INTEGER NOT NULL,
-        expires_at  INTEGER NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS sessions_by_user
-        ON sessions (user_id);
-
       CREATE TABLE IF NOT EXISTS site_config (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
-    `,
-  },
-  {
-    id: "0002-better-auth-schema",
-    description: "Better Auth tables (admin + mcp plugins) per ADR-0014",
-    // Better Auth tables are singular by convention — `user`, `session`,
-    // `account`, `verification` — and live alongside the legacy plural
-    // tables (`users`, `sessions`, `staff`) until the v0.1.0 cleanup
-    // commit drops the legacy ones. For SQLite, Better Auth's adapter
-    // sets `supportsDates: false` + `supportsBooleans: false`, so date
-    // values are stored as ISO 8601 strings (TEXT) and booleans as 0/1
-    // (INTEGER). Column types follow Better Auth's getMigrations type
-    // map for the `sqlite` provider.
-    sql: `
-      -- Core: user (with admin plugin fields + githubLogin custom field)
+
+      -- =========================================================
+      -- Better Auth tables (ADR-0014). Singular names by convention.
+      -- =========================================================
+
+      -- user (with admin plugin fields + githubLogin custom field)
       CREATE TABLE IF NOT EXISTS user (
         id            TEXT PRIMARY KEY NOT NULL,
         name          TEXT NOT NULL,
@@ -129,7 +93,7 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
         githubLogin   TEXT
       );
 
-      -- Core: session (with admin plugin impersonatedBy field)
+      -- session (with admin plugin impersonatedBy field)
       CREATE TABLE IF NOT EXISTS session (
         id             TEXT PRIMARY KEY NOT NULL,
         expiresAt      TEXT NOT NULL,
@@ -143,7 +107,7 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
       );
       CREATE INDEX IF NOT EXISTS session_userId_idx ON session (userId);
 
-      -- Core: account (one row per linked credential — github / email-otp / ...)
+      -- account (one row per linked credential — github / email-otp / ...)
       CREATE TABLE IF NOT EXISTS account (
         id                       TEXT PRIMARY KEY NOT NULL,
         accountId                TEXT NOT NULL,
@@ -161,7 +125,7 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
       );
       CREATE INDEX IF NOT EXISTS account_userId_idx ON account (userId);
 
-      -- Core: verification (magic-link / OTP / email-verify tokens)
+      -- verification (magic-link / OTP / email-verify tokens)
       CREATE TABLE IF NOT EXISTS verification (
         id         TEXT PRIMARY KEY NOT NULL,
         identifier TEXT NOT NULL,

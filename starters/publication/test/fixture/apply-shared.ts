@@ -108,14 +108,18 @@ function buildSql(opts: ApplyFixtureOptions): string {
     );
   }
 
+  // Better Auth's `user` table: dates are ISO 8601 strings (the kysely
+  // adapter's `supportsDates: false` path serializes Date → string).
+  // emailVerified is required (DEFAULT 0). For the test profile we
+  // pre-set role='editor' so mcp-smoke / view-smoke can authenticate
+  // an editor without going through the GitHub OAuth flow; the dev
+  // profile leaves role NULL so the first GitHub sign-in fires
+  // ensureBootstrapOwner and lands the operator at role='owner'.
+  const fixtureNowIso = new Date(FIXTURE_NOW).toISOString();
+  const userRole = opts.seedStaffEditor ? "'editor'" : "NULL";
   lines.push(
-    `INSERT OR IGNORE INTO users (id, email, name, created_at) VALUES ('${FIXTURE_AUTHOR_ID}', 'editor@example.com', 'Demo Editor', ${FIXTURE_NOW});`,
+    `INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt, role) VALUES ('${FIXTURE_AUTHOR_ID}', 'Demo Editor', 'editor@example.com', 1, '${fixtureNowIso}', '${fixtureNowIso}', ${userRole});`,
   );
-  if (opts.seedStaffEditor) {
-    lines.push(
-      `INSERT OR IGNORE INTO staff (user_id, role, granted_by, granted_at) VALUES ('${FIXTURE_AUTHOR_ID}', 'editor', NULL, ${FIXTURE_NOW});`,
-    );
-  }
 
   let postIndex = 1;
   for (const post of FIXTURE_POSTS) {
