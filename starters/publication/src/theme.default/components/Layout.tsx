@@ -60,6 +60,7 @@ export function Layout(props: LayoutProps) {
         {seo ? html`${raw(renderSeoTagsHtml(seo))}` : null}
         {!seo && description ? <meta name="description" content={description} /> : null}
         {!seo && ogImage ? <meta property="og:image" content={ogImage} /> : null}
+        <link rel="icon" type="image/svg+xml" href={site.faviconUrl ?? "/favicon.svg"} />
         <style>{raw(SITE_CSS_RESOLVED)}</style>
         {html`<script>${raw(THEME_BOOTSTRAP_JS)}</script>`}
       </head>

@@ -21,6 +21,7 @@ import {
 import { indexHtml } from "@aotterclam/clam-cms-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
+import { AOTTER_CLAM_FAVICON_SVG } from "../assets/aotterClamFavicon.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
@@ -55,6 +56,50 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     new Response(indexHtml, {
       headers: { "content-type": "text/html; charset=utf-8" },
     });
+
+  app.get("/favicon.svg", () =>
+    new Response(AOTTER_CLAM_FAVICON_SVG, {
+      headers: {
+        "content-type": "image/svg+xml; charset=utf-8",
+        "cache-control": "public, max-age=86400",
+      },
+    }),
+  );
+
+  for (const path of [
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/oauth-protected-resource",
+  ]) {
+    app.get(path, async (c) => {
+      const url = new URL(c.req.url);
+      url.pathname = `/api/auth${url.pathname}`;
+      const res = await auth.handler(
+        new Request(url.toString(), { method: "GET", headers: c.req.raw.headers }),
+      );
+      if (!res.ok) return res;
+      const origin = new URL(c.req.url).origin;
+      const body = await res.json() as Record<string, unknown>;
+      if (path !== "/.well-known/oauth-authorization-server") {
+        return Response.json({
+          ...body,
+          logo_uri: `${origin}/favicon.svg`,
+        });
+      }
+      return Response.json({
+        ...body,
+        logo_uri: `${origin}/favicon.svg`,
+        scopes_supported: [
+          "openid",
+          "profile",
+          "email",
+          "offline_access",
+          "mcp:read",
+          "mcp:staff",
+        ],
+      });
+    });
+  }
+
   for (const path of [
     "/admin",
     "/admin/",

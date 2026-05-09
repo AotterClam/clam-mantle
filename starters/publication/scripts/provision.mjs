@@ -336,7 +336,7 @@ Provision complete
 Public URL:  ${ctx.workerUrl}
 Staff MCP:   ${ctx.workerUrl}/staff/mcp
 User MCP:    ${ctx.workerUrl}/mcp
-Sign in:     ${ctx.workerUrl}/admin/auth/github
+Sign in:     ${ctx.workerUrl}/admin/sign-in
 
 Cloudflare resources are scoped to ${names.projectName}; manage at
 https://dash.cloudflare.com/${ctx.accountId}.

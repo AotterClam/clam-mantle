@@ -40,6 +40,7 @@ interface InitialSeed {
   readonly tagline?: string;
   readonly description?: string;
   readonly origin: string;
+  readonly faviconUrl?: string;
   readonly locales: readonly string[];
   readonly canonicalLocale?: string;
   readonly mood?: string;
@@ -142,6 +143,7 @@ function readSeed(path: string, overrides: { readonly origin?: string } = {}): N
     origin: normalizeOrigin(origin),
     locales,
     canonicalLocale,
+    faviconUrl: raw.faviconUrl?.trim() || undefined,
   };
 
   return {
@@ -286,6 +288,7 @@ function buildSql(seed: NormalizedSeed, now: number): string {
     title: seed.site.title,
     description: seed.site.description ?? "",
     origin: seed.site.origin,
+    ...(seed.site.faviconUrl ? { faviconUrl: seed.site.faviconUrl } : {}),
     locales: seed.site.locales.join(","),
     canonicalLocale: seed.site.canonicalLocale ?? seed.site.locales[0],
   })) {
@@ -294,7 +297,7 @@ function buildSql(seed: NormalizedSeed, now: number): string {
     );
   }
   lines.push(
-    `INSERT OR REPLACE INTO users (id, email, name, created_at, updated_at) VALUES ('${SEED_AUTHOR_ID}', NULL, 'Initial Seed', ${now}, ${now});`,
+    `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt, role) VALUES ('${SEED_AUTHOR_ID}', 'Initial Seed', 'initial-seed@clam.local', 1, '${new Date(now).toISOString()}', '${new Date(now).toISOString()}', NULL);`,
   );
 
   for (const page of seed.pages) {

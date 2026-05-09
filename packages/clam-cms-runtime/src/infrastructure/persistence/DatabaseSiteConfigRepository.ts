@@ -25,6 +25,7 @@ const KEYS = {
   description: "description",
   origin: "origin",
   locales: "locales",
+  faviconUrl: "faviconUrl",
 } as const;
 
 export class DatabaseSiteConfigRepository implements SiteConfigRepository {
@@ -50,6 +51,9 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
     if (defaults.origin && defaults.origin.length > 0) {
       stmts.push(insert(KEYS.origin, defaults.origin));
     }
+    if (defaults.faviconUrl && defaults.faviconUrl.length > 0) {
+      stmts.push(insert(KEYS.faviconUrl, defaults.faviconUrl));
+    }
     if (defaults.locales && defaults.locales.length > 0) {
       stmts.push(insert(KEYS.locales, defaults.locales.join(",")));
     }
@@ -74,6 +78,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       locales,
       canonicalLocale: locales[0] ?? null,
       brand: m.get(KEYS.brand) ?? "Clam CMS",
+      faviconUrl: m.get(KEYS.faviconUrl) || undefined,
     };
   }
 
