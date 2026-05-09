@@ -159,14 +159,14 @@ The older `mantle-poc` starter Skill is still the operational reference. Keep th
 
 | Website option | Starter | What ships |
 |---|---|---|
-| Blog / marketing / docs landing | `starters/blog` | Public HTML, theme stack, i18n, contact form, sitemap, `.md` mirrors, llms.txt, SEO/AEO meta, `/api/views/*`, `/mcp`. |
+| Publication/site: marketing, docs, blog, landing | `starters/blog` | Public HTML, theme stack, i18n, contact form, sitemap, `.md` mirrors, llms.txt, SEO/AEO meta, `/api/views/*`, `/mcp`. |
 | Headless backend / bring-your-own frontend | `starters/blank` | API + MCP only. No public HTML routes. Local/headless authoring reference until its production OAuth wiring matches `blog`. |
 
-`blog` is a fixed-manifest starter. In its bootstrap flow, do not ask the user to redesign Schemas, Views, Procedures, or Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing blog model.
+`starters/blog` is currently the publication/site starter. It is fixed-manifest during bootstrap. Do not ask the user to redesign Schemas, Views, Procedures, or Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing publication model.
 
-If the user wants to design their own workflow at bootstrap time — for example a booking flow, micro-shop catalog/order pipeline, lead inbox, community posts/comments, or internal approval process — use `blank` or a dedicated future starter. That path should interview for the 4 atoms, generate manifests, validate them, and create a starter-specific seed. Do not silently mutate the blog starter into a custom app during first install.
+If the user wants to design their own workflow at bootstrap time — for example a booking flow, micro-shop catalog/order pipeline, lead inbox, community posts/comments, or internal approval process — use `blank` or a dedicated future starter. That path should interview for the 4 atoms, generate manifests, validate them, and create a starter-specific seed. Do not silently mutate the publication/site starter into a custom app during first install.
 
-`leads inbox` and `micro-shop` are v0.1.0 validation verticals but may initially be implemented as documented starter variants until dedicated starter directories land. Do not silently mix all verticals into `blog`.
+`leads inbox` and `micro-shop` are v0.1.0 validation verticals but may initially be implemented as documented starter variants until dedicated starter directories land. Do not silently mix all verticals into `starters/blog`.
 
 For the first v0.1.0 production proof, prefer `starters/blog`. It currently carries the full GitHub OAuth + Workers OAuth Provider/DCR wiring. Use `starters/blank` only when the user explicitly wants a headless reference and accepts that production MCP OAuth wiring may need to be copied from `blog`.
 

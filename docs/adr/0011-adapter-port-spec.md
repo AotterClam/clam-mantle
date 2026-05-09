@@ -44,7 +44,9 @@ For v0.1.x media hosting:
 
 These optional ports must not force first-run provisioning to create R2
 resources. Publication starters can carry external image URLs without a
-media storage implementation.
+media storage implementation. See
+[ADR-0013](0013-media-fields-and-optional-storage.md) for the media
+field/storage split.
 
 ### `DatabasePort`
 

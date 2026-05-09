@@ -1,8 +1,12 @@
 # `@aotter/starter-blog`
 
-Reference starter for mantle v0.1.0. Wraps the runtime + Cloudflare
-adapter into a runnable Worker with three Schemas (posts, post-translations,
-contact-messages) and a public read path served from KV.
+Reference publication/site starter for mantle v0.1.0. The package
+name still says `starter-blog` for the alpha, but the intended product
+shape is broader: marketing sites, docs, founder blogs, announcement
+feeds, and simple content-driven landing sites. It wraps the runtime +
+Cloudflare adapter into a runnable Worker with three Schemas (posts,
+post-translations, contact-messages) and a public read path served from
+KV.
 
 This starter is intentionally fixed-manifest during bootstrap. The
 first-run installer should ask for public copy and seed home/about/
