@@ -1,13 +1,14 @@
 import { AwsClient } from "aws4fetch";
 import { DiagnosticError, makeDiagnostic } from "@aotterclam/clam-cms-spec";
-import type {
-  CommitUploadArgs,
-  CreateUploadArgs,
-  CreateUploadResult,
-  DeleteAssetArgs,
-  GetPublicUrlArgs,
-  MediaAsset,
-  MediaStorage,
+import {
+  extensionForMime,
+  type CommitUploadArgs,
+  type CreateUploadArgs,
+  type CreateUploadResult,
+  type DeleteAssetArgs,
+  type GetPublicUrlArgs,
+  type MediaAsset,
+  type MediaStorage,
 } from "@aotterclam/clam-cms-runtime";
 
 /**
@@ -109,83 +110,40 @@ export class R2MediaStorage implements MediaStorage {
   }
 
   async commitUpload(args: CommitUploadArgs): Promise<MediaAsset> {
-    const obj = await this.bucket.head(args.storageKey);
-    if (!obj) {
-      throw new DiagnosticError(
-        makeDiagnostic({
-          code: "MEDIA_OBJECT_NOT_FOUND",
-          phase: "runtime",
-          severity: "error",
-          path: "adapter/R2MediaStorage/commitUpload",
-          value: args.uploadId,
-        }),
-      );
+    // Single `get` covers existence + metadata + body stream for the
+    // metadata-rewrite PUT. R2 has no metadata-only patch; the PUT
+    // streams `existing.body` (a ReadableStream) back without
+    // materialising bytes in Worker memory.
+    const existing = await this.bucket.get(args.storageKey);
+    if (!existing) throw mediaDiagnostic("MEDIA_OBJECT_NOT_FOUND", { value: args.uploadId });
+
+    const actualMime = existing.httpMetadata?.contentType ?? "application/octet-stream";
+    if (args.checksum && existing.etag && existing.etag.replace(/^"|"$/g, "") !== args.checksum) {
+      throw mediaDiagnostic("MEDIA_CHECKSUM_MISMATCH", {
+        value: existing.etag,
+        expected: args.checksum,
+      });
     }
-    const actualMime = obj.httpMetadata?.contentType ?? "application/octet-stream";
     if (actualMime !== args.expectedMimeType) {
-      throw new DiagnosticError(
-        makeDiagnostic({
-          code: "MEDIA_MIME_REJECTED",
-          phase: "runtime",
-          severity: "error",
-          path: "adapter/R2MediaStorage/commitUpload",
-          value: actualMime,
-          expected: args.expectedMimeType,
-        }),
-      );
+      throw mediaDiagnostic("MEDIA_MIME_REJECTED", {
+        value: actualMime,
+        expected: args.expectedMimeType,
+      });
     }
-    if (obj.size > args.maxBytes) {
-      throw new DiagnosticError(
-        makeDiagnostic({
-          code: "MEDIA_SIZE_EXCEEDED",
-          phase: "runtime",
-          severity: "error",
-          path: "adapter/R2MediaStorage/commitUpload",
-          value: obj.size,
-          expected: `<= ${args.maxBytes}`,
-        }),
-      );
-    }
-    if (args.checksum && obj.etag && obj.etag.replace(/^"|"$/g, "") !== args.checksum) {
-      throw new DiagnosticError(
-        makeDiagnostic({
-          code: "MEDIA_OBJECT_NOT_FOUND",
-          phase: "runtime",
-          severity: "error",
-          path: "adapter/R2MediaStorage/commitUpload",
-          value: obj.etag,
-          expected: args.checksum,
-          message: "Object etag does not match the supplied checksum.",
-        }),
-      );
+    if (existing.size > args.maxBytes) {
+      throw mediaDiagnostic("MEDIA_SIZE_EXCEEDED", {
+        value: existing.size,
+        expected: `<= ${args.maxBytes}`,
+      });
     }
 
-    // Stamp commit metadata so a future orphan-sweep can distinguish
-    // committed objects from PUT-but-never-committed ones. We rewrite
-    // the object's customMetadata in-place via `put` (R2 doesn't
-    // expose metadata-only patch). Body is unchanged.
     const customMetadata: Record<string, string> = {
-      ...obj.customMetadata,
+      ...existing.customMetadata,
       committedAt: String(args.now),
     };
     if (args.alt) customMetadata["alt"] = args.alt;
     if (args.caption) customMetadata["caption"] = args.caption;
 
-    // R2 requires a body for PUT. Use the existing object body so the
-    // bytes are preserved and metadata + httpMetadata are updated.
-    const existing = await this.bucket.get(args.storageKey);
-    if (!existing) {
-      throw new DiagnosticError(
-        makeDiagnostic({
-          code: "MEDIA_OBJECT_NOT_FOUND",
-          phase: "runtime",
-          severity: "error",
-          path: "adapter/R2MediaStorage/commitUpload",
-          value: args.storageKey,
-          message: "Object disappeared between head and get.",
-        }),
-      );
-    }
     await this.bucket.put(args.storageKey, existing.body, {
       httpMetadata: { contentType: actualMime },
       customMetadata,
@@ -196,7 +154,7 @@ export class R2MediaStorage implements MediaStorage {
       storageKey: args.storageKey,
       publicUrl: `${this.publicBase}/${args.storageKey}`,
       mimeType: actualMime,
-      byteSize: obj.size,
+      byteSize: existing.size,
       alt: args.alt,
       caption: args.caption,
       createdAt: args.now,
@@ -224,19 +182,21 @@ function buildStorageKey(mimeType: string, purpose?: string): string {
   return `${prefix}${id}.${ext}`;
 }
 
-function extensionForMime(mime: string): string {
-  switch (mime) {
-    case "image/png":
-      return "png";
-    case "image/jpeg":
-      return "jpg";
-    case "image/webp":
-      return "webp";
-    case "image/gif":
-      return "gif";
-    case "image/svg+xml":
-      return "svg";
-    default:
-      return "bin";
-  }
+function mediaDiagnostic(
+  code:
+    | "MEDIA_OBJECT_NOT_FOUND"
+    | "MEDIA_MIME_REJECTED"
+    | "MEDIA_SIZE_EXCEEDED"
+    | "MEDIA_CHECKSUM_MISMATCH",
+  fields: { value: unknown; expected?: string },
+): DiagnosticError {
+  return new DiagnosticError(
+    makeDiagnostic({
+      code,
+      phase: "runtime",
+      severity: "error",
+      path: "adapter/R2MediaStorage/commitUpload",
+      ...fields,
+    }),
+  );
 }

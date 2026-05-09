@@ -52,6 +52,7 @@ export type {
   DeleteAssetArgs,
   MediaAsset,
 } from "./domain/port/MediaStorage.js";
+export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
 
 // Identity-layer model types consumed by adapters implementing the auth ports.
 export type { User } from "./domain/model/User.js";

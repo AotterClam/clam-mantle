@@ -84,7 +84,8 @@ export type DiagnosticCode =
   | "MEDIA_OBJECT_NOT_FOUND"
   | "MEDIA_MIME_REJECTED"
   | "MEDIA_SIZE_EXCEEDED"
-  | "MEDIA_SVG_REJECTED";
+  | "MEDIA_SVG_REJECTED"
+  | "MEDIA_CHECKSUM_MISMATCH";
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
@@ -133,6 +134,7 @@ export const HTTP_STATUS_BY_CODE: Readonly<Partial<Record<DiagnosticCode, Runtim
   MEDIA_MIME_REJECTED: 400,
   MEDIA_SIZE_EXCEEDED: 400,
   MEDIA_SVG_REJECTED: 400,
+  MEDIA_CHECKSUM_MISMATCH: 409,
 };
 
 /** Resolve a Diagnostic's HTTP status for wire egress; unknown codes

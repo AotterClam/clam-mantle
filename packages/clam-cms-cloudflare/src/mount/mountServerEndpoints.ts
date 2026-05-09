@@ -275,12 +275,11 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       return mediaNotConfiguredResponse("/admin/api/media/uploads/commit");
     }
     const uploadId = c.req.param("uploadId");
-    let body: { alt?: unknown; caption?: unknown; checksum?: unknown };
-    try {
-      body = (await c.req.raw.json().catch(() => ({}))) as typeof body;
-    } catch {
-      body = {};
-    }
+    const body = (await c.req.raw.json().catch(() => ({}))) as {
+      alt?: unknown;
+      caption?: unknown;
+      checksum?: unknown;
+    };
     return await runUseCase(() =>
       runtime.media!.commitUpload.execute({
         uploadId,
