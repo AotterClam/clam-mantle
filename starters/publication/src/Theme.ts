@@ -8,18 +8,23 @@
  *
  *   L1  tokens     — palette, type scale, measure, gutter
  *   L2  extraCss   — additional rules (icons / i18n / extraCss)
- *   L3  components — Header or Footer chrome slot
+ *   L3  components — Header / Footer chrome swaps, or PageShell for
+ *                    body-layout variation (sidebar, sticky CTA,
+ *                    full-bleed sections, etc.)
  *   L4  templates  — replace a whole page's render function
  *
- * Layout shape itself is intentionally NOT a slot: changing it means
- * picking a different starter (e.g. `starters/publication` vs a future docs
- * starter). Header / Footer cover the actual chrome variation users
- * tend to ask for inside the same content shape.
+ * Layout (the document envelope — `<html>` / `<head>` / `<body>`
+ * + SEO meta + theme bootstrap) is intentionally NOT a slot.
+ * Changing those concerns crosses the starter-family line; switch
+ * starter (publication → community / micro-shop / ...) instead.
+ * PageShell covers body-layout variation inside the publication
+ * family without forking every template.
  */
 import type { EntryContext, ListContext } from "@aotterclam/clam-cms-runtime";
 import type { I18nBundle } from "./i18n/index.js";
 import type { Header } from "./theme.default/components/Header.js";
 import type { Footer } from "./theme.default/components/Footer.js";
+import type { PageShell } from "./theme.default/components/PageShell.js";
 import type { HomeContext } from "./theme.default/templates/home.js";
 import type { ContactContext } from "./theme.default/templates/contact.js";
 import type { NotFoundContext } from "./theme.default/templates/notFound.js";
@@ -53,13 +58,26 @@ export interface ThemeOverride {
    *  the rest. */
   i18n?: { [locale: string]: DeepPartial<I18nBundle> };
 
-  /** L3 — chrome component slots. Header sits at the top of every
-   *  page inside the baseline Layout; Footer sits at the bottom. To
-   *  swap the whole page envelope, prefer forking the relevant
-   *  template (L4) over trying to override Layout itself. */
+  /** L3 — body-level component slots.
+   *
+   *  - `Header` / `Footer` swap navigation chrome only (logo, nav,
+   *    language switcher, copyright, ...). They sit inside the
+   *    baseline `PageShell` between `<main>`'s open and close.
+   *  - `PageShell` swaps the broader body composition — Header /
+   *    `<main>` / Footer arrangement, sticky CTAs, sidebar variants,
+   *    full-bleed hero sections — without redoing the document
+   *    envelope. A consumer-supplied PageShell takes ownership of
+   *    whether or how to render the Header / Footer overrides; the
+   *    baseline composes them in the conventional top → main →
+   *    bottom order.
+   *
+   *  Layout (the document envelope) is NOT a slot. Switch starter
+   *  family (publication → community / micro-shop / ...) when the
+   *  shape you need crosses that line. */
   components?: {
     Header?: typeof Header;
     Footer?: typeof Footer;
+    PageShell?: typeof PageShell;
   };
 
   /** L4 — replace a page kind's render function in whole. Forks

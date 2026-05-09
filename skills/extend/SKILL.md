@@ -18,6 +18,7 @@ The 4-atom manifest model: **Schema** is the entity (table), **View** is the rea
 | "I want a contact form"                    | Schema (write target) + Procedure (handler.kind: builtin op:create) + Trigger (http POST /api/contact) |
 | "I want CAPTCHA / Slack notify on submit"  | + Procedure (handler.kind: ref) + Trigger (lifecycle before_/after_create) |
 | "I want a /search page filtered by tag"    | View with params: { tag } |
+| "I want a public prompt-generator / calculator / configurator page" | A consumer-side `app.get(...)` route in `src/index.ts` — see § Custom public routes (consumer-app freedom) |
 | "I want a /docs/<slug>/edit-history page"  | Defer — v0.1 ships `simple` lifecycle only; `editorial` is v0.1.x |
 | "I want comments"                          | v0.1: anonymous-with-email pattern (Schema + write Procedure). End-user member system is v0.2. |
 
@@ -137,6 +138,34 @@ pnpm mcp-smoke         # 12 cases against /mcp
 ```
 
 Both live in `test/integration/`. If you added a new MCP-relevant Schema, the per-collection authoring tools (`create_draft_<segment>`, `update_draft_<segment>`) auto-emit; verify with `tools/list`.
+
+## Custom public routes (consumer-app freedom)
+
+The starter owns its `Hono` app instance. If the user wants a public surface that doesn't fit the 4-atom model — a prompt generator, a calculator, a public configurator, a starter directory browser, a small interactive widget — add a route directly in `src/index.ts`:
+
+```ts
+// src/index.ts
+import { runtimeRef } from "./bootstrap.js";
+
+app.get("/:locale/tools/prompt-generator", async (c) => {
+  const runtime = await runtimeRef.get();
+  const profiles = await runtime.executeView.execute({
+    view: runtime.viewsByName.get("starter_profiles_active")!,
+  });
+  // render HTML / hydrate small JS / return Response
+  return c.html(renderPromptGenerator(profiles, c.req.param("locale")));
+});
+```
+
+This is consumer-app territory, NOT an SDK feature:
+
+- The SDK doesn't ship a `customRoutes.ts` declarative API or a type-safe context wrapper. The starter's `Hono` app + `runtime` access via `ref.get()` is enough; no abstraction layer needed.
+- Manifest grammar is reserved for things the runtime actually carries complexity for (CRUD entries, public View REST, typed Procedures, lifecycle hooks). A free-form view route doesn't qualify.
+- SDK mounts (`mountServerEndpoints`, `mountPublicRoutes`, `mountMcp`) register their routes early; consumer `app.get(...)` calls register on the same Hono instance. The `/:locale` param route in `mountPublicRoutes` 404s on unknown locales, so paths under `/tools/...`, `/api/foo`, `/calc`, etc. won't be accidentally interpreted as locales as long as your prefix isn't a declared site locale.
+
+When this is the right tool: the user wants ONE public page that doesn't read entries or carry workflow. When it's not: any time you find yourself reimplementing CRUD, list pagination, or auth gating — those are atom-shaped and belong in the manifest.
+
+Don't fork core templates (post, postList, page, home, contact, notFound) just to add an unrelated public page. Add the route, leave the templates untouched.
 
 ## Diagnostic recipes
 

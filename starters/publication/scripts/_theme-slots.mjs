@@ -34,7 +34,12 @@ export const INDEX_PATH = join(THEME_DIR, "index.ts");
 // produce an entry the override surface can't register — typecheck
 // would then fail downstream. Fail-fast at fork time keeps the SKILL
 // promise honest.
-const SUPPORTED_COMPONENT_SLOTS = new Set(["Header", "Footer"]);
+//
+// PageShell is the body-layout slot (Header / <main> / Footer
+// arrangement, sticky CTAs, sidebar variants); Header / Footer are
+// the chrome-only swaps. Layout itself is intentionally NOT here —
+// document-envelope decisions cross the starter-family line.
+const SUPPORTED_COMPONENT_SLOTS = new Set(["Header", "Footer", "PageShell"]);
 const SUPPORTED_TEMPLATE_SLOTS = new Set([
   "post",
   "postList",
@@ -53,7 +58,8 @@ export function pickSlot(rel) {
       throw new SlotError(
         `components/${key}.tsx is not a supported override slot. ` +
           `ThemeOverride.components only allows: ${[...SUPPORTED_COMPONENT_SLOTS].join(", ")}. ` +
-          `Layout shape is intentionally locked — change envelope via L4 template forks or pick another starter.`,
+          `PageShell is the body-layout escape hatch (sidebars / sticky CTAs / full-bleed). ` +
+          `Layout shape is intentionally locked — switch starter family if you need a different envelope.`,
       );
     }
     return { kind: "components", key };

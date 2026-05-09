@@ -18,7 +18,8 @@ You are layering a consumer theme over `starters/publication/`. The baseline liv
 | **L2** extraCss | `src/theme/index.ts:extraCss` | extra CSS rules (border-radius, hero size, etc.) |
 | **L2** icons | `src/theme/icons.ts` | replace baseline icons by name; add new ones |
 | **L2** i18n | `src/theme/i18n/<locale>.json` | retitle UI strings per locale (deep-merge) |
-| **L3** components | `src/theme/components/{Header,Footer}.tsx` | replace chrome wholesale |
+| **L3** components — chrome | `src/theme/components/{Header,Footer}.tsx` | swap navigation chrome (logo, nav, language switcher, footer copy) |
+| **L3** components — body layout | `src/theme/components/PageShell.tsx` | reshape body layout: sidebar variants, sticky CTAs, full-bleed hero, alternative Header / `<main>` / Footer arrangement |
 | **L4** templates | `src/theme/templates/<name>.tsx` | replace a page kind end-to-end |
 
 ## Conversation pattern
@@ -142,7 +143,7 @@ pnpm theme:fork components/Header.tsx
 pnpm theme:fork components/Footer.tsx
 ```
 
-Only `Header` and `Footer` are supported component slots — `theme:fork components/Layout.tsx` (or any other component name) fails fast with a clear error. Edit `src/theme/components/Header.tsx`. Key contracts:
+Use this when the user wants different chrome — different brand mark, different nav arrangement, different language switcher, custom footer copy — but the page body still reads top → main → bottom. Edit `src/theme/components/Header.tsx`. Key contracts:
 
 - Don't change the props signature: `Header(props: HeaderProps)`.
 - `props.site.brand`, `props.site.locales`, `props.locale`, `props.current` are available.
@@ -151,6 +152,30 @@ Only `Header` and `Footer` are supported component slots — `theme:fork compone
 Same shape for `Footer`.
 
 Revert: `pnpm theme:reset components/Header.tsx`.
+
+### L3 — PageShell (body layout)
+
+```bash
+pnpm theme:fork components/PageShell.tsx
+```
+
+Use this when the user wants to reshape the **body layout** rather than just swap chrome — for example:
+
+- Sidebar with table-of-contents alongside `<main>` for docs-lite pages
+- Sticky CTA bar between `<main>` and `<Footer>`
+- Full-bleed hero section above Header on the home page
+- Different Header / `<main>` / Footer ordering (e.g., side-rail logo)
+- Custom `<main>` container width or padding rules per template kind
+
+The forked PageShell takes ownership of how (or whether) to render the Header / Footer overrides. The baseline composes them in the conventional top → main → bottom order; a consumer-supplied PageShell can ignore or recompose them as the new shape requires.
+
+`Layout` (the document envelope — `<html>` / `<head>` / `<body>` + SEO meta + theme bootstrap) is NOT forkable. `theme:fork components/Layout.tsx` fails fast with a clear error. SEO emission order, charset, viewport, and theme-bootstrap timing are concerns that cross the starter-family line and shouldn't be redefined per page.
+
+Revert: `pnpm theme:reset components/PageShell.tsx`.
+
+### Other component forks fail fast
+
+Only `Header`, `Footer`, and `PageShell` are supported component slots. `theme:fork components/Layout.tsx` or any other name exits with a clear error pointing at PageShell as the body-layout escape hatch. Don't try to override Layout by hand-editing `src/theme/components/Layout.tsx` outside the fork machinery — the override surface won't register it.
 
 ### L4 — whole template (escape hatch)
 
