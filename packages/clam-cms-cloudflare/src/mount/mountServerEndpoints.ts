@@ -3,6 +3,7 @@ import {
   HTTP_STATUS_BY_CODE,
   MCP_HINT_KEYWORD,
   VIEW_PARAMS_RESERVED,
+  isMediaMcpHint,
   runtimeDiagnostic,
   type ContentState,
   type Diagnostic,
@@ -647,19 +648,10 @@ function mediaFieldsForSchema(schema: SchemaManifest): Array<{ name: string; hin
   for (const [name, prop] of Object.entries(props)) {
     if (typeof prop !== "object" || prop === null) continue;
     const hint = (prop as Record<string, unknown>)[MCP_HINT_KEYWORD];
-    if (!isMediaHint(hint)) continue;
+    if (!isMediaMcpHint(hint)) continue;
     out.push({ name, hint });
   }
   return out;
-}
-
-function isMediaHint(value: unknown): value is string {
-  return (
-    value === "media" ||
-    value === "media-image" ||
-    value === "media-video" ||
-    value === "media-file"
-  );
 }
 
 async function readSessionForAdmin(
