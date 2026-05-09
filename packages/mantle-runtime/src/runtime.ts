@@ -191,6 +191,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // MCP, admin, and builtin paths all hit the same wrapped repository.
   const innerEntries = new DatabaseEntryRepository(args.db);
   const triggerIndex = new TriggerIndex(partitioned.triggers);
+  const siteConfig = new DatabaseSiteConfigRepository(args.db);
   // `entries` is filled below — assigned via `let` so the lifecycle
   // hooks (which run procedures, which can themselves write entries
   // via builtin handlers) close over the wrapped repo, not the bare
@@ -206,8 +207,15 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     transitionStatus: (a) => entries.transitionStatus(a),
     list: (a) => entries.list(a),
     findByDataField: (a) => entries.findByDataField(a),
+    findByDataFields: (a) => entries.findByDataFields(a),
   };
-  const invokeBuiltin = new InvokeBuiltinUseCase(entriesProxy, schemasByName, clock, idgen);
+  const invokeBuiltin = new InvokeBuiltinUseCase(
+    entriesProxy,
+    schemasByName,
+    clock,
+    idgen,
+    siteConfig,
+  );
   const invokeProcedure = new InvokeProcedureUseCase(registry, invokeBuiltin);
   const lifecycleHooks = new RunLifecycleHooksUseCase(
     triggerIndex,
@@ -219,7 +227,6 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     triggerIndex,
     lifecycleHooks,
   );
-  const siteConfig = new DatabaseSiteConfigRepository(args.db);
   const publicPathResolver = args.publicPathResolver ?? null;
   const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(
@@ -231,8 +238,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
 
   // Content / view / boot use cases. They see `entries` only as the
   // chokepoint port — hook firing is invisible to them.
-  const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen);
-  const updateDraft = new UpdateDraftUseCase(entries, schemasByName, clock);
+  const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen, siteConfig);
+  const updateDraft = new UpdateDraftUseCase(entries, schemasByName, clock, siteConfig);
   const getEntry = new GetEntryUseCase(entries);
   const listEntries = new ListEntriesUseCase(entries, schemasByName);
   const contentPublishEffects = { publishOrchestrator, siteConfig, templates };
@@ -241,6 +248,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     schemasByName,
     clock,
     contentPublishEffects,
+    siteConfig,
   );
   const unpublish = new UnpublishUseCase(entries, clock, contentPublishEffects);
   const archive = new ArchiveUseCase(entries, schemasByName, clock, contentPublishEffects);

@@ -5,6 +5,7 @@ import type {
   DeleteEntryArgs,
   EntryRepository,
   FindEntryByDataFieldArgs,
+  FindEntryByDataFieldsArgs,
   ListEntriesArgs,
   TransitionStatusArgs,
   UpdateEntryArgs,
@@ -184,6 +185,35 @@ export class DatabaseEntryRepository implements EntryRepository {
           )
           .bind(args.collection, path, args.value);
     const row = await stmt.first<EntryDbRow>();
+    return row ? rowFromDb(row) : null;
+  }
+
+  async findByDataFields(args: FindEntryByDataFieldsArgs): Promise<EntryRow | null> {
+    const entries = Object.entries(args.fields);
+    if (entries.length === 0) return null;
+    const conditions = ["collection = ?"];
+    const binds: unknown[] = [args.collection];
+    if (args.status) {
+      conditions.push("status = ?");
+      binds.push(args.status);
+    }
+    for (const [field, value] of entries) {
+      conditions.push("json_extract(data, ?) = ?");
+      binds.push(jsonPathForTopLevelField(field), value);
+    }
+    if (args.excludeId) {
+      conditions.push("id <> ?");
+      binds.push(args.excludeId);
+    }
+    const row = await this.db
+      .prepare(
+        `SELECT id, collection, status, version, data, author_id, created_at, updated_at
+         FROM entries
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .bind(...binds)
+      .first<EntryDbRow>();
     return row ? rowFromDb(row) : null;
   }
 
