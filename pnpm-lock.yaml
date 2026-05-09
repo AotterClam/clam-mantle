@@ -95,12 +95,6 @@ importers:
       hono:
         specifier: ^4.6.20
         version: 4.12.16
-      kysely:
-        specifier: ^0.28.17
-        version: 0.28.17
-      kysely-d1:
-        specifier: ^0.4.0
-        version: 0.4.0(kysely@0.28.17)
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251101.0
@@ -1912,11 +1906,6 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
-
-  kysely-d1@0.4.0:
-    resolution: {integrity: sha512-wUcVvQNtm30OTfuo7Ad5vYJ1qHqPXOCZc+zWchVKNyuvqY3u8OuGw4gmUx1Ypdx2wRVFLHVQC9I7v0pTmF7Nkw==}
-    peerDependencies:
-      kysely: '*'
 
   kysely@0.28.17:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
@@ -3816,10 +3805,6 @@ snapshots:
   jsesc@3.1.0: {}
 
   json5@2.2.3: {}
-
-  kysely-d1@0.4.0(kysely@0.28.17):
-    dependencies:
-      kysely: 0.28.17
 
   kysely@0.28.17: {}
 

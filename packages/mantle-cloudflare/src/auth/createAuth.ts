@@ -26,8 +26,6 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, mcp } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
-import { Kysely } from "kysely";
-import { D1Dialect } from "kysely-d1";
 
 /**
  * Closed enum of admin (staff) roles. Mirrors the existing
@@ -100,15 +98,11 @@ const userAc = ac.newRole({
  * type.
  */
 function buildAuth(config: CreateAuthConfig) {
-  // Better Auth queries through Kysely; schema is unknown at
-  // typecheck time (canonical migrations own DDL out-of-band), so
-  // loose typing is fine — Better Auth's internal query builder is
-  // separately typed.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = new Kysely<any>({
-    dialect: new D1Dialect({ database: config.database }),
-  });
-
+  // Pass the raw D1 binding straight through. Better Auth's
+  // `createKyselyAdapter` detects D1 via the `batch` + `exec` +
+  // `prepare` heuristic and constructs its official `D1SqliteDialect`
+  // (from `@better-auth/kysely-adapter`) — no Kysely instance to wire
+  // ourselves, no third-party kysely-d1 dependency.
   const socialProviders: BetterAuthOptions["socialProviders"] = {};
   if (config.github) {
     socialProviders.github = {
@@ -127,7 +121,7 @@ function buildAuth(config: CreateAuthConfig) {
   const adminGithubLogin = config.adminGithubLogin?.trim();
 
   return betterAuth({
-    database: db,
+    database: config.database,
     secret: config.secret,
     baseURL: config.baseURL,
     socialProviders,
@@ -170,19 +164,17 @@ function buildAuth(config: CreateAuthConfig) {
             const u = user as { id: string; githubLogin?: string | null };
             if (u.githubLogin?.toLowerCase() !== adminGithubLogin.toLowerCase()) return;
 
-            const existingAdmin = await db
-              .selectFrom("user")
-              .select("id")
-              .where("role", "in", [...ADMIN_ROLES])
-              .limit(1)
-              .execute();
-            if (existingAdmin.length > 0) return;
+            const placeholders = ADMIN_ROLES.map(() => "?").join(",");
+            const existingAdmin = await config.database
+              .prepare(`SELECT id FROM user WHERE role IN (${placeholders}) LIMIT 1`)
+              .bind(...ADMIN_ROLES)
+              .first<{ id: string }>();
+            if (existingAdmin) return;
 
-            await db
-              .updateTable("user")
-              .set({ role: "owner" })
-              .where("id", "=", u.id)
-              .execute();
+            await config.database
+              .prepare("UPDATE user SET role = ? WHERE id = ?")
+              .bind("owner", u.id)
+              .run();
           },
         },
       },
