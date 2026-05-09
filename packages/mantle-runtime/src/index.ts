@@ -54,6 +54,11 @@ export type {
 } from "./domain/port/MediaStorage.js";
 export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
 
+// ID source — adapters wire this into binding-side helpers that need
+// random IDs. Default `RandomUuidGenerator` (`crypto.randomUUID()`)
+// can be swapped in tests with a deterministic counter.
+export { type IdGenerator, RandomUuidGenerator } from "./domain/port/IdGenerator.js";
+
 // Identity-layer model types consumed by adapters implementing the auth ports.
 export type { User } from "./domain/model/User.js";
 export type { GithubProfile } from "./domain/model/GithubProfile.js";

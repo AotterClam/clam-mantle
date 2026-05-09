@@ -1,12 +1,14 @@
 import { AwsClient } from "aws4fetch";
 import { DiagnosticError, makeDiagnostic } from "@aotter/mantle-spec";
 import {
+  RandomUuidGenerator,
   extensionForMime,
   type CommitUploadArgs,
   type CreateUploadArgs,
   type CreateUploadResult,
   type DeleteAssetArgs,
   type GetPublicUrlArgs,
+  type IdGenerator,
   type MediaAsset,
   type MediaStorage,
 } from "@aotter/mantle-runtime";
@@ -59,6 +61,10 @@ export class R2MediaStorage implements MediaStorage {
      *  domain) or `https://pub-<hash>.r2.dev` (R2 public dev domain).
      *  Trailing slash is normalised away. */
     publicBase: string,
+    /** ID source for `uploadId` and the random portion of `storageKey`.
+     *  Defaults to `RandomUuidGenerator`; tests inject a deterministic
+     *  fake to assert exact key strings. */
+    private readonly idgen: IdGenerator = RandomUuidGenerator,
   ) {
     if (!publicBase) {
       throw new DiagnosticError(
@@ -77,8 +83,8 @@ export class R2MediaStorage implements MediaStorage {
   private readonly publicBase: string;
 
   async createUpload(args: CreateUploadArgs): Promise<CreateUploadResult> {
-    const uploadId = crypto.randomUUID();
-    const storageKey = buildStorageKey(args.mimeType, args.purpose);
+    const uploadId = this.idgen.next();
+    const storageKey = this.buildStorageKey(args.mimeType, args.purpose);
     const ttlSeconds = Math.max(60, Math.floor((args.expiresAt - args.now) / 1000));
 
     // Sign-as-query: PUT URL with the SigV4 signature in the query
@@ -169,17 +175,17 @@ export class R2MediaStorage implements MediaStorage {
   async deleteAsset(args: DeleteAssetArgs): Promise<void> {
     await this.bucket.delete(args.storageKey);
   }
-}
 
-/** Object keys are server-generated UUIDs. The mime-derived extension
- *  is purely cosmetic — server-side serving never infers content-type
- *  from the key. Purpose, when supplied, becomes a dir-prefix so an
- *  operator can eyeball "post-cover/abc123.jpg" in R2 dashboards. */
-function buildStorageKey(mimeType: string, purpose?: string): string {
-  const id = crypto.randomUUID();
-  const ext = extensionForMime(mimeType);
-  const prefix = purpose && /^[a-z0-9-]+$/.test(purpose) ? `${purpose}/` : "";
-  return `${prefix}${id}.${ext}`;
+  /** Object keys are server-generated. The mime-derived extension is
+   *  purely cosmetic — server-side serving never infers content-type
+   *  from the key. Purpose, when supplied, becomes a dir-prefix so an
+   *  operator can eyeball "post-cover/abc123.jpg" in R2 dashboards. */
+  private buildStorageKey(mimeType: string, purpose?: string): string {
+    const id = this.idgen.next();
+    const ext = extensionForMime(mimeType);
+    const prefix = purpose && /^[a-z0-9-]+$/.test(purpose) ? `${purpose}/` : "";
+    return `${prefix}${id}.${ext}`;
+  }
 }
 
 function mediaDiagnostic(
