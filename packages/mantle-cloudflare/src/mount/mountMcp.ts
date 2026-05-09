@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
-import { McpJsonRpcDispatcher, type Staff } from "@aotter/mantle-runtime";
+import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
 import type { StaffRole } from "@aotter/mantle-spec";
-import { ADMIN_ROLE_SET, type Auth } from "../auth/createAuth.js";
+import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
 const UNAUTHORIZED: ResponseInit = {
@@ -18,11 +18,28 @@ export function mountMcp(
   ref: CmsRuntimeRef,
   options: { path?: string } = {},
 ): void {
+  if (!ref.auth) {
+    throw new Error(
+      "mountMcp requires `auth` on the runtime ref. " +
+        "Pass `auth: createAuth(...)` to buildCmsConfig.",
+    );
+  }
+  const auth = ref.auth;
   const path = options.path ?? "/mcp";
   let dispatcher: McpJsonRpcDispatcher | null = null;
-  const buildDispatcher = (
-    runtime: Awaited<ReturnType<CmsRuntimeRef["get"]>>,
-  ): McpJsonRpcDispatcher => {
+
+  app.all(path, async (c) => {
+    // Boot is independent of auth — fetch concurrently to save one
+    // D1 round-trip on the hot path.
+    const [session, runtime] = await Promise.all([
+      auth.getMcpSession(c.req.raw),
+      ref.get(),
+    ]);
+    if (!session) return new Response("unauthorized", UNAUTHORIZED);
+    const role = await auth.getUserRole(session.userId);
+    if (!role || !ADMIN_ROLE_SET.has(role)) {
+      return new Response("forbidden", FORBIDDEN);
+    }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
         listEntries: runtime.listEntries,
@@ -36,42 +53,9 @@ export function mountMcp(
       },
       [...runtime.schemasByName.values()],
     );
-    return dispatcher;
-  };
-
-  if (ref.auth) {
-    const auth = ref.auth;
-    app.all(path, async (c) => {
-      // Boot is independent of auth — fetch concurrently to save one
-      // D1 round-trip on the hot path.
-      const [session, runtime] = await Promise.all([
-        auth.getMcpSession(c.req.raw),
-        ref.get(),
-      ]);
-      if (!session) return new Response("unauthorized", UNAUTHORIZED);
-      const role = await auth.getUserRole(session.userId);
-      if (!role || !ADMIN_ROLE_SET.has(role)) {
-        return new Response("forbidden", FORBIDDEN);
-      }
-      // Better Auth's tokens carry no grant metadata; the placeholders
-      // satisfy the runtime's `Staff` shape but no consumer reads them.
-      const staff: Staff = {
-        userId: session.userId,
-        role: role as StaffRole,
-        grantedBy: null,
-        grantedAt: 0,
-      };
-      return buildDispatcher(runtime).dispatch(c.req.raw, { userId: session.userId, staff });
+    return dispatcher.dispatch(c.req.raw, {
+      userId: session.userId,
+      staff: { userId: session.userId, role: role as StaffRole },
     });
-    return;
-  }
-
-  app.all(path, async (c) => {
-    const runtime = await ref.get();
-    const identity = await runtime.oauth.verifyAccessToken(c.req.raw);
-    if (!identity) return new Response("unauthorized", UNAUTHORIZED);
-    const staff = await runtime.staff.readByUserId(identity.userId);
-    if (!staff) return new Response("forbidden", FORBIDDEN);
-    return buildDispatcher(runtime).dispatch(c.req.raw, { userId: identity.userId, staff });
   });
 }

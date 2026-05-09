@@ -34,15 +34,7 @@ export type {
   Migration,
 } from "./domain/port/DatabaseDriver.js";
 export type { KvCache, KvPutOptions, KvListResult } from "./domain/port/KvCache.js";
-export type { SessionRepository, Session } from "./domain/port/SessionRepository.js";
 export type { AssetServer } from "./domain/port/AssetServer.js";
-export type { OAuthVerifier, OAuthIdentity } from "./domain/port/OAuthVerifier.js";
-export type { UserRepository, GithubToken } from "./domain/port/UserRepository.js";
-export type {
-  StaffRepository,
-  StaffListEntry,
-  BootstrapOwnerOpts,
-} from "./domain/port/StaffRepository.js";
 export type {
   MediaStorage,
   CreateMediaUploadRequest,
@@ -58,11 +50,6 @@ export type {
   FetchAllowedUrlRequest,
   FetchedMedia,
 } from "./domain/port/RemoteMediaFetcher.js";
-
-// Identity-layer model types consumed by adapters implementing the auth ports.
-export type { User } from "./domain/model/User.js";
-export type { GithubProfile } from "./domain/model/GithubProfile.js";
-export type { Staff, StaffMembership } from "./domain/model/Staff.js";
 
 // Consumer/starter handler and render contracts.
 export type {
@@ -122,13 +109,9 @@ export {
   type McpUseCases,
 } from "./infrastructure/mcp/McpJsonRpcDispatcher.js";
 
-// Starter fixture support. Kept explicit so persistence/http/auth
+// Starter fixture support. Kept explicit so persistence/http
 // infrastructure do not become root public API by accident.
 export { CANONICAL_MIGRATIONS } from "./infrastructure/boot/canonicalMigrations.js";
-
-// Cookie session helpers — adapters use these to stay consistent with
-// the session name used by the runtime's session-assembly infrastructure.
-export { DEFAULT_SESSION_COOKIE, readCookie } from "./infrastructure/auth/CookieReader.js";
 
 // Procedure handler failure carrier used by platform helper handlers
 // such as Cloudflare Turnstile.

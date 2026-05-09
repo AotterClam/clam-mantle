@@ -1,37 +1,56 @@
 import { Hono } from "hono";
 import {
+  createAuth,
   createCmsRef,
   mountMcp,
   mountServerEndpoints,
+  type Auth,
+  type CreateAuthConfig,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
 
 /**
- * Headless worker entrypoint. Mounts only the API + MCP surfaces:
+ * Headless worker entrypoint. Mounts:
  *
- *   GET  /api/views/<name>          — view REST (auto-mounted per View atom)
- *   METHOD <trigger path>           — manifest-declared HTTP Trigger routes
- *   ALL  /mcp                       — MCP JSON-RPC dispatcher
+ *   GET  /api/views/<name>     — View REST
+ *   <method> <trigger path>    — manifest-declared HTTP Trigger routes
+ *   ALL  /mcp                  — MCP JSON-RPC dispatcher
+ *   ALL  /api/auth/*           — Better Auth (sign-in / sign-out / DCR)
  *
  * No `mountPublicRoutes` — this starter intentionally serves nothing
- * to end users. Wire your Next.js / Astro / SvelteKit / native app to
- * the API + MCP endpoints above.
- *
- * MCP auth is bearer-token-only via the runtime `OAuthVerifier` port
- * (StubOAuthVerifier behind `MANTLE_ALLOW_STUB_OAUTH=1` for dev). No
- * `/oauth/{authorize,token,register}` consent-UI route is mounted here;
- * use `starters/publication` if you need the full admin OAuth consent flow.
- *
- * If you decide to render HTML on the server later, swap to
- * `starters/publication` (or copy its `mountPublicRoutes` setup back in).
+ * to end users. Wire your own frontend to the API + MCP endpoints.
  */
 let appCache: Hono | null = null;
 
+function buildAuthFromEnv(env: Env): Auth {
+  if (!env.BETTER_AUTH_SECRET) {
+    throw new Error(
+      "BETTER_AUTH_SECRET is required. Run `wrangler secret put BETTER_AUTH_SECRET`.",
+    );
+  }
+  const baseURL = env.PUBLIC_ORIGIN ?? "http://localhost:8787";
+  const github: CreateAuthConfig["github"] =
+    env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? {
+          clientId: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+        }
+      : undefined;
+  return createAuth({
+    database: env.DB,
+    baseURL,
+    secret: env.BETTER_AUTH_SECRET,
+    github,
+    adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+  });
+}
+
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
-  const config = buildCmsConfig(env);
-  const cms = createCmsRef(config);
+  const auth = buildAuthFromEnv(env);
+  const cms = createCmsRef(buildCmsConfig(env, auth));
   const app = new Hono();
+  app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
   appCache = app;

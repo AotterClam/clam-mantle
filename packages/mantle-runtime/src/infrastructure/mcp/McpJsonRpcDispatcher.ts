@@ -3,6 +3,7 @@ import {
   redactForWire,
   type ContentState,
   type SchemaManifest,
+  type StaffRole,
 } from "@aotter/mantle-spec";
 import {
   ArchiveUseCase,
@@ -27,7 +28,6 @@ import {
   jsonRpcOk,
   jsonRpcOkRaw,
 } from "./McpResponses.js";
-import type { Staff } from "../../domain/model/Staff.js";
 
 /**
  * `McpJsonRpcDispatcher` — JSON-RPC dispatcher for the MCP transport.
@@ -49,9 +49,8 @@ import type { Staff } from "../../domain/model/Staff.js";
  */
 export interface McpAuthContext {
   readonly userId: string;
-  /** Resolved staff row for the authenticated user. Null when the user
-   *  is not staff (e.g. a service-account token with no staff row). */
-  readonly staff: Staff | null;
+  /** Caller's staff role; null for non-staff bearers. */
+  readonly staff: { readonly userId: string; readonly role: StaffRole } | null;
 }
 
 /**
