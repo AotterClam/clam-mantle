@@ -20,7 +20,9 @@ End state for this Skill:
 
 ## Website Handoff Contract
 
-The official-site prompt should include these fields. Parse them before asking the user anything:
+Localized prompt drafts the official site uses (and direct users can paste into any agent) live under [`docs/prompts/`](../../docs/prompts/) — currently `publication.en.md` and `publication.zh-TW.md`. Each prompt embeds the structured `clam_cms_request:` block below, with `{name}` placeholders the official site interpolates from the user's session before rendering.
+
+The prompt should include these fields. Parse them before asking the user anything:
 
 ```yaml
 clam_cms_request:

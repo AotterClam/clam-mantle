@@ -225,3 +225,102 @@ Before deploying THIS starter as-is:
    or keep using external image URLs until first-party media hosting is enabled.
 5. Bind real D1, render KV, and OAuth KV namespaces in `wrangler.toml`; boot applies runtime migrations on first request.
 6. Don't run `test/fixture/` against production — it is demo content for local dev.
+
+## Production smoke recipe
+
+End-to-end verification on a real Cloudflare account, ~20 min. Run this whenever the starter ships, an SDK release lands, or before declaring a v0.1.x release tag clean. Closes [#25](https://github.com/AotterClam/clam-cms/issues/25)'s production-smoke acceptance bullet.
+
+Prerequisites:
+
+- A Cloudflare account with billing profile (D1 + KV are free-tier; signup is the bar)
+- A GitHub OAuth App configured with the Worker URL as both Homepage URL and `<worker_url>/admin/auth/github/callback` as Authorization Callback URL. The first deploy gives you `<worker_url>` so this is a two-pass setup; copy the Worker URL after step 4 below, register the OAuth App, then come back and set `wrangler secret put GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET / ADMIN_GITHUB_LOGIN`.
+- Node 20+, pnpm 9+, an empty target directory.
+
+### Steps
+
+1. **Bootstrap from prompt.** Paste [`docs/prompts/publication.en.md`](../../docs/prompts/publication.en.md) (or `publication.zh-TW.md`) into Claude Code / Cursor / Codex with placeholders filled in. The agent reads the install Skill, copies the starter, runs `setup:site`, and reports back a clean `pnpm validate` + `pnpm typecheck`.
+
+2. **Local smoke.** Before any Cloudflare provisioning:
+
+   ```bash
+   pnpm fixture
+   pnpm dev
+   curl -s http://localhost:8787/en/posts/hello-world | head -5     # expect <!doctype html>
+   curl -s http://localhost:8787/api/views/recent-posts | jq '.data.rows | length'
+   curl -s http://localhost:8787/llms.txt | head -1
+   pnpm test:integration                                             # mcp-smoke + view-smoke
+   ```
+
+   All four must succeed. If `test:integration` fails, fix locally before continuing.
+
+3. **Provision Cloudflare resources** via the [provision Skill](../../skills/provision/SKILL.md). Creates D1, two KV namespaces (KV + OAUTH_KV), and writes their IDs into `wrangler.toml`. Verify `wrangler dev --remote` boots without binding errors.
+
+4. **First deploy.**
+
+   ```bash
+   pnpm wrangler deploy
+   # capture <worker_url> from the deploy output
+   ```
+
+5. **Register GitHub OAuth App** at <https://github.com/settings/developers> using `<worker_url>` and `<worker_url>/admin/auth/github/callback`. Then:
+
+   ```bash
+   pnpm wrangler secret put GITHUB_CLIENT_ID
+   pnpm wrangler secret put GITHUB_CLIENT_SECRET
+   pnpm wrangler secret put ADMIN_GITHUB_LOGIN     # your GH login
+   pnpm wrangler secret put TURNSTILE_SECRET_KEY   # real Turnstile secret
+   ```
+
+6. **Initial seed against production** — write home/about/contact/welcome content directly:
+
+   ```bash
+   pnpm run seed:initial -- --seed-file initial-seed.json --origin "<worker_url>" --remote
+   ```
+
+   The agent should have produced `initial-seed.json` during install with localized public copy.
+
+7. **Public smoke against deployed worker.**
+
+   ```bash
+   curl -s "<worker_url>/en/posts/welcome" | head -5
+   curl -s "<worker_url>/en/posts/welcome.md" | head -5    # markdown mirror
+   curl -s "<worker_url>/api/views/recent-posts" | jq '.data.rows[] | {slug, title}'
+   curl -s "<worker_url>/llms.txt"
+   curl -s "<worker_url>/en/llms.txt"
+   curl -s "<worker_url>/sitemap.xml" | head -10
+   ```
+
+   All HTML routes return 200; the View REST endpoint returns the seeded posts; both llms.txt variants exist; sitemap lists every locale × every published entry.
+
+8. **Owner sign-in.** Visit `<worker_url>/admin` in a browser, sign in with GitHub. `ensureBootstrapOwner` promotes you to `owner` on first login because `ADMIN_GITHUB_LOGIN` matches.
+
+9. **MCP operator smoke.** Open Claude Code / Cursor / Codex in any working directory; configure the MCP client with `<worker_url>/mcp`. The first connection opens the consent screen — approve it with the same GitHub account.
+
+   Then ask the agent to:
+
+   ```text
+   1. List entries in the posts collection.
+   2. Create a draft post titled "Smoke test post" in en with slug "smoke-test"
+      and a one-paragraph body.
+   3. Publish it.
+   4. Confirm the public HTML at <worker_url>/en/posts/smoke-test loads.
+   5. Confirm the markdown mirror at <worker_url>/en/posts/smoke-test.md loads.
+   6. Confirm the post appears in the recent-posts view.
+   ```
+
+   Every step must succeed. If `tools/list` doesn't show `create_draft_posts` / `request_publish` / etc., the boot validator failed silently — check `wrangler tail` for diagnostics.
+
+10. **Cleanup.** Either keep the deployment as your real site or `wrangler delete` and clean up the OAuth App + KV / D1 resources. The smoke is reproducible from step 1.
+
+### What this proves
+
+- Pinned-Skill install path works end-to-end ([#22](https://github.com/AotterClam/clam-cms/issues/22))
+- Provision + deploy creates real CF resources ([#23](https://github.com/AotterClam/clam-cms/issues/23))
+- Standalone GitHub-only install + MCP smoke ([#24](https://github.com/AotterClam/clam-cms/issues/24))
+- Blog/publication vertical end-to-end ([#25](https://github.com/AotterClam/clam-cms/issues/25))
+
+### When this fails
+
+- Step 2 fails: bug in the SDK or starter. File against the SDK; don't try to patch the consumer project.
+- Step 6 (initial seed) fails: `initial-seed.json` is malformed; agent needs to re-run install's public-copy intake step.
+- Step 9 (MCP) fails: most likely the OAuth consent flow — verify the OAuth App's callback URL matches `<worker_url>/admin/auth/github/callback` exactly, no trailing slash mismatch.
