@@ -1,6 +1,7 @@
 import type { Context, Hono } from "hono";
 import {
   HTTP_STATUS_BY_CODE,
+  MCP_HINT_KEYWORD,
   VIEW_PARAMS_RESERVED,
   runtimeDiagnostic,
   type ContentState,
@@ -140,6 +141,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
         description: s.spec.description ?? null,
         lifecycle: s.spec.lifecycle ?? "simple",
         hasTranslations: translatedParents.has(s.metadata.name),
+        mediaFields: mediaFieldsForCollection(s, schemas),
       }));
     return jsonResponse(200, { collections });
   });
@@ -621,6 +623,43 @@ function jsonResponse(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function mediaFieldsForCollection(
+  schema: SchemaManifest,
+  schemas: readonly SchemaManifest[],
+): Array<{ name: string; hint: string }> {
+  const related = [
+    schema,
+    ...schemas.filter((s) => s.spec.translates?.parent === schema.metadata.name),
+  ];
+  const out: Array<{ name: string; hint: string }> = [];
+  for (const s of related) {
+    out.push(...mediaFieldsForSchema(s));
+  }
+  return out;
+}
+
+function mediaFieldsForSchema(schema: SchemaManifest): Array<{ name: string; hint: string }> {
+  const props =
+    (schema.spec.schema as { properties?: Record<string, unknown> }).properties ?? {};
+  const out: Array<{ name: string; hint: string }> = [];
+  for (const [name, prop] of Object.entries(props)) {
+    if (typeof prop !== "object" || prop === null) continue;
+    const hint = (prop as Record<string, unknown>)[MCP_HINT_KEYWORD];
+    if (!isMediaHint(hint)) continue;
+    out.push({ name, hint });
+  }
+  return out;
+}
+
+function isMediaHint(value: unknown): value is string {
+  return (
+    value === "media" ||
+    value === "media-image" ||
+    value === "media-video" ||
+    value === "media-file"
+  );
 }
 
 async function readSessionForAdmin(

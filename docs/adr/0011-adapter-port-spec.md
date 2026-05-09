@@ -33,10 +33,23 @@ The POC accumulated multiple half-decisions about this seam (POC ADR-0015 docume
 | `UserRepository` | User identity — upsert by GitHub profile, store/read GitHub access token. |
 | `StaffRepository` | Staff roster — list all, read by user id, bootstrap first owner. |
 
+Optional feature ports may also live in `domain/port/`, but they are
+not part of the first-run adapter contract until a feature is enabled.
+For v0.1.x media hosting:
+
+| Optional port | Surface |
+|---|---|
+| `MediaStorage` | Object-storage-shaped media upload/commit/public URL/delete contract. Cloudflare may implement with R2, but runtime must not import R2 types. |
+| `RemoteMediaFetcher` | URL ingestion with platform-best SSRF, redirect, size, and content-type policy. Kept separate from storage so URL-fetch policy does not pollute object storage. |
+
+These optional ports must not force first-run provisioning to create R2
+resources. Publication starters can carry external image URLs without a
+media storage implementation.
+
 ### `DatabasePort`
 
 ```ts
-// packages/mantle-runtime/src/ports/database.ts (intent — exact shape lands in commit 4)
+// packages/mantle-runtime/src/domain/port/DatabaseDriver.ts
 export interface DatabasePort {
   /** Run a parameterised query. Returns a typed result-set object — adapters
    *  normalise their native driver into this shape. */
@@ -140,7 +153,7 @@ The runtime gets the 7 ports as a constructor object. There's no module-global s
 
 **Hard-enforced boundaries**:
 - `@aotter/mantle-runtime` MUST NOT import `D1Database`, `KVNamespace`, `Fetcher` (CF Workers ASSETS), `@cloudflare/*`, or any other adapter-specific type. CI will lint for this; PR reviewers can grep.
-- A new port can be added only by amending this ADR and updating ALL adapters (CF + Netlify stub) in the same change. The Netlify stub's README must reflect new ports too.
+- A new required port can be added only by amending this ADR and updating ALL adapters (CF + Netlify stub) in the same change. Optional feature ports must be documented here and must state when adapters are required to implement them.
 - Removing a port is also possible (if a port is found to overlap or be unnecessary), again by amending this ADR.
 
 **Discoverability for adapter authors**:
@@ -161,9 +174,9 @@ The runtime gets the 7 ports as a constructor object. There's no module-global s
 
 **(c) Function-injection (no interfaces, just functions)** — Runtime accepts a record of functions: `{ dbPrepare, kvGet, kvPut, sessionRead, … }`. **Rejected**: TypeScript interfaces are more discoverable (an adapter author IDE-jumps from `DatabasePort` to its surface; jumping from `dbPrepare` is harder). Interfaces also document grouping; functions don't.
 
-**(d) Plugin pattern (each port is a separate package)** — `@aotter/mantle-port-database`, `@aotter/mantle-port-kv`, etc., and runtime depends on all five. **Rejected**: 5 ports are too few to warrant 5 packages. The current 5-package structure (spec / runtime / admin-ui / cloudflare / netlify) is already at the boundary of "too many"; splitting further increases the maintenance tax without useful benefit. Ports are TS interfaces in `mantle-runtime`'s `src/ports/` directory — that's enough.
+**(d) Plugin pattern (each port is a separate package)** — `@aotter/mantle-port-database`, `@aotter/mantle-port-kv`, etc., and runtime depends on one package per port. **Rejected**: the port set is too small to warrant per-port packages. The current 5-package structure (spec / runtime / admin-ui / cloudflare / netlify) is already at the boundary of "too many"; splitting further increases the maintenance tax without useful benefit. Ports are TS interfaces in `mantle-runtime`'s `src/domain/port/` directory — that's enough.
 
-**(e) gRPC / wire-protocol seam** — Make ports a network protocol so adapters can be in any language. **Rejected**: the runtime is not an external service, it's a TypeScript library that adapters compose into a single Worker / Function. Network seam adds latency, deployment complexity, and operational surface for zero authoring benefit. The 5 ports are in-process; they always will be.
+**(e) gRPC / wire-protocol seam** — Make ports a network protocol so adapters can be in any language. **Rejected**: the runtime is not an external service, it's a TypeScript library that adapters compose into a single Worker / Function. Network seam adds latency, deployment complexity, and operational surface for zero authoring benefit. The ports are in-process; they always will be.
 
 ## How to apply
 
@@ -175,7 +188,7 @@ When you're authoring `@aotter/mantle-runtime` code:
 
 When you're authoring an adapter (`@aotter/mantle-cloudflare` for v0.1.0; future `mantle-netlify`, `mantle-bun`, …):
 
-1. Read `mantle-runtime/src/ports/`. Implement each port against your runtime's primitives.
+1. Read `mantle-runtime/src/domain/port/`. Implement each required port against your runtime's primitives.
 2. Compose the runtime via `createCmsRuntime({ db, kv, session, assets, oauth })`.
 3. Bind to your HTTP framework — Hono on CF, Netlify Functions handler, raw `fetch` Worker, …
 4. Bundle `@aotter/mantle-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetsPort` to it.
@@ -188,8 +201,8 @@ When you're reviewing a PR:
 
 ## Implementation status
 
-- [ ] Port interface files: `mantle-runtime/src/ports/{database,kv,session,assets,oauth}.ts` (commit 4)
-- [ ] Port impls: `mantle-cloudflare/src/ports/*.ts` (commit 6)
+- [ ] Port interface files: `mantle-runtime/src/domain/port/*.ts`
+- [ ] Port impls: `mantle-cloudflare/src/bindings/*.ts` plus optional feature impls when a starter enables them
 - [ ] Netlify stub README references this ADR (already done in commit 1)
 - [ ] CI lint: forbid `@cloudflare/*` / `D1Database` / `KVNamespace` imports in `mantle-runtime/` (post-v0.1.0; manual review until then)
 

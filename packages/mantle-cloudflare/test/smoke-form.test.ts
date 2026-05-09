@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotter/mantle-spec";
+import { DEFAULT_SESSION_COOKIE } from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import { mountMcp } from "../src/mount/mountMcp.js";
@@ -196,6 +197,66 @@ function oauthDiscoveryHarness(): Hono {
   return app;
 }
 
+async function adminCollectionsHarness(): Promise<{ app: Hono; sessionToken: string }> {
+  const sessionToken = "admin-session";
+  const sessions = new StubSessionRepository();
+  await sessions.write({
+    token: sessionToken,
+    userId: "u-admin",
+    createdAt: 0,
+    expiresAt: Date.now() + 60_000,
+  });
+  const oauthProvider = {
+    fetch: async () => new Response("ok"),
+  };
+  const apiVersion = "cms.mantle.aotter.net/v1" as const;
+  const ref = createCmsRef({
+    manifests: [
+      {
+        apiVersion,
+        kind: "Schema",
+        metadata: { name: "posts" },
+        spec: {
+          title: "Posts",
+          schema: {
+            type: "object",
+            properties: {
+              slug: { type: "string" },
+              coverUrl: {
+                type: "string",
+                format: "uri",
+                "x-mcp-hint": "media-image",
+              },
+              authorId: { type: "string", "x-mantle-bind": "ctx.user" },
+            },
+            required: ["slug"],
+          },
+          lifecycle: "simple",
+        },
+      },
+    ],
+    bindings: {
+      db: new InMemoryDatabase(),
+      kv: new InMemoryKv(),
+      sessions,
+      users: new StubUserRepository(),
+      staff: new StubStaffRepository(),
+      assets: new StubAssetServer(),
+      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
+    },
+    adminAuth: {
+      oauthProvider: oauthProvider as never,
+      oauthKv: new InMemoryKv() as unknown as KVNamespace,
+      githubClientId: "client-id",
+      githubClientSecret: "client-secret",
+      adminGithubLogin: "owner",
+    },
+  });
+  const app = new Hono();
+  mountServerEndpoints(app, ref);
+  return { app, sessionToken };
+}
+
 describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
   it("happy path: CAPTCHA passes, row written, Slack fires", async () => {
     const h = harness({ captchaPasses: true });
@@ -302,5 +363,22 @@ describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ path });
     }
+  });
+
+  it("admin collections expose media fields from x-mcp-hint", async () => {
+    const { app, sessionToken } = await adminCollectionsHarness();
+    const res = await app.request("/admin/api/collections", {
+      headers: { cookie: `${DEFAULT_SESSION_COOKIE}=${sessionToken}` },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      collections: Array<{ name: string; mediaFields?: Array<{ name: string; hint: string }> }>;
+    };
+    expect(body.collections).toEqual([
+      expect.objectContaining({
+        name: "posts",
+        mediaFields: [{ name: "coverUrl", hint: "media-image" }],
+      }),
+    ]);
   });
 });

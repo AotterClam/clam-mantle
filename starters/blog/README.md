@@ -36,8 +36,10 @@ a later dedicated starter.
   Lands in v0.2.
 - **Editorial lifecycle** (approval queue). Schemas use `lifecycle:
   simple` only. Editorial runtime lands in v0.1.x.
-- **R2 media uploads**. `posts.coverUrl` is a hand-supplied URL string
-  for now. UI picker + R2 upload land in v0.1.x.
+- **First-party media hosting**. `posts.coverUrl` is a hand-supplied
+  URL string marked with `x-mcp-hint: media-image` for agents/admin UI.
+  R2-backed uploads are an explicit opt-in add-on, not part of first-run
+  provisioning.
 - **Full admin SPA**. v0.1.0 ships a minimal owner landing at `/admin`.
   First public content is seeded by `pnpm run seed:initial`; ongoing
   content operations use MCP after owner bootstrap.
@@ -208,6 +210,7 @@ Before deploying THIS starter as-is:
 1. Remove `MANTLE_ALLOW_STUB_OAUTH` from deployable vars; production uses GitHub OAuth + Workers OAuth Provider.
 2. Replace `captchaCheck` with a real Turnstile / hCaptcha siteverify call.
 3. Replace `slackNotify` with your Slack webhook (or a different sink).
-4. Replace demo Unsplash cover images with assets you own when appropriate.
+4. Replace demo Unsplash cover images with assets you own when appropriate,
+   or keep using external image URLs until first-party media hosting is enabled.
 5. Bind real D1, render KV, and OAuth KV namespaces in `wrangler.toml`; boot applies runtime migrations on first request.
 6. Don't run `test/fixture/` against production — it is demo content for local dev.
