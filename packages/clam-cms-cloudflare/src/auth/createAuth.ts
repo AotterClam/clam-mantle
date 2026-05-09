@@ -50,6 +50,14 @@ export interface CreateAuthConfig {
   readonly github?: {
     readonly clientId: string;
     readonly clientSecret: string;
+    /** Override the OAuth callback URL Better Auth tells GitHub to
+     *  redirect to. Use this when your GitHub OAuth App is registered
+     *  with a different callback URI than Better Auth's default
+     *  `${baseURL}/api/auth/callback/github`. The consumer is then
+     *  responsible for forwarding requests at that URI to
+     *  `auth.handler` (typically by mounting a translator route
+     *  that rewrites the path). */
+    readonly redirectURI?: string;
   };
   /** GitHub login (handle) that auto-promotes to `owner` on first
    *  sign-in. Mirrors the legacy `ADMIN_GITHUB_LOGIN` env var. The
@@ -115,6 +123,16 @@ function buildAuth(config: CreateAuthConfig) {
       mapProfileToUser: (profile) => ({
         githubLogin: profile.login,
       }),
+      // Custom callback URL preserves compatibility with GitHub OAuth
+      // apps registered against the legacy `/admin/auth/github/callback`
+      // path (the rebuild predecessor's redirect URI). The consumer
+      // mounts a tiny path translator at that URL that rewrites the
+      // request to Better Auth's actual handler at
+      // `/api/auth/callback/github`. Defaults to Better Auth's normal
+      // path when omitted.
+      ...(config.github.redirectURI
+        ? { redirectURI: config.github.redirectURI }
+        : {}),
     };
   }
 
