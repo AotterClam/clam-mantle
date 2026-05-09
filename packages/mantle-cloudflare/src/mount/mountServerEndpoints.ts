@@ -62,7 +62,7 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
     app.on(method, honoPath, async (c) => {
       const runtime = await ref.get();
       const waitUntil = readWaitUntil(c);
-      return handleHttpTrigger(c.req.raw, runtime, triggerName, path, waitUntil);
+      return handleHttpTrigger(c.req.raw, runtime, ref.auth, triggerName, path, waitUntil);
     });
   }
   for (const v of ref.manifests) {
@@ -607,6 +607,7 @@ async function handleConsentPost(
 async function handleHttpTrigger(
   req: Request,
   runtime: CmsRuntime,
+  auth: Auth | null,
   triggerName: string,
   triggerPath: string,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
@@ -629,7 +630,7 @@ async function handleHttpTrigger(
   // `id`). Body fields fill in non-path inputs only.
   const input = { ...body, ...params };
 
-  const ctx: HandlerContext = await buildHandlerContext(req, runtime, waitUntil);
+  const ctx: HandlerContext = await buildHandlerContext(req, runtime, auth, waitUntil);
 
   const result = await runtime.invokeProcedure.execute({
     procedure,
@@ -716,13 +717,25 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
 async function buildHandlerContext(
   req: Request,
   runtime: CmsRuntime,
+  auth: Auth | null,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
+  const wu = waitUntil ? { waitUntil } : {};
+  if (auth) {
+    const session = await auth.getMcpSession(req);
+    if (!session) return { user: null, staff: null, env: {}, ...wu };
+    const role = await auth.getUserRole(session.userId);
+    const staff =
+      role && ADMIN_ROLES_FOR_GATE.has(role)
+        ? { id: session.userId, role: role as AdminRole }
+        : null;
+    return { user: { id: session.userId }, staff, env: {}, ...wu };
+  }
   const identity = await runtime.oauth.verifyAccessToken(req);
-  if (!identity) return { user: null, staff: null, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  if (!identity) return { user: null, staff: null, env: {}, ...wu };
   const staffRow = await runtime.staff.readByUserId(identity.userId);
   const staff = staffRow ? { id: staffRow.userId, role: staffRow.role } : null;
-  return { user: { id: identity.userId }, staff, env: {}, ...(waitUntil ? { waitUntil } : {}) };
+  return { user: { id: identity.userId }, staff, env: {}, ...wu };
 }
 
 function openApiToHono(path: string): string {

@@ -109,10 +109,26 @@ function buildSql(opts: ApplyFixtureOptions): string {
   }
 
   const fixtureNowIso = new Date(FIXTURE_NOW).toISOString();
+  const fixturePlus30dIso = new Date(FIXTURE_NOW + 30 * 24 * 60 * 60 * 1000).toISOString();
   const userRole = opts.seedStaffEditor ? "'editor'" : "NULL";
   lines.push(
     `INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt, role) VALUES ('${FIXTURE_AUTHOR_ID}', 'Demo Editor', 'editor@example.com', 1, '${fixtureNowIso}', '${fixtureNowIso}', ${userRole});`,
   );
+
+  // Test profile only: pre-mint a Better Auth MCP access token so
+  // mcp-smoke can authenticate without going through GitHub OAuth.
+  // Real deployments mint these via the MCP DCR + authorize flow.
+  if (opts.seedStaffEditor) {
+    const clientId = "fixture-mcp-client";
+    const accessToken = "fixture-mcp-access-token";
+    const refreshToken = "fixture-mcp-refresh-token";
+    lines.push(
+      `INSERT OR IGNORE INTO oauthApplication (id, name, clientId, redirectUrls, type, createdAt, updatedAt) VALUES ('fx-app-1', 'fixture mcp client', '${clientId}', 'http://localhost:0', 'web', '${fixtureNowIso}', '${fixtureNowIso}');`,
+    );
+    lines.push(
+      `INSERT OR IGNORE INTO oauthAccessToken (id, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, clientId, userId, scopes, createdAt, updatedAt) VALUES ('fx-tok-1', '${accessToken}', '${refreshToken}', '${fixturePlus30dIso}', '${fixturePlus30dIso}', '${clientId}', '${FIXTURE_AUTHOR_ID}', 'openid profile email', '${fixtureNowIso}', '${fixtureNowIso}');`,
+    );
+  }
 
   let postIndex = 1;
   for (const post of FIXTURE_POSTS) {

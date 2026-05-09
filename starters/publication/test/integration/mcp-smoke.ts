@@ -20,7 +20,10 @@
 import { strict as assert } from "node:assert";
 
 const BASE = process.env.WRANGLER_BASE_URL ?? "http://localhost:8787";
-const BEARER = "Bearer dev-u-staff-1";
+// The fixture seeds this token as an `oauthAccessToken` row pointed
+// at the test editor (`u-staff-1`, role='editor'). Better Auth's MCP
+// plugin validates the bearer against `oauthAccessToken.accessToken`.
+const BEARER = "Bearer fixture-mcp-access-token";
 
 interface JsonRpcResult {
   readonly result?: unknown;
