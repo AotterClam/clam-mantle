@@ -17,7 +17,7 @@ import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
-import { postsSchema } from "./fakes/manifests.js";
+import { postsSchema, recentPostsView } from "./fakes/manifests.js";
 
 interface Harness {
   store: InMemoryEntryRepository;
@@ -108,6 +108,33 @@ describe("McpJsonRpcDispatcher", () => {
     expect(names).toContain("update_draft_posts");
     // Old generic create_draft is gone.
     expect(names).not.toContain("create_draft");
+  });
+
+  it("public surface exposes View query tools, not staff authoring tools", async () => {
+    const { dispatcher: _staff, ...h } = buildHarness();
+    const dispatcher = new McpJsonRpcDispatcher(
+      {
+        listEntries: new ListEntriesUseCase(h.store, new Map([["posts", postsSchema()]])),
+        getEntry: new GetEntryUseCase(h.store),
+        createDraft: new CreateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }, { next: () => "x" }),
+        updateDraft: new UpdateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        requestPublish: new RequestPublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        unpublish: new UnpublishUseCase(h.store, { now: () => 0 }),
+        archive: new ArchiveUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        deleteEntry: new DeleteEntryUseCase(h.store),
+      },
+      [postsSchema()],
+      {
+        surface: "public",
+        views: [recentPostsView()],
+      },
+    );
+    const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1", staff: null });
+    const body = (await res.json()) as {
+      result: { tools: { name: string }[] };
+    };
+    const names = body.result.tools.map((t) => t.name);
+    expect(names).toEqual(["query_view_recent_posts"]);
   });
 
   it("tools/list preserves media x-mcp-hint metadata for agents", async () => {

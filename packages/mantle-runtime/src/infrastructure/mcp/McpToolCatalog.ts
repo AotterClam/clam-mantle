@@ -1,6 +1,7 @@
 import {
   MANTLE_BIND_KEYWORD,
   type SchemaManifest,
+  type ViewManifest,
 } from "@aotter/mantle-spec";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 
@@ -129,6 +130,9 @@ export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
 
 export const CREATE_DRAFT_PREFIX = "create_draft_";
 export const UPDATE_DRAFT_PREFIX = "update_draft_";
+export const QUERY_VIEW_PREFIX = "query_view_";
+
+export type McpToolSurface = "staff" | "public";
 
 /**
  * Build the full tool catalog from the manifest's Schemas. The
@@ -140,12 +144,20 @@ export interface BuildMcpToolCatalogOpts {
    *  Adapters set this from the runtime's `media` field (non-null when
    *  a `mediaStorage` was bound). */
   readonly mediaEnabled?: boolean;
+  /** Staff surface exposes authoring / lifecycle tools. Public
+   *  surface exposes only read-only View queries for v0.1. */
+  readonly surface?: McpToolSurface;
+  readonly views?: ReadonlyArray<ViewManifest>;
 }
 
 export function buildMcpToolCatalog(
   schemas: ReadonlyArray<SchemaManifest>,
   opts: BuildMcpToolCatalogOpts = {},
 ): readonly McpToolDefinition[] {
+  const surface = opts.surface ?? "staff";
+  if (surface === "public") {
+    return (opts.views ?? []).map(buildQueryViewTool);
+  }
   const out: McpToolDefinition[] = [...GENERIC_TOOLS];
   if (opts.mediaEnabled) out.push(...MEDIA_TOOLS);
   for (const s of schemas) {
@@ -202,6 +214,27 @@ function buildUpdateTool(schema: SchemaManifest): McpToolDefinition {
   return {
     name: `${UPDATE_DRAFT_PREFIX}${mcpToolNameSegment(schema.metadata.name)}`,
     description: describeUpdateTool(schema),
+    inputSchema,
+  };
+}
+
+function buildQueryViewTool(view: ViewManifest): McpToolDefinition {
+  const params = view.spec.params as
+    | { properties?: Record<string, unknown>; required?: readonly string[] }
+    | undefined;
+  const properties: Record<string, unknown> = {
+    ...(params?.properties ?? {}),
+    page: { type: "number", description: "Optional 1-based page number." },
+    show: { type: "number", description: "Optional page size, capped by the View limit." },
+  };
+  const inputSchema: Record<string, unknown> = {
+    type: "object",
+    properties,
+  };
+  if (params?.required?.length) inputSchema["required"] = params.required;
+  return {
+    name: `${QUERY_VIEW_PREFIX}${mcpToolNameSegment(view.metadata.name)}`,
+    description: `Query public View '${view.metadata.name}'.`,
     inputSchema,
   };
 }

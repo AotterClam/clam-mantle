@@ -12,13 +12,14 @@
  *   GITHUB_CLIENT_SECRET=... pnpm run provision:up -- \
  *       --project-name X --github-username Y --client-id Z \
  *       [--client-secret W] [--seed-file initial-seed.json]
- *     Creates D1 + 2 KV + Turnstile widget via CF API, writes
- *     wrangler.toml + site defaults, deploys, sets all 4 worker
+ *     Creates D1 + render KV + Turnstile widget via CF API, writes
+ *     wrangler.toml + site defaults, deploys, sets worker
  *     secrets, optionally syncs/applies initial-seed.json, and prints
  *     the final handoff. CLOUDFLARE_API_TOKEN must be exported.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 
 const COMMAND = process.argv[2];
 const SUB_ARGV = process.argv.slice(3);
@@ -55,19 +56,17 @@ async function up(args) {
   console.log("\n[1/5] Creating Cloudflare resources...");
   const d1 = await createD1(token, ctx.accountId, names.d1);
   const renderKv = await createKv(token, ctx.accountId, names.renderKv);
-  const oauthKv = await createKv(token, ctx.accountId, names.oauthKv);
   const widget = await createWidget(token, ctx.accountId, names.turnstile, ctx.hostname);
   console.log(`  D1:        ${d1.uuid}`);
   console.log(`  Render KV: ${renderKv.id}`);
-  console.log(`  OAuth KV:  ${oauthKv.id}`);
   console.log(`  Turnstile: ${widget.sitekey}`);
 
   console.log("\n[2/5] Writing wrangler.toml + site defaults...");
   updateWranglerToml({
     d1Id: d1.uuid,
     renderKvId: renderKv.id,
-    oauthKvId: oauthKv.id,
     turnstileSiteKey: widget.sitekey,
+    publicOrigin: ctx.workerUrl,
   });
   if (seedSite) {
     updateSeedOrigin(seedFile, ctx.workerUrl);
@@ -89,6 +88,7 @@ async function up(args) {
   pipeSecret("ADMIN_GITHUB_LOGIN", githubUsername);
   pipeSecret("GITHUB_CLIENT_ID", clientId);
   pipeSecret("GITHUB_CLIENT_SECRET", clientSecret);
+  pipeSecret("BETTER_AUTH_SECRET", randomBytes(32).toString("base64url"));
   pipeSecret("TURNSTILE_SECRET_KEY", widget.secret);
 
   if (seedFile) {
@@ -111,7 +111,6 @@ function resourceNames(projectName) {
     worker: projectName,
     d1: `${projectName}-db`,
     renderKv: `${projectName}-render`,
-    oauthKv: `${projectName}-oauth`,
     turnstile: projectName,
   };
 }
@@ -171,17 +170,24 @@ async function cf(token, path, opts = {}) {
   return data.result;
 }
 
-function updateWranglerToml({ d1Id, renderKvId, oauthKvId, turnstileSiteKey }) {
+function updateWranglerToml({ d1Id, renderKvId, turnstileSiteKey, publicOrigin }) {
   let toml = readFileSync("wrangler.toml", "utf8");
   toml = replaceInBlock(toml, "d1_databases", 'binding = "DB"', "database_id", d1Id);
   toml = replaceInBlock(toml, "kv_namespaces", 'binding = "KV"', "id", renderKvId);
-  toml = replaceInBlock(toml, "kv_namespaces", 'binding = "OAUTH_KV"', "id", oauthKvId);
-  const next = toml.replace(
-    /^TURNSTILE_SITE_KEY = ".*"$/m,
-    `TURNSTILE_SITE_KEY = ${JSON.stringify(turnstileSiteKey)}`,
-  );
-  if (next === toml) throw new Error("TURNSTILE_SITE_KEY line not found in wrangler.toml");
-  writeFileSync("wrangler.toml", next);
+  toml = upsertVar(toml, "TURNSTILE_SITE_KEY", turnstileSiteKey);
+  toml = upsertVar(toml, "PUBLIC_ORIGIN", publicOrigin);
+  writeFileSync("wrangler.toml", toml);
+}
+
+function upsertVar(toml, key, value) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const line = `${key} = ${JSON.stringify(value)}`;
+  const next = toml.replace(new RegExp(`^${escaped} = ".*"$`, "m"), line);
+  if (next !== toml) return next;
+  const varsHeader = "[vars]\n";
+  const idx = toml.indexOf(varsHeader);
+  if (idx === -1) throw new Error("[vars] block not found in wrangler.toml");
+  return `${toml.slice(0, idx + varsHeader.length)}${line}\n${toml.slice(idx + varsHeader.length)}`;
 }
 
 function updateOrigin(workerUrl) {
@@ -290,13 +296,10 @@ Will create:
   Worker            ${names.worker}
   D1 database       ${names.d1}
   Render KV         ${names.renderKv}
-  OAuth KV          ${names.oauthKv}
   Turnstile widget  ${names.turnstile}
 
 Important: these KV names are created through the Cloudflare API,
 not through "wrangler kv namespace create". Do not prefix them again.
-The OAuth KV must be exactly "${names.oauthKv}", not
-"${names.projectName}-${names.oauthKv}".
 
 Before running provision:up, create a GitHub OAuth App:
 
@@ -331,7 +334,8 @@ Provision complete
 ==============================================
 
 Public URL:  ${ctx.workerUrl}
-MCP URL:     ${ctx.workerUrl}/mcp
+Staff MCP:   ${ctx.workerUrl}/staff/mcp
+User MCP:    ${ctx.workerUrl}/mcp
 Sign in:     ${ctx.workerUrl}/admin/auth/github
 
 Cloudflare resources are scoped to ${names.projectName}; manage at

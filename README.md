@@ -23,14 +23,15 @@ You're an agent helping a (likely non-technical) user install or extend a mantle
 
 → **Install a fresh publication/site** — start at [`skills/install/SKILL.md`](skills/install/SKILL.md).
 → **Add a new atom** (Schema / View / Procedure + http Trigger) to an existing starter — start at [`skills/extend/SKILL.md`](skills/extend/SKILL.md).
-→ **Provision Cloudflare resources** (D1, KV, OAuth, Turnstile) and deploy — start at [`skills/provision/SKILL.md`](skills/provision/SKILL.md).
+→ **Provision Cloudflare resources** (D1, KV, Turnstile) and deploy — start at [`skills/provision/SKILL.md`](skills/provision/SKILL.md).
 
 ## For humans
 
 End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.dev` with:
 
 - `/admin` — GitHub-OAuth-gated React admin SPA
-- `/mcp` — MCP endpoint, AI clients connect here to edit content
+- `/staff/mcp` — staff MCP endpoint, owner/editor agents connect here to edit content
+- `/mcp` — end-user/read MCP endpoint for public View tools and future member flows
 - `/<locale>/<collection>/<slug>` — per-entry HTML
 - `/<locale>/<collection>/<slug>.md` — agent-friendly markdown mirror
 - `/<locale>/llms.txt` — per-locale llms.txt index
@@ -43,9 +44,9 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 | Package | Role |
 |---|---|
 | `@aotter/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
-| `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + auth + MCP. Defines required adapter ports plus optional feature ports. |
+| `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
 | `@aotter/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
-| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS / Workers OAuth. |
+| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS and owns Better Auth wiring. |
 | `@aotter/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
 
 ## Starters
