@@ -127,11 +127,17 @@ export class R2MediaStorage implements MediaStorage {
     if (!existing) throw mediaDiagnostic("MEDIA_OBJECT_NOT_FOUND", { value: args.uploadId });
 
     const actualMime = existing.httpMetadata?.contentType ?? "application/octet-stream";
-    if (args.checksum && existing.etag && existing.etag.replace(/^"|"$/g, "") !== args.checksum) {
-      throw mediaDiagnostic("MEDIA_CHECKSUM_MISMATCH", {
-        value: existing.etag,
-        expected: args.checksum,
-      });
+    if (args.checksum) {
+      // R2 always returns an etag for stored objects, but fail closed
+      // if it's missing for any reason — a supplied checksum that
+      // can't be verified must not silently no-op.
+      const etag = existing.etag?.replace(/^"|"$/g, "") ?? "";
+      if (etag !== args.checksum) {
+        throw mediaDiagnostic("MEDIA_CHECKSUM_MISMATCH", {
+          value: existing.etag ?? "(no etag returned)",
+          expected: args.checksum,
+        });
+      }
     }
     if (actualMime !== args.expectedMimeType) {
       throw mediaDiagnostic("MEDIA_MIME_REJECTED", {
