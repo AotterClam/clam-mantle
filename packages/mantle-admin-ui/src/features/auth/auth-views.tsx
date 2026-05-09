@@ -68,7 +68,23 @@ export function SignInView(): React.ReactElement {
   const { language } = usePreferences();
   const params = new URLSearchParams(window.location.search);
   const ret = params.get("return") ?? "/admin";
-  const href = `/admin/auth/github?return_to=${encodeURIComponent(ret)}`;
+
+  // Better Auth (ADR-0014): POST /api/auth/sign-in/social returns
+  // { url, redirect: true }; the SPA navigates to the GitHub
+  // authorize URL, GitHub bounces back to the OAuth callback (handled
+  // by Better Auth via the starter's translator route), Better Auth
+  // sets a session cookie, then 302s back to `callbackURL`.
+  const startGitHub = async (): Promise<void> => {
+    const res = await fetch("/api/auth/sign-in/social", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "github", callbackURL: ret }),
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as { url?: string; redirect?: boolean };
+    if (data.url) window.location.href = data.url;
+  };
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
@@ -78,18 +94,21 @@ export function SignInView(): React.ReactElement {
         <p className="mb-6 text-sm text-muted-foreground">
           {t(language, "auth.signIn.body")}
         </p>
-        <Button asChild className="w-full">
-          <a href={href}>{t(language, "auth.signIn.github")}</a>
+        <Button onClick={() => void startGitHub()} className="w-full">
+          {t(language, "auth.signIn.github")}
         </Button>
       </div>
     </div>
   );
 }
 
+// Better Auth (ADR-0014): POST /api/auth/sign-out clears the session
+// cookie and returns 200. The SPA then bounces to the sign-in view.
 function signOut(): void {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = "/admin/logout";
-  document.body.appendChild(form);
-  form.submit();
+  void fetch("/api/auth/sign-out", {
+    method: "POST",
+    credentials: "include",
+  }).then(() => {
+    window.location.href = "/admin/sign-in";
+  });
 }

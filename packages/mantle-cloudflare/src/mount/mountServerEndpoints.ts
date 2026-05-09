@@ -21,6 +21,7 @@ import {
 } from "@aotter/mantle-runtime";
 import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
+import type { Auth } from "../auth/createAuth.js";
 import { BypassToConsent } from "../oauth/oauthConstants.js";
 import { CallbackError, handleCallback, startAuthorize } from "../oauth/githubOAuth.js";
 import {
@@ -71,6 +72,18 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       const runtime = await ref.get();
       return handleViewRequest(c.req.raw, runtime, viewName);
     });
+  }
+
+  // ── ADR-0014 path: Better Auth is in effect ──────────────────────────
+  //
+  // When a `Auth` instance is on the ref (consumer wired it via
+  // `createCmsRef({ ..., auth })`), mount the new admin surface and
+  // skip the legacy `/admin/auth/github`, OAuth consent UI, and
+  // `/oauth/*` DCR routes — those are owned by Better Auth at
+  // `/api/auth/*` (sign-in, callbacks, MCP DCR / token / discovery).
+  if (ref.auth) {
+    mountAdminBetterAuth(app, ref, ref.auth);
+    return;
   }
 
   const { adminAuth } = ref;
@@ -371,6 +384,160 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   app.all("/oauth/register", (c) =>
     oauthProvider.fetch(c.req.raw, oauthEnv as never, safeExecutionCtx(c)),
   );
+}
+
+/**
+ * Better Auth (ADR-0014) admin surface.
+ *
+ * Replaces the legacy block (`/admin/auth/github`, OAuth consent UI,
+ * `/oauth/*` DCR endpoints) with three things:
+ *
+ *  1. The same `/admin` SPA shell + sub-routes — unchanged shape.
+ *  2. `/admin/api/me|collections|site|entries` gated via
+ *     `auth.getSession(req)` reading Better Auth's session cookie.
+ *     Authorization is by `session.user.role`: any of `owner`,
+ *     `editor`, `contributor` permits access; `user` (the admin
+ *     plugin's `defaultRole`) and `null` get 403.
+ *  3. Sign-in / sign-out are NOT mounted here — Better Auth owns
+ *     them at `/api/auth/sign-in/social` and `/api/auth/sign-out`.
+ *     The admin SPA's SignInView (sign in) and signOut() helpers
+ *     POST to those Better Auth endpoints directly.
+ */
+function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
+  // ── Admin SPA shell ────────────────────────────────────────────────
+  const spa = (): Response =>
+    new Response(indexHtml, {
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  app.get("/admin", spa);
+  app.get("/admin/", spa);
+  app.get("/admin/sign-in", spa);
+  app.get("/admin/c/:collection", spa);
+  app.get("/admin/approvals", spa);
+  app.get("/admin/preferences", spa);
+  app.get("/admin/settings", spa);
+
+  // ── /admin/api/* — JSON endpoints consumed by the SPA ──────────────
+  app.get("/admin/api/me", async (c) => {
+    const gate = await readAdminGate(c, auth);
+    if (gate.kind === "unauth") return adminUnauthenticated(c, "/admin/api/me");
+    if (gate.kind === "forbidden") return adminNotStaff(c, "/admin/api/me", gate.login);
+    return jsonResponse(200, {
+      login: gate.login,
+      role: gate.role,
+      userId: gate.userId,
+    });
+  });
+
+  app.get("/admin/api/collections", async (c) => {
+    const gate = await readAdminGate(c, auth);
+    if (gate.kind === "unauth") return adminUnauthenticated(c, "/admin/api/collections");
+    if (gate.kind === "forbidden") return adminNotStaff(c, "/admin/api/collections", gate.login);
+    const schemas = ref.manifests.filter(
+      (m): m is SchemaManifest => m.kind === "Schema",
+    );
+    const translatedParents = new Set<string>();
+    for (const s of schemas) {
+      if (s.spec.translates) translatedParents.add(s.spec.translates.parent);
+    }
+    const collections = schemas
+      .filter((s) => !s.spec.translates)
+      .map((s) => ({
+        name: s.metadata.name,
+        title: s.spec.title,
+        description: s.spec.description ?? null,
+        lifecycle: s.spec.lifecycle ?? "simple",
+        hasTranslations: translatedParents.has(s.metadata.name),
+        mediaFields: mediaFieldsForCollection(s, schemas),
+      }));
+    return jsonResponse(200, { collections });
+  });
+
+  app.get("/admin/api/site", async (c) => {
+    const gate = await readAdminGate(c, auth);
+    if (gate.kind === "unauth") return adminUnauthenticated(c, "/admin/api/site");
+    if (gate.kind === "forbidden") return adminNotStaff(c, "/admin/api/site", gate.login);
+    const runtime = await ref.get();
+    const site = await runtime.siteConfig.load();
+    const url = new URL(c.req.url);
+    const publicUrl = site.origin || url.origin;
+    return jsonResponse(200, {
+      ...site,
+      publicUrl,
+      mcpUrl: `${url.origin}/mcp`,
+    });
+  });
+
+  app.get("/admin/api/entries", async (c) => {
+    const gate = await readAdminGate(c, auth);
+    if (gate.kind === "unauth") return adminUnauthenticated(c, "/admin/api/entries");
+    if (gate.kind === "forbidden") return adminNotStaff(c, "/admin/api/entries", gate.login);
+    const collection = c.req.query("collection");
+    if (!collection) {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: "GET /admin/api/entries",
+          expected: "?collection=<name> query parameter",
+          message: "Missing `collection` query parameter.",
+        }),
+      });
+    }
+    const status = c.req.query("status");
+    const runtime = await ref.get();
+    const rows = await runtime.listEntries.execute({
+      collection,
+      status: status as ContentState | undefined,
+    });
+    const items = rows.map((row) => ({
+      id: row.id,
+      collection: row.collection,
+      locale: row.locale ?? null,
+      status: row.status,
+      version: row.version,
+      title: row.data.title,
+      updated_at: row.updatedAt,
+    }));
+    return jsonResponse(200, { items, next_cursor: null });
+  });
+}
+
+/** Decision returned by `readAdminGate`. */
+type AdminGate =
+  | { kind: "unauth" }
+  | { kind: "forbidden"; login: string | null }
+  | {
+      kind: "ok";
+      userId: string;
+      login: string | null;
+      role: "owner" | "editor" | "contributor";
+    };
+
+const ADMIN_ROLES_FOR_GATE = new Set(["owner", "editor", "contributor"] as const);
+
+/**
+ * Read the cookie session via Better Auth and classify the caller as
+ * unauthenticated / authenticated-but-not-staff / staff-with-role.
+ * `login` exposes the GitHub handle when known so the SPA can render
+ * the "you're signed in but lack admin access" view with a face on
+ * the rejection.
+ */
+async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
+  const session = await auth.getSession(c.req.raw);
+  if (!session) return { kind: "unauth" };
+  const role = session.user.role ?? null;
+  const login = session.user.githubLogin ?? null;
+  if (!role || !ADMIN_ROLES_FOR_GATE.has(role as "owner" | "editor" | "contributor")) {
+    return { kind: "forbidden", login };
+  }
+  return {
+    kind: "ok",
+    userId: session.user.id,
+    login,
+    role: role as "owner" | "editor" | "contributor",
+  };
 }
 
 type OAuthHelpers = {

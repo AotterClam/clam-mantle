@@ -7,6 +7,7 @@ import {
   KvCacheBinding,
   StubOAuthVerifier,
   type AdminAuthConfig,
+  type Auth,
   type CmsConfig,
 } from "@aotter/mantle-cloudflare";
 import {
@@ -70,9 +71,14 @@ export interface Env {
  * The starter calls this once at module-init time inside `index.ts`
  * (under the `let runtimeRef` guard) so the runtime + decorator
  * chain is built once per isolate.
+ *
+ * Pass `auth` (Better Auth instance, ADR-0014) when available — the
+ * SDK then mounts /admin/api/* gated by `auth.getSession()`. When
+ * omitted, falls back to legacy /admin/auth/github + WorkersOAuth
+ * routes via `adminAuth` (deprecated; slated for removal).
  */
-export function buildCmsConfig(env: Env): CmsConfig {
-  const adminAuth = buildAdminAuth(env);
+export function buildCmsConfig(env: Env, auth?: Auth): CmsConfig {
+  const adminAuth = auth ? undefined : buildAdminAuth(env);
   return {
     manifests: loadManifests(),
     handlers: buildHandlers(env),
@@ -104,7 +110,8 @@ export function buildCmsConfig(env: Env): CmsConfig {
             return new WorkersOAuthVerifier(env.OAUTH_KV);
           })(),
     },
-    adminAuth,
+    ...(adminAuth ? { adminAuth } : {}),
+    ...(auth ? { auth } : {}),
   };
 }
 

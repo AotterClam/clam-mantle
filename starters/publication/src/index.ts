@@ -63,7 +63,8 @@ function getAuth(env: Env): Auth | null {
 
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
-  const config = buildCmsConfig(env);
+  const auth = getAuth(env);
+  const config = buildCmsConfig(env, auth ?? undefined);
   const cms = createCmsRef(config);
   const app = new Hono();
 
