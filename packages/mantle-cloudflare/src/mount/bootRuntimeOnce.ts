@@ -33,23 +33,9 @@ export interface CmsRuntimeRef {
   /** The manifest set this ref's runtime was built from. Mounts use
    *  this to materialize routes statically without awaiting boot. */
   readonly manifests: readonly Manifest[];
-  /** Present when `config.adminAuth` was supplied. Exposes the
-   *  OAuthProvider and GitHub OAuth config to mount factories
-   *  (`mountServerEndpoints` for consent UI / passthrough;
-   *  `mountMcp` in issue #20 for token verification).
-   *
-   *  @deprecated Pre-v0.1.0 spike: superseded by `auth` (Better Auth
-   *  per ADR-0014). Kept temporarily on the ref so the legacy
-   *  `mountServerEndpoints` block still compiles during the rewire.
-   *  Slated for removal alongside the legacy /admin/auth/* + /oauth/*
-   *  routes. */
+  /** @deprecated Superseded by `auth` (ADR-0014). Removed once the
+   *  legacy /admin/auth/* + /oauth/* block goes. */
   readonly adminAuth: AdminAuthConfig | null;
-  /** Better Auth instance. When present, `mountServerEndpoints`
-   *  reads `auth.getSession(req)` for /admin/api/* gating, and
-   *  `mountMcp` reads `auth.getMcpSession(req)` for bearer-token
-   *  validation on /mcp + /staff/mcp. Optional during the rewire —
-   *  null means the consumer hasn't switched to Better Auth yet
-   *  and the legacy `adminAuth` path applies. */
   readonly auth: Auth | null;
 }
 

@@ -69,11 +69,6 @@ export function SignInView(): React.ReactElement {
   const params = new URLSearchParams(window.location.search);
   const ret = params.get("return") ?? "/admin";
 
-  // Better Auth (ADR-0014): POST /api/auth/sign-in/social returns
-  // { url, redirect: true }; the SPA navigates to the GitHub
-  // authorize URL, GitHub bounces back to the OAuth callback (handled
-  // by Better Auth via the starter's translator route), Better Auth
-  // sets a session cookie, then 302s back to `callbackURL`.
   const startGitHub = async (): Promise<void> => {
     const res = await fetch("/api/auth/sign-in/social", {
       method: "POST",
@@ -82,7 +77,7 @@ export function SignInView(): React.ReactElement {
       body: JSON.stringify({ provider: "github", callbackURL: ret }),
     });
     if (!res.ok) return;
-    const data = (await res.json()) as { url?: string; redirect?: boolean };
+    const data = (await res.json()) as { url?: string };
     if (data.url) window.location.href = data.url;
   };
 
@@ -102,8 +97,6 @@ export function SignInView(): React.ReactElement {
   );
 }
 
-// Better Auth (ADR-0014): POST /api/auth/sign-out clears the session
-// cookie and returns 200. The SPA then bounces to the sign-in view.
 function signOut(): void {
   void fetch("/api/auth/sign-out", {
     method: "POST",

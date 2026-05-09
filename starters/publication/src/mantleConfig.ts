@@ -42,12 +42,9 @@ export interface Env {
   /** GitHub login that receives the `owner` staff role on first sign-in.
    *  Must match exactly — case-insensitive. Use `wrangler secret put ADMIN_GITHUB_LOGIN`. */
   readonly ADMIN_GITHUB_LOGIN?: string;
-  /** Spike (ADR-0014): Better Auth signing secret. 32+ random bytes.
-   *  `wrangler secret put BETTER_AUTH_SECRET`. */
+  /** 32+ random bytes; `wrangler secret put BETTER_AUTH_SECRET`. */
   readonly BETTER_AUTH_SECRET?: string;
-  /** Spike (ADR-0014): Better Auth baseURL. Production = the deployed
-   *  Worker origin. Dev = `http://localhost:8787`. Used in OAuth
-   *  callback URLs + cookie domain. */
+  /** Deployed Worker origin (dev: `http://localhost:8787`). */
   readonly PUBLIC_ORIGIN?: string;
   /** Public — embedded in the contact form widget. wrangler.toml
    *  ships CF's "always passes" test key as the dev default. */
@@ -67,18 +64,11 @@ export interface Env {
 }
 
 /**
- * Build the per-isolate `CmsConfig` from the worker's `env` bindings.
- * The starter calls this once at module-init time inside `index.ts`
- * (under the `let runtimeRef` guard) so the runtime + decorator
- * chain is built once per isolate.
- *
- * Pass `auth` (Better Auth instance, ADR-0014) when available — the
- * SDK then mounts /admin/api/* gated by `auth.getSession()`. When
- * omitted, falls back to legacy /admin/auth/github + WorkersOAuth
- * routes via `adminAuth` (deprecated; slated for removal).
+ * Build the per-isolate `CmsConfig`. With `auth`, mounts the Better
+ * Auth admin gate; without, falls back to legacy `adminAuth` (slated
+ * for removal alongside the legacy /admin/auth/* + /oauth/* block).
  */
 export function buildCmsConfig(env: Env, auth?: Auth): CmsConfig {
-  const adminAuth = auth ? undefined : buildAdminAuth(env);
   return {
     manifests: loadManifests(),
     handlers: buildHandlers(env),
@@ -110,8 +100,7 @@ export function buildCmsConfig(env: Env, auth?: Auth): CmsConfig {
             return new WorkersOAuthVerifier(env.OAUTH_KV);
           })(),
     },
-    ...(adminAuth ? { adminAuth } : {}),
-    ...(auth ? { auth } : {}),
+    ...(auth ? { auth } : { adminAuth: buildAdminAuth(env) }),
   };
 }
 

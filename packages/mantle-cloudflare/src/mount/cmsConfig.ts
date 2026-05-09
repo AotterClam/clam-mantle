@@ -63,20 +63,8 @@ export interface CmsConfig {
     CreateCmsRuntimeArgs,
     "db" | "kv" | "sessions" | "assets" | "oauth" | "users" | "staff"
   >;
-  /** Optional. Supply to enable GitHub admin auth + OAuth consent UI +
-   *  DCR endpoints. Without this, the `/admin/auth/*` and `/oauth/*`
-   *  routes are not registered and the MCP endpoint requires a
-   *  `StubOAuthVerifier`-compatible bearer token.
-   *
-   *  @deprecated Pre-v0.1.0 spike: superseded by `auth` (Better Auth
-   *  per ADR-0014). Field is kept temporarily so consumers can switch
-   *  in a single PR; it'll be removed once the legacy /admin/auth/*
-   *  + /oauth/* routes are deleted from `mountServerEndpoints`. */
+  /** @deprecated Superseded by `auth` (ADR-0014). */
   readonly adminAuth?: AdminAuthConfig;
-  /** Better Auth instance (per ADR-0014). When supplied, the SDK
-   *  mounts `/admin/api/*` gating and MCP bearer-token validation
-   *  against Better Auth's session + admin-plugin-role schema instead
-   *  of the legacy session/staff repositories. Construct with
-   *  `createAuth({ database, baseURL, secret, github, adminGithubLogin })`. */
+  /** Better Auth instance — see `createAuth(...)`. */
   readonly auth?: Auth;
 }

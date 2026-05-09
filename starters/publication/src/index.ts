@@ -7,6 +7,7 @@ import {
   mountPublicRoutes,
   mountServerEndpoints,
   type Auth,
+  type CreateAuthConfig,
   type PublicRouteContext,
 } from "@aotter/mantle-cloudflare";
 import { buildCmsConfig, type Env } from "./mantleConfig.js";
@@ -32,80 +33,56 @@ import {
  * injection, SEO/AEO meta composition) is SDK-managed.
  */
 let appCache: Hono | null = null;
-let authCache: Auth | null = null;
 
-function getAuth(env: Env): Auth | null {
-  if (authCache) return authCache;
-  // Better Auth runs only when its required env is present. Dev boxes
-  // that haven't set BETTER_AUTH_SECRET yet boot fine without auth —
-  // the `/api/auth/*` route just returns 503 (see fetch handler).
+const AUTH_NOT_CONFIGURED = {
+  error: "auth_not_configured",
+  message:
+    "Better Auth requires BETTER_AUTH_SECRET. Run `wrangler secret put BETTER_AUTH_SECRET` and redeploy.",
+} as const;
+
+function buildAuthFromEnv(env: Env): Auth | null {
   if (!env.BETTER_AUTH_SECRET) return null;
   const baseURL = env.PUBLIC_ORIGIN ?? "http://localhost:8787";
-  authCache = createAuth({
+  const github: CreateAuthConfig["github"] =
+    env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? {
+          clientId: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          // The existing GitHub OAuth App is registered with the
+          // legacy callback URL — keep it pointed there until the OAuth
+          // App config is updated, then delete this override + the
+          // translator route below.
+          redirectURI: `${baseURL}/admin/auth/github/callback`,
+        }
+      : undefined;
+  return createAuth({
     database: env.DB,
     baseURL,
     secret: env.BETTER_AUTH_SECRET,
-    github:
-      env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
-        ? {
-            clientId: env.GITHUB_CLIENT_ID,
-            clientSecret: env.GITHUB_CLIENT_SECRET,
-            // Match the existing GitHub OAuth App's registered
-            // callback URL. The translator route below funnels the
-            // request to Better Auth's actual handler.
-            redirectURI: `${baseURL}/admin/auth/github/callback`,
-          }
-        : undefined,
+    github,
     adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
   });
-  return authCache;
 }
 
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
-  const auth = getAuth(env);
+  const auth = buildAuthFromEnv(env);
   const config = buildCmsConfig(env, auth ?? undefined);
   const cms = createCmsRef(config);
   const app = new Hono();
 
-  // Better Auth handler at /api/auth/* — owns sign-in / sign-out /
-  // OAuth callbacks / session reads / MCP DCR endpoints (per ADR-0014).
-  app.all("/api/auth/*", async (c) => {
-    const auth = getAuth(env);
-    if (!auth) {
-      return c.json(
-        {
-          error: "auth_not_configured",
-          message:
-            "Better Auth requires BETTER_AUTH_SECRET. Run `wrangler secret put BETTER_AUTH_SECRET` and redeploy.",
-        },
-        503,
+  if (auth) {
+    app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+    app.get("/admin/auth/github/callback", (c) => {
+      const url = new URL(c.req.url);
+      url.pathname = "/api/auth/callback/github";
+      return auth.handler(
+        new Request(url.toString(), { method: "GET", headers: c.req.raw.headers }),
       );
-    }
-    return auth.handler(c.req.raw);
-  });
-
-  // Path translator for the legacy GitHub OAuth callback URL. The
-  // existing GitHub OAuth App is registered with
-  // `/admin/auth/github/callback` as its authorization callback URL;
-  // GitHub rejects mismatches with "Invalid Redirect URI". This route
-  // accepts the callback at the legacy path and rewrites the request
-  // URL to Better Auth's expected `/api/auth/callback/github` shape
-  // before delegating to `auth.handler`. Once the GitHub OAuth App
-  // gets its callback URL updated to the canonical Better Auth path,
-  // delete this route.
-  app.get("/admin/auth/github/callback", async (c) => {
-    const auth = getAuth(env);
-    if (!auth) return c.json({ error: "auth_not_configured" }, 503);
-    const url = new URL(c.req.url);
-    url.pathname = "/api/auth/callback/github";
-    const translated = new Request(url.toString(), {
-      method: "GET",
-      headers: c.req.raw.headers,
-      redirect: "manual",
     });
-    return auth.handler(translated);
-  });
+  } else {
+    app.all("/api/auth/*", (c) => c.json(AUTH_NOT_CONFIGURED, 503));
+  }
 
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
