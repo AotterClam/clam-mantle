@@ -17,7 +17,28 @@ export function mountMcp(
   const path = options.path ?? "/mcp";
   const surface = options.surface ?? "staff";
   const requiredScope = options.requiredScope ?? (surface === "staff" ? "mcp:staff" : "mcp:read");
+  const metadataPath = `${path}/.well-known/oauth-protected-resource`;
   let dispatcher: McpJsonRpcDispatcher | null = null;
+
+  app.get(metadataPath, (c) => {
+    const url = new URL(c.req.url);
+    return c.json({
+      resource: `${url.origin}${path}`,
+      authorization_servers: [url.origin],
+      jwks_uri: `${url.origin}/api/auth/mcp/jwks`,
+      logo_uri: `${url.origin}/favicon.svg`,
+      scopes_supported: [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "mcp:read",
+        "mcp:staff",
+      ],
+      bearer_methods_supported: ["header"],
+      resource_signing_alg_values_supported: ["RS256", "none"],
+    });
+  });
 
   app.all(path, async (c) => {
     // Boot is independent of auth — fetch concurrently to save one
@@ -72,12 +93,9 @@ function hasRequiredScope(scopes: readonly string[], required: "mcp:staff" | "mc
   return required === "mcp:read" && scopes.includes("mcp:staff");
 }
 
-function unauthorized(
-  requestUrl: string,
-  requiredScope: "mcp:staff" | "mcp:read",
-): ResponseInit {
+function unauthorized(requestUrl: string, requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
   const url = new URL(requestUrl);
-  const metadataPath = "/api/auth/.well-known/oauth-protected-resource";
+  const metadataPath = `${url.pathname}/.well-known/oauth-protected-resource`;
   return {
     status: 401,
     headers: {

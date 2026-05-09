@@ -202,7 +202,7 @@ If any step fails, the script exits non-zero. Resources already created are not 
 Tell the user to open:
 
 ```text
-<worker_url>/admin/auth/github
+<worker_url>/admin/sign-in
 ```
 
 After GitHub redirects back, the callback creates or updates the user and calls `ensureBootstrapOwner` using `ADMIN_GITHUB_LOGIN`.
@@ -297,7 +297,7 @@ Your site is online:
 Open it first. If the title, footer sentence, colors, tone, or first content feels wrong, tell me what to change and I can keep adjusting it.
 
 Next, sign in as the site owner:
-<worker_url>/admin/auth/github
+<worker_url>/admin/sign-in
 
 After sign-in, the admin console will show the Staff MCP URL and the next prompts for letting another AI agent manage content.
 ```

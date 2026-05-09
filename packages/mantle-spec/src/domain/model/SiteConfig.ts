@@ -38,6 +38,9 @@ export interface SiteConfig {
    *  sign-in card). Distinct from `title` so single-tenant operators
    *  can ship one and agencies can override the other. */
   readonly brand: string;
+  /** Absolute or root-relative favicon URL. Omit to use the SDK's
+   *  default aotter mark at `/favicon.svg`. */
+  readonly faviconUrl?: string;
 }
 
 /**
@@ -72,4 +75,6 @@ export interface SiteDefaults {
    *  consumers. Seed it from `mantleConfig.ts` so a fresh deploy gets
    *  correct URLs without an admin-UI round trip. */
   readonly origin?: string;
+  /** Absolute or root-relative favicon URL. */
+  readonly faviconUrl?: string;
 }
