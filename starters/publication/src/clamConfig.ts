@@ -58,11 +58,17 @@ export interface Env {
    *  every page immediately, no `pnpm fixture` rebake. Don't set in
    *  production — defeats the publish pipeline's KV cache. */
   readonly CLAM_LOCAL_DEV?: string;
-  /** Optional R2 media bucket. When bound (in `wrangler.toml`'s
+  /** Optional **public** R2 media bucket. When bound (in `wrangler.toml`'s
    *  `[[r2_buckets]] binding = "MEDIA"`), the runtime registers
    *  `create_media_upload` / `commit_media_upload` MCP tools and the
-   *  `/admin/api/media/uploads` admin lifecycle. Leave unbound to keep
-   *  first-run provisioning R2-free. */
+   *  `/admin/api/media/uploads` admin lifecycle. Reads bypass the
+   *  Worker (`MEDIA_PUBLIC_URL_BASE` → CDN → R2). Leave unbound to
+   *  keep first-run provisioning R2-free.
+   *
+   *  Private content (subscription-gated, fan-club, signed-GET) lands
+   *  in v0.2 as a SEPARATE binding (`MEDIA_PRIVATE` or similar) wired
+   *  to a separate `PrivateMediaStorage` port. Two buckets, two ports.
+   *  See ADR-0011 § "Public vs private media — two buckets, two ports". */
   readonly MEDIA?: R2Bucket;
   /** Public read-base URL for media. `https://media.<domain>` for
    *  custom domain, or `https://pub-<hash>.r2.dev` for the dev-only

@@ -11,12 +11,20 @@ import type {
 } from "@aotterclam/clam-cms-runtime";
 
 /**
- * `R2MediaStorage` — `MediaStorage` adapter backed by Cloudflare R2.
+ * `R2MediaStorage` — `MediaStorage` adapter backed by Cloudflare R2,
+ * **public bucket only**.
+ *
+ * The bound R2 bucket is expected to have public access enabled and
+ * (typically) a custom domain or `pub-<hash>.r2.dev` URL pointing at
+ * it. Reads bypass the Worker entirely. CORS on the bucket should be
+ * scoped to the admin SPA origin so browser direct PUTs work without
+ * exposing other origins.
  *
  * Two access modes — both required:
- *   - `bucket` (`R2Bucket` binding) — server-side `head` / `delete`.
- *     Used at commit-time to verify the uploaded object's metadata
- *     before writing `committedAt`, and to clean up failed uploads.
+ *   - `bucket` (`R2Bucket` binding) — server-side `head` / `get` /
+ *     `put` / `delete`. Used at commit-time to verify the uploaded
+ *     object's metadata before stamping `committedAt`, and to clean
+ *     up failed uploads.
  *   - `s3` (`AwsClient` from `aws4fetch`) — SigV4 presigned PUT URL
  *     generation. The R2 binding cannot issue presigned URLs.
  *
@@ -26,6 +34,17 @@ import type {
  * configured separately. Adapters never derive the public URL from
  * account / bucket — the consumer must wire it through the `cmsConfig`
  * env (typically `MEDIA_PUBLIC_URL_BASE`).
+ *
+ * # Future: private bucket adapter
+ *
+ * A v0.2 `R2PrivateMediaStorage` will live alongside this class and
+ * implement a separate `PrivateMediaStorage` port. It binds a
+ * different R2 bucket — public access disabled — and routes every
+ * read through a Worker policy gate (staff / subscription check)
+ * before streaming via `bucket.get()` or 302-ing to a short-lived
+ * signed GET. **Two buckets, two ports**, by design — see ADR-0011
+ * § "Public vs private media — two buckets, two ports". Don't bolt
+ * a `visibility` flag onto this class to handle private content.
  */
 export class R2MediaStorage implements MediaStorage {
   constructor(
