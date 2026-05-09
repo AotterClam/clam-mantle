@@ -16,6 +16,7 @@ Records of *why* mantle ended up shaped this way. The numbering preserves POC AD
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
 | [0013](0013-agent-provisioned-consumer-projects.md) | Agent-provisioned consumer projects: website prompt → Skill → npm packages → starter setup → first-run provision/seed → owner/MCP handoff. | Accepted (new) |
 | [0014](0014-auth-better-auth-and-multi-tenant-mcp.md) | Better Auth replaces both hand-rolled GitHub OAuth and `@cloudflare/workers-oauth-provider`. `staff` table → `user.role` via admin plugin. MCP splits into `/staff/mcp` (write, scope `mcp:staff`, admin-role) and `/mcp` (read + future user writes, scope `mcp:read`, any signed-in user); surface partition derives from `Procedure.requires.auth.all` predicate, not config flags. Auth port disappears; runtime takes Better Auth instance directly. Platform-agnostic — Netlify / Bun / Deno adapters get the surface for free. | Accepted (new) |
+| [0015](0015-website-archetypes-and-starter-selection.md) | Official-site selector uses website archetypes (`presence`, `publication`, `intake`, `transaction`, `reservation`, `community`, `membership`) as product language. Starters are implementation presets; agents map archetype → closest starter + consumer extension instead of creating starter sprawl. | Accepted (new) |
 
 ## Reading order
 
@@ -27,7 +28,8 @@ If you're new to the codebase:
 4. **0011** — the boundary between the runtime and the adapter (most load-bearing for the rebuild).
 5. **0010** — how locale flows through the system.
 6. **0013** — how the website prompt, Skills, npm packages, starters, seed, provision, and handoff fit together.
-7. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
+7. **0015** — how the official site asks what the user wants to build, and how that maps to starters.
+8. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
 
 ## What's NOT here (and why)
 
@@ -49,7 +51,7 @@ The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accum
 
 ## Contributing a new ADR
 
-1. Pick the next number (currently 0015).
+1. Pick the next number (currently 0016).
 2. File: `docs/adr/<NNNN>-<kebab-title>.md`.
 3. Sections: Status, Date, Context, Decision, Consequences, Alternatives, How to apply, Implementation status.
 4. Link from this README's table.
