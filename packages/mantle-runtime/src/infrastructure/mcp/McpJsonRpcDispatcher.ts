@@ -29,24 +29,9 @@ import {
   jsonRpcOkRaw,
 } from "./McpResponses.js";
 
-/**
- * `McpJsonRpcDispatcher` — JSON-RPC dispatcher for the MCP transport.
- * Env-agnostic — the adapter resolves the caller's identity via
- * `OAuthVerifier.verifyAccessToken` and hands `dispatch` a
- * `McpAuthContext` plus the use-case bag.
- *
- * v0.1.0 surfaces a per-collection authoring catalog
- * (`create_draft_<collection>`, `update_draft_<collection>` for each
- * Schema in the manifest set, with the Schema's properties inlined
- * into the tool's `inputSchema`) plus generic read/status tools
- * (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`,
- * `archive_entry`).
- * Boot validation refuses Schemas whose names mangle to the same
- * tool-name suffix.
- *
- * Thin adapter per the clean-arch rule — JSON-RPC envelope handling
- * only, no business logic.
- */
+/** JSON-RPC dispatcher for the MCP transport. Env-agnostic; the
+ *  adapter resolves the caller's identity and hands `dispatch` a
+ *  `McpAuthContext` plus the use-case bag. */
 export interface McpAuthContext {
   readonly userId: string;
   /** Caller's staff role; null for non-staff bearers. */

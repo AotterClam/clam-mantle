@@ -144,6 +144,8 @@ export interface Auth {
 
 export function createAuth(config: CreateAuthConfig): Auth {
   const auth = buildAuth(config);
+  // The mcp plugin is always loaded by buildAuth, so getMcpSession is
+  // guaranteed present. Bind once at construction.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const api = auth.api as any;
   return {
@@ -151,9 +153,7 @@ export function createAuth(config: CreateAuthConfig): Auth {
     getSession: (request) =>
       api.getSession({ headers: request.headers }).then((r: unknown) => r ?? null),
     getMcpSession: (request) =>
-      typeof api.getMcpSession === "function"
-        ? api.getMcpSession({ headers: request.headers }).then((r: unknown) => r ?? null)
-        : Promise.resolve(null),
+      api.getMcpSession({ headers: request.headers }).then((r: unknown) => r ?? null),
     getUserRole: async (userId) => {
       const row = await config.database
         .prepare("SELECT role FROM user WHERE id = ? LIMIT 1")

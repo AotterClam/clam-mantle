@@ -22,8 +22,7 @@ import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
-/** Mount HTTP Triggers + Views from `ref.manifests`, plus the admin
- *  surface (Better Auth gate when `ref.auth` is set, else legacy). */
+/** Mount HTTP Triggers + Views + the Better Auth admin surface. */
 export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
   for (const t of ref.manifests) {
     if (t.kind !== "Trigger") continue;
@@ -45,13 +44,6 @@ export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
       const runtime = await ref.get();
       return handleViewRequest(c.req.raw, runtime, viewName);
     });
-  }
-
-  if (!ref.auth) {
-    throw new Error(
-      "mountServerEndpoints requires `auth` on the runtime ref. " +
-      "Pass `auth: createAuth(...)` to buildCmsConfig.",
-    );
   }
   mountAdminBetterAuth(app, ref, ref.auth);
 }
