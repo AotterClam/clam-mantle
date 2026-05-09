@@ -177,7 +177,7 @@ describe("McpJsonRpcDispatcher", () => {
       id: "p1",
       collection: "posts",
       status: "draft",
-      data: {},
+      data: { title: "x" },
       authorId: "u1",
       now: 0,
     });
@@ -200,7 +200,7 @@ describe("McpJsonRpcDispatcher", () => {
       id: "p1",
       collection: "posts",
       status: "published",
-      data: {},
+      data: { title: "x" },
       authorId: "u1",
       now: 0,
     });

@@ -188,23 +188,30 @@ class InMemoryStatement implements PreparedStatement {
       return { rows: [r as unknown as Record<string, unknown>], changes: 1 };
     }
 
-    // SELECT … FROM entries WHERE collection = ? [AND status = ?] AND json_extract(data, ?) = ? ORDER BY updated_at DESC LIMIT 1
+    // SELECT … FROM entries WHERE collection = ? [AND status = ?] AND json_extract(data, ?) = ? [...AND id <> ?] ORDER BY updated_at DESC LIMIT 1
     if (
       sql.startsWith("SELECT id, collection, status, version, data, author_id, created_at, updated_at FROM entries") &&
       sql.includes("json_extract(data, ?) = ?")
     ) {
       const hasStatus = sql.includes("AND status = ?");
+      const hasExcludeId = sql.includes("AND id <> ?");
       const collection = p[0] as string;
-      const status = hasStatus ? (p[1] as string) : null;
-      const path = (hasStatus ? p[2] : p[1]) as string;
-      const value = hasStatus ? p[3] : p[2];
-      const field = fieldFromJsonPath(path);
+      let pi = 1;
+      const status = hasStatus ? (p[pi++] as string) : null;
+      const fieldValues: Array<{ field: string; value: unknown }> = [];
+      while (pi < p.length - (hasExcludeId ? 1 : 0)) {
+        const path = p[pi++] as string;
+        const value = p[pi++];
+        fieldValues.push({ field: fieldFromJsonPath(path), value });
+      }
+      const excludeId = hasExcludeId ? (p[p.length - 1] as string) : null;
       const filtered = [...this.db.entries.values()]
         .filter((r) => r.collection === collection)
         .filter((r) => (status ? r.status === status : true))
+        .filter((r) => (excludeId ? r.id !== excludeId : true))
         .filter((r) => {
           const data = JSON.parse(r.data) as Record<string, unknown>;
-          return data[field] === value;
+          return fieldValues.every(({ field, value }) => data[field] === value);
         })
         .sort((a, b) => b.updated_at - a.updated_at)
         .slice(0, 1);

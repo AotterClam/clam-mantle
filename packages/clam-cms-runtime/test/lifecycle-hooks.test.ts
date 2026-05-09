@@ -295,7 +295,7 @@ describe("LifecycleHookingEntryRepository — publish + delete", () => {
     });
     const row = await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     expect(row.id).toBe("post-1");
@@ -359,7 +359,7 @@ describe("LifecycleHookingEntryRepository — multi-trigger ordering", () => {
     });
     await h.createDraft.execute({
       collection: "posts",
-      data: {},
+      data: { title: "x" },
       authorId: null,
     });
     expect(h.calls).toEqual(["h1", "h2", "h3"]);
