@@ -41,6 +41,13 @@ export interface Env {
   /** GitHub login that receives the `owner` staff role on first sign-in.
    *  Must match exactly — case-insensitive. Use `wrangler secret put ADMIN_GITHUB_LOGIN`. */
   readonly ADMIN_GITHUB_LOGIN?: string;
+  /** Spike (ADR-0014): Better Auth signing secret. 32+ random bytes.
+   *  `wrangler secret put BETTER_AUTH_SECRET`. */
+  readonly BETTER_AUTH_SECRET?: string;
+  /** Spike (ADR-0014): Better Auth baseURL. Production = the deployed
+   *  Worker origin. Dev = `http://localhost:8787`. Used in OAuth
+   *  callback URLs + cookie domain. */
+  readonly PUBLIC_ORIGIN?: string;
   /** Public — embedded in the contact form widget. wrangler.toml
    *  ships CF's "always passes" test key as the dev default. */
   readonly TURNSTILE_SITE_KEY?: string;
