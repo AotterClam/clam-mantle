@@ -268,6 +268,40 @@ describe("CreateDraftUseCase", () => {
       },
     });
   });
+
+  it("accepts localized entries when site.locales is empty (subsystem off, ADR-0010)", async () => {
+    const schema: SchemaManifest = {
+      apiVersion: "cms.clam.ai/v1",
+      kind: "Schema",
+      metadata: { name: "post-translations" },
+      spec: {
+        title: "Post translations",
+        localized: true,
+        schema: {
+          type: "object",
+          properties: {
+            slug: { type: "string" },
+            locale: { type: "string" },
+            title: { type: "string" },
+            body: { type: "string" },
+          },
+          required: ["slug", "locale", "title", "body"],
+        },
+        lifecycle: "simple",
+      },
+    };
+    const h = harness({
+      schemas: new Map([[schema.metadata.name, schema]]),
+      siteConfig: fakeSiteConfig([]),
+    });
+    const row = await h.createDraft.execute({
+      collection: "post-translations",
+      data: { slug: "hello", locale: "en", title: "Hi", body: "..." },
+      authorId: null,
+    });
+    expect(row.collection).toBe("post-translations");
+    expect((row.data as { locale: string }).locale).toBe("en");
+  });
 });
 
 describe("UpdateDraftUseCase", () => {
