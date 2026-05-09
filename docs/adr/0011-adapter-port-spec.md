@@ -39,12 +39,55 @@ For v0.1.x media hosting:
 
 | Optional port | Surface |
 |---|---|
-| `MediaStorage` | Object-storage-shaped media upload/commit/public URL/delete contract. Cloudflare may implement with R2, but runtime must not import R2 types. |
-| `RemoteMediaFetcher` | URL ingestion with platform-best SSRF, redirect, size, and content-type policy. Kept separate from storage so URL-fetch policy does not pollute object storage. |
+| `MediaStorage` | Object-storage-shaped media upload/commit/public URL/delete contract for **public** media. Cloudflare may implement with R2, but runtime must not import R2 types. |
 
 These optional ports must not force first-run provisioning to create R2
 resources. Publication starters can carry external image URLs without a
 media storage implementation.
+
+### Public vs private media — two buckets, two ports
+
+`MediaStorage` deliberately models **public-only** semantics:
+
+- `getPublicUrl()` returns an unconditional public URL. Reads bypass
+  the Worker entirely (`MEDIA_PUBLIC_URL_BASE` → CDN → R2).
+- `MediaAsset.publicUrl` is frozen at commit time and embedded directly
+  into entry data (e.g. `posts.coverUrl`). This is intentional: for
+  public assets the URL is permanent, the read path is hot, and adding
+  a Worker round-trip on every render would defeat the cost / latency
+  model.
+- The CORS config on the underlying R2 bucket scopes browser PUTs to
+  the admin origin only.
+
+**Private content (subscription-gated, fan-club, signed-GET, etc.)
+will be a *separate* port and a *separate* R2 bucket in v0.2.** Two
+buckets, two ports — not one port with a `visibility` flag. Reasons:
+
+1. **Bucket-level isolation.** Private bucket disables public access
+   at the bucket level, so the worst-case "leaked private object" bug
+   is structurally impossible.
+2. **Different read paths.** Private reads MUST go through a Worker
+   route (`/api/media/private/<key>` or similar) that runs the policy
+   gate (staff predicate, subscription check, signed cookie, etc.)
+   before resolving the object. The Worker either streams via
+   `bucket.get()` or 302s to a short-lived signed GET URL.
+3. **Different cost models.** Public bucket is CDN-cached, near-zero
+   marginal cost. Private bucket charges Worker invocations on every
+   read. Operator should opt into the cost knowingly, not by accident.
+4. **Different MCP tool surface.** `create_private_media_upload` /
+   `commit_private_media_upload` keeps the closed-list semantics of
+   each tool tight. Agents pick the upload type explicitly.
+5. **No migration debt.** Public assets stay public forever; their
+   `coverUrl` strings remain valid. Private fields use a different
+   schema field shape (`x-mcp-hint: private-media-image` over an
+   opaque `assetId`, resolved at render time through the policy gate).
+   No batch update over already-published entries.
+
+Adding `PrivateMediaStorage` in v0.2 is a purely additive change to
+the port set and the runtime. Current `MediaStorage` callers are
+untouched. The Worker route, the use cases, the MCP tools, and the
+adapter all live in their own module — they compose alongside the
+public path rather than retrofitting it.
 
 ### `DatabaseDriver`
 
@@ -216,7 +259,7 @@ When you're reviewing a PR:
 
 - [x] Required port interface files live in `packages/mantle-runtime/src/domain/port/*.ts`.
 - [x] Cloudflare required port implementations live in `packages/mantle-cloudflare/src/bindings/*.ts`.
-- [x] Optional feature ports (`MediaStorage`, `RemoteMediaFetcher`) are declared but not required by first-run adapters.
+- [x] Optional feature port `MediaStorage` (public bucket) is declared but not required by first-run adapters. `PrivateMediaStorage` is v0.2.
 - [x] Netlify stub README references this ADR.
 - [ ] CI lint: forbid `@cloudflare/*` / `D1Database` / `KVNamespace` imports in `mantle-runtime/` (post-v0.1.0; manual review until then)
 

@@ -73,6 +73,15 @@ id = "kv-mantle-publication-test"
 binding = "OAUTH_KV"
 id = "kv-mantle-publication-oauth-test"
 
+# Public media bucket. Reads bypass the Worker; in production the
+# bucket should have public access enabled, with `MEDIA_PUBLIC_URL_BASE`
+# pointing at a custom domain (or the `pub-<hash>.r2.dev` fallback).
+#
+# Private media (subscription-gated, fan-club, signed-GET) lands in
+# v0.2 as a SEPARATE [[r2_buckets]] block (`MEDIA_PRIVATE` or similar)
+# wired to a separate `PrivateMediaStorage` port. Two buckets, two
+# ports. See ADR-0011 § "Public vs private media — two buckets, two
+# ports".
 [[env.test.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "mantle-publication-media-test"
