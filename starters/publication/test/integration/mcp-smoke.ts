@@ -18,43 +18,10 @@
  * printed; CI surfaces this as a job failure.
  */
 import { strict as assert } from "node:assert";
-import { FIXTURE_MCP_ACCESS_TOKEN } from "../fixture/data.js";
+import { makeMcpClient } from "./mcp-client.js";
 
 const BASE = process.env.WRANGLER_BASE_URL ?? "http://localhost:8787";
-const BEARER = `Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`;
-
-interface JsonRpcResult {
-  readonly result?: unknown;
-  readonly error?: { readonly code: number; readonly message: string };
-}
-
-let rpcId = 1;
-
-async function rpc(method: string, params?: unknown): Promise<JsonRpcResult> {
-  const res = await fetch(`${BASE}/mcp`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: BEARER },
-    body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),
-  });
-  if (!res.ok) {
-    throw new Error(`MCP HTTP ${res.status}: ${await res.text()}`);
-  }
-  return (await res.json()) as JsonRpcResult;
-}
-
-interface ToolCallEnvelope {
-  readonly content: ReadonlyArray<{ readonly type: string; readonly text: string }>;
-}
-
-async function tool<T = unknown>(name: string, args: Record<string, unknown>): Promise<T> {
-  const r = await rpc("tools/call", { name, arguments: args });
-  if (r.error) {
-    throw new Error(`MCP tool '${name}' failed: ${r.error.message}`);
-  }
-  const env = r.result as ToolCallEnvelope;
-  const text = env.content[0]?.text ?? "null";
-  return JSON.parse(text) as T;
-}
+const { rpc, tool } = makeMcpClient(BASE);
 
 interface EntryRow {
   readonly id: string;

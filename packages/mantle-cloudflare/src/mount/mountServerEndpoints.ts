@@ -90,10 +90,11 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
 
   type AdminGateOk = Extract<AdminGate, { kind: "ok" }>;
   const guarded = (
+    method: "get" | "post",
     path: string,
     body: (c: Context, gate: AdminGateOk) => Response | Promise<Response>,
   ): void => {
-    app.get(path, async (c) => {
+    app.on(method.toUpperCase(), path, async (c) => {
       const gate = await readAdminGate(c, auth);
       if (gate.kind === "unauth") return adminUnauthenticated(c, path);
       if (gate.kind === "forbidden") return adminNotStaff(c, path, gate.login);
@@ -101,13 +102,13 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     });
   };
 
-  guarded("/admin/api/me", (_c, gate) =>
+  guarded("get", "/admin/api/me", (_c, gate) =>
     jsonResponse(200, { login: gate.login, role: gate.role, userId: gate.userId }),
   );
 
-  guarded("/admin/api/collections", () => jsonResponse(200, { collections }));
+  guarded("get", "/admin/api/collections", () => jsonResponse(200, { collections }));
 
-  guarded("/admin/api/site", async (c) => {
+  guarded("get", "/admin/api/site", async (c) => {
     const runtime = await ref.get();
     const site = await runtime.siteConfig.load();
     const url = new URL(c.req.url);
@@ -118,7 +119,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     });
   });
 
-  guarded("/admin/api/entries", async (c) => {
+  guarded("get", "/admin/api/entries", async (c) => {
     const collection = c.req.query("collection");
     if (!collection) {
       return jsonResponse(400, {
@@ -149,27 +150,15 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     return jsonResponse(200, { items, next_cursor: null });
   });
 
-  // ── /admin/api/media — direct upload lifecycle ──────────────────────
-  //
-  // Three-step flow (browser): POST /uploads (capability) → PUT direct
-  // to R2 S3 endpoint (Worker not in this hop) → POST /uploads/:id/commit.
-  // Endpoints registered only when the runtime has a `mediaStorage`
-  // adapter bound; missing → 501 with `MEDIA_NOT_CONFIGURED`.
-  const guardedPost = (
-    path: string,
-    body: (c: Context, gate: AdminGateOk) => Response | Promise<Response>,
-  ): void => {
-    app.post(path, async (c) => {
-      const gate = await readAdminGate(c, auth);
-      if (gate.kind === "unauth") return adminUnauthenticated(c, path);
-      if (gate.kind === "forbidden") return adminNotStaff(c, path, gate.login);
-      return body(c, gate);
-    });
-  };
+  // Three-step direct-upload flow: POST /uploads (capability) → caller
+  // PUTs directly to R2 S3 (Worker bypassed) → POST /uploads/:id/commit.
+  const MEDIA_UPLOADS_PATH = "/admin/api/media/uploads";
+  const MEDIA_COMMIT_PATH = "/admin/api/media/uploads/:uploadId/commit";
 
-  guardedPost("/admin/api/media/uploads", async (c) => {
+  guarded("post", MEDIA_UPLOADS_PATH, async (c) => {
     const runtime = await ref.get();
-    if (!runtime.media) return mediaNotConfiguredResponse("/admin/api/media/uploads");
+    const media = runtime.media;
+    if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_UPLOADS_PATH}`);
     const body = (await c.req.raw.json().catch(() => ({}))) as {
       filename?: unknown;
       mimeType?: unknown;
@@ -184,15 +173,16 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
         diagnostic: runtimeDiagnostic({
           code: "INPUT_VALIDATION_FAILED",
           severity: "error",
-          path: "POST /admin/api/media/uploads",
+          path: `POST ${MEDIA_UPLOADS_PATH}`,
           expected: "{ filename: string, mimeType: string, byteSize?: number }",
         }),
       });
     }
-    return runUseCase("POST /admin/api/media/uploads", () =>
-      runtime.media!.createUpload.execute({
-        filename: body.filename as string,
-        mimeType: body.mimeType as string,
+    const { filename, mimeType } = body;
+    return runUseCase(`POST ${MEDIA_UPLOADS_PATH}`, () =>
+      media.createUpload.execute({
+        filename,
+        mimeType,
         byteSize: typeof body.byteSize === "number" ? body.byteSize : undefined,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
@@ -201,19 +191,20 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     );
   });
 
-  guardedPost("/admin/api/media/uploads/:uploadId/commit", async (c) => {
+  guarded("post", MEDIA_COMMIT_PATH, async (c) => {
     const runtime = await ref.get();
-    if (!runtime.media) {
-      return mediaNotConfiguredResponse("/admin/api/media/uploads/commit");
-    }
-    const uploadId = c.req.param("uploadId") ?? "";
+    const media = runtime.media;
+    if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_COMMIT_PATH}`);
+    // Hono only invokes this handler when the route matched, so the
+    // path param is always present at runtime.
+    const uploadId = c.req.param("uploadId")!;
     const body = (await c.req.raw.json().catch(() => ({}))) as {
       alt?: unknown;
       caption?: unknown;
       checksum?: unknown;
     };
-    return runUseCase("POST /admin/api/media/uploads/:id/commit", () =>
-      runtime.media!.commitUpload.execute({
+    return runUseCase(`POST ${MEDIA_COMMIT_PATH}`, () =>
+      media.commitUpload.execute({
         uploadId,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
