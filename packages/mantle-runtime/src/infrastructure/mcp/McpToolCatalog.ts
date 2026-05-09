@@ -37,6 +37,41 @@ export interface McpToolDefinition {
   readonly inputSchema: Record<string, unknown>;
 }
 
+export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
+  {
+    name: "create_media_upload",
+    description:
+      "Issue a short-lived direct-upload capability for a media object. The caller PUTs the bytes to the returned uploadUrl using the requiredHeaders, then calls commit_media_upload with the same uploadId. Only registered when the runtime has a media storage adapter bound.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
+        mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
+        byteSize: { type: "number", description: "Optional. When provided, enforced in the signed PUT and at commit." },
+        alt: { type: "string" },
+        caption: { type: "string" },
+        purpose: { type: "string", description: "Optional purpose tag (e.g. 'post-cover')." },
+      },
+      required: ["filename", "mimeType"],
+    },
+  },
+  {
+    name: "commit_media_upload",
+    description:
+      "Commit a previously-PUT object. Verifies the bytes landed at the storage backend and writes commit metadata. Returns the committed MediaAsset including its publicUrl. Only registered when the runtime has a media storage adapter bound.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        uploadId: { type: "string", description: "Returned by create_media_upload." },
+        alt: { type: "string" },
+        caption: { type: "string" },
+        checksum: { type: "string", description: "Optional client-side sha256; verified against storage etag when supplied." },
+      },
+      required: ["uploadId"],
+    },
+  },
+];
+
 export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
   {
     name: "list_entries",
@@ -100,10 +135,19 @@ export const UPDATE_DRAFT_PREFIX = "update_draft_";
  * runtime constructs this once at boot (post-validation) and the
  * dispatcher reads it for `tools/list` + name-based routing.
  */
+export interface BuildMcpToolCatalogOpts {
+  /** When true, registers `create_media_upload` + `commit_media_upload`.
+   *  Adapters set this from the runtime's `media` field (non-null when
+   *  a `mediaStorage` was bound). */
+  readonly mediaEnabled?: boolean;
+}
+
 export function buildMcpToolCatalog(
   schemas: ReadonlyArray<SchemaManifest>,
+  opts: BuildMcpToolCatalogOpts = {},
 ): readonly McpToolDefinition[] {
   const out: McpToolDefinition[] = [...GENERIC_TOOLS];
+  if (opts.mediaEnabled) out.push(...MEDIA_TOOLS);
   for (const s of schemas) {
     out.push(buildCreateTool(s));
     out.push(buildUpdateTool(s));

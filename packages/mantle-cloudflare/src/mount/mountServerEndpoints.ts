@@ -1,9 +1,11 @@
 import type { Context, Hono } from "hono";
 import {
+  DiagnosticError,
   HTTP_STATUS_BY_CODE,
   MCP_HINT_KEYWORD,
   VIEW_PARAMS_RESERVED,
   isMediaMcpHint,
+  redactForWire,
   runtimeDiagnostic,
   type ContentState,
   type Diagnostic,
@@ -88,10 +90,11 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
 
   type AdminGateOk = Extract<AdminGate, { kind: "ok" }>;
   const guarded = (
+    method: "get" | "post",
     path: string,
     body: (c: Context, gate: AdminGateOk) => Response | Promise<Response>,
   ): void => {
-    app.get(path, async (c) => {
+    app.on(method.toUpperCase(), path, async (c) => {
       const gate = await readAdminGate(c, auth);
       if (gate.kind === "unauth") return adminUnauthenticated(c, path);
       if (gate.kind === "forbidden") return adminNotStaff(c, path, gate.login);
@@ -99,13 +102,13 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     });
   };
 
-  guarded("/admin/api/me", (_c, gate) =>
+  guarded("get", "/admin/api/me", (_c, gate) =>
     jsonResponse(200, { login: gate.login, role: gate.role, userId: gate.userId }),
   );
 
-  guarded("/admin/api/collections", () => jsonResponse(200, { collections }));
+  guarded("get", "/admin/api/collections", () => jsonResponse(200, { collections }));
 
-  guarded("/admin/api/site", async (c) => {
+  guarded("get", "/admin/api/site", async (c) => {
     const runtime = await ref.get();
     const site = await runtime.siteConfig.load();
     const url = new URL(c.req.url);
@@ -116,7 +119,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     });
   });
 
-  guarded("/admin/api/entries", async (c) => {
+  guarded("get", "/admin/api/entries", async (c) => {
     const collection = c.req.query("collection");
     if (!collection) {
       return jsonResponse(400, {
@@ -145,6 +148,69 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       updated_at: row.updatedAt,
     }));
     return jsonResponse(200, { items, next_cursor: null });
+  });
+
+  // Three-step direct-upload flow: POST /uploads (capability) → caller
+  // PUTs directly to R2 S3 (Worker bypassed) → POST /uploads/:id/commit.
+  const MEDIA_UPLOADS_PATH = "/admin/api/media/uploads";
+  const MEDIA_COMMIT_PATH = "/admin/api/media/uploads/:uploadId/commit";
+
+  guarded("post", MEDIA_UPLOADS_PATH, async (c) => {
+    const runtime = await ref.get();
+    const media = runtime.media;
+    if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_UPLOADS_PATH}`);
+    const body = (await c.req.raw.json().catch(() => ({}))) as {
+      filename?: unknown;
+      mimeType?: unknown;
+      byteSize?: unknown;
+      alt?: unknown;
+      caption?: unknown;
+      purpose?: unknown;
+    };
+    if (typeof body.filename !== "string" || typeof body.mimeType !== "string") {
+      return jsonResponse(400, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "INPUT_VALIDATION_FAILED",
+          severity: "error",
+          path: `POST ${MEDIA_UPLOADS_PATH}`,
+          expected: "{ filename: string, mimeType: string, byteSize?: number }",
+        }),
+      });
+    }
+    const { filename, mimeType } = body;
+    return runUseCase(`POST ${MEDIA_UPLOADS_PATH}`, () =>
+      media.createUpload.execute({
+        filename,
+        mimeType,
+        byteSize: typeof body.byteSize === "number" ? body.byteSize : undefined,
+        alt: typeof body.alt === "string" ? body.alt : undefined,
+        caption: typeof body.caption === "string" ? body.caption : undefined,
+        purpose: typeof body.purpose === "string" ? body.purpose : undefined,
+      }),
+    );
+  });
+
+  guarded("post", MEDIA_COMMIT_PATH, async (c) => {
+    const runtime = await ref.get();
+    const media = runtime.media;
+    if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_COMMIT_PATH}`);
+    // Hono only invokes this handler when the route matched, so the
+    // path param is always present at runtime.
+    const uploadId = c.req.param("uploadId")!;
+    const body = (await c.req.raw.json().catch(() => ({}))) as {
+      alt?: unknown;
+      caption?: unknown;
+      checksum?: unknown;
+    };
+    return runUseCase(`POST ${MEDIA_COMMIT_PATH}`, () =>
+      media.commitUpload.execute({
+        uploadId,
+        alt: typeof body.alt === "string" ? body.alt : undefined,
+        caption: typeof body.caption === "string" ? body.caption : undefined,
+        checksum: typeof body.checksum === "string" ? body.checksum : undefined,
+      }),
+    );
   });
 }
 
@@ -399,6 +465,43 @@ function jsonError(args: { status: number; code: string; message: string }): Res
     message: args.message,
   };
   return jsonResponse(args.status, { ok: false, diagnostic });
+}
+
+async function runUseCase<T>(opPath: string, fn: () => Promise<T>): Promise<Response> {
+  try {
+    const result = await fn();
+    return jsonResponse(200, result);
+  } catch (e) {
+    if (e instanceof DiagnosticError) {
+      const status = HTTP_STATUS_BY_CODE[e.diagnostic.code] ?? 500;
+      return jsonResponse(status, { ok: false, diagnostic: redactForWire(e.diagnostic) });
+    }
+    // Don't leak raw exception strings on the wire — R2 / D1 / aws4fetch
+    // errors can carry bucket names, account IDs, or query fragments.
+    console.error(`[runUseCase ${opPath}] unhandled error`, e);
+    return jsonResponse(500, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "INTERNAL_ERROR",
+        severity: "error",
+        path: opPath,
+        message: "An internal error occurred.",
+      }),
+    });
+  }
+}
+
+function mediaNotConfiguredResponse(path: string): Response {
+  return jsonResponse(501, {
+    ok: false,
+    diagnostic: runtimeDiagnostic({
+      code: "MEDIA_NOT_CONFIGURED",
+      severity: "error",
+      path,
+      message:
+        "Media uploads are not enabled on this deployment. Bind a `mediaStorage` adapter in `createCmsRuntime` to enable.",
+    }),
+  });
 }
 
 export type { CmsRuntimeRef };

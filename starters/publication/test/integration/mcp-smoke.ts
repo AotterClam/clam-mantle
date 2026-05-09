@@ -18,43 +18,10 @@
  * printed; CI surfaces this as a job failure.
  */
 import { strict as assert } from "node:assert";
-import { FIXTURE_MCP_ACCESS_TOKEN } from "../fixture/data.js";
+import { makeMcpClient } from "./mcp-client.js";
 
 const BASE = process.env.WRANGLER_BASE_URL ?? "http://localhost:8787";
-const BEARER = `Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`;
-
-interface JsonRpcResult {
-  readonly result?: unknown;
-  readonly error?: { readonly code: number; readonly message: string };
-}
-
-let rpcId = 1;
-
-async function rpc(method: string, params?: unknown): Promise<JsonRpcResult> {
-  const res = await fetch(`${BASE}/mcp`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: BEARER },
-    body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),
-  });
-  if (!res.ok) {
-    throw new Error(`MCP HTTP ${res.status}: ${await res.text()}`);
-  }
-  return (await res.json()) as JsonRpcResult;
-}
-
-interface ToolCallEnvelope {
-  readonly content: ReadonlyArray<{ readonly type: string; readonly text: string }>;
-}
-
-async function tool<T = unknown>(name: string, args: Record<string, unknown>): Promise<T> {
-  const r = await rpc("tools/call", { name, arguments: args });
-  if (r.error) {
-    throw new Error(`MCP tool '${name}' failed: ${r.error.message}`);
-  }
-  const env = r.result as ToolCallEnvelope;
-  const text = env.content[0]?.text ?? "null";
-  return JSON.parse(text) as T;
-}
+const { rpc, tool } = makeMcpClient(BASE);
 
 interface EntryRow {
   readonly id: string;
@@ -86,11 +53,13 @@ async function main(): Promise<void> {
     const names = result.tools.map((t) => t.name).sort();
     const expected = [
       "archive_entry",
+      "commit_media_upload",
       "create_draft_contact_messages",
       "create_draft_page_translations",
       "create_draft_pages",
       "create_draft_post_translations",
       "create_draft_posts",
+      "create_media_upload",
       "get_entry",
       "list_entries",
       "request_publish",
@@ -103,7 +72,7 @@ async function main(): Promise<void> {
     ];
     assert.deepEqual(names, expected, `tools/list mismatch: got ${names.join(",")}`);
     console.log(
-      `[mcp]  2/12  tools/list → ${names.length} tools (5 generic + 10 per-collection)`,
+      `[mcp]  2/12  tools/list → ${names.length} tools (5 generic + 2 media + 10 per-collection)`,
     );
   }
 
