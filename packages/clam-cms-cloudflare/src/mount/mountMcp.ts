@@ -18,12 +18,6 @@ export function mountMcp(
   ref: CmsRuntimeRef,
   options: { path?: string } = {},
 ): void {
-  if (!ref.auth) {
-    throw new Error(
-      "mountMcp requires `auth` on the runtime ref. " +
-        "Pass `auth: createAuth(...)` to buildCmsConfig.",
-    );
-  }
   const auth = ref.auth;
   const path = options.path ?? "/mcp";
   let dispatcher: McpJsonRpcDispatcher | null = null;

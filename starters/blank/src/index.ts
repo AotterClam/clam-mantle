@@ -9,17 +9,8 @@ import {
 } from "@aotterclam/clam-cms-cloudflare";
 import { buildCmsConfig, type Env } from "./clamConfig.js";
 
-/**
- * Headless worker entrypoint. Mounts:
- *
- *   GET  /api/views/<name>     — View REST
- *   <method> <trigger path>    — manifest-declared HTTP Trigger routes
- *   ALL  /mcp                  — MCP JSON-RPC dispatcher
- *   ALL  /api/auth/*           — Better Auth (sign-in / sign-out / DCR)
- *
- * No `mountPublicRoutes` — this starter intentionally serves nothing
- * to end users. Wire your own frontend to the API + MCP endpoints.
- */
+/** Headless worker entrypoint — API + MCP only, no rendered UI.
+ *  Wire your own frontend to /api/views/* + /mcp + /api/auth/*. */
 let appCache: Hono | null = null;
 
 function buildAuthFromEnv(env: Env): Auth {

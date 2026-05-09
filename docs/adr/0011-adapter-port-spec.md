@@ -2,7 +2,9 @@
 
 **Status:** Accepted for v0.1.0. New ADR. Replaces the architectural concerns previously tracked in POC ADR-0015 (`cms-astro` internal seam discipline).
 
-**Date:** 2026-05-04
+**Date:** 2026-05-04 (revised 2026-05-09 to absorb ADR-0014).
+
+**Update 2026-05-09:** ADR-0014 (Better Auth) replaces the four auth ports (`SessionRepository`, `OAuthVerifier`, `UserRepository`, `StaffRepository`) with a single `Auth` instance on `CmsConfig`. Required adapter ports drop from seven to three (`DatabaseDriver`, `KvCache`, `AssetServer`); auth lives in `@aotterclam/clam-cms-cloudflare/src/auth/createAuth.ts` not the runtime. The pre-revision sections below (`SessionRepository`, `OAuthVerifier`, the seven-port table, and the wiring example) are kept as historical context but no longer reflect shipped code.
 
 ## Context
 
