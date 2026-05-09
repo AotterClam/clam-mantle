@@ -3,10 +3,11 @@
  * Concrete implementations live in `infrastructure/` (or in adapter
  * packages like `@aotter/mantle-cloudflare`).
  *
- * The five ADR-0011 ports — `DatabaseDriver`, `KvCache`,
- * `SessionRepository`, `AssetServer`, `OAuthVerifier` — plus
- * dispatcher-internal ports `Clock`, `IdGenerator`, `HandlerRegistry`,
- * and the chokepoint `EntryRepository`.
+ * ADR-0011 required adapter ports — `DatabaseDriver`, `KvCache`,
+ * `SessionRepository`, `AssetServer`, `OAuthVerifier`,
+ * `UserRepository`, `StaffRepository` — plus optional feature ports
+ * and dispatcher-internal seams (`Clock`, `IdGenerator`,
+ * `HandlerRegistry`, `EntryRepository`, etc.).
  *
  * Per the Aotter clean-architecture convention, no `*Port` suffix;
  * ports are discoverable by the package alone.
@@ -47,6 +48,21 @@ export type {
   PublishOrchestrator,
   PublishEntryRequest,
 } from "./PublishOrchestrator.js";
+export type {
+  MediaStorage,
+  CreateMediaUploadRequest,
+  CreateMediaUploadResponse,
+  CommitMediaUploadRequest,
+  PutMediaObjectRequest,
+  GetMediaPublicUrlRequest,
+  DeleteMediaAssetRequest,
+  MediaAsset,
+} from "./MediaStorage.js";
+export type {
+  RemoteMediaFetcher,
+  FetchAllowedUrlRequest,
+  FetchedMedia,
+} from "./RemoteMediaFetcher.js";
 export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,

@@ -108,11 +108,10 @@ the `CmsConfig.siteDefaults` declarative seed. The consumer's
 }
 ```
 
-`bootSdk` calls `assertSiteDefaultsCanonical(siteDefaults)`
-synchronously at module init (BCP 47 canonicalization of every
-declared locale; throws `InvalidSiteDefaultsError` if any tag is
-malformed, which surfaces in `wrangler tail`). On the first request
-that touches D1, `applySiteDefaultsIfMissing` writes the seed via
+`createCmsRuntime(...).bootInit()` calls the site-config repository's
+seed path. That path runs `assertSiteDefaultsCanonical(siteDefaults)`
+(BCP 47 canonicalization of every declared locale; throws
+`InvalidSiteDefaultsError` if any tag is malformed) and writes the seed via
 `INSERT INTO site_config (...) VALUES (...) ON CONFLICT(key) DO NOTHING`
 — idempotent, so re-deploys never clobber values an operator has
 edited via the admin Settings page.
@@ -415,7 +414,7 @@ When configuring a new consumer:
 2. If the site has no locales, omit `siteDefaults.locales` entirely.
    The whole subsystem stays off.
 3. Don't write `site_config` rows manually for the seed —
-   `applySiteDefaultsIfMissing` is idempotent and runs on cold start.
+   `bootInit()` seeds through `DatabaseSiteConfigRepository` and is idempotent.
    Operators who later edit values via the admin Settings page win
    over the seed (the `ON CONFLICT(key) DO NOTHING` clause is what
    makes that safe).
@@ -426,17 +425,17 @@ Accepted for v0.1.0. The POC shipped the grammar, runtime gate, and
 `siteDefaults` seed; the v0.1.0 rebuild ports the same shapes into
 the new package layout (`@aotter/mantle-spec` for the manifest
 grammar, `@aotter/mantle-runtime` for the gate, the CF adapter
-for `bootSdk` + `applySiteDefaultsIfMissing`):
+for `createCmsRuntime().bootInit()` + `DatabaseSiteConfigRepository.seed`):
 
-- Grammar in `mantle-spec/src/manifests/types.ts` + `parse.ts`.
+- Grammar in `packages/mantle-spec/src/domain/model/ManifestGrammar.ts`
+  + the manifest parser.
 - Cross-Schema validation in the validate + boot phases.
 - D1 schema: no `entries.locale` column; `data.locale` is the
   authoritative storage; partial unique index per localized Schema.
 - `site_config` key/value table with the `locales` key.
-- Runtime locale gate in `mantle-runtime/src/content-ops/helpers.ts`.
-- `CmsConfig.siteDefaults` consumed by the CF adapter's `bootSdk`,
-  with `assertSiteDefaultsCanonical` (sync) + `applySiteDefaultsIfMissing`
-  (async, idempotent) per the aotter/mantle repo conventions.
-- Starter blog manifests demo: `posts` → `localized: true`, plus a
-  `products` + `product-translations` pair illustrating the
-  parent/child pattern.
+- Runtime locale gate in `packages/mantle-runtime/src/domain/service/ContentLocaleGate.ts`.
+- `CmsConfig.siteDefaults` consumed by runtime `bootInit()`, with
+  `assertSiteDefaultsCanonical` + `DatabaseSiteConfigRepository.seed`
+  (async, idempotent).
+- Starter blog manifests demo the parent/child pattern:
+  `posts` + `post-translations`.

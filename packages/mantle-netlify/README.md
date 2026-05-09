@@ -8,7 +8,7 @@ This package is intentionally empty in v0.1.0.
 
 It exists as an **engineering forcing function**.
 
-The 7 adapter ports defined in `@aotter/mantle-runtime` (DatabaseDriver / KvCache / SessionRepository / AssetServer / OAuthVerifier / UserRepository / StaffRepository) only stay adapter-agnostic if there's pressure to implement them in more than one place. With only `mantle-cloudflare` shipping, `mantle-runtime` would slowly grow Cloudflare-specific imports in PR review (`D1Database` here, `KVNamespace` there) — death by a thousand papercuts. After a year, "adapter-agnostic" is a comment, not a constraint.
+The 7 required adapter ports defined in `@aotter/mantle-runtime` (DatabaseDriver / KvCache / SessionRepository / AssetServer / OAuthVerifier / UserRepository / StaffRepository) only stay adapter-agnostic if there's pressure to implement them in more than one place. Optional feature ports, such as media hosting, must stay optional until a starter explicitly enables that feature. With only `mantle-cloudflare` shipping, `mantle-runtime` would slowly grow Cloudflare-specific imports in PR review (`D1Database` here, `KVNamespace` there) — death by a thousand papercuts. After a year, "adapter-agnostic" is a comment, not a constraint.
 
 This README declares the public commitment to a second adapter. PR reviewers can point at this directory when blocking a CF-coupling slip.
 

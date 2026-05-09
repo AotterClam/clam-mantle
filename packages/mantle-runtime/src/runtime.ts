@@ -71,8 +71,8 @@ import { CANONICAL_MIGRATIONS } from "./infrastructure/boot/index.js";
  * to use cases (`usecase/content/*`, etc.) via ports
  * (`domain/port/*`).
  *
- * Adapters call this once at boot, pass the 5 ADR-0011 ports + the
- * consumer's manifests + handlers + templates + siteDefaults, and
+ * Adapters call this once at boot, pass the required ADR-0011 ports +
+ * the consumer's manifests + handlers + templates + siteDefaults, and
  * receive a `CmsRuntime` they expose to their HTTP framework's
  * routing layer.
  *
@@ -86,7 +86,7 @@ export interface CreateCmsRuntimeArgs {
   readonly handlers?: Readonly<Record<string, AnyHandler>>;
   readonly templates?: TemplateRegistry;
   readonly siteDefaults?: SiteDefaults;
-  /** The 5 ADR-0011 ports + identity layer. */
+  /** Required ADR-0011 ports + identity layer. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
   readonly sessions: SessionRepository;
@@ -107,7 +107,7 @@ export interface CreateCmsRuntimeArgs {
 }
 
 export interface CmsRuntime {
-  /** The 5 ADR-0011 ports + identity layer — re-exposed so adapters can pass them downstream. */
+  /** Required ADR-0011 ports + identity layer — re-exposed so adapters can pass them downstream. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
   readonly sessions: SessionRepository;

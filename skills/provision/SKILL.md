@@ -65,6 +65,12 @@ gh auth status
 
 For non-technical users, prefer a Cloudflare API token created in the dashboard and revoked after provisioning. Do not start by asking them to run `wrangler login`.
 
+Default first-run provisioning must not enable R2, ask for billing setup,
+or mention credit cards. First-party media hosting is an optional add-on
+flow after the site is online; publication starters use external image
+URLs for seeded covers until the user explicitly asks to enable media
+hosting.
+
 Guide the user step by step:
 
 1. Open `https://dash.cloudflare.com/profile/api-tokens` and click **Create Token**.
@@ -317,6 +323,7 @@ Only print the raw MCP URL after explaining that the admin console also shows it
 - Don't expose staff management as MCP tools.
 - Don't promise custom domain automation in v0.1.0.
 - Don't use paid Cloudflare features for the default path.
+- Don't create R2 buckets or ask for billing/credit-card setup in the first-run provision path. If the user asks for first-party media hosting, treat it as an explicit opt-in add-on flow.
 - **Don't ship the Turnstile test site key (`1x00000000000000000000AA`) or `dev-stub` secret to production.** The starter ships them so `pnpm dev` works; production deploys must replace both. If you skip the contact form entirely, say so explicitly to the user.
 
 ## When You're Done

@@ -21,7 +21,7 @@ const noopOAuth: OAuthVerifier = {
 };
 
 describe("createCmsRuntime + bootInit", () => {
-  it("constructs with empty manifests + 5 ports", async () => {
+  it("constructs with empty manifests + required ports", async () => {
     const runtime = createCmsRuntime({
       manifests: [],
       db: new InMemoryDatabase(),
