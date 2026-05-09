@@ -1,41 +1,38 @@
 import type { Hono } from "hono";
 import { McpJsonRpcDispatcher } from "@aotterclam/clam-cms-runtime";
+import type { StaffRole } from "@aotterclam/clam-cms-spec";
+import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
-/**
- * Mount the MCP `/mcp` endpoint onto the consumer's Hono app. Pass-
- * through to `McpJsonRpcDispatcher` after extracting the bearer-token
- * identity via the runtime's `OAuthVerifier`.
- *
- * Returns 401 with no JSON-RPC envelope when the bearer is missing /
- * invalid — matches MCP spec behavior (transport-level auth failure
- * before JSON-RPC parsing).
- *
- * Path defaults to `/mcp`; consumers can override via the `path`
- * option when their worker hosts multiple MCP surfaces.
- */
+const UNAUTHORIZED: ResponseInit = {
+  status: 401,
+  headers: { "www-authenticate": 'Bearer realm="mcp"' },
+};
+const FORBIDDEN: ResponseInit = {
+  status: 403,
+  headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
+};
+
 export function mountMcp(
   app: Hono,
   ref: CmsRuntimeRef,
   options: { path?: string } = {},
 ): void {
+  const auth = ref.auth;
   const path = options.path ?? "/mcp";
   let dispatcher: McpJsonRpcDispatcher | null = null;
+
   app.all(path, async (c) => {
-    const runtime = await ref.get();
-    const identity = await runtime.oauth.verifyAccessToken(c.req.raw);
-    if (!identity) {
-      return new Response("unauthorized", {
-        status: 401,
-        headers: { "www-authenticate": 'Bearer realm="mcp"' },
-      });
-    }
-    const staff = await runtime.staff.readByUserId(identity.userId);
-    if (!staff) {
-      return new Response("forbidden", {
-        status: 403,
-        headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
-      });
+    // Boot is independent of auth — fetch concurrently to save one
+    // D1 round-trip on the hot path.
+    const [session, runtime] = await Promise.all([
+      auth.getMcpSession(c.req.raw),
+      ref.get(),
+    ]);
+    if (!session) return new Response("unauthorized", UNAUTHORIZED);
+    const role = await auth.getUserRole(session.userId);
+    if (!role || !ADMIN_ROLE_SET.has(role)) {
+      return new Response("forbidden", FORBIDDEN);
     }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
@@ -56,6 +53,9 @@ export function mountMcp(
       },
       [...runtime.schemasByName.values()],
     );
-    return dispatcher.dispatch(c.req.raw, { userId: identity.userId, staff });
+    return dispatcher.dispatch(c.req.raw, {
+      userId: session.userId,
+      staff: { userId: session.userId, role: role as StaffRole },
+    });
   });
 }

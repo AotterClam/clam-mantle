@@ -1,14 +1,7 @@
 # Local-only vars wrangler dev reads. NOT deployed.
-# Copy this file to `.dev.vars` and fill in the GitHub OAuth section
-# below before running `pnpm dev` if you need to sign in at /admin.
-# Public read routes (the rendered publication) work without any OAuth.
-
-# StubOAuthVerifier flag — accepts `Authorization: Bearer dev-<user_id>`
-# headers on /mcp etc., the cheap way to exercise role-gated paths from
-# curl/scripts (see `Smoke test` in README.md). Does NOT affect the
-# browser admin SPA sign-in flow, which always uses real GitHub OAuth.
-# Production: remove.
-CLAM_ALLOW_STUB_OAUTH=1
+# Copy this file to `.dev.vars` and fill in the secrets below before
+# running `pnpm dev`. Public read routes work without any auth; /admin
+# + /mcp need BETTER_AUTH_SECRET and (for /admin) the GitHub OAuth App.
 
 # Cloudflare Turnstile secret key. Default `dev-stub` short-circuits
 # siteverify with a literal-string check (turnstileToken === "fail"
@@ -21,21 +14,28 @@ TURNSTILE_SECRET_KEY=dev-stub
 # Don't set in production.
 CLAM_LOCAL_DEV=1
 
-# ── Admin SPA sign-in (required for /admin; public routes don't need this) ──
-# Even on local dev, /admin uses real GitHub OAuth — there is no stub
-# for the browser redirect flow. To use /admin locally:
+# Better Auth signing secret (32+ random bytes). Generate locally with
+# `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+# Production: `wrangler secret put BETTER_AUTH_SECRET`.
+BETTER_AUTH_SECRET=<32+ random bytes — see comment above>
+
+# Better Auth's baseURL. Production: the deployed Worker origin.
+PUBLIC_ORIGIN=http://localhost:8787
+
+# ── /admin sign-in (skip if you only need /api/views/* and /mcp) ──
+# /admin uses GitHub OAuth via Better Auth. Set up:
 #
 #   1. Create a GitHub OAuth App at github.com/settings/developers
 #      - Homepage URL:    http://localhost:8787
 #      - Callback URL:    http://localhost:8787/admin/auth/github/callback
 #   2. Paste the client id / secret below.
 #   3. Set ADMIN_GITHUB_LOGIN to YOUR GitHub login. The runtime's
-#      `ensureBootstrapOwner` promotes whoever signs in matching this
-#      login to `owner` on first sign-in (only fires while the staff
-#      table is empty — `pnpm fixture` deliberately leaves it empty).
+#      `ensureBootstrapOwner` hook promotes whoever signs in matching
+#      this login to `owner` on first sign-in (no-ops once any admin
+#      already exists).
 #
-# The same OAuth App can be reused for production by adding the
-# deployed callback URL alongside the localhost one.
+# Reuse the same OAuth App for production by adding the deployed
+# callback URL alongside the localhost one.
 GITHUB_CLIENT_ID=<your_github_oauth_app_client_id>
 GITHUB_CLIENT_SECRET=<your_github_oauth_app_client_secret>
 ADMIN_GITHUB_LOGIN=<your_github_login>

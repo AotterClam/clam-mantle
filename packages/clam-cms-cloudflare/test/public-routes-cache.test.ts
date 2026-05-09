@@ -4,14 +4,11 @@ import type { Manifest } from "@aotterclam/clam-cms-spec";
 import { TemplateRegistry } from "@aotterclam/clam-cms-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
-import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
 import { InMemoryDatabase } from "../../clam-cms-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubSessionRepository,
-  StubStaffRepository,
-  StubUserRepository,
+  stubAuth,
 } from "./fakes/runtime-bindings.js";
 
 function manifests(): Manifest[] {
@@ -57,12 +54,9 @@ function harness(locales: readonly string[] = ["en"]) {
     bindings: {
       db,
       kv,
-      sessions: new StubSessionRepository(),
-      users: new StubUserRepository(),
-      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ CLAM_ALLOW_STUB_OAUTH: "1" }),
     },
+    auth: stubAuth,
   });
   const app = new Hono();
   mountPublicRoutes(app, ref, {

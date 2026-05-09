@@ -3,11 +3,11 @@
  * Concrete implementations live in `infrastructure/` (or in adapter
  * packages like `@aotterclam/clam-cms-cloudflare`).
  *
- * ADR-0011 required adapter ports — `DatabaseDriver`, `KvCache`,
- * `SessionRepository`, `AssetServer`, `OAuthVerifier`,
- * `UserRepository`, `StaffRepository`. Optional feature ports —
- * `MediaStorage` (public-bucket media uploads). Dispatcher-internal
- * seams — `Clock`, `IdGenerator`, `HandlerRegistry`, `EntryRepository`.
+ * Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer`.
+ * Optional feature ports — `MediaStorage` (public-bucket media
+ * uploads). Dispatcher-internal seams — `Clock`, `IdGenerator`,
+ * `HandlerRegistry`, `EntryRepository`. Identity / session / OAuth
+ * live outside the runtime via Better Auth (ADR-0014).
  *
  * Per the Aotter clean-architecture convention, no `*Port` suffix;
  * ports are discoverable by the package alone.
@@ -21,9 +21,7 @@ export type {
   Migration,
 } from "./DatabaseDriver.js";
 export type { KvCache, KvPutOptions, KvListResult } from "./KvCache.js";
-export type { SessionRepository, Session } from "./SessionRepository.js";
 export type { AssetServer } from "./AssetServer.js";
-export type { OAuthVerifier, OAuthIdentity } from "./OAuthVerifier.js";
 export type {
   EntryRepository,
   CreateEntryArgs,
@@ -35,15 +33,6 @@ export type {
   MutationHookFields,
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";
-export type {
-  UserRepository,
-  GithubToken,
-} from "./UserRepository.js";
-export type {
-  StaffRepository,
-  StaffListEntry,
-  BootstrapOwnerOpts,
-} from "./StaffRepository.js";
 export type {
   PublishOrchestrator,
   PublishEntryRequest,

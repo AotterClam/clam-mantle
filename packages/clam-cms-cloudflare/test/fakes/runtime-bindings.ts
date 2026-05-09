@@ -1,28 +1,11 @@
 import type {
   AssetServer,
-  BootstrapOwnerOpts,
-  GithubProfile,
-  GithubToken,
   KvCache,
   KvListResult,
   KvPutOptions,
-  Session,
-  SessionRepository,
-  Staff,
-  StaffListEntry,
-  StaffRepository,
-  User,
-  UserRepository,
 } from "@aotterclam/clam-cms-runtime";
+import type { Auth } from "../../src/auth/createAuth.js";
 
-/**
- * Stub bindings for the smoke test. We re-use the runtime's
- * `InMemoryDatabase` for `DatabaseDriver` (already battle-tested) and
- * supply minimal stand-ins for the four other ports — they aren't on
- * the form-submission hot path. `OAuthVerifier` comes from
- * `src/bindings/StubOAuthVerifier` (re-exported as part of the public
- * API; constructed with the dev-only env flag).
- */
 export class InMemoryKv implements KvCache {
   private store = new Map<string, string>();
   async get(key: string): Promise<string | null> {
@@ -42,37 +25,17 @@ export class InMemoryKv implements KvCache {
   }
 }
 
-export class StubSessionRepository implements SessionRepository {
-  private sessions = new Map<string, Session>();
-  async read(token: string): Promise<Session | null> {
-    return this.sessions.get(token) ?? null;
-  }
-  async write(session: Session): Promise<void> {
-    this.sessions.set(session.token, session);
-  }
-  async invalidate(token: string): Promise<void> {
-    this.sessions.delete(token);
-  }
-}
-
 export class StubAssetServer implements AssetServer {
   async fetch(_req: Request): Promise<Response | null> {
     return null;
   }
 }
 
-export class StubUserRepository implements UserRepository {
-  async findById(_id: string): Promise<User | null> { return null; }
-  async findGithubLogin(_userId: string): Promise<string | null> { return null; }
-  async upsertByGithub(_profile: GithubProfile, _now: number): Promise<string> { return "stub-user"; }
-  async storeGithubToken(_userId: string, _accessToken: string, _scope: string, _now: number): Promise<void> {}
-  async readGithubToken(_userId: string): Promise<GithubToken | null> { return null; }
-}
-
-export class StubStaffRepository implements StaffRepository {
-  async listAll(): Promise<StaffListEntry[]> { return []; }
-  async readByUserId(userId: string): Promise<Staff | null> {
-    return { userId, role: "owner", grantedBy: null, grantedAt: 0 };
-  }
-  async ensureBootstrapOwner(_opts: BootstrapOwnerOpts): Promise<void> {}
-}
+/** Auth fake that denies every session — for tests that exercise the
+ *  public surface without going through Better Auth. */
+export const stubAuth: Auth = {
+  handler: async () => new Response(null, { status: 404 }),
+  getSession: async () => null,
+  getMcpSession: async () => null,
+  getUserRole: async () => null,
+};

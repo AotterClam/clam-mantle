@@ -32,8 +32,10 @@
  */
 import { strict as assert } from "node:assert";
 
+import { FIXTURE_MCP_ACCESS_TOKEN } from "../fixture/data.js";
+
 const BASE = process.env.WRANGLER_BASE_URL ?? "http://localhost:8788";
-const BEARER = "Bearer dev-u-staff-1";
+const BEARER = `Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`;
 
 interface JsonRpcResult {
   readonly result?: unknown;

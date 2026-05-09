@@ -83,7 +83,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 - One barrel `index.ts` per folder.
 - Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
-- The ADR-0011 required ports — `DatabaseDriver`, `KvCache`, `SessionRepository`, `AssetServer`, `OAuthVerifier`, `UserRepository`, `StaffRepository` — live in `clam-cms-runtime/src/domain/port/`. Optional feature ports such as `MediaStorage` / `RemoteMediaFetcher` also live there but must not become mandatory first-run bindings. Concrete impls live in `clam-cms-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`clam-cms-cloudflare`, future `clam-cms-netlify`).
+- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `clam-cms-runtime/src/domain/port/`. Auth is supplied by adapters via the Better Auth `Auth` instance on `CmsConfig` (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `RemoteMediaFetcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `clam-cms-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`clam-cms-cloudflare`, future `clam-cms-netlify`).
 
 ### Spec/runtime type boundary (separate from layer rules)
 
@@ -91,7 +91,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
   (manifests, `Entry`, `Revision`, `Approval`, `SiteConfig`, closed enums incl.
   `StaffRole`, `Diagnostic`).
 - Runtime owns: rows / runtime facts only the dispatcher fills
-  (`EntryRow`, `User`, `Staff`, `StaffMembership`, `HandlerContext`, `HandlerFn`).
+  (`EntryRow`, `HandlerContext`, `HandlerFn`).
 - Test: does any spec function reference this type? If yes → spec. If only
   runtime ports / use cases / dispatcher do → runtime.
 

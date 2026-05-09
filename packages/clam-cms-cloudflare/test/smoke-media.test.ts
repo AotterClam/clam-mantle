@@ -1,22 +1,19 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SESSION_COOKIE } from "@aotterclam/clam-cms-runtime";
 import type {
   CommitUploadArgs,
   CreateUploadArgs,
-  MediaStorage,
   Manifest,
+  MediaStorage,
 } from "@aotterclam/clam-cms-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
-import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
+import type { Auth } from "../src/auth/createAuth.js";
 import { InMemoryDatabase } from "../../clam-cms-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubSessionRepository,
-  StubStaffRepository,
-  StubUserRepository,
+  stubAuth,
 } from "./fakes/runtime-bindings.js";
 
 /**
@@ -27,7 +24,7 @@ import {
  * - happy-path create + commit through the use cases
  * - mime allowlist rejection bubbles a structured diagnostic out the
  *   wire path
- * - admin session enforcement (401 / 403 returns)
+ * - admin session enforcement (401 when no Better Auth session)
  */
 class FakeMediaStorage implements MediaStorage {
   public createCalls: CreateUploadArgs[] = [];
@@ -90,65 +87,54 @@ function manifests(): Manifest[] {
   ];
 }
 
+const STAFF_USER = {
+  id: "u-admin",
+  email: "admin@example.test",
+  name: "Admin",
+  role: "owner" as const,
+  githubLogin: "admin-login",
+};
+
+function staffAuth(): Auth {
+  return {
+    handler: stubAuth.handler,
+    getSession: async () => ({
+      session: { id: "sess-1", userId: STAFF_USER.id, expiresAt: new Date(Date.now() + 60_000) },
+      user: STAFF_USER,
+    }),
+    getMcpSession: stubAuth.getMcpSession,
+    getUserRole: async () => "owner",
+  };
+}
+
 interface Harness {
   app: Hono;
   storage: FakeMediaStorage | null;
-  sessionToken: string;
 }
 
-async function harness(opts: { withMedia: boolean }): Promise<Harness> {
-  const sessionToken = "admin-session";
-  const sessions = new StubSessionRepository();
-  await sessions.write({
-    token: sessionToken,
-    userId: "u-admin",
-    createdAt: 0,
-    expiresAt: Date.now() + 60_000,
-  });
-  // StubStaffRepository.readByUserId returns staff for every userId — fine for these tests.
-  const staff = new StubStaffRepository();
+function harness(opts: { withMedia: boolean; auth: Auth }): Harness {
   const storage = opts.withMedia ? new FakeMediaStorage() : null;
-  const oauthProvider = {
-    fetch: async () => new Response("ok"),
-  };
   const ref = createCmsRef({
     manifests: manifests(),
     bindings: {
       db: new InMemoryDatabase(),
       kv: new InMemoryKv(),
-      sessions,
-      users: new StubUserRepository(),
-      staff,
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ CLAM_ALLOW_STUB_OAUTH: "1" }),
       ...(storage ? { mediaStorage: storage } : {}),
     },
-    adminAuth: {
-      oauthProvider: oauthProvider as never,
-      oauthKv: new InMemoryKv() as unknown as KVNamespace,
-      githubClientId: "client-id",
-      githubClientSecret: "client-secret",
-      adminGithubLogin: "owner",
-    },
+    auth: opts.auth,
   });
   const app = new Hono();
   mountServerEndpoints(app, ref);
-  return { app, storage, sessionToken };
-}
-
-function adminCookie(token: string): string {
-  return `${DEFAULT_SESSION_COOKIE}=${token}`;
+  return { app, storage };
 }
 
 describe("smoke: /admin/api/media/uploads", () => {
   it("returns 501 + MEDIA_NOT_CONFIGURED when no mediaStorage is bound", async () => {
-    const h = await harness({ withMedia: false });
+    const h = harness({ withMedia: false, auth: staffAuth() });
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: adminCookie(h.sessionToken),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ filename: "x.png", mimeType: "image/png" }),
     });
     expect(res.status).toBe(501);
@@ -157,7 +143,7 @@ describe("smoke: /admin/api/media/uploads", () => {
   });
 
   it("returns 401 when there is no admin session", async () => {
-    const h = await harness({ withMedia: true });
+    const h = harness({ withMedia: true, auth: stubAuth });
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -167,13 +153,10 @@ describe("smoke: /admin/api/media/uploads", () => {
   });
 
   it("happy path: create returns uploadId + uploadUrl", async () => {
-    const h = await harness({ withMedia: true });
+    const h = harness({ withMedia: true, auth: staffAuth() });
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: adminCookie(h.sessionToken),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         filename: "cover.png",
         mimeType: "image/png",
@@ -195,13 +178,10 @@ describe("smoke: /admin/api/media/uploads", () => {
   });
 
   it("rejects disallowed mime with structured diagnostic", async () => {
-    const h = await harness({ withMedia: true });
+    const h = harness({ withMedia: true, auth: staffAuth() });
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: adminCookie(h.sessionToken),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ filename: "x.exe", mimeType: "application/octet-stream" }),
     });
     expect(res.status).toBe(400);
@@ -211,13 +191,10 @@ describe("smoke: /admin/api/media/uploads", () => {
   });
 
   it("commit returns MEDIA_UPLOAD_EXPIRED when the uploadId has no KV record", async () => {
-    const h = await harness({ withMedia: true });
+    const h = harness({ withMedia: true, auth: staffAuth() });
     const res = await h.app.request("/admin/api/media/uploads/missing/commit", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: adminCookie(h.sessionToken),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(410);
@@ -226,13 +203,10 @@ describe("smoke: /admin/api/media/uploads", () => {
   });
 
   it("create + commit roundtrip writes a MediaAsset back", async () => {
-    const h = await harness({ withMedia: true });
+    const h = harness({ withMedia: true, auth: staffAuth() });
     const createRes = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: adminCookie(h.sessionToken),
-      },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ filename: "x.png", mimeType: "image/png", byteSize: 2048 }),
     });
     expect(createRes.status).toBe(200);
@@ -242,10 +216,7 @@ describe("smoke: /admin/api/media/uploads", () => {
       `/admin/api/media/uploads/${created.uploadId}/commit`,
       {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: adminCookie(h.sessionToken),
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ alt: "the cover" }),
       },
     );

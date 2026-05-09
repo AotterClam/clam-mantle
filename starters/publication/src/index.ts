@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import type { Entry } from "@aotterclam/clam-cms-spec";
 import {
+  createAuth,
   createCmsRef,
   mountMcp,
   mountPublicRoutes,
   mountServerEndpoints,
+  type Auth,
+  type CreateAuthConfig,
   type PublicRouteContext,
 } from "@aotterclam/clam-cms-cloudflare";
 import { buildCmsConfig, type Env } from "./clamConfig.js";
@@ -14,28 +17,50 @@ import {
   notFoundTemplate,
 } from "./theme.default/templates/index.js";
 
-/**
- * Worker entrypoint. Lives at `wrangler.toml`'s `main`.
- *
- * The SDK's `mountPublicRoutes` registers every routine public
- * surface (post / page / list / `.md` mirror / llms.txt / sitemap /
- * preview / live-dev). This file handles only the consumer-specific
- * pieces:
- *
- *   - `homeRenderer`     — composes `/{locale}` from page + recent posts
- *   - `notFoundRenderer` — locale-aware 404
- *   - `slugOverrides`    — `pages/contact` swaps in the Turnstile form
- *
- * Everything else (route ordering, KV key derivation, preview-banner
- * injection, SEO/AEO meta composition) is SDK-managed.
- */
 let appCache: Hono | null = null;
+
+const AUTH_NOT_CONFIGURED = {
+  error: "auth_not_configured",
+  message:
+    "BETTER_AUTH_SECRET is required. Run `wrangler secret put BETTER_AUTH_SECRET` and redeploy.",
+} as const;
+
+function buildAuthFromEnv(env: Env): Auth {
+  const baseURL = env.PUBLIC_ORIGIN ?? "http://localhost:8787";
+  const github: CreateAuthConfig["github"] =
+    env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? {
+          clientId: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+          // Keeps the existing GitHub OAuth App's registered callback
+          // URL working; delete with the translator route once the App
+          // config moves to /api/auth/callback/github.
+          redirectURI: `${baseURL}/admin/auth/github/callback`,
+        }
+      : undefined;
+  return createAuth({
+    database: env.DB,
+    baseURL,
+    secret: env.BETTER_AUTH_SECRET,
+    github,
+    adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+  });
+}
 
 function getApp(env: Env): Hono {
   if (appCache) return appCache;
-  const config = buildCmsConfig(env);
-  const cms = createCmsRef(config);
+  const auth = buildAuthFromEnv(env);
+  const cms = createCmsRef(buildCmsConfig(env, auth));
   const app = new Hono();
+
+  app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+  app.get("/admin/auth/github/callback", (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = "/api/auth/callback/github";
+    return auth.handler(
+      new Request(url.toString(), { method: "GET", headers: c.req.raw.headers }),
+    );
+  });
 
   mountServerEndpoints(app, cms);
   mountMcp(app, cms);
@@ -148,6 +173,9 @@ async function renderNotFound(ctx: PublicRouteContext): Promise<Response> {
 
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (!env.BETTER_AUTH_SECRET) {
+      return Response.json(AUTH_NOT_CONFIGURED, { status: 503 });
+    }
     return getApp(env).fetch(req, env, ctx);
   },
 };

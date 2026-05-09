@@ -10,8 +10,6 @@ compatibility_flags = ["nodejs_compat"]
 # dash.cloudflare.com/?to=/:account/turnstile and replace.
 # https://developers.cloudflare.com/turnstile/troubleshooting/testing/
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
-# CLAM_ALLOW_STUB_OAUTH is intentionally NOT set here. Set it only in
-# .dev.vars (local dev). wrangler deploy should always use WorkersOAuthVerifier.
 
 [[d1_databases]]
 binding = "DB"
@@ -21,10 +19,6 @@ database_id = "00000000-0000-0000-0000-000000000000"
 [[kv_namespaces]]
 binding = "KV"
 id = "kv-clam-publication-local"
-
-[[kv_namespaces]]
-binding = "OAUTH_KV"
-id = "kv-clam-publication-oauth-local"
 
 # Bundle YAML manifests as inline text strings — TS imports them via
 # `?raw` query param, esbuild resolves to a string export at build time.
@@ -48,9 +42,6 @@ fallthrough = true
 
 [env.test.vars]
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"
-# Test profile uses StubOAuthVerifier so mcp-smoke can sign-in with
-# `Bearer dev-<userId>` without provisioning a real GitHub OAuth app.
-CLAM_ALLOW_STUB_OAUTH = "1"
 # Media uploads enabled in test profile so integration smokes can
 # exercise the create/commit lifecycle. Stub credentials — miniflare's
 # local R2 emulation accepts the binding ops; real CF deploy needs
@@ -68,10 +59,6 @@ database_id = "00000000-0000-0000-0000-000000000000"
 [[env.test.kv_namespaces]]
 binding = "KV"
 id = "kv-clam-publication-test"
-
-[[env.test.kv_namespaces]]
-binding = "OAUTH_KV"
-id = "kv-clam-publication-oauth-test"
 
 # Public media bucket. Reads bypass the Worker; in production the
 # bucket should have public access enabled, with `MEDIA_PUBLIC_URL_BASE`

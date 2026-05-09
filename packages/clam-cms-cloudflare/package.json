@@ -1,7 +1,7 @@
 {
   "name": "@aotterclam/clam-cms-cloudflare",
   "version": "0.0.6-alpha",
-  "description": "Cloudflare Workers adapter for clam-cms. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Implements runtime ports against D1 / KV / ASSETS / bearer-token OAuth verification.",
+  "description": "Cloudflare Workers adapter for clam-cms. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Better Auth (admin + mcp plugins) for sign-in + bearer-token validation.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/clam-cms-cloudflare",
   "repository": {
@@ -21,10 +21,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./cf": {
-      "types": "./dist/cf.d.ts",
-      "import": "./dist/cf.js"
     }
   },
   "files": [
@@ -41,8 +37,8 @@
     "@aotterclam/clam-cms-admin-ui": "workspace:*",
     "@aotterclam/clam-cms-runtime": "workspace:*",
     "@aotterclam/clam-cms-spec": "workspace:*",
-    "@cloudflare/workers-oauth-provider": "^0.4.0",
     "aws4fetch": "^1.0.20",
+    "better-auth": "^1.6.9",
     "hono": "^4.6.20"
   },
   "devDependencies": {
