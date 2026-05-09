@@ -135,6 +135,10 @@ export interface Auth {
     scopes: string[];
     clientId: string;
   } | null>;
+  /** Read `user.role` directly from D1. Bearer-token auth surfaces
+   *  (MCP, HTTP Triggers) need this because Better Auth's MCP access
+   *  tokens carry userId + scopes but not the user's role. */
+  readonly getUserRole: (userId: string) => Promise<string | null>;
 }
 
 export function createAuth(config: CreateAuthConfig): Auth {
@@ -149,5 +153,12 @@ export function createAuth(config: CreateAuthConfig): Auth {
       typeof api.getMcpSession === "function"
         ? api.getMcpSession({ headers: request.headers }).then((r: unknown) => r ?? null)
         : Promise.resolve(null),
+    getUserRole: async (userId) => {
+      const row = await config.database
+        .prepare("SELECT role FROM user WHERE id = ? LIMIT 1")
+        .bind(userId)
+        .first<{ role: string | null }>();
+      return row?.role ?? null;
+    },
   };
 }
