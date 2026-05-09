@@ -6,7 +6,8 @@
  *      (port 8788; profile from wrangler.toml [env.test]).
  *   2. Wait for "Ready on" in stderr/stdout.
  *   3. Apply the test fixture (apply-test.ts) — seeds posts/pages
- *      plus the `staff(u-staff-1, editor)` row mcp-smoke needs.
+ *      plus `user(u-staff-1, role=editor)` and a Better Auth MCP
+ *      access token with `mcp:staff` scope.
  *   4. Run integration smokes against http://localhost:8788.
  *   5. Tear down the wrangler process.
  *

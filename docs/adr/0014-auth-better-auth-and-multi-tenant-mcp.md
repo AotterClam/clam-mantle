@@ -79,7 +79,7 @@ What we lose: `grantedBy` / `grantedAt` audit trail. v0.1.0 doesn't need this; v
 
 ### 3. Two MCP routes, surface-derived from manifest predicate
 
-`/mcp` and `/staff/mcp` are mounted side-by-side from boot. Surface partition is **automatic**, derived from each Procedure's `requires.auth.all` predicate:
+`/mcp` and `/staff/mcp` are mounted side-by-side from boot. v0.1.0 ships the conservative partition: `/staff/mcp` exposes all staff authoring/lifecycle tools and requires `mcp:staff` plus an admin role; `/mcp` exposes only read-only `query_view_<name>` tools and requires `mcp:read`. The v0.2+ extension point is **automatic** surface partition derived from each Procedure's `requires.auth.all` predicate:
 
 ```
 predicate contains ctx.staff: [...]    → tool exposed on /staff/mcp only
@@ -126,12 +126,7 @@ Each MCP route validates token scope at request time via `auth.api.getMcpSession
 - `/staff/mcp` requires `mcp:staff` ∈ session.scopes
 - `/mcp` requires `mcp:read` ∈ session.scopes (`mcp:staff` accepted as superset)
 
-Two RFC 9728 protected-resource metadata documents at:
-
-- `/.well-known/oauth-protected-resource/staff/mcp`
-- `/.well-known/oauth-protected-resource/mcp`
-
-Both reference the same Better Auth authorization server. We mount these via Better Auth's `oAuthProtectedResourceMetadata()` helper called twice with different audience URLs (or hand-roll the JSON if the helper doesn't accept multiple).
+The Better Auth MCP plugin exposes the RFC 9728 protected-resource metadata document at the auth mount (`/api/auth/.well-known/oauth-protected-resource` in the Cloudflare starter). Both `/staff/mcp` and `/mcp` point unauthenticated clients at that metadata document through `WWW-Authenticate`.
 
 ### 5. Role checked dynamically, not embedded in token
 
@@ -174,8 +169,8 @@ This is a minor amendment to ADR-0011 (adapter port spec): the auth port disappe
 
 ### What stays
 
-- `mount/mountMcp.ts` — refactored to mount both `/mcp` + `/staff/mcp`, validates via `auth.api.getMcpSession()`
-- `infrastructure/mcp/McpJsonRpcDispatcher.ts` — refactored to support per-tool surface routing
+- `mount/mountMcp.ts` — refactored to mount both `/mcp` + `/staff/mcp`, validates via `auth.api.getMcpSession()`, and enforces route scopes.
+- `infrastructure/mcp/McpJsonRpcDispatcher.ts` — refactored to support staff vs public tool catalogs.
 - All entries / publish / view machinery (zero auth-related changes)
 - Admin SPA — sign-in view rewritten to redirect to Better Auth route; identity / role queries use Better Auth client
 
@@ -186,7 +181,8 @@ This is a minor amendment to ADR-0011 (adapter port spec): the auth port disappe
 - New `EmailSender` port + `ResendEmailSender` adapter impl (used by Better Auth `magicLink` / `emailOTP` plugins)
 - `databaseHooks.user.create.after` for `ensureBootstrapOwner` semantics
 - Two `/.well-known/oauth-protected-resource/*` metadata endpoints (Better Auth helpers)
-- Manifest grammar tools: dispatcher reads `Procedure.requires.auth.all` to route tools to `/mcp` or `/staff/mcp`
+- Public View MCP tools: dispatcher emits `query_view_<name>` on `/mcp`.
+- Future manifest grammar tools: dispatcher will read `Procedure.requires.auth.all` to route user-facing tools to `/mcp` or `/staff/mcp`.
 - Skills + docs updates for the dual MCP URL handoff
 
 ### Backward compatibility

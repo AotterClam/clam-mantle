@@ -3,22 +3,23 @@
  *
  *   apply-dev.ts   → `pnpm fixture` — seeds the dev profile with demo
  *                    posts/pages so a fresh `pnpm dev` admin SPA has
- *                    something to render. Does NOT seed the `staff`
- *                    table; the OAuth callback's `ensureBootstrapOwner`
+ *                    something to render. Does NOT seed an admin
+ *                    role; the OAuth callback's `ensureBootstrapOwner`
  *                    fires for the first admin login.
  *
  *   apply-test.ts  → `pnpm test:integration` (via globalSetup) — seeds
  *                    the test profile with the same demo content PLUS
- *                    a `staff(u-staff-1, editor)` row that mcp-smoke /
- *                    view-smoke depend on for role-gated write paths.
+ *                    `user(u-staff-1, role=editor)` and a Better Auth
+ *                    MCP token that mcp-smoke / view-smoke depend on
+ *                    for role-gated write paths.
  *                    Targets the test profile's wrangler env
  *                    (`--env test --persist-to .wrangler-test`).
  *
- * The split exists because dev and test cannot share the same staff
- * seed: a pre-seeded staff row makes `ensureBootstrapOwner`'s
- * `WHERE NOT EXISTS (SELECT 1 FROM staff)` guard a no-op, locking the
- * dev's first OAuth login out of the admin. See issue #43 for the
- * structural rationale.
+ * The split exists because dev and test cannot share the same admin
+ * seed: a pre-seeded admin role makes `ensureBootstrapOwner`'s
+ * "no existing admin role" guard a no-op, locking the dev's first
+ * OAuth login out of the admin. See issue #43 for the structural
+ * rationale.
  */
 import { execSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
@@ -53,9 +54,9 @@ const DOCTYPE = "<!doctype html>";
 
 export interface ApplyFixtureOptions {
   /**
-   * When true, seeds `staff(u-staff-1, editor)`. Required for the
-   * test profile (mcp-smoke / view-smoke authenticate as
-   * `Bearer dev-u-staff-1`); MUST be false for the dev profile so
+   * When true, seeds `user(u-staff-1, role=editor)` plus a Better
+   * Auth MCP bearer with `mcp:staff` scope. Required for the test
+   * profile; MUST be false for the dev profile so
    * `ensureBootstrapOwner` can fire on the operator's first OAuth
    * login.
    */
@@ -115,17 +116,17 @@ function buildSql(opts: ApplyFixtureOptions): string {
   const fixturePlus30dIso = new Date(FIXTURE_NOW + 30 * 24 * 60 * 60 * 1000).toISOString();
   const userRole = opts.seedStaffEditor ? "'editor'" : "NULL";
   lines.push(
-    `INSERT OR IGNORE INTO user (id, name, email, emailVerified, createdAt, updatedAt, role) VALUES ('${FIXTURE_AUTHOR_ID}', 'Demo Editor', 'editor@example.com', 1, '${fixtureNowIso}', '${fixtureNowIso}', ${userRole});`,
+    `INSERT OR REPLACE INTO user (id, name, email, emailVerified, createdAt, updatedAt, role) VALUES ('${FIXTURE_AUTHOR_ID}', 'Demo Editor', 'editor@example.com', 1, '${fixtureNowIso}', '${fixtureNowIso}', ${userRole});`,
   );
 
   // Test profile only: pre-mint a Better Auth MCP access token so
   // mcp-smoke can authenticate without going through GitHub OAuth.
   if (opts.seedStaffEditor) {
     lines.push(
-      `INSERT OR IGNORE INTO oauthApplication (id, name, clientId, redirectUrls, type, createdAt, updatedAt) VALUES ('fx-app-1', 'fixture mcp client', '${FIXTURE_MCP_CLIENT_ID}', 'http://localhost:0', 'web', '${fixtureNowIso}', '${fixtureNowIso}');`,
+      `INSERT OR REPLACE INTO oauthApplication (id, name, clientId, redirectUrls, type, createdAt, updatedAt) VALUES ('fx-app-1', 'fixture mcp client', '${FIXTURE_MCP_CLIENT_ID}', 'http://localhost:0', 'web', '${fixtureNowIso}', '${fixtureNowIso}');`,
     );
     lines.push(
-      `INSERT OR IGNORE INTO oauthAccessToken (id, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, clientId, userId, scopes, createdAt, updatedAt) VALUES ('fx-tok-1', '${FIXTURE_MCP_ACCESS_TOKEN}', '${FIXTURE_MCP_REFRESH_TOKEN}', '${fixturePlus30dIso}', '${fixturePlus30dIso}', '${FIXTURE_MCP_CLIENT_ID}', '${FIXTURE_AUTHOR_ID}', 'openid profile email', '${fixtureNowIso}', '${fixtureNowIso}');`,
+      `INSERT OR REPLACE INTO oauthAccessToken (id, accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, clientId, userId, scopes, createdAt, updatedAt) VALUES ('fx-tok-1', '${FIXTURE_MCP_ACCESS_TOKEN}', '${FIXTURE_MCP_REFRESH_TOKEN}', '${fixturePlus30dIso}', '${fixturePlus30dIso}', '${FIXTURE_MCP_CLIENT_ID}', '${FIXTURE_AUTHOR_ID}', 'openid profile email mcp:staff', '${fixtureNowIso}', '${fixtureNowIso}');`,
     );
   }
 

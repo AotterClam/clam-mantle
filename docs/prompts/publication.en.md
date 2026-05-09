@@ -21,6 +21,6 @@ Things you should still confirm with me before writing files:
 - The brand voice and home / about / contact / first-post copy. Draft a compact preview first (one line of brand intro per page); I'll react and you can adjust.
 - Cover image for the welcome post — pick a neutral image that fits the mood, or ask me for a URL.
 
-Do **not** create Cloudflare resources during install — that's the [provision Skill](https://raw.githubusercontent.com/AotterClam/clam-cms/{template_ref}/skills/provision/SKILL.md)'s job and runs as a separate step after I review the install. After provision finishes, you'll hand me back a public URL and an MCP URL; from then on, content operations happen through MCP, not through this chat.
+Do **not** create Cloudflare resources during install — that's the [provision Skill](https://raw.githubusercontent.com/AotterClam/clam-cms/{template_ref}/skills/provision/SKILL.md)'s job and runs as a separate step after I review the install. After provision finishes, you'll hand me back a public URL plus Staff/User MCP URLs. From then on, content operations happen through the Staff MCP URL, not through this chat.
 
 When you're done with install, summarize what changed in the project and give me one curl command to verify the local dev server boots.

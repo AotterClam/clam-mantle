@@ -29,12 +29,12 @@ export interface McpClient {
   }>;
 }
 
-export function makeMcpClient(baseUrl: string): McpClient {
+export function makeMcpClient(baseUrl: string, path = "/staff/mcp"): McpClient {
   const bearer = `Bearer ${FIXTURE_MCP_ACCESS_TOKEN}`;
   let rpcId = 1;
 
   const rpc: McpClient["rpc"] = async (method, params) => {
-    const res = await fetch(`${baseUrl}/mcp`, {
+    const res = await fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: bearer },
       body: JSON.stringify({ jsonrpc: "2.0", id: rpcId++, method, params }),

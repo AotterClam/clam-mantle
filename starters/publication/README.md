@@ -110,9 +110,10 @@ pnpm test:integration
 `pnpm test:integration` orchestrates the test profile end-to-end:
 spawns wrangler with `--env test --persist-to .wrangler-test --port 8788`,
 applies the test fixture (which **does** pre-seed
-`staff(u-staff-1, editor)` so `Bearer dev-u-staff-1` reaches the
-role-gated MCP/View paths — that's exactly what should NOT happen on
-the dev profile), runs both smokes against port 8788, then tears
+`user(u-staff-1, role=editor)` plus a Better Auth MCP token with
+`mcp:staff` scope so the Staff MCP smoke reaches the role-gated
+authoring path — that's exactly what should NOT happen on the dev
+profile), runs both smokes against port 8788, then tears
 wrangler down.
 
 The test profile has its own miniflare state (`.wrangler-test/`) and
@@ -165,14 +166,11 @@ curl -i -X POST http://localhost:8787/api/contact \
   -H 'content-type: application/json' \
   -d '{"name":"Bot","email":"b@example.com","message":"spam","turnstileToken":"fail"}'
 
-# MCP /mcp transport handshake. `Bearer dev-<user_id>` is StubOAuthVerifier's
-# happy path; `initialize` is role-free so it works on the dev profile.
-# Anything that touches a role-gated tool (tools/call) requires either
-# (a) running against the test profile via `pnpm test:integration` (which
-# pre-seeds u-staff-1 as editor), or (b) manually inserting a staff row
-# for the user_id you embed in the Bearer token.
-curl -i -X POST http://localhost:8787/mcp \
-  -H 'authorization: Bearer dev-u-staff-1' \
+# Staff MCP smoke uses the test profile's pre-minted Better Auth MCP
+# token. Local dev browser sign-in uses real GitHub OAuth; no stub
+# bearer is accepted on the dev profile.
+curl -i -X POST http://localhost:8788/staff/mcp \
+  -H 'authorization: Bearer fixture-mcp-access-token' \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
 ```
@@ -204,11 +202,11 @@ test/fixture/
   apply-dev.ts       # `pnpm fixture` — dev seed (no staff row;
                      # `ensureBootstrapOwner` fires for first OAuth login)
   apply-test.ts      # `pnpm test:integration` setup — same content +
-                     # staff(u-staff-1, editor) row, targets test profile
+                     # user(u-staff-1, role=editor) + MCP token
 test/integration/
-  mcp-smoke.ts       # MCP JSON-RPC smoke (Bearer dev-u-staff-1)
+  mcp-smoke.ts       # Staff MCP JSON-RPC smoke (fixture Better Auth token)
   view-rest-smoke.ts # public-read smoke
-wrangler.toml          # default env: local D1 + KV bindings; CLAM_ALLOW_STUB_OAUTH=1
+wrangler.toml          # default env: local D1 + KV bindings
                        # [env.test]: separate bindings, port 8788
 .dev.vars.example      # committed; .dev.vars itself stays gitignored
 .dev.vars.test.example # committed; .dev.vars.test loaded by wrangler --env test
@@ -218,12 +216,12 @@ wrangler.toml          # default env: local D1 + KV bindings; CLAM_ALLOW_STUB_OA
 
 Before deploying THIS starter as-is:
 
-1. Remove `CLAM_ALLOW_STUB_OAUTH` from deployable vars; production uses GitHub OAuth + Workers OAuth Provider.
+1. Production uses Better Auth with GitHub OAuth + MCP OAuth/DCR. Set real `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and `BETTER_AUTH_SECRET`.
 2. Replace `captchaCheck` with a real Turnstile / hCaptcha siteverify call.
 3. Replace `slackNotify` with your Slack webhook (or a different sink).
 4. Replace demo Unsplash cover images with assets you own when appropriate,
    or keep using external image URLs until first-party media hosting is enabled.
-5. Bind real D1, render KV, and OAuth KV namespaces in `wrangler.toml`; boot applies runtime migrations on first request.
+5. Bind real D1 and render KV namespaces in `wrangler.toml`; boot applies runtime migrations on first request.
 6. Don't run `test/fixture/` against production — it is demo content for local dev.
 
 ## Production smoke recipe
@@ -253,7 +251,7 @@ Prerequisites:
 
    All four must succeed. If `test:integration` fails, fix locally before continuing.
 
-3. **Provision Cloudflare resources** via the [provision Skill](../../skills/provision/SKILL.md). Creates D1, two KV namespaces (KV + OAUTH_KV), and writes their IDs into `wrangler.toml`. Verify `wrangler dev --remote` boots without binding errors.
+3. **Provision Cloudflare resources** via the [provision Skill](../../skills/provision/SKILL.md). Creates D1 + render KV and writes their IDs into `wrangler.toml`. Verify `wrangler dev --remote` boots without binding errors.
 
 4. **First deploy.**
 
@@ -294,7 +292,7 @@ Prerequisites:
 
 8. **Owner sign-in.** Visit `<worker_url>/admin` in a browser, sign in with GitHub. `ensureBootstrapOwner` promotes you to `owner` on first login because `ADMIN_GITHUB_LOGIN` matches.
 
-9. **MCP operator smoke.** Open Claude Code / Cursor / Codex in any working directory; configure the MCP client with `<worker_url>/mcp`. The first connection opens the consent screen — approve it with the same GitHub account.
+9. **MCP operator smoke.** Open Claude Code / Cursor / Codex in any working directory; configure the MCP client with `<worker_url>/staff/mcp`. The first connection opens the consent screen — approve it with the same GitHub account.
 
    Then ask the agent to:
 

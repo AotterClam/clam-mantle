@@ -10,7 +10,7 @@ import {
 import { buildCmsConfig, type Env } from "./clamConfig.js";
 
 /** Headless worker entrypoint — API + MCP only, no rendered UI.
- *  Wire your own frontend to /api/views/* + /mcp + /api/auth/*. */
+ *  Wire your own frontend to /api/views/* + /staff/mcp + /mcp + /api/auth/*. */
 let appCache: Hono | null = null;
 
 const AUTH_NOT_CONFIGURED = {
@@ -44,7 +44,16 @@ function getApp(env: Env): Hono {
   const app = new Hono();
   app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
   mountServerEndpoints(app, cms);
-  mountMcp(app, cms);
+  mountMcp(app, cms, {
+    path: "/staff/mcp",
+    surface: "staff",
+    requiredScope: "mcp:staff",
+  });
+  mountMcp(app, cms, {
+    path: "/mcp",
+    surface: "public",
+    requiredScope: "mcp:read",
+  });
   appCache = app;
   return app;
 }

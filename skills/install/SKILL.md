@@ -155,7 +155,7 @@ The older `clam-cms-poc` starter Skill is still the operational reference. Keep 
 - Do not touch R2, Zero Trust, billing-profile setup, or paid Cloudflare features in the default v0.1.0 path. Cover images use external URLs during first-run provisioning; first-party media hosting is a later explicit opt-in.
 - Treat GitHub OAuth App setup as a browser-assisted user step, not something the agent can fully automate.
 - The OAuth callback URL must be exact: `<worker_url>/admin/auth/github/callback`.
-- The final handoff must include both public URL and MCP URL.
+- The final handoff must include the public URL plus Staff/User MCP URLs.
 
 ## Starter Families
 
@@ -183,8 +183,8 @@ Classify the request as one of:
 
 For v0.1.0 first-run bootstrap, the only directly-installable starters are `publication` and `blank`:
 
-- **`publication`** — primary path. It is fixed-manifest during bootstrap; do **not** ask the user to redesign Schemas / Views / Procedures / Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing publication model. It currently carries the full GitHub OAuth + Workers OAuth Provider / DCR wiring required for MCP.
-- **`blank`** — only when the user explicitly wants a headless reference (e.g. they're shipping their own Next.js / Astro frontend) and accepts that production MCP OAuth wiring may need to be copied from `publication`.
+- **`publication`** — primary path. It is fixed-manifest during bootstrap; do **not** ask the user to redesign Schemas / Views / Procedures / Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing publication model. It currently carries the full Better Auth GitHub OAuth + MCP OAuth/DCR wiring required for MCP.
+- **`blank`** — only when the user explicitly wants a headless reference (e.g. they're shipping their own Next.js / Astro frontend). It has the same Better Auth + dual MCP mount shape, but no public HTML.
 - **`leads-inbox` / `micro-shop`** — v0.1.0 verticals but ship initially as **documented variants of `publication`** (extra schemas + custom routes added in-project), not as their own starter directory. Do not silently mix vertical-specific schemas into the base `publication` starter; they live in the consumer project.
 - **`booking` / `community` / `fan-club`** — refuse for v0.1.0; explain to the user the family lands in v0.2+ and offer `blank` or `publication`-extension as a holding pattern.
 
@@ -272,12 +272,13 @@ The script:
 
 Keep `ADMIN_GITHUB_LOGIN` out of source code. It is a Worker secret set by the `provision` Skill using `github_username`.
 
-Do not set `CLAM_ALLOW_STUB_OAUTH = "1"` in deployable `[vars]`.
-
-For local dev only, create `.dev.vars` if the user wants stub MCP smoke:
+For local dev admin sign-in, create `.dev.vars` with real GitHub OAuth dev credentials:
 
 ```dotenv
-CLAM_ALLOW_STUB_OAUTH=1
+GITHUB_CLIENT_ID=<local-dev-client-id>
+GITHUB_CLIENT_SECRET=<local-dev-client-secret>
+ADMIN_GITHUB_LOGIN=<your-github-login>
+BETTER_AUTH_SECRET=<32+ random bytes>
 ```
 
 Do not commit `.dev.vars`.
@@ -357,7 +358,7 @@ Smoke routes for publication:
 - `http://localhost:8787/<locale>/posts/hello-world` should render only if optional fixture data was applied.
 - `http://localhost:8787/<locale>/posts/hello-world.md` should render only if optional fixture data was applied.
 - `http://localhost:8787/api/views/recent-posts` should return JSON.
-- `POST http://localhost:8787/mcp` without a bearer token should return 401.
+- `POST http://localhost:8787/staff/mcp` without a bearer token should return 401.
 
 Smoke routes for blank:
 
@@ -379,7 +380,7 @@ template_ref: "<template_ref>"
 seed_file: "initial-seed.json"
 ```
 
-Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Worker secrets, deploy, updating seed origin, applying initial content directly to D1/KV, post-deploy smoke, and returning the MCP URL.
+Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secrets, deploy, updating seed origin, applying initial content directly to D1/KV, post-deploy smoke, and returning the Staff/User MCP URLs.
 
 ## Diagnostic Recipes
 
@@ -391,7 +392,7 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 | `tsc` tries to read `../../tsconfig.base.json` | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag, or set `extends` to `./tsconfig.base.json`. |
 | `Cannot find module @aotterclam/clam-cms-*` | npm install did not complete or version is unpublished | Verify `clam_cms_version`, run `pnpm install`, and check `npm view @aotterclam/clam-cms-cloudflare@<version>`. |
 | `pnpm validate` exits with `MANIFEST_ROOT_NOT_FOUND` | Not running from consumer root | `cd` to the directory containing `manifests/`. |
-| `wrangler dev` boots but MCP stub fails | `.dev.vars` missing local-only `CLAM_ALLOW_STUB_OAUTH=1` | Add `.dev.vars` for local smoke only. Never put this in deployable `[vars]`. |
+| `wrangler dev` boots but admin sign-in fails | GitHub OAuth vars or `BETTER_AUTH_SECRET` missing | Fill `.dev.vars` with `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and `BETTER_AUTH_SECRET`, then restart dev. |
 | Publication `/llms.txt` or post route 404s locally | Fixture data was not applied | Run `pnpm fixture` and restart `pnpm dev`. |
 | `pnpm run seed:initial -- --dry-run` fails on content | `initial-seed.json` is missing required public copy | Add `brand`, `origin`, `locales`, `home`, `about`, and `welcomePost`. |
 | Design customization was applied but `src/theme.default/` was edited directly | Agent searched for token file and edited the baseline copy instead of forking | Run `git checkout src/theme.default/` to restore the baseline, then `pnpm theme:fork tokens.ts` and re-apply edits to `src/theme/tokens.ts`. |
@@ -401,7 +402,7 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 - Don't ignore starter/locales/GitHub username when the official prompt already provided them.
 - Don't require admin UI for v0.1.0 validation. Bootstrap owner + MCP OAuth is enough.
 - Don't put `ADMIN_GITHUB_LOGIN`, GitHub client secret, Turnstile secret, or Cloudflare API tokens in git.
-- Don't deploy with `CLAM_ALLOW_STUB_OAUTH=1` in `wrangler.toml`.
+- Don't reintroduce stub bearer auth or `CLAM_ALLOW_STUB_OAUTH`.
 - Don't keep `.clam-cms-template` in the consumer repo after copying the starter.
 - Don't write directly to D1 for normal content operations; use runtime/MCP tools. The starter-owned `seed:initial` script is the v0.1.0 exception for first content only.
 - Don't add public Schema reads. Public reads go through Views.
@@ -415,12 +416,12 @@ Report:
 - Confirmed GitHub owner username.
 - clam-cms npm package version and template ref.
 - Local validation result: `pnpm validate`, `pnpm typecheck`, and starter-specific smoke.
-- Next command: use `skills/provision/SKILL.md` to deploy and get the MCP URL.
+- Next command: use `skills/provision/SKILL.md` to deploy and get the Staff/User MCP URLs.
 
 Do not claim production readiness until provision completes and a second agent can connect through MCP.
 
 ## See Also
 
-- [`provision`](../provision/SKILL.md) - D1/KV/OAUTH_KV, secrets, deploy, MCP handoff.
+- [`provision`](../provision/SKILL.md) - D1/KV, secrets, deploy, MCP handoff.
 - [`customize-design`](../customize-design/SKILL.md) - publication theme customization.
 - [`extend`](../extend/SKILL.md) - adding Schemas, Views, Procedures, and Triggers.

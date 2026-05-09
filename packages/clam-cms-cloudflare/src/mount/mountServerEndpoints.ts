@@ -115,7 +115,9 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     return jsonResponse(200, {
       ...site,
       publicUrl: site.origin || url.origin,
-      mcpUrl: `${url.origin}/mcp`,
+      mcpUrl: `${url.origin}/staff/mcp`,
+      staffMcpUrl: `${url.origin}/staff/mcp`,
+      userMcpUrl: `${url.origin}/mcp`,
     });
   });
 

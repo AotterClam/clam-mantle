@@ -4,6 +4,7 @@ import {
   type ContentState,
   type SchemaManifest,
   type StaffRole,
+  type ViewManifest,
 } from "@aotterclam/clam-cms-spec";
 import {
   ArchiveUseCase,
@@ -20,11 +21,14 @@ import {
   CreateMediaUploadUseCase,
 } from "../../usecase/media/index.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
+import { ExecuteViewUseCase } from "../../usecase/view/index.js";
 import {
   CREATE_DRAFT_PREFIX,
+  QUERY_VIEW_PREFIX,
   UPDATE_DRAFT_PREFIX,
   buildMcpToolCatalog,
   extractCollectionSegment,
+  type McpToolSurface,
   type McpToolDefinition,
 } from "./McpToolCatalog.js";
 import {
@@ -56,6 +60,7 @@ export interface McpUseCases {
   readonly unpublish: UnpublishUseCase;
   readonly archive: ArchiveUseCase;
   readonly deleteEntry: DeleteEntryUseCase;
+  readonly executeView?: ExecuteViewUseCase;
   /** Optional. When set, `create_media_upload` and `commit_media_upload`
    *  appear in the catalog and route here. */
   readonly media?: {
@@ -72,18 +77,28 @@ export class McpJsonRpcDispatcher {
    *  segment from the tool name and recovers the canonical
    *  collection name. */
   private readonly schemaBySegment: ReadonlyMap<string, string>;
+  private readonly viewBySegment: ReadonlyMap<string, ViewManifest>;
 
   constructor(
     private readonly useCases: McpUseCases,
     private readonly schemas: ReadonlyArray<SchemaManifest>,
+    private readonly options: {
+      readonly surface?: McpToolSurface;
+      readonly views?: ReadonlyArray<ViewManifest>;
+    } = {},
   ) {
     this.catalog = buildMcpToolCatalog(schemas, {
+      surface: options.surface ?? "staff",
       mediaEnabled: useCases.media !== undefined,
+      views: options.views,
     });
     this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;
     const map = new Map<string, string>();
     for (const s of schemas) map.set(mcpToolNameSegment(s.metadata.name), s.metadata.name);
     this.schemaBySegment = map;
+    const views = new Map<string, ViewManifest>();
+    for (const v of options.views ?? []) views.set(mcpToolNameSegment(v.metadata.name), v);
+    this.viewBySegment = views;
   }
 
   async dispatch(req: Request, auth: McpAuthContext): Promise<Response> {
@@ -157,6 +172,23 @@ export class McpJsonRpcDispatcher {
     args: Record<string, unknown>,
     auth: McpAuthContext,
   ): Promise<unknown | typeof UNKNOWN_TOOL | typeof MISSING_ARG> {
+    if ((this.options.surface ?? "staff") === "public") {
+      const viewSegment = extractCollectionSegment(name, QUERY_VIEW_PREFIX);
+      if (!viewSegment) return UNKNOWN_TOOL;
+      const view = this.viewBySegment.get(viewSegment);
+      if (!view || !this.useCases.executeView) return UNKNOWN_TOOL;
+      const result = await this.useCases.executeView.execute({
+        view,
+        options: {
+          params: stripViewReservedArgs(args),
+          page: typeof args["page"] === "number" ? args["page"] : undefined,
+          show: typeof args["show"] === "number" ? args["show"] : undefined,
+        },
+        pathPrefix: `MCP ${name}`,
+      });
+      return result;
+    }
+
     switch (name) {
       case "list_entries": {
         const collection = args["collection"];
@@ -273,6 +305,16 @@ function stripReservedArgs(args: Record<string, unknown>): Record<string, unknow
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(args)) {
     if (RESERVED_ARG_KEYS.includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+const VIEW_RESERVED_ARG_KEYS: readonly string[] = ["page", "show"];
+function stripViewReservedArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (VIEW_RESERVED_ARG_KEYS.includes(k)) continue;
     out[k] = v;
   }
   return out;
