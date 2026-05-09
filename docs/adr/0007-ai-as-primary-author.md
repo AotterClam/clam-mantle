@@ -109,7 +109,7 @@ What it catches:
 This is the cheapest loop; it must be runnable without booting
 anything. AI authors should run it after every manifest edit.
 
-#### Test harness (`@aotter/mantle-spec/testing`)
+#### Test harness (planned public package surface)
 
 Supporting tooling that consumers use inside their own test suites —
 it is not itself a feedback loop, it's the harness those tests run
@@ -118,8 +118,10 @@ imports a public testing module that spins up a complete dispatcher
 against an in-memory D1 substitute, seeds rows, and calls Procedures
 or Views directly without going through HTTP.
 
+Target API sketch:
+
 ```ts
-import { createTestDispatcher } from "@aotter/mantle-spec/testing";
+import { createTestDispatcher } from "@aotter/mantle-runtime/testing";
 import { manifests } from "../manifests"; // loaded by build hook
 import { handlers } from "../handlers";   // map of ref → fn
 
@@ -147,11 +149,11 @@ Catches:
 - View result correctness against fixture data
 - Cross-Trigger correctness when one Procedure has multiple bindings
 
-The test harness is **not** mocked — it shares the real dispatcher,
-the real validator, the real handler registry. The only swap is the
-storage adapter (in-memory SQLite vs production D1). Tests that pass
-here are tests that pass at runtime, modulo D1-vs-SQLite SQL semantic
-gaps (acknowledged risk; covered by SDK integration tests in CI).
+The test harness is **not** mocked — it should share the real
+dispatcher, validator, handler registry, and in-memory runtime ports.
+The public `testing` export has not shipped yet; current v0.1.0 code
+uses runtime package tests plus starter integration smokes to cover
+the same contract until the consumer-facing harness is promoted.
 
 #### Loop 2 — Boot-time fail-fast
 
@@ -219,15 +221,17 @@ Two AI agents read and write to a `@aotter/mantle-*` deployment:
 1. **The coder agent** — Claude Code (cc) running inside the
    consumer's repo. Edits manifests, handlers, scaffold files,
    `wrangler.toml`. Runs CLI commands (`mantle validate`,
-   `mantle openapi`). Reads skill files. Has shell, filesystem, git,
+   `mantle emit-openapi`). Reads skill files. Has shell, filesystem, git,
    and network access in the consumer's dev environment.
 
 2. **The operator agent** — a content-editing client (Claude Desktop,
    claude.ai, or any MCP-speaking host) connected to the deployed
    Worker's `/mcp` endpoint over OAuth. Calls the Day-1 MCP tool
-   catalog (`get_schema` / `list_entries` / `get_entry` /
-   `create_draft` / `update_draft` / `request_publish`). Has *only*
-   the MCP tools the Worker exposes; no shell, no filesystem, no git.
+   catalog: generic tools (`list_entries`, `get_entry`,
+   `request_publish`, `unpublish_entry`, `archive_entry`) plus
+   per-collection authoring tools (`create_draft_<collection>`,
+   `update_draft_<collection>`). Has *only* the MCP tools the Worker
+   exposes; no shell, no filesystem, no git.
 
 These are different roles with different *capability surfaces*. The
 coder agent has many more capabilities than the operator agent *by
@@ -278,12 +282,14 @@ Concrete artifacts today:
   location is the in-repo path, and any agent that can fetch a URL
   can consume them.
 - `mantle validate` CLI (shipped in `@aotter/mantle-spec`)
-- `mantle openapi` CLI (likewise)
-- `@aotter/mantle-spec/testing` test harness module
+- `mantle emit-openapi` CLI (likewise)
+- Public testing harness (planned; current coverage is SDK tests +
+  starter integration smokes)
 
 #### What goes on MCP (operator surface)
 
-- **CRUD on content state** — the Day-1 6 tools.
+- **CRUD on content state** — the Day-1 generic tools plus the
+  per-collection create/update tools generated from Schemas.
 - Anything an **operator user** would do in a hypothetical WordPress
   admin: write a post, update a draft, request publish, list
   submissions.
