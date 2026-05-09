@@ -110,6 +110,21 @@ describe("McpJsonRpcDispatcher", () => {
     expect(names).not.toContain("create_draft");
   });
 
+  it("tools/list preserves media x-mcp-hint metadata for agents", async () => {
+    const { dispatcher } = buildHarness();
+    const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" });
+    const body = (await res.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: { properties?: Record<string, Record<string, unknown>> };
+        }>;
+      };
+    };
+    const createPosts = body.result.tools.find((t) => t.name === "create_draft_posts");
+    expect(createPosts?.inputSchema.properties?.coverUrl?.["x-mcp-hint"]).toBe("media-image");
+  });
+
   it("tools/call create_draft_posts creates an entry through the use case", async () => {
     const { dispatcher, store } = buildHarness();
     const res = await dispatcher.dispatch(

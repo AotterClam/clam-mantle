@@ -21,11 +21,13 @@ spec:
       coverUrl:
         type: string
         format: uri
+        x-mcp-hint: media-image
         description: |
           Public URL of the cover image. v0.1.0: hand-supplied URL only
           (consumer hosts the asset elsewhere — Imgur, S3, CDN, etc.).
-          v0.1.x adds R2 media uploads + a UI picker; this field stays
-          a string URL so existing posts keep working.
+          v0.1.x may add explicit opt-in first-party media hosting
+          (R2 on Cloudflare) + a UI picker; this field stays a string
+          URL so existing posts keep working.
       authorId:
         type: string
         x-clam-bind: ctx.user

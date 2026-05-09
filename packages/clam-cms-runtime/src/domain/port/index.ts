@@ -48,6 +48,21 @@ export type {
   PublishEntryRequest,
 } from "./PublishOrchestrator.js";
 export type {
+  MediaStorage,
+  CreateMediaUploadRequest,
+  CreateMediaUploadResponse,
+  CommitMediaUploadRequest,
+  PutMediaObjectRequest,
+  GetMediaPublicUrlRequest,
+  DeleteMediaAssetRequest,
+  MediaAsset,
+} from "./MediaStorage.js";
+export type {
+  RemoteMediaFetcher,
+  FetchAllowedUrlRequest,
+  FetchedMedia,
+} from "./RemoteMediaFetcher.js";
+export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,
 } from "./LifecycleHookRunner.js";

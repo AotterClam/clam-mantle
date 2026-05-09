@@ -19,7 +19,7 @@ import type { LifecycleHook, StaffRole } from "@aotterclam/clam-cms-spec";
 export interface HandlerContext {
   readonly user: { readonly id: string } | null;
   readonly staff: { readonly id: string; readonly role: StaffRole } | null;
-  /** Adapter-specific bindings (D1 + KV + R2 + ... on Cloudflare).
+  /** Adapter-specific bindings (D1 + KV + optional feature bindings on Cloudflare).
    *  Untyped here so the runtime stays portable — consumer handlers
    *  cast to their adapter's bindings type. The test harness passes
    *  `{}` unless a test needs a specific shape. */

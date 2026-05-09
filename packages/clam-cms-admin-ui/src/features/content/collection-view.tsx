@@ -65,6 +65,11 @@ export function CollectionView({
             {collection?.hasTranslations ? (
               <span className="badge-status bg-accent text-accent-foreground">i18n</span>
             ) : null}
+            {collection?.mediaFields?.length ? (
+              <span className="badge-status bg-[color-mix(in_srgb,var(--success)_16%,transparent)] text-[color:var(--success)]">
+                media
+              </span>
+            ) : null}
           </div>
         }
       />

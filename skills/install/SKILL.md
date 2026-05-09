@@ -150,7 +150,7 @@ The older `clam-cms-poc` starter Skill is still the operational reference. Keep 
 - Prefer Cloudflare signup/login through GitHub for non-technical users; it reduces account mismatch.
 - For Cloudflare provisioning, prefer a short-lived/scoped dashboard API token for non-technical users. `wrangler login` is only for users comfortable with terminal browser auth.
 - If using a Cloudflare API token, never echo it; read with `read -rsp`, keep it temporary, and remind the user to revoke it.
-- Do not touch R2, Zero Trust, or paid Cloudflare features in the default v0.1.0 path.
+- Do not touch R2, Zero Trust, billing-profile setup, or paid Cloudflare features in the default v0.1.0 path. Cover images use external URLs during first-run provisioning; first-party media hosting is a later explicit opt-in.
 - Treat GitHub OAuth App setup as a browser-assisted user step, not something the agent can fully automate.
 - The OAuth callback URL must be exact: `<worker_url>/admin/auth/github/callback`.
 - The final handoff must include both public URL and MCP URL.

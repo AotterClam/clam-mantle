@@ -227,11 +227,12 @@ referencing rows in another Schema. Not enforced in v0.1 (the SDK
 passes it through; no foreign-key constraint, no cascade, no orphan
 detection). Future grammar may upgrade it to enforced.
 
-**Example** (from the blog starter's `posts.yaml`):
+**Example**:
 ```yaml
-cover:
-  type: [string, "null"]
-  x-clam-ref: media           # this UUID points at a row in `media` Schema
+authorId:
+  type: string
+  format: uuid
+  x-clam-ref: authors         # this UUID points at a row in `authors` Schema
 ```
 
 **Implementation status**: declared in
@@ -242,19 +243,29 @@ widgets) but does not enforce referential integrity at write time.
 #### `x-mcp-hint: <hint-string>` — agent / widget intent
 
 Descriptive hint for AI agents and admin UI widgets. The string is
-free-form but conventional values (`markdown`, `richtext`, `code`,
-`media`) tell consumers how to render or generate the field's value.
+accepted as free-form for forward compatibility, but conventional
+values (`markdown`, `richtext`, `code`, `media`, `media-image`,
+`media-video`, `media-file`) tell consumers how to render or generate
+the field's value.
 
-**Example** (from the blog starter's `posts.yaml`):
+**Examples** (from the publication/blog starter manifests):
 ```yaml
 content:
   type: string
   x-mcp-hint: markdown        # admin uses markdown editor; agents know to author markdown
+
+coverUrl:
+  type: string
+  format: uri
+  x-mcp-hint: media-image     # media-shaped URL; first-run uses external URLs
 ```
 
 **Implementation status**: declared in
-`@aotterclam/clam-cms-spec` as the `MCP_HINT_KEYWORD` constant; admin
-UI reads it from JSON Forms `uiSchema` to choose widgets.
+`@aotterclam/clam-cms-spec` as the `MCP_HINT_KEYWORD` constant; the
+conventional values are exported as `MCP_HINTS` / `MEDIA_MCP_HINTS`.
+MCP tool schemas preserve the hint for agents. Admin surfaces expose
+media-shaped fields but first-party upload hosting is optional and not
+part of first-run provisioning.
 
 ---
 

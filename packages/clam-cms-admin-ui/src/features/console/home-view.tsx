@@ -152,6 +152,11 @@ export function HomeView(): React.ReactElement {
                       i18n
                     </span>
                   ) : null}
+                  {c.mediaFields?.length ? (
+                    <span className="badge-status bg-[color-mix(in_srgb,var(--success)_16%,transparent)] text-[color:var(--success)]">
+                      media
+                    </span>
+                  ) : null}
                   <span className="badge-status bg-muted text-muted-foreground">
                     {statusLabel(language, "published")}
                   </span>

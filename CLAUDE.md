@@ -32,7 +32,7 @@ This is the lens for every architectural decision in this codebase.
 | `docs/getting-started.md` | Human Quickstart. (Stubbed during v0.1.0 dev.) |
 | `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / extend / provision flows. Discoverable by URL — no Claude plugin install required. |
 | `packages/clam-cms-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
-| `packages/clam-cms-runtime/` | Runtime engine. Defines the 5 adapter ports. Adapter-agnostic — see "MUST NOT" rule below. |
+| `packages/clam-cms-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
 | `packages/clam-cms-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/clam-cms-cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Workers OAuth. |
 | `packages/clam-cms-netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
@@ -82,7 +82,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 - One barrel `index.ts` per folder.
 - Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
-- The 5 ADR-0011 ports — `DatabaseDriver`, `KvCache`, `SessionRepository`, `AssetServer`, `OAuthVerifier` — live in `clam-cms-runtime/src/domain/port/`. Concrete impls live in `clam-cms-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`clam-cms-cloudflare`, future `clam-cms-netlify`).
+- The ADR-0011 required ports — `DatabaseDriver`, `KvCache`, `SessionRepository`, `AssetServer`, `OAuthVerifier`, `UserRepository`, `StaffRepository` — live in `clam-cms-runtime/src/domain/port/`. Optional feature ports such as `MediaStorage` / `RemoteMediaFetcher` also live there but must not become mandatory first-run bindings. Concrete impls live in `clam-cms-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`clam-cms-cloudflare`, future `clam-cms-netlify`).
 
 ### Spec/runtime type boundary (separate from layer rules)
 
@@ -114,7 +114,7 @@ Each package has its own `build` / `typecheck` / `test` script that the workspac
 
 Several v0.1.x features ship as **interface defined, impl stubbed** in v0.1.0:
 
-- R2 media uploads — port interface in runtime; CF impl returns NotImplemented
+- R2 media uploads — optional port interface in runtime; no first-run provisioning or required CF binding
 - Sitemap auto-emit — starter ships a hand-rolled `<SitemapStub />`
 - Editorial lifecycle — schema accepts `lifecycle: editorial` but boot validator rejects with a clear "v0.1.x" message; starters use `simple` only
 - Image variants / OG card generation — not present; lands after R2 impl
