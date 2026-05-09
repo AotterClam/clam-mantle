@@ -6,10 +6,10 @@
  *
  *   domain ← usecase ← infrastructure ← runtime.ts (assembly root)
  *
- * Adapters (e.g. `@aotterclam/clam-cms-cloudflare`) implement the 5
- * port interfaces in `domain/port/` (DatabaseDriver / KvCache /
- * SessionRepository / AssetServer / OAuthVerifier) and call
- * `createCmsRuntime` to compose everything.
+ * Adapters (e.g. `@aotterclam/clam-cms-cloudflare`) implement the
+ * required port interfaces in `domain/port/` and call `createCmsRuntime`
+ * to compose everything. Optional feature ports (for example media
+ * hosting) stay adapter-agnostic and are only wired when enabled.
  *
  * MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-
  * specific type. The Netlify stub package exists as a public reminder.
@@ -43,6 +43,21 @@ export type {
   StaffListEntry,
   BootstrapOwnerOpts,
 } from "./domain/port/StaffRepository.js";
+export type {
+  MediaStorage,
+  CreateMediaUploadRequest,
+  CreateMediaUploadResponse,
+  CommitMediaUploadRequest,
+  PutMediaObjectRequest,
+  GetMediaPublicUrlRequest,
+  DeleteMediaAssetRequest,
+  MediaAsset,
+} from "./domain/port/MediaStorage.js";
+export type {
+  RemoteMediaFetcher,
+  FetchAllowedUrlRequest,
+  FetchedMedia,
+} from "./domain/port/RemoteMediaFetcher.js";
 
 // Identity-layer model types consumed by adapters implementing the auth ports.
 export type { User } from "./domain/model/User.js";

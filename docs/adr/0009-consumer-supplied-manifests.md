@@ -41,19 +41,17 @@ ships*.
 The SDK's mount factory accepts manifest YAML text passed in by the
 consumer. The SDK ships **zero** embedded manifests; the registry is
 built exclusively from what the consumer passes. The resulting
-registry feeds the boot validator (`assertBootValid`), the dispatcher
-mounter (`mountTriggers`), the View executor, and the MCP
-`get_schema` reflection.
+registry feeds `createCmsRuntime(...).bootInit()`, the HTTP Trigger
+mounts, the View executor, and the MCP tool catalog.
 
 ```ts
 export interface CmsConfig {
   /** Procedure handlers keyed by `Procedure.spec.handler.ref`. */
   readonly handlers?: Readonly<Record<string, AnyHandler>>;
-  /** Consumer-authored manifest YAML, one entry per file. Multi-doc
-   *  files (`---`-separated) are supported per [ADR-0001](0001-four-atom-manifest-model.md)
-   *  §"Authoring shape: multi-doc YAML". The SDK parses and validates
-   *  these at boot. */
-  readonly manifests?: readonly string[];
+  /** Parsed consumer-authored manifests. Starters usually import YAML
+   *  as text via Wrangler rules and call `parseManifestsOrThrow()`
+   *  before passing them to the adapter. */
+  readonly manifests: readonly Manifest[];
 }
 ```
 
@@ -141,9 +139,10 @@ through the sequence.
   author-time YAML and runtime parse. Multi-doc YAML grouping
   ([ADR-0001](0001-four-atom-manifest-model.md) §"Authoring shape: multi-doc YAML")
   is preserved end-to-end.
-- The MCP `get_schema` reflection automatically picks up the
-  consumer's atoms — no separate registration call. The consumer
-  adds a `comments` Schema and the AI editor sees it the next deploy.
+- The MCP tool catalog automatically picks up the consumer's atoms —
+  no separate registration call. The consumer adds a `comments` Schema
+  and the operator agent sees `create_draft_comments` /
+  `update_draft_comments` on the next deploy.
 
 ### Costs
 

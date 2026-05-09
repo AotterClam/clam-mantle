@@ -28,11 +28,36 @@
 export const API_VERSION = "cms.clam.ai/v1" as const;
 export type ApiVersion = typeof API_VERSION;
 
+export const MCP_HINTS = [
+  "markdown",
+  "richtext",
+  "code",
+  "media",
+  "media-image",
+  "media-video",
+  "media-file",
+] as const;
+export type McpHint = (typeof MCP_HINTS)[number];
+
+export const MEDIA_MCP_HINTS = [
+  "media",
+  "media-image",
+  "media-video",
+  "media-file",
+] as const;
+export type MediaMcpHint = (typeof MEDIA_MCP_HINTS)[number];
+
+export function isMediaMcpHint(value: unknown): value is MediaMcpHint {
+  return typeof value === "string" && (MEDIA_MCP_HINTS as readonly string[]).includes(value);
+}
+
 /** Loose JSON Schema shape — we don't constrain it at the type level.
  *  Manifest authoring stays JSON Schema; runtime validators translate
  *  to zod (Workers-CSP-safe). Cross-collection refs use the custom
  *  keyword `x-clam-ref: <collectionName>` on string-typed fields holding
- *  foreign-key IDs; `x-mcp-hint` is a free-form widget-intent hint. */
+ *  foreign-key IDs; `x-mcp-hint` is a widget-intent hint. The grammar
+ *  accepts strings, but `MCP_HINTS` lists the v0.1 conventional values
+ *  agents and admin widgets should understand. */
 export type JsonSchema = {
   readonly type?: string | readonly string[];
   readonly properties?: Readonly<Record<string, JsonSchema>>;
@@ -218,11 +243,9 @@ export interface ProcedureManifestSpec {
   readonly input: JsonSchema;
   /** JSON Schema for the response body. */
   readonly output: JsonSchema;
-  /** Handler binding. v0.1.0 ships `kind: "ref"` only (consumer registers
-   *  via `sdk.registerHandler(ref, fn)` at boot). `kind: "builtin"`
-   *  (5-op CRUD shortcut over the storage adapter) is v0.1.x-committed
-   *  but not yet implemented; the parser rejects it today with
-   *  HANDLER_BUILTIN_NOT_IN_V010. See ADR-0001 § "What's DRAFT". */
+  /** Handler binding. v0.1.0 ships `kind: "ref"` (consumer supplies
+   *  a handler map) and `kind: "builtin"` (5-op CRUD shortcut over
+   *  the entry-writer chokepoint). */
   readonly handler: HandlerBinding;
 }
 
