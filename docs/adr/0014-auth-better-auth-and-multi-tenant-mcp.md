@@ -192,7 +192,7 @@ Staff MCP URL:  https://<worker>.workers.dev/staff/mcp     (give to your owner a
 User MCP URL:   https://<worker>.workers.dev/mcp           (give to visitors / their agents)
 ```
 
-`starters/publication/README.md` § "Production smoke recipe" updates to use `/staff/mcp` for the MCP operator smoke step.
+The publication starter repo's production smoke recipe uses `/staff/mcp` for the MCP operator smoke step.
 
 ### Future-proof for v0.2
 

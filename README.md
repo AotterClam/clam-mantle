@@ -55,7 +55,7 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 Six-family taxonomy (#58). v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
 
-End-user starters are cloneable GitHub template repos. The monorepo keeps starter copies only as development mirrors / fixtures while the split completes.
+End-user starters are cloneable GitHub template repos. `starters/blank` remains in this monorepo until its standalone split is needed.
 
 | Starter | Family | Status | What |
 |---|---|---|---|
