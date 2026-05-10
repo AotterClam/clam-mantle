@@ -1,0 +1,53 @@
+name: Discussion
+description: Converge on a decision before implementation.
+title: "[Discussion] "
+labels: ["question", "needs-discussion"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What decision or uncertainty needs convergence?
+    validations:
+      required: true
+  - type: textarea
+    id: reference_points
+    attributes:
+      label: Reference points
+      description: Link ADRs, issues, code paths, prior PRs, or external constraints.
+      placeholder: |
+        - ADR-...
+        - #...
+        - path/to/file.ts
+    validations:
+      required: true
+  - type: textarea
+    id: candidate_cuts
+    attributes:
+      label: Candidate cuts
+      description: List the plausible options and what each optimizes for.
+    validations:
+      required: true
+  - type: textarea
+    id: closing_criteria
+    attributes:
+      label: Closing criteria
+      description: What must be true before this can become implementation work?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - area:runtime
+        - area:spec
+        - area:cf
+        - area:starters
+        - area:skills
+        - area:admin-ui
+        - area:docs
+        - area:adapter
+        - unknown
+    validations:
+      required: true

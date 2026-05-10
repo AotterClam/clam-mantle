@@ -1,0 +1,64 @@
+name: Proposal
+description: ADR-lite proposal for a concrete decision.
+title: "[Proposal] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What pressure forces a decision now?
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Proposed decision
+      description: State the decision directly.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What else was considered?
+    validations:
+      required: true
+  - type: textarea
+    id: consequences
+    attributes:
+      label: Consequences
+      description: Positive and negative consequences.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope of impact
+      description: Packages, docs, starters, Skills, runtime behavior, auth, storage, or public API surfaces affected.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - area:runtime
+        - area:spec
+        - area:cf
+        - area:starters
+        - area:skills
+        - area:admin-ui
+        - area:docs
+        - area:adapter
+        - unknown
+    validations:
+      required: true
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gates
+      options:
+        - label: This should become a full ADR before implementation.
+        - label: This touches manifest grammar or closed enums.
+        - label: This affects a security or trust boundary.

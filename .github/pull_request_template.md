@@ -1,0 +1,37 @@
+## Summary
+
+-
+
+## Why
+
+-
+
+## Scope
+
+-
+
+## Non-goals
+
+-
+
+## Test plan
+
+- [ ] `pnpm build`
+- [ ] `pnpm typecheck`
+- [ ] `pnpm test`
+- [ ] Other:
+
+## Follow-ups
+
+-
+
+## Related
+
+Refs #
+
+## Contributor checklist
+
+- [ ] Base branch is `develop`.
+- [ ] Labels match `docs/labels.md`.
+- [ ] ADR / grammar / security gates are called out when relevant.
+- [ ] User-facing docs or changelog entries are updated when relevant.
