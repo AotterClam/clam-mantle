@@ -34,4 +34,4 @@ Substitution happens at request time in the official site's frontend JS — no a
 
 ## Production smoke
 
-Before treating a prompt as production-ready, walk it on a fresh empty directory + a clean Cloudflare account. The recipe lives in [`starters/publication/README.md` § "Production smoke recipe"](../../starters/publication/README.md).
+Before treating a prompt as production-ready, walk it on a fresh empty directory + a clean Cloudflare account. For `publication`, use the cloneable starter repo: <https://github.com/aotter/mantle-starters>.
