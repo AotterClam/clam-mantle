@@ -50,6 +50,12 @@ export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,
 } from "./LifecycleHookRunner.js";
+export type {
+  DeferredHookDispatcher,
+  DeferredHookEnvelope,
+  CtxSnapshot,
+} from "./DeferredHookDispatcher.js";
+export { ctxSnapshotFrom } from "./DeferredHookDispatcher.js";
 export { type Clock, SystemClock } from "./Clock.js";
 export { type IdGenerator, RandomUuidGenerator } from "./IdGenerator.js";
 export {

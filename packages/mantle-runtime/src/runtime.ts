@@ -11,6 +11,7 @@ import type { AnyHandler } from "./domain/model/HandlerContext.js";
 import type { TemplateRegistry } from "./domain/model/TemplateRegistry.js";
 import type { AssetServer } from "./domain/port/AssetServer.js";
 import type { DatabaseDriver } from "./domain/port/DatabaseDriver.js";
+import type { DeferredHookDispatcher } from "./domain/port/DeferredHookDispatcher.js";
 import type { EntryRepository } from "./domain/port/EntryRepository.js";
 import type { KvCache } from "./domain/port/KvCache.js";
 import type { MediaStorage } from "./domain/port/MediaStorage.js";
@@ -42,7 +43,10 @@ import {
 } from "./usecase/procedure/index.js";
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
-import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
+import {
+  RunDeferredHookUseCase,
+  RunLifecycleHooksUseCase,
+} from "./usecase/lifecycle/index.js";
 import {
   ComposeEntrySeoMetaUseCase,
   ComposeLlmsTxtUseCase,
@@ -108,6 +112,12 @@ export interface CreateCmsRuntimeArgs {
   readonly mediaAllowSvg?: boolean;
   /** Optional override of the default 25 MB upload byte ceiling. */
   readonly mediaMaxBytes?: number;
+  /** Optional deferred-delivery dispatcher for `after_*` lifecycle
+   *  hooks. When set, after-hooks are enqueued through it instead of
+   *  riding `ctx.waitUntil` / inline-await. Cloudflare adapter wires
+   *  a Workers-Queues-backed impl by default. Absent → existing
+   *  waitUntil → inline ladder applies. */
+  readonly deferredHookDispatcher?: DeferredHookDispatcher;
   /** Optional clock — test seam. Defaults to `SystemClock`. */
   readonly clock?: Clock;
   /** Optional id generator — test seam. Defaults to `RandomUuidGenerator`. */
@@ -151,6 +161,11 @@ export interface CmsRuntime {
     readonly createUpload: CreateMediaUploadUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
   } | null;
+  /** Drive a deferred after-hook from an enqueued envelope. Adapter
+   *  queue consumers call `runDeferredHook.execute({ envelope, env })`
+   *  with the consume-side binding bag (different invocation than
+   *  the one that produced the envelope). */
+  readonly runDeferredHook: RunDeferredHookUseCase;
 
   /** Adapter-helper bag. */
   readonly registry: HandlerRegistry;
@@ -226,7 +241,9 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     innerEntries,
     triggerIndex,
     lifecycleHooks,
+    args.deferredHookDispatcher,
   );
+  const runDeferredHook = new RunDeferredHookUseCase(lifecycleHooks);
   const publicPathResolver = args.publicPathResolver ?? null;
   const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(
@@ -315,6 +332,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     siteConfig,
     publicPathResolver,
     media,
+    runDeferredHook,
 
     registry,
     templates,

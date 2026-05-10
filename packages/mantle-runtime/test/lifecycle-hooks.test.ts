@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DiagnosticError,
   type ProcedureManifest,
 } from "@aotter/mantle-spec";
 import type { Clock } from "../src/domain/port/Clock.js";
+import type {
+  DeferredHookEnvelope,
+  DeferredHookDispatcher,
+} from "../src/domain/port/DeferredHookDispatcher.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { InMemoryHandlerRegistry } from "../src/domain/port/HandlerRegistry.js";
 import { TriggerIndex } from "../src/domain/service/TriggerIndex.js";
@@ -14,7 +18,10 @@ import {
   DeleteEntryUseCase,
   RequestPublishUseCase,
 } from "../src/usecase/content/index.js";
-import { RunLifecycleHooksUseCase } from "../src/usecase/lifecycle/index.js";
+import {
+  RunDeferredHookUseCase,
+  RunLifecycleHooksUseCase,
+} from "../src/usecase/lifecycle/index.js";
 import { InvokeProcedureUseCase } from "../src/usecase/procedure/InvokeProcedureUseCase.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import {
@@ -42,6 +49,7 @@ function harness(opts: {
   procedures: readonly ProcedureManifest[];
   triggers: readonly Parameters<typeof makeLifecycleTrigger>[0][];
   handlers: Record<string, (input: unknown, ctx: unknown) => unknown>;
+  deferred?: DeferredHookDispatcher;
 }): Harness {
   const store = new InMemoryEntryRepository();
   const schemas = new Map([[postsSchema().metadata.name, postsSchema()]]);
@@ -58,7 +66,12 @@ function harness(opts: {
   const triggerIndex = new TriggerIndex(triggers);
   const invoke = new InvokeProcedureUseCase(registry);
   const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, invoke);
-  const hookedRepo = new LifecycleHookingEntryRepository(store, triggerIndex, hookRunner);
+  const hookedRepo = new LifecycleHookingEntryRepository(
+    store,
+    triggerIndex,
+    hookRunner,
+    opts.deferred,
+  );
   return {
     store,
     hookedRepo,
@@ -334,6 +347,250 @@ describe("LifecycleHookingEntryRepository — publish + delete", () => {
       .update({ id: "ghost", collection: "posts", expectedVersion: 1, data: {}, now: 0 })
       .catch(() => undefined);
     expect(h.calls).toEqual([]);
+  });
+});
+
+describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () => {
+  it("enqueues envelope through dispatcher and skips inline run", async () => {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
+      enqueue: async (envelope) => {
+        enqueued.push(envelope);
+      },
+    };
+    const h = harness({
+      procedures: [slackProcedure],
+      triggers: [
+        {
+          procedure: "slackNotify",
+          schema: "posts",
+          on: ["after_create"],
+        },
+      ],
+      handlers: { slackNotify: () => ({ ok: true }) },
+      deferred: dispatcher,
+    });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+    });
+    // Inline handler must NOT have run when dispatcher accepted the envelope.
+    expect(h.calls).toEqual([]);
+    expect(enqueued).toHaveLength(1);
+    expect(enqueued[0]?.hook).toBe("after_create");
+    expect(enqueued[0]?.schema).toBe("posts");
+    expect(enqueued[0]?.entry.id).toBe("post-1");
+    // Anonymous create → no ctx snapshot.
+    expect(enqueued[0]?.ctxSnapshot).toBeNull();
+  });
+
+  it("captures ctxSnapshot from staff actor", async () => {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
+      enqueue: async (envelope) => {
+        enqueued.push(envelope);
+      },
+    };
+    const h = harness({
+      procedures: [slackProcedure],
+      triggers: [
+        {
+          procedure: "slackNotify",
+          schema: "posts",
+          on: ["after_create"],
+        },
+      ],
+      handlers: { slackNotify: () => ({ ok: true }) },
+      deferred: dispatcher,
+    });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: "user-1",
+      ctx: {
+        user: { id: "user-1" },
+        staff: { id: "user-1", role: "owner" },
+        env: {},
+      },
+    });
+    expect(enqueued[0]?.ctxSnapshot).toEqual({
+      userId: "user-1",
+      staffId: "user-1",
+      staffRole: "owner",
+    });
+  });
+
+  it("falls back to ctx.waitUntil when dispatcher rejects", async () => {
+    const dispatcher: DeferredHookDispatcher = {
+      enqueue: async () => {
+        throw new Error("queue 5xx");
+      },
+    };
+    let captured: Promise<unknown> | null = null;
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const h = harness({
+      procedures: [slackProcedure],
+      triggers: [
+        {
+          procedure: "slackNotify",
+          schema: "posts",
+          on: ["after_create"],
+        },
+      ],
+      handlers: { slackNotify: () => ({ ok: true }) },
+      deferred: dispatcher,
+    });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+      ctx: {
+        user: null,
+        staff: null,
+        env: {},
+        waitUntil: (p) => {
+          captured = p;
+        },
+      },
+    });
+    expect(captured).not.toBeNull();
+    await captured;
+    expect(h.calls).toEqual(["slackNotify"]);
+    errSpy.mockRestore();
+  });
+
+  it("falls back to inline-await when dispatcher rejects and waitUntil absent", async () => {
+    const dispatcher: DeferredHookDispatcher = {
+      enqueue: async () => {
+        throw new Error("queue down");
+      },
+    };
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const h = harness({
+      procedures: [slackProcedure],
+      triggers: [
+        {
+          procedure: "slackNotify",
+          schema: "posts",
+          on: ["after_create"],
+        },
+      ],
+      handlers: { slackNotify: () => ({ ok: true }) },
+      deferred: dispatcher,
+    });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+    });
+    expect(h.calls).toEqual(["slackNotify"]);
+    errSpy.mockRestore();
+  });
+
+  it("does NOT route before_* hooks through the dispatcher", async () => {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
+      enqueue: async (envelope) => {
+        enqueued.push(envelope);
+      },
+    };
+    const h = harness({
+      procedures: [captchaProcedure],
+      triggers: [
+        {
+          procedure: "captchaCheck",
+          schema: "posts",
+          on: ["before_create"],
+          errorPolicy: "abort",
+        },
+      ],
+      handlers: { captchaCheck: () => ({ ok: true }) },
+      deferred: dispatcher,
+    });
+    await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+    });
+    expect(h.calls).toEqual(["captchaCheck"]);
+    expect(enqueued).toEqual([]);
+  });
+});
+
+describe("RunDeferredHookUseCase", () => {
+  it("rebuilds ctx from snapshot and forwards to hook runner", async () => {
+    let received: { hook: string; schema: string; entry: unknown; ctx: unknown } | null = null;
+    const stubRunner = {
+      run: async (req: { hook: string; schema: string; entry: unknown; ctx: unknown }) => {
+        received = {
+          hook: req.hook,
+          schema: req.schema,
+          entry: req.entry,
+          ctx: req.ctx,
+        };
+      },
+    };
+    const useCase = new RunDeferredHookUseCase(stubRunner);
+    const envelope: DeferredHookEnvelope = {
+      hook: "after_publish",
+      schema: "posts",
+      entry: {
+        id: "post-9",
+        collection: "posts",
+        status: "published",
+        version: 2,
+        data: { title: "Hi" },
+        authorId: "user-1",
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      originalInput: { foo: "bar" },
+      ctxSnapshot: {
+        userId: "user-1",
+        staffId: "user-1",
+        staffRole: "editor",
+      },
+    };
+    const env = { MANTLE_INTERNAL_QUEUE: "fake" };
+    await useCase.execute({ envelope, env });
+    expect(received).toEqual({
+      hook: "after_publish",
+      schema: "posts",
+      entry: envelope.entry,
+      ctx: {
+        user: { id: "user-1" },
+        staff: { id: "user-1", role: "editor" },
+        env,
+      },
+    });
+  });
+
+  it("rebuilds anonymous ctx when snapshot is null", async () => {
+    let receivedCtx: { user: unknown; staff: unknown; env: unknown } | null = null;
+    const stubRunner = {
+      run: async (req: { ctx: { user: unknown; staff: unknown; env: unknown } }) => {
+        receivedCtx = req.ctx;
+      },
+    };
+    const useCase = new RunDeferredHookUseCase(stubRunner);
+    const envelope: DeferredHookEnvelope = {
+      hook: "after_create",
+      schema: "posts",
+      entry: {
+        id: "post-1",
+        collection: "posts",
+        status: "draft",
+        version: 1,
+        data: {},
+        authorId: null,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+      ctxSnapshot: null,
+    };
+    await useCase.execute({ envelope, env: {} });
+    expect(receivedCtx).toEqual({ user: null, staff: null, env: {} });
   });
 });
 
