@@ -1,11 +1,11 @@
 import type { LifecycleHook } from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { HandlerContext } from "../../domain/model/HandlerContext.js";
-import type {
-  AfterHookEnvelope,
-  CtxSnapshot,
-  DurableHookDispatcher,
-} from "../../domain/port/DurableHookDispatcher.js";
+import {
+  ctxSnapshotFrom,
+  type DeferredHookDispatcher,
+  type DeferredHookEnvelope,
+} from "../../domain/port/DeferredHookDispatcher.js";
 import type {
   ArchiveEntryArgs,
   CreateEntryArgs,
@@ -54,7 +54,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     private readonly inner: EntryRepository,
     private readonly triggers: TriggerIndex,
     private readonly hooks: LifecycleHookRunner,
-    private readonly durable?: DurableHookDispatcher,
+    private readonly deferred?: DeferredHookDispatcher,
   ) {}
 
   async create(args: CreateEntryArgs): Promise<EntryRow> {
@@ -174,11 +174,11 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
   /**
    * After-hook execution. Tries delivery rungs in order:
    *
-   *   1. `durable.enqueue(envelope)` — adapter-backed durable queue
+   *   1. `deferred.enqueue(envelope)` — adapter-backed deferred path
    *      (CF Workers Queues, Inngest, pg-boss, …). Survives isolate
    *      death; consume invocation rehydrates the envelope and re-fires
-   *      via `CmsRuntime.consumeDurableHook`. A rejection downgrades
-   *      to the next rung rather than dropping the hook silently.
+   *      via `CmsRuntime.runDeferredHook`. A rejection downgrades to
+   *      the next rung rather than dropping the hook silently.
    *   2. `ctx.waitUntil(promise)` — adapter-populated fire-and-forget
    *      bridge (CF Workers `ExecutionContext`). Fast but non-durable:
    *      isolate death between response and resolution loses the work.
@@ -200,20 +200,20 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     ctx: HandlerContext,
     args: MutationHookFields,
   ): Promise<void> {
-    if (this.durable && this.triggers.forHook(entry.collection, hook).length > 0) {
-      const envelope: AfterHookEnvelope = {
+    if (this.deferred && this.triggers.forHook(entry.collection, hook).length > 0) {
+      const envelope: DeferredHookEnvelope = {
         hook,
         schema: entry.collection,
         entry,
         originalInput: args.originalInput,
-        ctxSnapshot: snapshotOf(ctx),
+        ctxSnapshot: ctxSnapshotFrom(ctx),
       };
       try {
-        await this.durable.enqueue(envelope);
+        await this.deferred.enqueue(envelope);
         return;
       } catch (err) {
         console.error(
-          `[lifecycle] durable enqueue for ${hook} on ${entry.collection}/${entry.id} failed; falling back`,
+          `[lifecycle] deferred enqueue for ${hook} on ${entry.collection}/${entry.id} failed; falling back`,
           err,
         );
       }
@@ -233,15 +233,6 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     }
     await promise;
   }
-}
-
-function snapshotOf(ctx: HandlerContext): CtxSnapshot | null {
-  if (!ctx.user && !ctx.staff) return null;
-  return {
-    userId: ctx.user?.id ?? null,
-    staffId: ctx.staff?.id ?? null,
-    staffRole: ctx.staff?.role ?? null,
-  };
 }
 
 function ctxOf(args: MutationHookFields): HandlerContext {

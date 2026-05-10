@@ -3,6 +3,6 @@ export { KvCacheBinding } from "./KvCacheBinding.js";
 export { AssetsAssetServer } from "./AssetsAssetServer.js";
 export { R2MediaStorage } from "./R2MediaStorage.js";
 export {
-  WorkersQueueDurableHookDispatcher,
+  WorkersQueueHookDispatcher,
   createQueueHandler,
-} from "./WorkersQueueDurableHookDispatcher.js";
+} from "./WorkersQueueHookDispatcher.js";

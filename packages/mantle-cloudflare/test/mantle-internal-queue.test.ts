@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
-  AfterHookEnvelope,
+  DeferredHookEnvelope,
   CmsRuntime,
 } from "@aotter/mantle-runtime";
 import {
-  WorkersQueueDurableHookDispatcher,
+  WorkersQueueHookDispatcher,
   createQueueHandler,
-} from "../src/bindings/WorkersQueueDurableHookDispatcher.js";
+} from "../src/bindings/WorkersQueueHookDispatcher.js";
 
 interface CapturedSend<T> {
   body: T;
@@ -66,7 +66,7 @@ function fakeBatch<T>(envelopes: T[]): {
   return { batch, messages };
 }
 
-const sampleEnvelope: AfterHookEnvelope = {
+const sampleEnvelope: DeferredHookEnvelope = {
   hook: "after_publish",
   schema: "posts",
   entry: {
@@ -82,10 +82,10 @@ const sampleEnvelope: AfterHookEnvelope = {
   ctxSnapshot: null,
 };
 
-describe("WorkersQueueDurableHookDispatcher.enqueue", () => {
+describe("WorkersQueueHookDispatcher#enqueue", () => {
   it("forwards the envelope through queue.send", async () => {
-    const queue = fakeQueue<AfterHookEnvelope>();
-    const dispatcher = new WorkersQueueDurableHookDispatcher(queue);
+    const queue = fakeQueue<DeferredHookEnvelope>();
+    const dispatcher = new WorkersQueueHookDispatcher(queue);
     await dispatcher.enqueue(sampleEnvelope);
     expect(queue.captured).toEqual([{ body: sampleEnvelope, options: undefined }]);
   });
@@ -96,25 +96,27 @@ describe("WorkersQueueDurableHookDispatcher.enqueue", () => {
         throw new Error("queue 5xx");
       },
       sendBatch: async () => {},
-    } as unknown as Queue<AfterHookEnvelope>;
-    const dispatcher = new WorkersQueueDurableHookDispatcher(queue);
+    } as unknown as Queue<DeferredHookEnvelope>;
+    const dispatcher = new WorkersQueueHookDispatcher(queue);
     await expect(dispatcher.enqueue(sampleEnvelope)).rejects.toThrow("queue 5xx");
   });
 });
 
 describe("createQueueHandler", () => {
-  it("ack()s each message after consumeDurableHook resolves", async () => {
-    const consumed: { envelope: AfterHookEnvelope; env: unknown }[] = [];
+  it("ack()s each message after runDeferredHook.execute resolves", async () => {
+    const consumed: { envelope: DeferredHookEnvelope; env: unknown }[] = [];
     const cmsRef = {
       get: async (): Promise<CmsRuntime> =>
         ({
-          consumeDurableHook: async (envelope: AfterHookEnvelope, env: unknown) => {
-            consumed.push({ envelope, env });
+          runDeferredHook: {
+            execute: async (request: { envelope: DeferredHookEnvelope; env: unknown }) => {
+              consumed.push({ envelope: request.envelope, env: request.env });
+            },
           },
         }) as unknown as CmsRuntime,
     };
     const handler = createQueueHandler<{ tag: string }>(cmsRef);
-    const { batch, messages } = fakeBatch<AfterHookEnvelope>([sampleEnvelope, sampleEnvelope]);
+    const { batch, messages } = fakeBatch<DeferredHookEnvelope>([sampleEnvelope, sampleEnvelope]);
     await handler(batch, { tag: "env" });
     expect(consumed).toHaveLength(2);
     expect(consumed[0]?.env).toEqual({ tag: "env" });
@@ -154,7 +156,7 @@ describe("createQueueHandler", () => {
         retryAllCalled = true;
         for (const m of messages) m.retried = true;
       },
-    } as unknown as MessageBatch<AfterHookEnvelope>;
+    } as unknown as MessageBatch<DeferredHookEnvelope>;
     await handler(batch, {});
     expect(retryAllCalled).toBe(true);
     // Per-message ack/retry MUST NOT have been called — the loop never started.
@@ -168,14 +170,16 @@ describe("createQueueHandler", () => {
     const cmsRef = {
       get: async (): Promise<CmsRuntime> =>
         ({
-          consumeDurableHook: async () => {
-            callCount++;
-            if (callCount === 1) throw new Error("hook blew up");
+          runDeferredHook: {
+            execute: async () => {
+              callCount++;
+              if (callCount === 1) throw new Error("hook blew up");
+            },
           },
         }) as unknown as CmsRuntime,
     };
     const handler = createQueueHandler<unknown>(cmsRef);
-    const { batch, messages } = fakeBatch<AfterHookEnvelope>([sampleEnvelope, sampleEnvelope]);
+    const { batch, messages } = fakeBatch<DeferredHookEnvelope>([sampleEnvelope, sampleEnvelope]);
     await handler(batch, {});
     expect(messages[0]?.retried).toBe(true);
     expect(messages[0]?.acked).toBe(false);

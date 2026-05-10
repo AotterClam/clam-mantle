@@ -23,11 +23,12 @@ export interface CmsConfig {
      *  `/admin/api/media/*` endpoints are registered. Forwarded to the
      *  runtime as `mediaStorage`. */
     readonly mediaStorage?: CreateCmsRuntimeArgs["mediaStorage"];
-    /** Optional durable hook dispatcher. When set, `after_*` lifecycle
-     *  hooks fire through this instead of riding `ctx.waitUntil`. The
-     *  Cloudflare adapter expects a `WorkersQueueDurableHookDispatcher`
-     *  bound to the `mantle_internal` queue here. */
-    readonly durableHookDispatcher?: CreateCmsRuntimeArgs["durableHookDispatcher"];
+    /** Optional deferred-delivery dispatcher. When set, `after_*`
+     *  lifecycle hooks fire through this instead of riding
+     *  `ctx.waitUntil`. The Cloudflare adapter expects a
+     *  `WorkersQueueHookDispatcher` bound to the `mantle_internal` queue
+     *  here. */
+    readonly deferredHookDispatcher?: CreateCmsRuntimeArgs["deferredHookDispatcher"];
   };
   /** Pass-through to runtime: SVG opt-in flag (default false). */
   readonly mediaAllowSvg?: boolean;

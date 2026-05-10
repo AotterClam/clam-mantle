@@ -1,2 +1,2 @@
 export { RunLifecycleHooksUseCase } from "./RunLifecycleHooksUseCase.js";
-export { ConsumeDurableHookUseCase } from "./ConsumeDurableHookUseCase.js";
+export { RunDeferredHookUseCase } from "./RunDeferredHookUseCase.js";

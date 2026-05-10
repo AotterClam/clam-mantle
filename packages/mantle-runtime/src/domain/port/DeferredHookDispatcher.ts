@@ -1,21 +1,23 @@
 import type { LifecycleHook, StaffRole } from "@aotter/mantle-spec";
 import type { EntryRow } from "../model/EntryRow.js";
+import type { HandlerContext } from "../model/HandlerContext.js";
 
 /**
- * Optional adapter port for delivering `after_*` lifecycle hooks via
- * a durable queue. The adapter's queue consumer rehydrates the
- * envelope and calls `CmsRuntime.consumeDurableHook` on the consume
- * side. Absent a dispatcher, the decorator's `fireAfter` ladder
- * downgrades to `ctx.waitUntil` then inline-await.
+ * Optional adapter port for delivering `after_*` lifecycle hooks
+ * out-of-band — later, in a separate invocation, with durability
+ * across isolate death. The adapter's consume-side handler rehydrates
+ * the envelope and drives `CmsRuntime.runDeferredHook`. Absent a
+ * dispatcher, the decorator's `fireAfter` ladder downgrades to
+ * `ctx.waitUntil` then inline-await.
  *
  * Contract: a thrown rejection from `enqueue` is treated as a hard
- * durability failure — the decorator catches it and downgrades to
- * the next rung. Adapters should swallow transient errors they can
+ * delivery failure — the decorator catches it and downgrades to the
+ * next rung. Adapters should swallow transient errors they can
  * tolerate themselves; only escalate when the hook genuinely cannot
- * be queued.
+ * be deferred.
  */
-export interface DurableHookDispatcher {
-  enqueue(envelope: AfterHookEnvelope): Promise<void>;
+export interface DeferredHookDispatcher {
+  enqueue(envelope: DeferredHookEnvelope): Promise<void>;
 }
 
 /**
@@ -33,7 +35,7 @@ export interface DurableHookDispatcher {
  * the consume invocation owns its own request lifetime — and `env` is
  * filled from the consume-side adapter binding.
  */
-export interface AfterHookEnvelope {
+export interface DeferredHookEnvelope {
   readonly hook: LifecycleHook;
   readonly schema: string;
   readonly entry: EntryRow;
@@ -45,4 +47,19 @@ export interface CtxSnapshot {
   readonly userId: string | null;
   readonly staffId: string | null;
   readonly staffRole: StaffRole | null;
+}
+
+/**
+ * Capture identity from a `HandlerContext` into the wire-friendly
+ * `CtxSnapshot`. Returns `null` for fully anonymous contexts so the
+ * envelope stays small. Lives next to `CtxSnapshot` so the producer
+ * (decorator) and consumer (use case) share one source of truth.
+ */
+export function ctxSnapshotFrom(ctx: HandlerContext): CtxSnapshot | null {
+  if (!ctx.user && !ctx.staff) return null;
+  return {
+    userId: ctx.user?.id ?? null,
+    staffId: ctx.staff?.id ?? null,
+    staffRole: ctx.staff?.role ?? null,
+  };
 }

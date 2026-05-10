@@ -46,10 +46,10 @@ export type {
 } from "./domain/port/MediaStorage.js";
 export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
 export type {
-  DurableHookDispatcher,
-  AfterHookEnvelope,
+  DeferredHookDispatcher,
+  DeferredHookEnvelope,
   CtxSnapshot,
-} from "./domain/port/DurableHookDispatcher.js";
+} from "./domain/port/DeferredHookDispatcher.js";
 
 // ID source — adapters wire this into binding-side helpers that need
 // random IDs. Default `RandomUuidGenerator` (`crypto.randomUUID()`)

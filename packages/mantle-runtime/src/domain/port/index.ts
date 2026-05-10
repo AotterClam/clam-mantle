@@ -51,10 +51,11 @@ export type {
   RunLifecycleHookRequest,
 } from "./LifecycleHookRunner.js";
 export type {
-  DurableHookDispatcher,
-  AfterHookEnvelope,
+  DeferredHookDispatcher,
+  DeferredHookEnvelope,
   CtxSnapshot,
-} from "./DurableHookDispatcher.js";
+} from "./DeferredHookDispatcher.js";
+export { ctxSnapshotFrom } from "./DeferredHookDispatcher.js";
 export { type Clock, SystemClock } from "./Clock.js";
 export { type IdGenerator, RandomUuidGenerator } from "./IdGenerator.js";
 export {

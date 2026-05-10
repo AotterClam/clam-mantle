@@ -5,9 +5,9 @@ import {
 } from "@aotter/mantle-spec";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type {
-  AfterHookEnvelope,
-  DurableHookDispatcher,
-} from "../src/domain/port/DurableHookDispatcher.js";
+  DeferredHookEnvelope,
+  DeferredHookDispatcher,
+} from "../src/domain/port/DeferredHookDispatcher.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { InMemoryHandlerRegistry } from "../src/domain/port/HandlerRegistry.js";
 import { TriggerIndex } from "../src/domain/service/TriggerIndex.js";
@@ -19,7 +19,7 @@ import {
   RequestPublishUseCase,
 } from "../src/usecase/content/index.js";
 import {
-  ConsumeDurableHookUseCase,
+  RunDeferredHookUseCase,
   RunLifecycleHooksUseCase,
 } from "../src/usecase/lifecycle/index.js";
 import { InvokeProcedureUseCase } from "../src/usecase/procedure/InvokeProcedureUseCase.js";
@@ -49,7 +49,7 @@ function harness(opts: {
   procedures: readonly ProcedureManifest[];
   triggers: readonly Parameters<typeof makeLifecycleTrigger>[0][];
   handlers: Record<string, (input: unknown, ctx: unknown) => unknown>;
-  durable?: DurableHookDispatcher;
+  deferred?: DeferredHookDispatcher;
 }): Harness {
   const store = new InMemoryEntryRepository();
   const schemas = new Map([[postsSchema().metadata.name, postsSchema()]]);
@@ -70,7 +70,7 @@ function harness(opts: {
     store,
     triggerIndex,
     hookRunner,
-    opts.durable,
+    opts.deferred,
   );
   return {
     store,
@@ -352,8 +352,8 @@ describe("LifecycleHookingEntryRepository — publish + delete", () => {
 
 describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () => {
   it("enqueues envelope through dispatcher and skips inline run", async () => {
-    const enqueued: AfterHookEnvelope[] = [];
-    const dispatcher: DurableHookDispatcher = {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
       enqueue: async (envelope) => {
         enqueued.push(envelope);
       },
@@ -368,7 +368,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
         },
       ],
       handlers: { slackNotify: () => ({ ok: true }) },
-      durable: dispatcher,
+      deferred: dispatcher,
     });
     await h.createDraft.execute({
       collection: "posts",
@@ -386,8 +386,8 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
   });
 
   it("captures ctxSnapshot from staff actor", async () => {
-    const enqueued: AfterHookEnvelope[] = [];
-    const dispatcher: DurableHookDispatcher = {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
       enqueue: async (envelope) => {
         enqueued.push(envelope);
       },
@@ -402,7 +402,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
         },
       ],
       handlers: { slackNotify: () => ({ ok: true }) },
-      durable: dispatcher,
+      deferred: dispatcher,
     });
     await h.createDraft.execute({
       collection: "posts",
@@ -422,7 +422,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
   });
 
   it("falls back to ctx.waitUntil when dispatcher rejects", async () => {
-    const dispatcher: DurableHookDispatcher = {
+    const dispatcher: DeferredHookDispatcher = {
       enqueue: async () => {
         throw new Error("queue 5xx");
       },
@@ -439,7 +439,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
         },
       ],
       handlers: { slackNotify: () => ({ ok: true }) },
-      durable: dispatcher,
+      deferred: dispatcher,
     });
     await h.createDraft.execute({
       collection: "posts",
@@ -461,7 +461,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
   });
 
   it("falls back to inline-await when dispatcher rejects and waitUntil absent", async () => {
-    const dispatcher: DurableHookDispatcher = {
+    const dispatcher: DeferredHookDispatcher = {
       enqueue: async () => {
         throw new Error("queue down");
       },
@@ -477,7 +477,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
         },
       ],
       handlers: { slackNotify: () => ({ ok: true }) },
-      durable: dispatcher,
+      deferred: dispatcher,
     });
     await h.createDraft.execute({
       collection: "posts",
@@ -489,8 +489,8 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
   });
 
   it("does NOT route before_* hooks through the dispatcher", async () => {
-    const enqueued: AfterHookEnvelope[] = [];
-    const dispatcher: DurableHookDispatcher = {
+    const enqueued: DeferredHookEnvelope[] = [];
+    const dispatcher: DeferredHookDispatcher = {
       enqueue: async (envelope) => {
         enqueued.push(envelope);
       },
@@ -506,7 +506,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
         },
       ],
       handlers: { captchaCheck: () => ({ ok: true }) },
-      durable: dispatcher,
+      deferred: dispatcher,
     });
     await h.createDraft.execute({
       collection: "posts",
@@ -518,7 +518,7 @@ describe("LifecycleHookingEntryRepository — durable dispatcher (after_*)", () 
   });
 });
 
-describe("ConsumeDurableHookUseCase", () => {
+describe("RunDeferredHookUseCase", () => {
   it("rebuilds ctx from snapshot and forwards to hook runner", async () => {
     let received: { hook: string; schema: string; entry: unknown; ctx: unknown } | null = null;
     const stubRunner = {
@@ -531,8 +531,8 @@ describe("ConsumeDurableHookUseCase", () => {
         };
       },
     };
-    const useCase = new ConsumeDurableHookUseCase(stubRunner);
-    const envelope: AfterHookEnvelope = {
+    const useCase = new RunDeferredHookUseCase(stubRunner);
+    const envelope: DeferredHookEnvelope = {
       hook: "after_publish",
       schema: "posts",
       entry: {
@@ -553,7 +553,7 @@ describe("ConsumeDurableHookUseCase", () => {
       },
     };
     const env = { MANTLE_INTERNAL_QUEUE: "fake" };
-    await useCase.execute(envelope, env);
+    await useCase.execute({ envelope, env });
     expect(received).toEqual({
       hook: "after_publish",
       schema: "posts",
@@ -573,8 +573,8 @@ describe("ConsumeDurableHookUseCase", () => {
         receivedCtx = req.ctx;
       },
     };
-    const useCase = new ConsumeDurableHookUseCase(stubRunner);
-    const envelope: AfterHookEnvelope = {
+    const useCase = new RunDeferredHookUseCase(stubRunner);
+    const envelope: DeferredHookEnvelope = {
       hook: "after_create",
       schema: "posts",
       entry: {
@@ -589,7 +589,7 @@ describe("ConsumeDurableHookUseCase", () => {
       },
       ctxSnapshot: null,
     };
-    await useCase.execute(envelope, {});
+    await useCase.execute({ envelope, env: {} });
     expect(receivedCtx).toEqual({ user: null, staff: null, env: {} });
   });
 });
