@@ -54,7 +54,7 @@ Adopt Better Auth as the SDK's full auth surface. It owns:
 - `admin` plugin for role machinery (replaces the `staff` table — `user.role` carries the role string)
 - **`oauthProvider` (or `mcp`) plugin for DCR-compliant authorization server** (replaces `@cloudflare/workers-oauth-provider`)
 
-`@cloudflare/workers-oauth-provider` is removed entirely. The `OAUTH_KV` binding is no longer required. The whole `mantle-cloudflare/src/oauth/` directory disappears (singleton wiring, hand-rolled GitHub OAuth, consent HTML renderer with locale list — Better Auth's consent flow replaces).
+`@cloudflare/workers-oauth-provider` is removed entirely. The `OAUTH_KV` binding is no longer required. The whole `packages/adapters/cloudflare/src/oauth/` directory disappears (singleton wiring, hand-rolled GitHub OAuth, consent HTML renderer with locale list — Better Auth's consent flow replaces).
 
 The auth runtime stops being an adapter port. `OAuthVerifier` port + `WorkersOAuthVerifier` adapter are deleted. Validating bearer tokens at `/mcp` and `/staff/mcp` becomes `auth.api.getMcpSession(req.raw)` — a direct Better Auth API call, no port indirection.
 
@@ -134,29 +134,22 @@ The token can carry `role` via `customAccessTokenClaims` for caller convenience,
 
 ### 6. Single auth surface, no port indirection
 
-Auth is no longer an adapter port. `mantle-runtime` does NOT define an auth port. The runtime accepts a Better Auth instance (or a thin abstraction) directly from the adapter at boot:
+Auth is no longer an adapter port. `mantle-runtime` does NOT define an auth port and `createCmsRuntime()` does not accept auth. Adapter packages (`mantle-cloudflare`, future `mantle-netlify`) construct the Better Auth instance with the right database adapter for their platform and keep it in the adapter-owned HTTP/MCP mount layer.
 
-```ts
-createCmsRuntime({
-  ...,
-  auth: betterAuthInstance,
-})
-```
+The adapter uses Better Auth to validate sessions, MCP bearer tokens, scopes, and roles, then passes authenticated user/staff context into runtime dispatchers. Better Auth remains platform-agnostic, but it is not a runtime dependency.
 
-Adapter packages (`mantle-cloudflare`, future `mantle-netlify`) construct the Better Auth instance with the right database adapter for their platform and pass it in. The runtime calls `auth.api.getSession()` / `auth.api.getMcpSession()` / `auth.api.getUser()` — Better Auth's surface stays the same across adapters.
-
-This is a minor amendment to ADR-0011 (adapter port spec): the auth port disappears, replaced by direct Better Auth dependency. The hard invariant ("`mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved — Better Auth's runtime surface is platform-agnostic.
+This is a minor amendment to ADR-0011 (adapter port spec): the auth ports disappear and auth becomes adapter-owned mount wiring. The hard invariant ("`mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved.
 
 ## Consequences
 
 ### What gets deleted
 
-- `mantle-cloudflare/src/oauth/` entire directory (`githubOAuth.ts`, `consentHtml.ts`, `oauthSingleton.ts`, `oauthConstants.ts`, `index.ts`)
-- `mantle-cloudflare/src/bindings/D1UserRepository.ts`
-- `mantle-cloudflare/src/bindings/D1SessionRepository.ts`
-- `mantle-cloudflare/src/bindings/D1StaffRepository.ts`
-- `mantle-cloudflare/src/bindings/WorkersOAuthVerifier.ts`
-- `mantle-cloudflare/src/bindings/StubOAuthVerifier.ts`
+- `packages/adapters/cloudflare/src/oauth/` entire directory (`githubOAuth.ts`, `consentHtml.ts`, `oauthSingleton.ts`, `oauthConstants.ts`, `index.ts`)
+- `packages/adapters/cloudflare/src/bindings/D1UserRepository.ts`
+- `packages/adapters/cloudflare/src/bindings/D1SessionRepository.ts`
+- `packages/adapters/cloudflare/src/bindings/D1StaffRepository.ts`
+- `packages/adapters/cloudflare/src/bindings/WorkersOAuthVerifier.ts`
+- `packages/adapters/cloudflare/src/bindings/StubOAuthVerifier.ts`
 - `mantle-runtime/src/domain/port/UserRepository.ts`
 - `mantle-runtime/src/domain/port/SessionRepository.ts`
 - `mantle-runtime/src/domain/port/StaffRepository.ts`
@@ -177,7 +170,7 @@ This is a minor amendment to ADR-0011 (adapter port spec): the auth port disappe
 ### What gets added
 
 - Better Auth library + Kysely + `kysely-d1` packages (or whichever D1 adapter Better Auth recommends current)
-- Better Auth instance at `mantle-cloudflare/src/auth.ts` (factory taking env / D1 binding)
+- Better Auth instance at `packages/adapters/cloudflare/src/auth/createAuth.ts` (factory taking env / D1 binding)
 - New `EmailSender` port + `ResendEmailSender` adapter impl (used by Better Auth `magicLink` / `emailOTP` plugins)
 - `databaseHooks.user.create.after` for `ensureBootstrapOwner` semantics
 - Two `/.well-known/oauth-protected-resource/*` metadata endpoints (Better Auth helpers)

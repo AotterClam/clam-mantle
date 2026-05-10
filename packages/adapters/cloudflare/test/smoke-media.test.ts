@@ -9,7 +9,7 @@ import type {
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import type { Auth } from "../src/auth/createAuth.js";
-import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
+import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,

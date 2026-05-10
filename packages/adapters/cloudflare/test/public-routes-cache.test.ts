@@ -4,7 +4,7 @@ import type { Manifest } from "@aotter/mantle-spec";
 import { TemplateRegistry } from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
-import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
+import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,

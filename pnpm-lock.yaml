@@ -8,6 +8,45 @@ importers:
 
   .: {}
 
+  packages/adapters/cloudflare:
+    dependencies:
+      '@aotter/mantle-admin-ui':
+        specifier: workspace:*
+        version: link:../../mantle-admin-ui
+      '@aotter/mantle-runtime':
+        specifier: workspace:*
+        version: link:../../mantle-runtime
+      '@aotter/mantle-spec':
+        specifier: workspace:*
+        version: link:../../mantle-spec
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
+      better-auth:
+        specifier: ^1.6.9
+        version: 1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
+      hono:
+        specifier: ^4.6.20
+        version: 4.12.16
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251101.0
+        version: 4.20260504.1
+      '@types/node':
+        specifier: ^20
+        version: 20.19.39
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
+      wrangler:
+        specifier: ^3.103.2
+        version: 3.114.17(@cloudflare/workers-types@4.20260504.1)
+
+  packages/adapters/netlify: {}
+
   packages/mantle-admin-ui:
     dependencies:
       '@radix-ui/react-collapsible':
@@ -75,45 +114,6 @@ importers:
         specifier: ^2.0.3
         version: 2.3.3(rollup@4.60.3)(vite@7.3.2(@types/node@20.19.39)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  packages/mantle-cloudflare:
-    dependencies:
-      '@aotter/mantle-admin-ui':
-        specifier: workspace:*
-        version: link:../mantle-admin-ui
-      '@aotter/mantle-runtime':
-        specifier: workspace:*
-        version: link:../mantle-runtime
-      '@aotter/mantle-spec':
-        specifier: workspace:*
-        version: link:../mantle-spec
-      aws4fetch:
-        specifier: ^1.0.20
-        version: 1.0.20
-      better-auth:
-        specifier: ^1.6.9
-        version: 1.6.9(@cloudflare/workers-types@4.20260504.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
-      hono:
-        specifier: ^4.6.20
-        version: 4.12.16
-    devDependencies:
-      '@cloudflare/workers-types':
-        specifier: ^4.20251101.0
-        version: 4.20260504.1
-      '@types/node':
-        specifier: ^20
-        version: 20.19.39
-      typescript:
-        specifier: ^5.6.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.5
-        version: 4.1.5(@types/node@20.19.39)(vite@8.0.10(@types/node@20.19.39)(esbuild@0.17.19)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
-      wrangler:
-        specifier: ^3.103.2
-        version: 3.114.17(@cloudflare/workers-types@4.20260504.1)
-
-  packages/mantle-netlify: {}
-
   packages/mantle-runtime:
     dependencies:
       '@aotter/mantle-spec':
@@ -159,7 +159,7 @@ importers:
     dependencies:
       '@aotter/mantle-cloudflare':
         specifier: workspace:*
-        version: link:../../packages/mantle-cloudflare
+        version: link:../../packages/adapters/cloudflare
       '@aotter/mantle-runtime':
         specifier: workspace:*
         version: link:../../packages/mantle-runtime
@@ -187,7 +187,7 @@ importers:
     dependencies:
       '@aotter/mantle-cloudflare':
         specifier: workspace:*
-        version: link:../../packages/mantle-cloudflare
+        version: link:../../packages/adapters/cloudflare
       '@aotter/mantle-runtime':
         specifier: workspace:*
         version: link:../../packages/mantle-runtime

@@ -2,13 +2,11 @@
 
 **Status:** Accepted for v0.1.0. New ADR. Replaces the architectural concerns previously tracked in POC ADR-0015 (`cms-astro` internal seam discipline).
 
-**Date:** 2026-05-04 (revised 2026-05-09 to absorb ADR-0014).
-
-**Update 2026-05-09:** ADR-0014 (Better Auth) replaces the four auth ports (`SessionRepository`, `OAuthVerifier`, `UserRepository`, `StaffRepository`) with a single `Auth` instance on `CmsConfig`. Required adapter ports drop from seven to three (`DatabaseDriver`, `KvCache`, `AssetServer`); auth lives in `@aotter/mantle-cloudflare/src/auth/createAuth.ts` not the runtime. The pre-revision sections below (`SessionRepository`, `OAuthVerifier`, the seven-port table, and the wiring example) are kept as historical context but no longer reflect shipped code.
+**Date:** 2026-05-04 (revised 2026-05-09 to absorb ADR-0014; revised 2026-05-10 to remove obsolete pre-ADR-0014 port text).
 
 ## Context
 
-`@aotter/mantle-runtime` is adapter-agnostic. It owns dispatcher, entry-writer, view executor, content-ops, render pipeline, auth, and MCP. It depends only on `@aotter/mantle-spec` and a small set of TypeScript interfaces it defines itself.
+`@aotter/mantle-runtime` is adapter-agnostic. It owns dispatcher, entry-writer, view executor, content-ops, render pipeline, boot validation, and MCP JSON-RPC dispatch. It depends only on `@aotter/mantle-spec` and a small set of TypeScript interfaces it defines itself.
 
 `@aotter/mantle-cloudflare` is the only adapter shipping in v0.1.0. It binds the runtime's interfaces against Cloudflare Workers' D1, KV, ASSETS, and supplies a Better Auth instance (per ADR-0014) for sign-in + MCP bearer validation.
 
@@ -23,29 +21,32 @@ The POC accumulated multiple half-decisions about this seam (POC ADR-0015 docume
 
 ## Decision
 
-**Seven ports**, defined as TypeScript interfaces in `@aotter/mantle-runtime/src/domain/port/`. Concrete adapters provide implementations and inject them at module init via a single factory call.
+**Three required adapter ports**, defined as TypeScript interfaces in `@aotter/mantle-runtime/src/domain/port/`. Concrete adapters provide implementations and inject them into `createCmsRuntime`.
 
 | Port | Surface |
 |---|---|
 | `DatabaseDriver` | All persistent state — `entries`, `site_config`, `staff`, `users`, `approvals`, plus migrations. |
 | `KvCache` | Publish-pipeline cache — pre-rendered HTML, `.md` mirrors, `llms.txt` per locale. Read-mostly, written by the publish pipeline. |
-| `SessionRepository` | Cookie-session state — staff session lookup, OAuth state, MCP session. |
 | `AssetServer` | Static-asset serving for the admin SPA. The runtime hands the adapter an asset path + `Request`; the adapter returns a `Response` with the right MIME and caching. |
-| `OAuthVerifier` | MCP OAuth provider with Dynamic Client Registration. Responsible for the `/oauth/{token,register}` and `/.well-known/oauth-*` surfaces. |
-| `UserRepository` | User identity — upsert by GitHub profile, store/read GitHub access token. |
-| `StaffRepository` | Staff roster — list all, read by user id, bootstrap first owner. |
 
 Optional feature ports may also live in `domain/port/`, but they are
 not part of the first-run adapter contract until a feature is enabled.
-For v0.1.x media hosting:
+For v0.1.x media hosting and durable lifecycle dispatch:
 
 | Optional port | Surface |
 |---|---|
 | `MediaStorage` | Object-storage-shaped media upload/commit/public URL/delete contract for **public** media. Cloudflare may implement with R2, but runtime must not import R2 types. |
+| `DeferredHookDispatcher` | Queue-shaped dispatcher for durable `after_*` lifecycle hooks. Cloudflare may implement with Workers Queues; other adapters may use a queue, job runner, or leave it unset. |
 
 These optional ports must not force first-run provisioning to create R2
 resources. Publication starters can carry external image URLs without a
 media storage implementation.
+
+Identity, session, OAuth, and role enforcement are adapter-owned per
+ADR-0014. The runtime does not define `SessionRepository`,
+`OAuthVerifier`, `UserRepository`, or `StaffRepository` ports. Adapters
+must provide an auth surface compatible with their HTTP framework and
+must pass authenticated user/staff context into runtime dispatchers.
 
 ### Public vs private media — two buckets, two ports
 
@@ -118,25 +119,11 @@ export interface KvCache {
   put(key: string, value: string, opts?: { expirationTtl?: number }): Promise<void>;
   delete(key: string): Promise<void>;
   /** List keys with a prefix — used by sitemap / llms.txt aggregation. */
-  list(prefix: string): Promise<{ keys: string[]; cursor: string | null }>;
+  list(prefix: string, cursor?: string | null): Promise<{ keys: string[]; cursor: string | null }>;
 }
 ```
 
 CF adapter: Workers KV. Future: Redis, FS, S3-compatible store.
-
-### `SessionRepository`
-
-```ts
-export interface SessionRepository {
-  read(token: string): Promise<Session | null>;
-  write(session: Session): Promise<void>;
-  invalidate(token: string): Promise<void>;
-}
-```
-
-CF adapter: D1-backed session table (same `DatabaseDriver` instance, but the runtime has its own typed surface so callers don't write SQL). Future: signed JWT (no read-back), Redis, etc.
-
-`SessionRepository` looks like a redundant abstraction over `DatabaseDriver` for the CF case — it isn't. It lets adapters use a fast / cheap session store (Redis, signed cookies) without touching the canonical DB. The CF impl happens to use D1 for v0.1.0 simplicity.
 
 ### `AssetServer`
 
@@ -152,21 +139,6 @@ export interface AssetServer {
 CF adapter: wraps `env.ASSETS.fetch(req)`. Future: filesystem read, S3+CDN, Netlify static-publish dir.
 
 The admin SPA itself lives in `@aotter/mantle-admin-ui` as a pre-built `dist/`. The adapter binds `AssetServer` to whatever serves that `dist/`; the runtime knows nothing about static asset serving except "ask the port and pass through the response."
-
-### `OAuthVerifier`
-
-```ts
-export interface OAuthVerifier {
-  /** Verify an MCP request's bearer token against the provider's state. */
-  verifyAccessToken(req: Request): Promise<OAuthIdentity | null>;
-}
-```
-
-> **Refinement (commit 4):** an earlier draft of this ADR also declared `mount(framework: AdapterFrameworkContext): void` on the port. The runtime never had a use for `AdapterFrameworkContext` — mounting `/oauth/token`, `/oauth/register`, `/.well-known/oauth-*`, and the consent UI is the adapter's HTTP-framework job (the CF adapter binds `@cloudflare/workers-oauth-provider` directly to its Hono app), and surfacing the framework type through the runtime would have leaked HTTP-shape into a port that exists for the verify boundary. Dropped. Adapters are responsible for mounting their OAuth surface; the port covers only the verify path the runtime actually invokes.
-
-CF adapter: `@cloudflare/workers-oauth-provider` (DCR-compliant, KV-backed). Future: standalone oauth2 lib, Hydra, Auth0, etc.
-
-This is the most adapter-shaped port — different runtimes have different OAuth conventions, and the spec deliberately doesn't try to unify the wire-level semantics (DCR + JSON-RPC + transparency log all emerge from the CF OAuth provider's specifics; v0.2's Netlify port may reasonably look different in flow, just compatible at the verify-bearer-token boundary).
 
 ## How adapters wire ports
 
@@ -208,12 +180,10 @@ export default {
 ```
 
 The runtime gets three required adapter ports (`db`, `kv`, `assets`)
-plus the Better Auth instance, alongside manifests, handlers,
-templates, and site defaults. There's no module-global state holding
-adapter-specific bindings (POC's `db-init.ts > stashedSiteDefaults`
-was the closest thing to that and survived only because the stash was
-framework-agnostic; with explicit
-ports there's no temptation to add module globals).
+alongside manifests, handlers, templates, and site defaults. Auth is
+owned by the adapter layer that mounts HTTP/MCP surfaces; the runtime
+receives authenticated context when the adapter dispatches requests.
+There's no module-global state holding adapter-specific bindings.
 
 ## Consequences
 
@@ -223,7 +193,7 @@ ports there's no temptation to add module globals).
 - Removing a port is also possible (if a port is found to overlap or be unnecessary), again by amending this ADR.
 
 **Discoverability for adapter authors**:
-- A future Bun/Deno/Vercel/Netlify port author reads this ADR + reads the 7 port interface files in `mantle-runtime/src/domain/port/` + writes 7 port impl files. That's the contract. No hidden state, no implicit assumptions about the HTTP framework.
+- A future Bun/Deno/Vercel/Netlify port author reads this ADR + [`docs/adapter-guide.md`](../adapter-guide.md), implements the three required ports, then wires boot and HTTP/MCP surfaces. That's the contract. No hidden state, no implicit assumptions about the HTTP framework.
 
 **Test ergonomics**:
 - Each port is small and isolated. Tests can mock individual ports without spinning up D1 / KV / OAuth provider.
@@ -234,7 +204,7 @@ ports there's no temptation to add module globals).
 
 ## Alternatives considered
 
-**(a) Single mega-port** — One `RuntimePorts` interface containing every method (db.prepare, kv.get, session.read, assets.fetch, oauth.verify, …). **Rejected**: leaks the entire surface onto every adapter. Adapter authors who only want to swap KV would have to touch the mega-port impl. Discrete ports keep change blast radius per port.
+**(a) Single mega-port** — One `RuntimePorts` interface containing every method (db.prepare, kv.get, assets.fetch, media.createUpload, …). **Rejected**: leaks the entire surface onto every adapter. Adapter authors who only want to swap KV would have to touch the mega-port impl. Discrete ports keep change blast radius per port.
 
 **(b) Concrete CF types in runtime** — Just `import type { D1Database } from "@cloudflare/workers-types"` directly into `mantle-runtime`. Treat "CF-only" as a v0.1.0 reality, defer the abstraction. **Rejected**: this is what the POC did (via `cms-server` having implicit assumptions about D1 shape) and it's the trap the rebuild exists to escape. Once concrete CF types land in runtime, removing them is a multi-PR uplift later. Cheaper to do it right at v0.1.0.
 
@@ -255,9 +225,11 @@ When you're authoring `@aotter/mantle-runtime` code:
 When you're authoring an adapter (`@aotter/mantle-cloudflare` for v0.1.0; future `mantle-netlify`, `mantle-bun`, …):
 
 1. Read `mantle-runtime/src/domain/port/`. Implement each required port against your runtime's primitives.
-2. Compose the runtime via `createCmsRuntime({ db, kv, sessions, assets, oauth, users, staff, manifests, ... })`.
-3. Bind to your HTTP framework — Hono on CF, Netlify Functions handler, raw `fetch` Worker, …
-4. Bundle `@aotter/mantle-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetServer` to it.
+2. Compose the runtime via `createCmsRuntime({ db, kv, assets, manifests, handlers, templates, siteDefaults, ... })`.
+3. Call `runtime.bootInit()` once before serving CMS traffic.
+4. Bind to your HTTP framework — Hono on CF, Netlify Functions handler, raw `fetch` Worker, …
+5. Provide adapter-owned auth and map sessions/scopes/roles into runtime handler context.
+6. Bundle `@aotter/mantle-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetServer` to it.
 
 When you're reviewing a PR:
 
@@ -268,7 +240,7 @@ When you're reviewing a PR:
 ## Implementation status
 
 - [x] Required port interface files live in `packages/mantle-runtime/src/domain/port/*.ts`.
-- [x] Cloudflare required port implementations live in `packages/mantle-cloudflare/src/bindings/*.ts`.
+- [x] Cloudflare required port implementations live in `packages/adapters/cloudflare/src/bindings/*.ts`.
 - [x] Optional feature port `MediaStorage` (public bucket) is declared but not required by first-run adapters. `PrivateMediaStorage` is v0.2.
 - [x] Netlify stub README references this ADR.
 - [ ] CI lint: forbid `@cloudflare/*` / `D1Database` / `KVNamespace` imports in `mantle-runtime/` (post-v0.1.0; manual review until then)
