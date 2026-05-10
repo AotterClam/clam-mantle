@@ -22,6 +22,8 @@ Labels keep issues and PRs sortable for humans and cold-start AI agents. Apply t
 
 Use at least one `area:*` label when the affected surface is known.
 
+For package README or package-local docs changes, prefer the package area label (`area:spec`, `area:runtime`, `area:cf`, or `area:admin-ui`). Use `area:docs` for repo-wide docs, governance, ADRs, release docs, root README content, and cross-cutting documentation work.
+
 | Label | Meaning |
 |---|---|
 | `area:runtime` | `packages/clam-cms-runtime` behavior, ports, use cases, dispatcher, render, MCP runtime. |
@@ -30,7 +32,7 @@ Use at least one `area:*` label when the affected surface is known.
 | `area:starters` | `starters/*` consumer templates and starter validation. |
 | `area:skills` | `skills/*` agent briefs and install/extend/provision workflows. |
 | `area:admin-ui` | `packages/clam-cms-admin-ui` React admin SPA. |
-| `area:docs` | Human docs, governance docs, ADR text, release docs, README content. |
+| `area:docs` | Repo-wide human docs, governance docs, ADR text, release docs, root README content, and cross-cutting documentation work. |
 | `area:adapter` | Adapter boundary work spanning Cloudflare, Netlify stub, or future adapters. |
 
 ## Release and review gates
