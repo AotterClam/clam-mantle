@@ -18,9 +18,9 @@ mantle_request:
 
 Things you should still confirm with me before writing files:
 
-- The brand voice and home / about / contact / first-post copy. Draft a compact preview first (one line of brand intro per page); I'll react and you can adjust.
-- Cover image for the welcome post — pick a neutral image that fits the mood, or ask me for a URL.
+- The brand voice / visual mood only, if it is not obvious from the fields above.
+- Do not create fixture data, `initial-seed.json`, or a welcome post during install.
 
-Do **not** create Cloudflare resources during install — that's the [provision Skill](https://raw.githubusercontent.com/aotter/mantle/{template_ref}/skills/provision/SKILL.md)'s job and runs as a separate step after I review the install. After provision finishes, you'll hand me back a public URL plus Staff/User MCP URLs. From then on, content operations happen through the Staff MCP URL, not through this chat.
+Do **not** create Cloudflare resources during install — that's the [provision Skill](https://raw.githubusercontent.com/aotter/mantle/{template_ref}/skills/provision/SKILL.md)'s job and runs as a separate step after I review the install. After provision finishes, you'll hand me back a public URL plus Staff/User MCP URLs. Then ask whether I want help creating the first pages/posts; if I approve, create them through Staff MCP/admin authoring, not by direct seed.
 
 When you're done with install, summarize what changed in the project and give me one curl command to verify the local dev server boots.

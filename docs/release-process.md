@@ -105,8 +105,9 @@ For `0.0.x-alpha`, publish SDK packages only:
 
 Do **not** publish starter packages during alpha unless a separate PR
 explicitly prepares their package allowlists and verifies the tarballs.
-Current starter install flow copies starter files from GitHub/template
-refs; npm is the runtime dependency source.
+Current starter install flow downloads starter source tarballs from
+GitHub/template refs, extracts them without preserving the template
+repo remote, and uses npm as the runtime dependency source.
 
 Do **not** publish `@aotter/mantle-netlify` while it is a stub.
 
