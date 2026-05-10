@@ -27,7 +27,11 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
     publicPathResolver: config.publicPathResolver,
     mediaAllowSvg: config.mediaAllowSvg,
     mediaMaxBytes: config.mediaMaxBytes,
-    ...config.bindings,
+    db: config.bindings.db,
+    kv: config.bindings.kv,
+    assets: config.bindings.assets,
+    mediaStorage: config.bindings.mediaStorage,
+    durableHookDispatcher: config.bindings.durableHookDispatcher,
   });
 
   let booted: Promise<CmsRuntime> | null = null;
