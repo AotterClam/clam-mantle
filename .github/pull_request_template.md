@@ -19,6 +19,7 @@
 - [ ] `pnpm build`
 - [ ] `pnpm typecheck`
 - [ ] `pnpm test`
+- [ ] Not run / not applicable:
 - [ ] Other:
 
 ## Follow-ups
