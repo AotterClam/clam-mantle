@@ -44,7 +44,18 @@ export function createQueueHandler<Env>(
   cmsRef: { get(): Promise<CmsRuntime> },
 ): (batch: MessageBatch<AfterHookEnvelope>, env: Env) => Promise<void> {
   return async (batch, env) => {
-    const cms = await cmsRef.get();
+    let cms: CmsRuntime;
+    try {
+      cms = await cmsRef.get();
+    } catch (err) {
+      // Boot failed (D1 unreachable, manifest invalid, …). Use
+      // batch.retryAll so each message's per-message attempt counter
+      // increments — letting wrangler's max_retries / DLQ rules
+      // engage instead of looping forever at the batch level.
+      console.error("[clam-internal] runtime boot failed; retrying batch", err);
+      batch.retryAll();
+      return;
+    }
     // Drain in parallel — after-hooks are independent and CF Queues
     // ack/retry is per-message, so serial processing only burns the
     // 30s consumer wall clock on larger batches.

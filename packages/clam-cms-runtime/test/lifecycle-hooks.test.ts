@@ -49,7 +49,7 @@ function harness(opts: {
   procedures: readonly ProcedureManifest[];
   triggers: readonly Parameters<typeof makeLifecycleTrigger>[0][];
   handlers: Record<string, (input: unknown, ctx: unknown) => unknown>;
-  durable?: DurableHookDispatcher | null;
+  durable?: DurableHookDispatcher;
 }): Harness {
   const store = new InMemoryEntryRepository();
   const schemas = new Map([[postsSchema().metadata.name, postsSchema()]]);
@@ -70,7 +70,7 @@ function harness(opts: {
     store,
     triggerIndex,
     hookRunner,
-    opts.durable ?? null,
+    opts.durable,
   );
   return {
     store,
