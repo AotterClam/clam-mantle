@@ -55,9 +55,11 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 Six-family taxonomy (#58). v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
 
+End-user starters are cloneable GitHub template repos. `starters/blank` remains in this monorepo until its standalone split is needed.
+
 | Starter | Family | Status | What |
 |---|---|---|---|
-| `starters/publication/` | publication | v0.1.0 (available) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | publication | v0.1.0 (available) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
 | `starters/blank/` | — | v0.1.0 (available) | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
 | `starters/leads-inbox/` | leads-inbox | v0.1.0 (planned) | Multi-form intake + lead status (new / qualified / contacted / won / lost) + assignment + agent-operated follow-up. May ship initially as a documented variant of `publication` before a dedicated directory lands. |
 | `starters/micro-shop/` | micro-shop | v0.1.0 (planned) | Small catalog + order intake on pure D1 (~100 orders/day). Stripe Checkout, cookie cart, agent-operated order handling. |

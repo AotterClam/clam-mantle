@@ -19,8 +19,8 @@ const rootPackage = JSON.parse(
  * of JS chunks). Acceptable for a 1–2 operator admin tool; revisit
  * if the SPA grows past ~1 MB.
  *
- * Dev workflow (one port, 8787):
- *   Terminal 1:  cd starters/publication && pnpm dev
+ * Dev workflow (one port, 8787, from a cloned publication starter):
+ *   Terminal 1:  pnpm dev
  *   Terminal 2:  pnpm -F @aotter/mantle-admin-ui watch
  *
  * `watch` runs `vite build --watch` so every source edit auto-rebuilds

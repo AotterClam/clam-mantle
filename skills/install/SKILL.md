@@ -163,7 +163,7 @@ Six top-level families define the product taxonomy (#58). Pick the closest fit a
 
 | Family | Status | What it carries | Not for |
 |---|---|---|---|
-| `publication` | **available** (`starters/publication`) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form, simple public widgets / calculators. | Inventory / order workflows; lead-management pipelines; member-created content; private/paid creator content. |
+| `publication` | **available** (`aotter/mantle-starters`) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form, simple public widgets / calculators. | Inventory / order workflows; lead-management pipelines; member-created content; private/paid creator content. |
 | `blank` | **available** (`starters/blank`) | Headless API + MCP only. No public HTML, no theme stack. | Anything user-facing without consumer providing their own frontend. |
 | `leads-inbox` | planned | Multi-form intake, lead status (new / qualified / contacted / won / lost), assignment, follow-up, source attribution, agent-operated triage. | Owner-published content (basic contact form belongs in `publication`); community-shaped content. |
 | `micro-shop` | planned | Products, variants, prices, catalog views, cart / order intent, fulfillment notes, agent-operated order handling, optional payment integration later. | Content-only websites; CRM intake; member content. |
@@ -230,7 +230,15 @@ Normalize:
 
 ### 2. Fetch the pinned starter template
 
-Use the public GitHub repo only as a starter template source. Do not build this repo inside the consumer project.
+Use public GitHub repos only as starter template sources. Do not build the `mantle` SDK monorepo inside the consumer project.
+
+For `publication`, clone the standalone starter repo directly:
+
+```bash
+git clone --depth 1 --branch <template_ref> https://github.com/aotter/mantle-starters.git .
+```
+
+For `blank`, use the monorepo development mirror until its standalone starter repo exists:
 
 ```bash
 git clone --depth 1 --branch <template_ref> https://github.com/aotter/mantle.git .mantle-template
@@ -240,7 +248,9 @@ If `git` is unavailable, ask the user to install Git or download the tagged sour
 
 ### 3. Copy the starter into the consumer root
 
-Run from the empty target directory:
+For `publication`, skip this step; the starter repo was cloned directly into the consumer root.
+
+For `blank`, run from the empty target directory:
 
 ```bash
 cp -R .mantle-template/starters/<starter>/. .
@@ -267,7 +277,7 @@ The script:
 
 - Updates `wrangler.toml` worker name and D1 database name.
 - Updates `src/mantleConfig.ts` site defaults.
-- Rewrites copied starter dependencies from `workspace:*` to `@aotter/*@<mantle_version>`.
+- Rewrites copied starter dependencies to `@aotter/*@<mantle_version>`.
 - Keeps `tsconfig.json` standalone by extending `./tsconfig.base.json`.
 
 Keep `ADMIN_GITHUB_LOGIN` out of source code. It is a Worker secret set by the `provision` Skill using `github_username`.
@@ -338,7 +348,7 @@ pnpm run seed:initial -- --seed-file initial-seed.json --dry-run
 
 This writes `.mantle-seed.sql` and `.mantle-seed.kv.json` as generated artifacts. They are ignored by git. Do not apply this seed to production during install; provision will run it against remote D1/KV.
 
-For `starters/publication`, fixture data is optional. Use it only if the user wants a local demo site before deployment:
+For `publication`, fixture data is optional. Use it only if the user wants a local demo site before deployment:
 
 ```bash
 pnpm fixture
@@ -386,9 +396,9 @@ Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secr
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `git clone` cannot access `github.com/aotter/mantle` | Network or Git installation issue | Confirm Git is installed and the repo is public: `https://github.com/aotter/mantle`. |
+| `git clone` cannot access the starter repo | Network or Git installation issue | Confirm Git is installed and the repo is public. For publication, use `https://github.com/aotter/mantle-starters`. |
 | `pnpm run setup:site` is missing | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag. |
-| `pnpm install` cannot resolve `workspace:*` | `setup:site` was skipped before install | Run `pnpm run setup:site -- ... --mantle-version "<version>"`, then `pnpm install` again. |
+| `pnpm install` cannot resolve `workspace:*` | The consumer project was copied from the monorepo mirror and `setup:site` was skipped before install | Run `pnpm run setup:site -- ... --mantle-version "<version>"`, then `pnpm install` again. Publication installs from the standalone starter repo should not hit this. |
 | `tsc` tries to read `../../tsconfig.base.json` | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag, or set `extends` to `./tsconfig.base.json`. |
 | `Cannot find module @aotter/mantle-*` | npm install did not complete or version is unpublished | Verify `mantle_version`, run `pnpm install`, and check `npm view @aotter/mantle-cloudflare@<version>`. |
 | `pnpm validate` exits with `MANIFEST_ROOT_NOT_FOUND` | Not running from consumer root | `cd` to the directory containing `manifests/`. |

@@ -36,7 +36,7 @@ This is the lens for every architectural decision in this codebase.
 | `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| `starters/publication/` | Reference `publication` starter — Hono + theme stack (`theme.default/` + `theme/`) + i18n + contact form + sitemap + SEO/AEO. Owner-published content (articles / pages / docs-lite / basic contact). One of six starter families per #58. |
+| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | End-user `publication` starter template repo. Clone this for provisioning. Publication starter code lives outside this SDK monorepo. |
 | `starters/blank/` | Headless API + MCP starter. No UI, no theme stack — drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
 | `starters/_archive/` | Frozen snapshots of retired starters. Excluded from workspace via `pnpm-workspace.yaml` negation; not maintained. |
 

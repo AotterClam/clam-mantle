@@ -282,7 +282,7 @@ For `blank`:
 - List it through MCP.
 - Confirm the relevant View/API behavior.
 
-Only run the `blank` production proof after its `src/mantleConfig.ts` uses the same Better Auth factory, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and dual MCP mounts as `starters/publication`.
+Only run the `blank` production proof after its `src/mantleConfig.ts` uses the same Better Auth factory, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and dual MCP mounts as the publication starter repo.
 
 This second-agent proof is the release gate. Do not call the install production-ready until this works.
 
