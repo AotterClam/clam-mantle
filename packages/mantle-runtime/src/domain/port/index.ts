@@ -3,10 +3,11 @@
  * Concrete implementations live in `infrastructure/` (or in adapter
  * packages like `@aotter/mantle-cloudflare`).
  *
- * The five ADR-0011 ports — `DatabaseDriver`, `KvCache`,
- * `SessionRepository`, `AssetServer`, `OAuthVerifier` — plus
- * dispatcher-internal ports `Clock`, `IdGenerator`, `HandlerRegistry`,
- * and the chokepoint `EntryRepository`.
+ * Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer`.
+ * Optional feature ports — `MediaStorage` (public-bucket media
+ * uploads). Dispatcher-internal seams — `Clock`, `IdGenerator`,
+ * `HandlerRegistry`, `EntryRepository`. Identity / session / OAuth
+ * live outside the runtime via Better Auth (ADR-0014).
  *
  * Per the Aotter clean-architecture convention, no `*Port` suffix;
  * ports are discoverable by the package alone.
@@ -20,9 +21,7 @@ export type {
   Migration,
 } from "./DatabaseDriver.js";
 export type { KvCache, KvPutOptions, KvListResult } from "./KvCache.js";
-export type { SessionRepository, Session } from "./SessionRepository.js";
 export type { AssetServer } from "./AssetServer.js";
-export type { OAuthVerifier, OAuthIdentity } from "./OAuthVerifier.js";
 export type {
   EntryRepository,
   CreateEntryArgs,
@@ -35,22 +34,28 @@ export type {
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";
 export type {
-  UserRepository,
-  GithubToken,
-} from "./UserRepository.js";
-export type {
-  StaffRepository,
-  StaffListEntry,
-  BootstrapOwnerOpts,
-} from "./StaffRepository.js";
-export type {
   PublishOrchestrator,
   PublishEntryRequest,
 } from "./PublishOrchestrator.js";
 export type {
+  MediaStorage,
+  CreateUploadArgs,
+  CreateUploadResult,
+  CommitUploadArgs,
+  GetPublicUrlArgs,
+  DeleteAssetArgs,
+  MediaAsset,
+} from "./MediaStorage.js";
+export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,
 } from "./LifecycleHookRunner.js";
+export type {
+  DeferredHookDispatcher,
+  DeferredHookEnvelope,
+  CtxSnapshot,
+} from "./DeferredHookDispatcher.js";
+export { ctxSnapshotFrom } from "./DeferredHookDispatcher.js";
 export { type Clock, SystemClock } from "./Clock.js";
 export { type IdGenerator, RandomUuidGenerator } from "./IdGenerator.js";
 export {

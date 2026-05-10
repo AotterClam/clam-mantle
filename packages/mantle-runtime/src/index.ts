@@ -6,10 +6,10 @@
  *
  *   domain ← usecase ← infrastructure ← runtime.ts (assembly root)
  *
- * Adapters (e.g. `@aotter/mantle-cloudflare`) implement the 5
- * port interfaces in `domain/port/` (DatabaseDriver / KvCache /
- * SessionRepository / AssetServer / OAuthVerifier) and call
- * `createCmsRuntime` to compose everything.
+ * Adapters (e.g. `@aotter/mantle-cloudflare`) implement the
+ * required port interfaces in `domain/port/` and call `createCmsRuntime`
+ * to compose everything. Optional feature ports (for example media
+ * hosting) stay adapter-agnostic and are only wired when enabled.
  *
  * MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-
  * specific type. The Netlify stub package exists as a public reminder.
@@ -34,20 +34,27 @@ export type {
   Migration,
 } from "./domain/port/DatabaseDriver.js";
 export type { KvCache, KvPutOptions, KvListResult } from "./domain/port/KvCache.js";
-export type { SessionRepository, Session } from "./domain/port/SessionRepository.js";
 export type { AssetServer } from "./domain/port/AssetServer.js";
-export type { OAuthVerifier, OAuthIdentity } from "./domain/port/OAuthVerifier.js";
-export type { UserRepository, GithubToken } from "./domain/port/UserRepository.js";
 export type {
-  StaffRepository,
-  StaffListEntry,
-  BootstrapOwnerOpts,
-} from "./domain/port/StaffRepository.js";
+  MediaStorage,
+  CreateUploadArgs,
+  CreateUploadResult,
+  CommitUploadArgs,
+  GetPublicUrlArgs,
+  DeleteAssetArgs,
+  MediaAsset,
+} from "./domain/port/MediaStorage.js";
+export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
+export type {
+  DeferredHookDispatcher,
+  DeferredHookEnvelope,
+  CtxSnapshot,
+} from "./domain/port/DeferredHookDispatcher.js";
 
-// Identity-layer model types consumed by adapters implementing the auth ports.
-export type { User } from "./domain/model/User.js";
-export type { GithubProfile } from "./domain/model/GithubProfile.js";
-export type { Staff, StaffMembership } from "./domain/model/Staff.js";
+// ID source — adapters wire this into binding-side helpers that need
+// random IDs. Default `RandomUuidGenerator` (`crypto.randomUUID()`)
+// can be swapped in tests with a deterministic counter.
+export { type IdGenerator, RandomUuidGenerator } from "./domain/port/IdGenerator.js";
 
 // Consumer/starter handler and render contracts.
 export type {
@@ -107,13 +114,9 @@ export {
   type McpUseCases,
 } from "./infrastructure/mcp/McpJsonRpcDispatcher.js";
 
-// Starter fixture support. Kept explicit so persistence/http/auth
+// Starter fixture support. Kept explicit so persistence/http
 // infrastructure do not become root public API by accident.
 export { CANONICAL_MIGRATIONS } from "./infrastructure/boot/canonicalMigrations.js";
-
-// Cookie session helpers — adapters use these to stay consistent with
-// the session name used by the runtime's session-assembly infrastructure.
-export { DEFAULT_SESSION_COOKIE, readCookie } from "./infrastructure/auth/CookieReader.js";
 
 // Procedure handler failure carrier used by platform helper handlers
 // such as Cloudflare Turnstile.

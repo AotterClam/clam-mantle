@@ -12,3 +12,4 @@ export * from "./view/index.js";
 export * from "./boot/index.js";
 export * from "./lifecycle/index.js";
 export * from "./render/index.js";
+export * from "./media/index.js";

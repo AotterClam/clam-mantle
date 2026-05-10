@@ -9,12 +9,12 @@ import { ComposeEntrySeoMetaUseCase } from "../src/usecase/render/ComposeEntrySe
 import { InMemoryDatabase } from "./fakes/database.js";
 
 const site: SiteConfig = {
-  title: "Mantle Blog",
+  title: "Mantle Publication",
   description: "Reference starter",
   origin: "https://example.com",
   locales: ["en", "zh-TW"],
   canonicalLocale: "en",
-  brand: "Mantle Blog",
+  brand: "Mantle Publication",
 };
 
 function makeEntry(overrides: Partial<Entry> = {}): Entry {

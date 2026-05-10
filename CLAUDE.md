@@ -32,12 +32,13 @@ This is the lens for every architectural decision in this codebase.
 | `docs/getting-started.md` | Human Quickstart. (Stubbed during v0.1.0 dev.) |
 | `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / extend / provision flows. Discoverable by URL — no Claude plugin install required. |
 | `packages/mantle-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
-| `packages/mantle-runtime/` | Runtime engine. Defines the 5 adapter ports. Adapter-agnostic — see "MUST NOT" rule below. |
+| `packages/mantle-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
 | `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
-| `packages/mantle-cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Workers OAuth. |
+| `packages/mantle-cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/mantle-netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| `starters/blog/` | Reference rendered-blog starter — Hono + theme stack (`theme.default/` + `theme/`) + i18n + contact form + sitemap + SEO/AEO. Use for "I want a website out of the box". |
+| `starters/publication/` | Reference `publication` starter — Hono + theme stack (`theme.default/` + `theme/`) + i18n + contact form + sitemap + SEO/AEO. Owner-published content (articles / pages / docs-lite / basic contact). One of six starter families per #58. |
 | `starters/blank/` | Headless API + MCP starter. No UI, no theme stack — drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
+| `starters/_archive/` | Frozen snapshots of retired starters. Excluded from workspace via `pnpm-workspace.yaml` negation; not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
@@ -82,7 +83,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 - One barrel `index.ts` per folder.
 - Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
-- The 5 ADR-0011 ports — `DatabaseDriver`, `KvCache`, `SessionRepository`, `AssetServer`, `OAuthVerifier` — live in `mantle-runtime/src/domain/port/`. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`mantle-cloudflare`, future `mantle-netlify`).
+- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `mantle-runtime/src/domain/port/`. Auth is supplied by adapters via the Better Auth `Auth` instance on `CmsConfig` (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `RemoteMediaFetcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`mantle-cloudflare`, future `mantle-netlify`).
 
 ### Spec/runtime type boundary (separate from layer rules)
 
@@ -90,7 +91,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
   (manifests, `Entry`, `Revision`, `Approval`, `SiteConfig`, closed enums incl.
   `StaffRole`, `Diagnostic`).
 - Runtime owns: rows / runtime facts only the dispatcher fills
-  (`EntryRow`, `User`, `Staff`, `StaffMembership`, `HandlerContext`, `HandlerFn`).
+  (`EntryRow`, `HandlerContext`, `HandlerFn`).
 - Test: does any spec function reference this type? If yes → spec. If only
   runtime ports / use cases / dispatcher do → runtime.
 
@@ -114,7 +115,7 @@ Each package has its own `build` / `typecheck` / `test` script that the workspac
 
 Several v0.1.x features ship as **interface defined, impl stubbed** in v0.1.0:
 
-- R2 media uploads — port interface in runtime; CF impl returns NotImplemented
+- R2 media uploads — optional port interface in runtime; no first-run provisioning or required CF binding
 - Sitemap auto-emit — starter ships a hand-rolled `<SitemapStub />`
 - Editorial lifecycle — schema accepts `lifecycle: editorial` but boot validator rejects with a clear "v0.1.x" message; starters use `simple` only
 - Image variants / OG card generation — not present; lands after R2 impl

@@ -4,9 +4,8 @@ import { BootValidationError } from "../src/usecase/boot/index.js";
 import { DatabaseSiteConfigRepository } from "../src/infrastructure/persistence/DatabaseSiteConfigRepository.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { InMemoryKv } from "./fakes/kv.js";
-import { InMemorySessions } from "./fakes/session.js";
 import { makeProcedure } from "./fakes/manifests.js";
-import type { AssetServer, OAuthVerifier } from "../src/domain/port/index.js";
+import type { AssetServer } from "../src/domain/port/index.js";
 
 const noopAssets: AssetServer = {
   async fetch() {
@@ -14,21 +13,13 @@ const noopAssets: AssetServer = {
   },
 };
 
-const noopOAuth: OAuthVerifier = {
-  async verifyAccessToken() {
-    return null;
-  },
-};
-
 describe("createCmsRuntime + bootInit", () => {
-  it("constructs with empty manifests + 5 ports", async () => {
+  it("constructs with empty manifests + required ports", async () => {
     const runtime = createCmsRuntime({
       manifests: [],
       db: new InMemoryDatabase(),
       kv: new InMemoryKv(),
-      sessions: new InMemorySessions(),
       assets: noopAssets,
-      oauth: noopOAuth,
     });
     expect(runtime.schemasByName.size).toBe(0);
     expect(runtime.proceduresByName.size).toBe(0);
@@ -42,9 +33,7 @@ describe("createCmsRuntime + bootInit", () => {
       handlers: { echoHandler: () => ({ ok: true }) },
       db,
       kv: new InMemoryKv(),
-      sessions: new InMemorySessions(),
       assets: noopAssets,
-      oauth: noopOAuth,
       siteDefaults: {
         brand: "Blog",
         title: "Blog Site",
@@ -66,9 +55,7 @@ describe("createCmsRuntime + bootInit", () => {
       manifests: [makeProcedure({ handlerRef: "missing" })],
       db: new InMemoryDatabase(),
       kv: new InMemoryKv(),
-      sessions: new InMemorySessions(),
       assets: noopAssets,
-      oauth: noopOAuth,
     });
     await expect(runtime.bootInit()).rejects.toBeInstanceOf(BootValidationError);
   });
@@ -79,9 +66,7 @@ describe("createCmsRuntime + bootInit", () => {
       manifests: [],
       db,
       kv: new InMemoryKv(),
-      sessions: new InMemorySessions(),
       assets: noopAssets,
-      oauth: noopOAuth,
       siteDefaults: { brand: "First" },
     });
     await runtime.bootInit();
@@ -92,9 +77,7 @@ describe("createCmsRuntime + bootInit", () => {
       manifests: [],
       db,
       kv: new InMemoryKv(),
-      sessions: new InMemorySessions(),
       assets: noopAssets,
-      oauth: noopOAuth,
       siteDefaults: { brand: "Second" },
     });
     await runtime2.bootInit();

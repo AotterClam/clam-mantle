@@ -1,6 +1,6 @@
 ---
 name: mantle install
-description: Bootstrap a new mantle consumer project from a website-generated starting prompt. Use when the user pasted a mantle prompt that names a starter, GitHub username, locales, and a pinned mantle Skill URL, or when the user starts from an empty repo and asks for a blog / headless CMS / MCP-native Cloudflare site.
+description: Bootstrap a new mantle consumer project from a website-generated starting prompt. Use when the user pasted a mantle prompt that names a starter, GitHub username, locales, and a pinned mantle Skill URL, or when the user starts from an empty repo and asks for a publication site / headless CMS / MCP-native Cloudflare site.
 when_to_invoke: |
   The user is starting from scratch. Strong indicators: empty repo, pasted "Mantle CMS install request", no manifests/ directory, no @aotter/* deps in package.json.
 applies_to: mantle@v0.1.0
@@ -20,14 +20,16 @@ End state for this Skill:
 
 ## Website Handoff Contract
 
-The official-site prompt should include these fields. Parse them before asking the user anything:
+Localized prompt drafts the official site uses (and direct users can paste into any agent) live under [`docs/prompts/`](../../docs/prompts/) — currently `publication.en.md` and `publication.zh-TW.md`. Each prompt embeds the structured `mantle_request:` block below, with `{name}` placeholders the official site interpolates from the user's session before rendering.
+
+The prompt should include these fields. Parse them before asking the user anything:
 
 ```yaml
 mantle_request:
-  mantle_version: "0.0.6-alpha"
+  mantle_version: "0.0.7-alpha"
   template_ref: "main"
   skill_url: "https://raw.githubusercontent.com/aotter/mantle/<ref>/skills/install/SKILL.md"
-  starter: "blog" # blog | blank
+  starter: "publication" # publication | blank (others are roadmap; see Starter Families)
   github_username: "<verified-by-website>"
   locales: ["en", "zh-TW"]
   project_name: "<worker-safe-name>"
@@ -94,7 +96,7 @@ Generate considered neutral content that fits project name + locales + any signa
 
 Before writing `initial-seed.json`, you must have resolved:
 
-- `brand` — site name (not onboarding copy like "my first AI blog")
+- `brand` — site name (not onboarding copy like "my first AI site")
 - `tagline` — footer/metadata one-liner
 - `mood` — one of `warm`, `editorial`, `playful`, `technical`, `minimal`; infer from conversation, use closest English equivalent if user described in another language
 - home / about / contact / welcome post copy — agent-drafted, user-approved (or user-modified)
@@ -150,25 +152,43 @@ The older `mantle-poc` starter Skill is still the operational reference. Keep th
 - Prefer Cloudflare signup/login through GitHub for non-technical users; it reduces account mismatch.
 - For Cloudflare provisioning, prefer a short-lived/scoped dashboard API token for non-technical users. `wrangler login` is only for users comfortable with terminal browser auth.
 - If using a Cloudflare API token, never echo it; read with `read -rsp`, keep it temporary, and remind the user to revoke it.
-- Do not touch R2, Zero Trust, or paid Cloudflare features in the default v0.1.0 path.
+- Do not touch R2, Zero Trust, billing-profile setup, or paid Cloudflare features in the default v0.1.0 path. Cover images use external URLs during first-run provisioning; first-party media hosting is a later explicit opt-in.
 - Treat GitHub OAuth App setup as a browser-assisted user step, not something the agent can fully automate.
 - The OAuth callback URL must be exact: `<worker_url>/admin/auth/github/callback`.
-- The final handoff must include both public URL and MCP URL.
+- The final handoff must include the public URL plus Staff/User MCP URLs.
 
-## Starter Choices
+## Starter Families
 
-| Website option | Starter | What ships |
-|---|---|---|
-| Blog / marketing / docs landing | `starters/blog` | Public HTML, theme stack, i18n, contact form, sitemap, `.md` mirrors, llms.txt, SEO/AEO meta, `/api/views/*`, `/mcp`. |
-| Headless backend / bring-your-own frontend | `starters/blank` | API + MCP only. No public HTML routes. Local/headless authoring reference until its production OAuth wiring matches `blog`. |
+Six top-level families define the product taxonomy (#58). Pick the closest fit and fill small gaps inside the chosen starter — do **not** invent a new starter just because one project needs one extra schema or one extra public widget. Starter sprawl makes the agent experience worse.
 
-`blog` is a fixed-manifest starter. In its bootstrap flow, do not ask the user to redesign Schemas, Views, Procedures, or Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing blog model.
+| Family | Status | What it carries | Not for |
+|---|---|---|---|
+| `publication` | **available** (`starters/publication`) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form, simple public widgets / calculators. | Inventory / order workflows; lead-management pipelines; member-created content; private/paid creator content. |
+| `blank` | **available** (`starters/blank`) | Headless API + MCP only. No public HTML, no theme stack. | Anything user-facing without consumer providing their own frontend. |
+| `leads-inbox` | planned | Multi-form intake, lead status (new / qualified / contacted / won / lost), assignment, follow-up, source attribution, agent-operated triage. | Owner-published content (basic contact form belongs in `publication`); community-shaped content. |
+| `micro-shop` | planned | Products, variants, prices, catalog views, cart / order intent, fulfillment notes, agent-operated order handling, optional payment integration later. | Content-only websites; CRM intake; member content. |
+| `booking` | v0.2+ | Services / appointment types, availability windows, booking requests, reminders, cancellation/reschedule, staff/resource assignment. | — |
+| `community` | v0.2+ | Member posts, comments, likes, reactions, moderation queue, public profiles/handles, agent-assisted moderation. Requires end-user auth (v0.2). | — |
+| `fan-club` | v0.2+ | Public + private posts, member/follower tiers, creator updates, paid/free access boundaries. Requires end-user auth + row-level visibility grammar + Stripe entitlement. | — |
 
-If the user wants to design their own workflow at bootstrap time — for example a booking flow, micro-shop catalog/order pipeline, lead inbox, community posts/comments, or internal approval process — use `blank` or a dedicated future starter. That path should interview for the 4 atoms, generate manifests, validate them, and create a starter-specific seed. Do not silently mutate the blog starter into a custom app during first install.
+### Closest-fit classification
 
-`leads inbox` and `micro-shop` are v0.1.0 validation verticals but may initially be implemented as documented starter variants until dedicated starter directories land. Do not silently mix all verticals into `blog`.
+Classify the request as one of:
 
-For the first v0.1.0 production proof, prefer `starters/blog`. It currently carries the full GitHub OAuth + Workers OAuth Provider/DCR wiring. Use `starters/blank` only when the user explicitly wants a headless reference and accepts that production MCP OAuth wiring may need to be copied from `blog`.
+- **Within starter shape** — customize copy / theme / seed only. Start the chosen starter, run `setup:site`, seed initial content, done. Most installs land here.
+- **Near starter shape** — keep the starter and add small schemas / views / procedures / starter-side custom routes inside the project. Example: `publication` + a public prompt-generator page + one extra Schema. Do **not** fork the starter to do this.
+- **Outside starter shape** — switch to a better-fitting starter, or use `blank` and interview for custom 4-atom design. Don't silently mutate `publication` into a shop or community app.
+
+### v0.1.0 install routing
+
+For v0.1.0 first-run bootstrap, the only directly-installable starters are `publication` and `blank`:
+
+- **`publication`** — primary path. It is fixed-manifest during bootstrap; do **not** ask the user to redesign Schemas / Views / Procedures / Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing publication model. It currently carries the full Better Auth GitHub OAuth + MCP OAuth/DCR wiring required for MCP.
+- **`blank`** — only when the user explicitly wants a headless reference (e.g. they're shipping their own Next.js / Astro frontend). It has the same Better Auth + dual MCP mount shape, but no public HTML.
+- **`leads-inbox` / `micro-shop`** — v0.1.0 verticals but ship initially as **documented variants of `publication`** (extra schemas + custom routes added in-project), not as their own starter directory. Do not silently mix vertical-specific schemas into the base `publication` starter; they live in the consumer project.
+- **`booking` / `community` / `fan-club`** — refuse for v0.1.0; explain to the user the family lands in v0.2+ and offer `blank` or `publication`-extension as a holding pattern.
+
+Basic contact-form capture belongs in `publication`. `leads-inbox` starts when the user needs **tracking, qualification, assignment, and follow-up workflow** — not just a contact page.
 
 ## Preflight
 
@@ -202,10 +222,10 @@ If the user does not have GitHub or Cloudflare yet:
 Normalize:
 
 - `project_name`: lowercase letters, numbers, and hyphens. This becomes `wrangler.toml` `name`.
-- `starter`: `blog` or `blank`.
+- `starter`: `publication` or `blank` for v0.1.0 install. Other family slugs (`leads-inbox`, `micro-shop`, etc.) only valid for documented-variant install paths or future v0.2+ starters.
 - `locales`: keep order. First locale is canonical.
 - `brand`, `description`, `origin`: pass confirmed public copy to `setup:site`. `origin` may stay `https://example.com` until provision knows the Workers URL.
-- `mantle_version`: npm package version. Default to the version from the website prompt, currently `0.0.6-alpha`.
+- `mantle_version`: npm package version. Default to the version from the website prompt, currently `0.0.7-alpha`.
 - `template_ref`: Git ref used only to copy starter files. For the current npm-first alpha, use `main` unless the website prompt provides a newer release tag. Avoid floating `develop` unless the user is explicitly testing unreleased code.
 
 ### 2. Fetch the pinned starter template
@@ -252,12 +272,13 @@ The script:
 
 Keep `ADMIN_GITHUB_LOGIN` out of source code. It is a Worker secret set by the `provision` Skill using `github_username`.
 
-Do not set `MANTLE_ALLOW_STUB_OAUTH = "1"` in deployable `[vars]`.
-
-For local dev only, create `.dev.vars` if the user wants stub MCP smoke:
+For local dev admin sign-in, create `.dev.vars` with real GitHub OAuth dev credentials:
 
 ```dotenv
-MANTLE_ALLOW_STUB_OAUTH=1
+GITHUB_CLIENT_ID=<local-dev-client-id>
+GITHUB_CLIENT_SECRET=<local-dev-client-secret>
+ADMIN_GITHUB_LOGIN=<your-github-login>
+BETTER_AUTH_SECRET=<32+ random bytes>
 ```
 
 Do not commit `.dev.vars`.
@@ -317,7 +338,7 @@ pnpm run seed:initial -- --seed-file initial-seed.json --dry-run
 
 This writes `.mantle-seed.sql` and `.mantle-seed.kv.json` as generated artifacts. They are ignored by git. Do not apply this seed to production during install; provision will run it against remote D1/KV.
 
-For `starters/blog`, fixture data is optional. Use it only if the user wants a local demo site before deployment:
+For `starters/publication`, fixture data is optional. Use it only if the user wants a local demo site before deployment:
 
 ```bash
 pnpm fixture
@@ -331,13 +352,13 @@ Then preview:
 pnpm dev
 ```
 
-Smoke routes for blog:
+Smoke routes for publication:
 
 - `http://localhost:8787/` should redirect to the canonical locale.
 - `http://localhost:8787/<locale>/posts/hello-world` should render only if optional fixture data was applied.
 - `http://localhost:8787/<locale>/posts/hello-world.md` should render only if optional fixture data was applied.
 - `http://localhost:8787/api/views/recent-posts` should return JSON.
-- `POST http://localhost:8787/mcp` without a bearer token should return 401.
+- `POST http://localhost:8787/staff/mcp` without a bearer token should return 401.
 
 Smoke routes for blank:
 
@@ -359,7 +380,7 @@ template_ref: "<template_ref>"
 seed_file: "initial-seed.json"
 ```
 
-Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Worker secrets, deploy, updating seed origin, applying initial content directly to D1/KV, post-deploy smoke, and returning the MCP URL.
+Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secrets, deploy, updating seed origin, applying initial content directly to D1/KV, post-deploy smoke, and returning the Staff/User MCP URLs.
 
 ## Diagnostic Recipes
 
@@ -371,8 +392,8 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 | `tsc` tries to read `../../tsconfig.base.json` | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag, or set `extends` to `./tsconfig.base.json`. |
 | `Cannot find module @aotter/mantle-*` | npm install did not complete or version is unpublished | Verify `mantle_version`, run `pnpm install`, and check `npm view @aotter/mantle-cloudflare@<version>`. |
 | `pnpm validate` exits with `MANIFEST_ROOT_NOT_FOUND` | Not running from consumer root | `cd` to the directory containing `manifests/`. |
-| `wrangler dev` boots but MCP stub fails | `.dev.vars` missing local-only `MANTLE_ALLOW_STUB_OAUTH=1` | Add `.dev.vars` for local smoke only. Never put this in deployable `[vars]`. |
-| Blog `/llms.txt` or post route 404s locally | Fixture data was not applied | Run `pnpm fixture` and restart `pnpm dev`. |
+| `wrangler dev` boots but admin sign-in fails | GitHub OAuth vars or `BETTER_AUTH_SECRET` missing | Fill `.dev.vars` with `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and `BETTER_AUTH_SECRET`, then restart dev. |
+| Publication `/llms.txt` or post route 404s locally | Fixture data was not applied | Run `pnpm fixture` and restart `pnpm dev`. |
 | `pnpm run seed:initial -- --dry-run` fails on content | `initial-seed.json` is missing required public copy | Add `brand`, `origin`, `locales`, `home`, `about`, and `welcomePost`. |
 | Design customization was applied but `src/theme.default/` was edited directly | Agent searched for token file and edited the baseline copy instead of forking | Run `git checkout src/theme.default/` to restore the baseline, then `pnpm theme:fork tokens.ts` and re-apply edits to `src/theme/tokens.ts`. |
 
@@ -381,7 +402,7 @@ Provision is responsible for D1/KV/OAUTH_KV creation, GitHub OAuth App setup, Wo
 - Don't ignore starter/locales/GitHub username when the official prompt already provided them.
 - Don't require admin UI for v0.1.0 validation. Bootstrap owner + MCP OAuth is enough.
 - Don't put `ADMIN_GITHUB_LOGIN`, GitHub client secret, Turnstile secret, or Cloudflare API tokens in git.
-- Don't deploy with `MANTLE_ALLOW_STUB_OAUTH=1` in `wrangler.toml`.
+- Don't reintroduce stub bearer auth or `MANTLE_ALLOW_STUB_OAUTH`.
 - Don't keep `.mantle-template` in the consumer repo after copying the starter.
 - Don't write directly to D1 for normal content operations; use runtime/MCP tools. The starter-owned `seed:initial` script is the v0.1.0 exception for first content only.
 - Don't add public Schema reads. Public reads go through Views.
@@ -395,12 +416,12 @@ Report:
 - Confirmed GitHub owner username.
 - mantle npm package version and template ref.
 - Local validation result: `pnpm validate`, `pnpm typecheck`, and starter-specific smoke.
-- Next command: use `skills/provision/SKILL.md` to deploy and get the MCP URL.
+- Next command: use `skills/provision/SKILL.md` to deploy and get the Staff/User MCP URLs.
 
 Do not claim production readiness until provision completes and a second agent can connect through MCP.
 
 ## See Also
 
-- [`provision`](../provision/SKILL.md) - D1/KV/OAUTH_KV, secrets, deploy, MCP handoff.
-- [`customize-design`](../customize-design/SKILL.md) - blog theme customization.
+- [`provision`](../provision/SKILL.md) - D1/KV, secrets, deploy, MCP handoff.
+- [`customize-design`](../customize-design/SKILL.md) - publication theme customization.
 - [`extend`](../extend/SKILL.md) - adding Schemas, Views, Procedures, and Triggers.

@@ -21,6 +21,9 @@ export interface Collection {
    *  `spec.translates`) are filtered out of `/admin/api/collections`
    *  entirely; they fold into their parent in the sidebar. */
   hasTranslations: boolean;
+  /** Schema properties carrying `x-mcp-hint: media-*`. Upload hosting
+   *  is optional; this only marks which fields are media-shaped. */
+  mediaFields?: Array<{ name: string; hint: string }>;
 }
 
 export interface AdminUser {

@@ -7,12 +7,14 @@ import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
+import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 import { projectUpdateAndStamp } from "../../domain/service/BuiltinProjector.js";
 import type { UpdateDraftRequest } from "../dto/content/index.js";
 import {
   notFoundDiagnostic,
   withConflictDiagnostic,
 } from "./diagnostics.js";
+import { assertEntryWritable } from "./EntryWriteGuards.js";
 
 /**
  * `UpdateDraftUseCase` — update a draft's data. Only entries in
@@ -24,6 +26,7 @@ export class UpdateDraftUseCase {
     private readonly entries: EntryRepository,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
+    private readonly siteConfig?: SiteConfigRepository,
   ) {}
 
   async execute(request: UpdateDraftRequest): Promise<EntryRow> {
@@ -66,6 +69,14 @@ export class UpdateDraftUseCase {
       patch: request.data,
       ctx,
       clockNow: now,
+    });
+    await assertEntryWritable({
+      opPath,
+      entries: this.entries,
+      schema,
+      data,
+      excludeId: existing.id,
+      siteConfig: this.siteConfig,
     });
     return withConflictDiagnostic(opPath, () =>
       this.entries.update({

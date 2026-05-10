@@ -1,4 +1,5 @@
-export { mountServerEndpoints, type CmsRuntimeRef } from "./mountServerEndpoints.js";
+export { mountServerEndpoints } from "./mountServerEndpoints.js";
+export { type CmsRuntimeRef, createCmsRef } from "./bootRuntimeOnce.js";
 export { mountMcp } from "./mountMcp.js";
 export {
   mountPublicRoutes,
@@ -7,5 +8,4 @@ export {
   type PublicRouteContext,
   type SlugOverride,
 } from "./mountPublicRoutes.js";
-export { createCmsRef } from "./bootRuntimeOnce.js";
-export type { AdminAuthConfig, CmsConfig } from "./cmsConfig.js";
+export type { CmsConfig } from "./cmsConfig.js";

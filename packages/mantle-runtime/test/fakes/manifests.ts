@@ -23,6 +23,7 @@ export function postsSchema(): SchemaManifest {
         properties: {
           title: { type: "string" },
           slug: { type: "string" },
+          coverUrl: { type: "string", format: "uri", "x-mcp-hint": "media-image" },
           content: { type: "string" },
         },
         required: ["title"],

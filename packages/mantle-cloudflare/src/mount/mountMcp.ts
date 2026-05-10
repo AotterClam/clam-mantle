@@ -1,41 +1,59 @@
 import type { Hono } from "hono";
 import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
+import type { StaffRole, ViewManifest } from "@aotter/mantle-spec";
+import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
-/**
- * Mount the MCP `/mcp` endpoint onto the consumer's Hono app. Pass-
- * through to `McpJsonRpcDispatcher` after extracting the bearer-token
- * identity via the runtime's `OAuthVerifier`.
- *
- * Returns 401 with no JSON-RPC envelope when the bearer is missing /
- * invalid — matches MCP spec behavior (transport-level auth failure
- * before JSON-RPC parsing).
- *
- * Path defaults to `/mcp`; consumers can override via the `path`
- * option when their worker hosts multiple MCP surfaces.
- */
 export function mountMcp(
   app: Hono,
   ref: CmsRuntimeRef,
-  options: { path?: string } = {},
+  options: {
+    path?: string;
+    surface?: "staff" | "public";
+    requiredScope?: "mcp:staff" | "mcp:read";
+  } = {},
 ): void {
+  const auth = ref.auth;
   const path = options.path ?? "/mcp";
+  const surface = options.surface ?? "staff";
+  const requiredScope = options.requiredScope ?? (surface === "staff" ? "mcp:staff" : "mcp:read");
+  const metadataPath = `${path}/.well-known/oauth-protected-resource`;
   let dispatcher: McpJsonRpcDispatcher | null = null;
+
+  app.get(metadataPath, (c) => {
+    const url = new URL(c.req.url);
+    return c.json({
+      resource: `${url.origin}${path}`,
+      authorization_servers: [url.origin],
+      jwks_uri: `${url.origin}/api/auth/mcp/jwks`,
+      logo_uri: `${url.origin}/favicon.svg`,
+      scopes_supported: [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "mcp:read",
+        "mcp:staff",
+      ],
+      bearer_methods_supported: ["header"],
+      resource_signing_alg_values_supported: ["RS256", "none"],
+    });
+  });
+
   app.all(path, async (c) => {
-    const runtime = await ref.get();
-    const identity = await runtime.oauth.verifyAccessToken(c.req.raw);
-    if (!identity) {
-      return new Response("unauthorized", {
-        status: 401,
-        headers: { "www-authenticate": 'Bearer realm="mcp"' },
-      });
+    // Boot is independent of auth — fetch concurrently to save one
+    // D1 round-trip on the hot path.
+    const [session, runtime] = await Promise.all([
+      auth.getMcpSession(c.req.raw),
+      ref.get(),
+    ]);
+    if (!session) return new Response("unauthorized", unauthorized(c.req.url, requiredScope));
+    if (!hasRequiredScope(session.scopes, requiredScope)) {
+      return new Response("forbidden", forbidden(requiredScope));
     }
-    const staff = await runtime.staff.readByUserId(identity.userId);
-    if (!staff) {
-      return new Response("forbidden", {
-        status: 403,
-        headers: { "www-authenticate": 'Bearer realm="mcp" error="insufficient_scope"' },
-      });
+    const role = await auth.getUserRole(session.userId);
+    if (surface === "staff" && (!role || !ADMIN_ROLE_SET.has(role))) {
+      return new Response("forbidden", forbidden(requiredScope));
     }
     dispatcher ??= new McpJsonRpcDispatcher(
       {
@@ -47,9 +65,52 @@ export function mountMcp(
         unpublish: runtime.unpublish,
         archive: runtime.archive,
         deleteEntry: runtime.deleteEntry,
+        executeView: runtime.executeView,
+        media: runtime.media
+          ? {
+              createUpload: runtime.media.createUpload,
+              commitUpload: runtime.media.commitUpload,
+            }
+          : undefined,
       },
       [...runtime.schemasByName.values()],
+      {
+        surface,
+        views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
+      },
     );
-    return dispatcher.dispatch(c.req.raw, { userId: identity.userId, staff });
+    return dispatcher.dispatch(c.req.raw, {
+      userId: session.userId,
+      staff: role && ADMIN_ROLE_SET.has(role)
+        ? { userId: session.userId, role: role as StaffRole }
+        : null,
+    });
   });
+}
+
+function hasRequiredScope(scopes: readonly string[], required: "mcp:staff" | "mcp:read"): boolean {
+  if (scopes.includes(required)) return true;
+  return required === "mcp:read" && scopes.includes("mcp:staff");
+}
+
+function unauthorized(requestUrl: string, requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
+  const url = new URL(requestUrl);
+  const metadataPath = `${url.pathname}/.well-known/oauth-protected-resource`;
+  return {
+    status: 401,
+    headers: {
+      "www-authenticate": `Bearer realm="mcp", scope="${requiredScope}", resource_metadata="${url.origin}${metadataPath}"`,
+      "access-control-expose-headers": "WWW-Authenticate",
+    },
+  };
+}
+
+function forbidden(requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
+  return {
+    status: 403,
+    headers: {
+      "www-authenticate": `Bearer realm="mcp", error="insufficient_scope", scope="${requiredScope}"`,
+      "access-control-expose-headers": "WWW-Authenticate",
+    },
+  };
 }

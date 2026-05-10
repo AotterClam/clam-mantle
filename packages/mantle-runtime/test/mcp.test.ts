@@ -17,7 +17,7 @@ import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
-import { postsSchema } from "./fakes/manifests.js";
+import { postsSchema, recentPostsView } from "./fakes/manifests.js";
 
 interface Harness {
   store: InMemoryEntryRepository;
@@ -110,6 +110,48 @@ describe("McpJsonRpcDispatcher", () => {
     expect(names).not.toContain("create_draft");
   });
 
+  it("public surface exposes View query tools, not staff authoring tools", async () => {
+    const { dispatcher: _staff, ...h } = buildHarness();
+    const dispatcher = new McpJsonRpcDispatcher(
+      {
+        listEntries: new ListEntriesUseCase(h.store, new Map([["posts", postsSchema()]])),
+        getEntry: new GetEntryUseCase(h.store),
+        createDraft: new CreateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }, { next: () => "x" }),
+        updateDraft: new UpdateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        requestPublish: new RequestPublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        unpublish: new UnpublishUseCase(h.store, { now: () => 0 }),
+        archive: new ArchiveUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        deleteEntry: new DeleteEntryUseCase(h.store),
+      },
+      [postsSchema()],
+      {
+        surface: "public",
+        views: [recentPostsView()],
+      },
+    );
+    const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1", staff: null });
+    const body = (await res.json()) as {
+      result: { tools: { name: string }[] };
+    };
+    const names = body.result.tools.map((t) => t.name);
+    expect(names).toEqual(["query_view_recent_posts"]);
+  });
+
+  it("tools/list preserves media x-mcp-hint metadata for agents", async () => {
+    const { dispatcher } = buildHarness();
+    const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" });
+    const body = (await res.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: { properties?: Record<string, Record<string, unknown>> };
+        }>;
+      };
+    };
+    const createPosts = body.result.tools.find((t) => t.name === "create_draft_posts");
+    expect(createPosts?.inputSchema.properties?.coverUrl?.["x-mcp-hint"]).toBe("media-image");
+  });
+
   it("tools/call create_draft_posts creates an entry through the use case", async () => {
     const { dispatcher, store } = buildHarness();
     const res = await dispatcher.dispatch(
@@ -135,7 +177,7 @@ describe("McpJsonRpcDispatcher", () => {
       id: "p1",
       collection: "posts",
       status: "draft",
-      data: {},
+      data: { title: "x" },
       authorId: "u1",
       now: 0,
     });
@@ -158,7 +200,7 @@ describe("McpJsonRpcDispatcher", () => {
       id: "p1",
       collection: "posts",
       status: "published",
-      data: {},
+      data: { title: "x" },
       authorId: "u1",
       now: 0,
     });

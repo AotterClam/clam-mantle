@@ -4,14 +4,11 @@ import type { Manifest } from "@aotter/mantle-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import { mountMcp } from "../src/mount/mountMcp.js";
-import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
 import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubSessionRepository,
-  StubStaffRepository,
-  StubUserRepository,
+  stubAuth,
 } from "./fakes/runtime-bindings.js";
 
 /**
@@ -152,48 +149,14 @@ function harness(opts: { captchaPasses: boolean }): Harness {
     bindings: {
       db,
       kv: new InMemoryKv(),
-      sessions: new StubSessionRepository(),
-      users: new StubUserRepository(),
-      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
     },
+    auth: stubAuth,
   });
   const app = new Hono();
   mountServerEndpoints(app, ref);
   mountMcp(app, ref);
   return { app, db, captchaCalls, slackCalls };
-}
-
-function oauthDiscoveryHarness(): Hono {
-  const oauthProvider = {
-    fetch: async (req: Request) =>
-      new Response(JSON.stringify({ path: new URL(req.url).pathname }), {
-        headers: { "content-type": "application/json" },
-      }),
-  };
-  const ref = createCmsRef({
-    manifests: [],
-    bindings: {
-      db: new InMemoryDatabase(),
-      kv: new InMemoryKv(),
-      sessions: new StubSessionRepository(),
-      users: new StubUserRepository(),
-      staff: new StubStaffRepository(),
-      assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
-    },
-    adminAuth: {
-      oauthProvider: oauthProvider as never,
-      oauthKv: new InMemoryKv() as unknown as KVNamespace,
-      githubClientId: "client-id",
-      githubClientSecret: "client-secret",
-      adminGithubLogin: "owner",
-    },
-  });
-  const app = new Hono();
-  mountServerEndpoints(app, ref);
-  return app;
 }
 
 describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
@@ -273,34 +236,5 @@ describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
     const h = harness({ captchaPasses: true });
     const res = await h.app.request("/mcp", { method: "POST" });
     expect(res.status).toBe(401);
-  });
-
-  it("MCP /mcp with dev bearer accepts initialize", async () => {
-    const h = harness({ captchaPasses: true });
-    const res = await h.app.request("/mcp", {
-      method: "POST",
-      headers: {
-        authorization: "Bearer dev-u-1",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }),
-    });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { result: { serverInfo: { name: string } } };
-    expect(body.result.serverInfo.name).toContain("mantle");
-  });
-
-  it("passes OAuth discovery routes through to the provider", async () => {
-    const app = oauthDiscoveryHarness();
-    const paths = [
-      "/.well-known/oauth-authorization-server",
-      "/.well-known/oauth-protected-resource",
-      "/.well-known/oauth-protected-resource/mcp",
-    ];
-    for (const path of paths) {
-      const res = await app.request(path);
-      expect(res.status).toBe(200);
-      await expect(res.json()).resolves.toEqual({ path });
-    }
   });
 });

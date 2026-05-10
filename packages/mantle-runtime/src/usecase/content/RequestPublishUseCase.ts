@@ -9,6 +9,7 @@ import {
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
+import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 import type { RequestPublishRequest } from "../dto/content/index.js";
 import {
   publishCache,
@@ -19,6 +20,7 @@ import {
   notFoundDiagnostic,
   withConflictDiagnostic,
 } from "./diagnostics.js";
+import { assertEntryWritable } from "./EntryWriteGuards.js";
 
 /**
  * `RequestPublishUseCase` — publish or queue-for-approval, depending
@@ -38,6 +40,7 @@ export class RequestPublishUseCase {
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
     private readonly clock: Clock,
     private readonly effects?: ContentPublishEffects,
+    private readonly siteConfig?: SiteConfigRepository,
   ) {}
 
   async execute(request: RequestPublishRequest): Promise<EntryRow> {
@@ -64,6 +67,16 @@ export class RequestPublishUseCase {
       throw new DiagnosticError(
         illegalTransitionDiagnostic(opPath, existing.status, "published"),
       );
+    }
+    if (schema) {
+      await assertEntryWritable({
+        opPath,
+        entries: this.entries,
+        schema,
+        data: existing.data,
+        excludeId: existing.id,
+        siteConfig: this.siteConfig,
+      });
     }
     await this.assertTranslatesParentPublished(opPath, existing, schema);
 

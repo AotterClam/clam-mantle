@@ -1,0 +1,43 @@
+{
+  "name": "@aotter/starter-publication",
+  "version": "0.0.7-alpha",
+  "private": true,
+  "description": "Reference publication starter for mantle v0.1.0 — owner-published content (articles / pages / docs-lite / basic contact form). Localized posts via translates; contact form via builtin + lifecycle hooks. Runs on wrangler dev with local D1 + KV.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "fixture": "tsx test/fixture/apply-dev.ts",
+    "test:integration": "node scripts/run-integration.mjs",
+    "mcp-smoke": "tsx test/integration/mcp-smoke.ts",
+    "view-smoke": "tsx test/integration/view-rest-smoke.ts",
+    "validate": "mantle validate",
+    "introspect": "mantle introspect",
+    "emit-openapi": "mantle emit-openapi > openapi.json",
+    "emit-types": "mantle emit-types --namespace PublicationCms > mantle-types.d.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check": "pnpm validate && pnpm typecheck",
+    "deploy": "wrangler deploy",
+    "setup:site": "node scripts/setup-site.mjs",
+    "provision:plan": "node scripts/provision.mjs plan",
+    "provision:up": "node scripts/provision.mjs up",
+    "seed:initial": "tsx scripts/seed-initial-content.ts",
+    "theme:fork": "node scripts/theme-fork.mjs",
+    "theme:reset": "node scripts/theme-reset.mjs"
+  },
+  "dependencies": {
+    "@aotter/mantle-cloudflare": "workspace:*",
+    "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-spec": "workspace:*",
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.6.20",
+    "marked": "^14.1.3",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^20",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.103.2"
+  }
+}

@@ -1,8 +1,10 @@
 # mantle
 
-MCP-native headless CMS for Cloudflare Workers. Declarative manifest, AI-first authoring, multi-locale by default.
+**Build your content model by prompting, not configuring.**
 
-> **0.0.6-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
+Agent-native headless CMS where AI agents are first-class authors — locked-grammar manifests, structured JSON diagnostics, and static `.md` mirrors every agent can crawl without auth. Most CMSes treat AI as a content editor; mantle treats it as the developer.
+
+> **0.0.7-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
 ## Part of Mantle
 
@@ -21,16 +23,17 @@ This repo is the OLTP side of that thesis applied to web content.
 
 You're an agent helping a (likely non-technical) user install or extend a mantle project.
 
-→ **Install a fresh blog** — start at [`skills/install/SKILL.md`](skills/install/SKILL.md).
+→ **Install a fresh publication/site** — start at [`skills/install/SKILL.md`](skills/install/SKILL.md).
 → **Add a new atom** (Schema / View / Procedure + http Trigger) to an existing starter — start at [`skills/extend/SKILL.md`](skills/extend/SKILL.md).
-→ **Provision Cloudflare resources** (D1, KV, OAuth, Turnstile) and deploy — start at [`skills/provision/SKILL.md`](skills/provision/SKILL.md).
+→ **Provision Cloudflare resources** (D1, KV, Turnstile) and deploy — start at [`skills/provision/SKILL.md`](skills/provision/SKILL.md).
 
 ## For humans
 
 End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.dev` with:
 
 - `/admin` — GitHub-OAuth-gated React admin SPA
-- `/mcp` — MCP endpoint, AI clients connect here to edit content
+- `/staff/mcp` — staff MCP endpoint, owner/editor agents connect here to edit content
+- `/mcp` — end-user/read MCP endpoint for public View tools and future member flows
 - `/<locale>/<collection>/<slug>` — per-entry HTML
 - `/<locale>/<collection>/<slug>.md` — agent-friendly markdown mirror
 - `/<locale>/llms.txt` — per-locale llms.txt index
@@ -43,19 +46,24 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 | Package | Role |
 |---|---|
 | `@aotter/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
-| `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + auth + MCP. Defines 5 adapter ports. |
+| `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
 | `@aotter/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
-| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS / Workers OAuth. |
+| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS and owns Better Auth wiring. |
 | `@aotter/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
 
 ## Starters
 
-| Starter | Status | What |
-|---|---|---|
-| `starters/blog/` | v0.1.0 | Single-author blog. Multi-locale posts, contact form (Cloudflare Turnstile), per-slug `.md` mirror, llms.txt. |
-| `starters/social-blog/` | v0.2+ | Likes / comments / private posts. |
-| `starters/micro-shop/` | v0.1.0 (planned) | <100 orders/day. |
-| `starters/paid-feed/` | v0.2+ | Subscribe + per-item unlock (OF-style). |
+Six-family taxonomy (#58). v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
+
+| Starter | Family | Status | What |
+|---|---|---|---|
+| `starters/publication/` | publication | v0.1.0 (available) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| `starters/blank/` | — | v0.1.0 (available) | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
+| `starters/leads-inbox/` | leads-inbox | v0.1.0 (planned) | Multi-form intake + lead status (new / qualified / contacted / won / lost) + assignment + agent-operated follow-up. May ship initially as a documented variant of `publication` before a dedicated directory lands. |
+| `starters/micro-shop/` | micro-shop | v0.1.0 (planned) | Small catalog + order intake on pure D1 (~100 orders/day). Stripe Checkout, cookie cart, agent-operated order handling. |
+| `starters/booking/` | booking | v0.2+ | Services / availability / appointment requests / reminders / cancellation. Blocks on DO + Queue infra (issue #21). |
+| `starters/community/` | community | v0.2+ | Member posts, comments, likes, reactions, moderation queue, agent-assisted moderation. Blocks on end-user auth (v0.2). |
+| `starters/fan-club/` | fan-club | v0.2+ | Creator/member content with private posts and membership tiers. Blocks on end-user auth + row-level visibility grammar + Stripe entitlement. |
 
 ## Repo conventions
 

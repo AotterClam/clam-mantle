@@ -4,14 +4,11 @@ import type { Manifest } from "@aotter/mantle-spec";
 import { TemplateRegistry } from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
-import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
 import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubSessionRepository,
-  StubStaffRepository,
-  StubUserRepository,
+  stubAuth,
 } from "./fakes/runtime-bindings.js";
 
 function manifests(): Manifest[] {
@@ -57,12 +54,9 @@ function harness(locales: readonly string[] = ["en"]) {
     bindings: {
       db,
       kv,
-      sessions: new StubSessionRepository(),
-      users: new StubUserRepository(),
-      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ MANTLE_ALLOW_STUB_OAUTH: "1" }),
     },
+    auth: stubAuth,
   });
   const app = new Hono();
   mountPublicRoutes(app, ref, {
