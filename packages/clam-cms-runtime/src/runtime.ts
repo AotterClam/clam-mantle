@@ -11,13 +11,11 @@ import type { AnyHandler } from "./domain/model/HandlerContext.js";
 import type { TemplateRegistry } from "./domain/model/TemplateRegistry.js";
 import type { AssetServer } from "./domain/port/AssetServer.js";
 import type { DatabaseDriver } from "./domain/port/DatabaseDriver.js";
+import type { DeferredHookDispatcher } from "./domain/port/DeferredHookDispatcher.js";
 import type { EntryRepository } from "./domain/port/EntryRepository.js";
 import type { KvCache } from "./domain/port/KvCache.js";
-import type { OAuthVerifier } from "./domain/port/OAuthVerifier.js";
+import type { MediaStorage } from "./domain/port/MediaStorage.js";
 import type { PublishOrchestrator } from "./domain/port/PublishOrchestrator.js";
-import type { SessionRepository } from "./domain/port/SessionRepository.js";
-import type { UserRepository } from "./domain/port/UserRepository.js";
-import type { StaffRepository } from "./domain/port/StaffRepository.js";
 import type { SiteConfigRepository } from "./domain/port/SiteConfigRepository.js";
 import { SystemClock, type Clock } from "./domain/port/Clock.js";
 import {
@@ -45,7 +43,10 @@ import {
 } from "./usecase/procedure/index.js";
 import { ExecuteViewUseCase } from "./usecase/view/index.js";
 import { ValidateBootUseCase } from "./usecase/boot/index.js";
-import { RunLifecycleHooksUseCase } from "./usecase/lifecycle/index.js";
+import {
+  RunDeferredHookUseCase,
+  RunLifecycleHooksUseCase,
+} from "./usecase/lifecycle/index.js";
 import {
   ComposeEntrySeoMetaUseCase,
   ComposeLlmsTxtUseCase,
@@ -54,6 +55,10 @@ import {
   RenderEntryLiveUseCase,
   RenderListLiveUseCase,
 } from "./usecase/render/index.js";
+import {
+  CommitMediaUploadUseCase,
+  CreateMediaUploadUseCase,
+} from "./usecase/media/index.js";
 import type { PublicPathResolver } from "./domain/service/PublicPathResolver.js";
 
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
@@ -71,8 +76,8 @@ import { CANONICAL_MIGRATIONS } from "./infrastructure/boot/index.js";
  * to use cases (`usecase/content/*`, etc.) via ports
  * (`domain/port/*`).
  *
- * Adapters call this once at boot, pass the 5 ADR-0011 ports + the
- * consumer's manifests + handlers + templates + siteDefaults, and
+ * Adapters call this once at boot, pass the required ADR-0011 ports +
+ * the consumer's manifests + handlers + templates + siteDefaults, and
  * receive a `CmsRuntime` they expose to their HTTP framework's
  * routing layer.
  *
@@ -86,20 +91,33 @@ export interface CreateCmsRuntimeArgs {
   readonly handlers?: Readonly<Record<string, AnyHandler>>;
   readonly templates?: TemplateRegistry;
   readonly siteDefaults?: SiteDefaults;
-  /** The 5 ADR-0011 ports + identity layer. */
+  /** Required ADR-0011 ports. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
-  readonly sessions: SessionRepository;
   readonly assets: AssetServer;
-  readonly oauth: OAuthVerifier;
-  readonly users: UserRepository;
-  readonly staff: StaffRepository;
   /** Optional public-path resolver. When set, the publish pipeline
    *  composes SEO/AEO meta on every entry render and the resolved
    *  paths drive sitemap / hreflang sibling URLs. Adapters that
    *  expose request-time render routes should also pass this through
    *  so request-time HTML matches publish-time HTML. */
   readonly publicPathResolver?: PublicPathResolver;
+  /** Optional media storage adapter. When unset, media MCP tools and
+   *  admin upload endpoints are not registered — uploads return 404 /
+   *  `MEDIA_NOT_CONFIGURED`. When set, the runtime wires
+   *  `CreateMediaUpload` + `CommitMediaUpload` use cases backed by
+   *  this adapter. The KV mapping for pending uploads reuses `args.kv`. */
+  readonly mediaStorage?: MediaStorage;
+  /** Whether the SVG mime is allowed in `CreateMediaUpload`. Default
+   *  false; object stores don't sanitize SVG payloads. */
+  readonly mediaAllowSvg?: boolean;
+  /** Optional override of the default 25 MB upload byte ceiling. */
+  readonly mediaMaxBytes?: number;
+  /** Optional deferred-delivery dispatcher for `after_*` lifecycle
+   *  hooks. When set, after-hooks are enqueued through it instead of
+   *  riding `ctx.waitUntil` / inline-await. Cloudflare adapter wires
+   *  a Workers-Queues-backed impl by default. Absent → existing
+   *  waitUntil → inline ladder applies. */
+  readonly deferredHookDispatcher?: DeferredHookDispatcher;
   /** Optional clock — test seam. Defaults to `SystemClock`. */
   readonly clock?: Clock;
   /** Optional id generator — test seam. Defaults to `RandomUuidGenerator`. */
@@ -107,14 +125,10 @@ export interface CreateCmsRuntimeArgs {
 }
 
 export interface CmsRuntime {
-  /** The 5 ADR-0011 ports + identity layer — re-exposed so adapters can pass them downstream. */
+  /** Required ADR-0011 ports — re-exposed so adapters can pass them downstream. */
   readonly db: DatabaseDriver;
   readonly kv: KvCache;
-  readonly sessions: SessionRepository;
   readonly assets: AssetServer;
-  readonly oauth: OAuthVerifier;
-  readonly users: UserRepository;
-  readonly staff: StaffRepository;
 
   /** Use cases (pre-wired with ports + clock + idgen). */
   readonly createDraft: CreateDraftUseCase;
@@ -140,6 +154,18 @@ export interface CmsRuntime {
    *  supply one. Adapters use this to derive URLs (sitemap, SEO
    *  hreflangs) without rebuilding the mapping. */
   readonly publicPathResolver: PublicPathResolver | null;
+  /** Pre-wired media use cases when `mediaStorage` was supplied; null
+   *  otherwise. Adapters route admin endpoints + MCP tools off this. */
+  readonly media: {
+    readonly storage: MediaStorage;
+    readonly createUpload: CreateMediaUploadUseCase;
+    readonly commitUpload: CommitMediaUploadUseCase;
+  } | null;
+  /** Drive a deferred after-hook from an enqueued envelope. Adapter
+   *  queue consumers call `runDeferredHook.execute({ envelope, env })`
+   *  with the consume-side binding bag (different invocation than
+   *  the one that produced the envelope). */
+  readonly runDeferredHook: RunDeferredHookUseCase;
 
   /** Adapter-helper bag. */
   readonly registry: HandlerRegistry;
@@ -180,6 +206,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   // MCP, admin, and builtin paths all hit the same wrapped repository.
   const innerEntries = new DatabaseEntryRepository(args.db);
   const triggerIndex = new TriggerIndex(partitioned.triggers);
+  const siteConfig = new DatabaseSiteConfigRepository(args.db);
   // `entries` is filled below — assigned via `let` so the lifecycle
   // hooks (which run procedures, which can themselves write entries
   // via builtin handlers) close over the wrapped repo, not the bare
@@ -195,8 +222,15 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     transitionStatus: (a) => entries.transitionStatus(a),
     list: (a) => entries.list(a),
     findByDataField: (a) => entries.findByDataField(a),
+    findByDataFields: (a) => entries.findByDataFields(a),
   };
-  const invokeBuiltin = new InvokeBuiltinUseCase(entriesProxy, schemasByName, clock, idgen);
+  const invokeBuiltin = new InvokeBuiltinUseCase(
+    entriesProxy,
+    schemasByName,
+    clock,
+    idgen,
+    siteConfig,
+  );
   const invokeProcedure = new InvokeProcedureUseCase(registry, invokeBuiltin);
   const lifecycleHooks = new RunLifecycleHooksUseCase(
     triggerIndex,
@@ -207,8 +241,9 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     innerEntries,
     triggerIndex,
     lifecycleHooks,
+    args.deferredHookDispatcher,
   );
-  const siteConfig = new DatabaseSiteConfigRepository(args.db);
+  const runDeferredHook = new RunDeferredHookUseCase(lifecycleHooks);
   const publicPathResolver = args.publicPathResolver ?? null;
   const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(
@@ -220,8 +255,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
 
   // Content / view / boot use cases. They see `entries` only as the
   // chokepoint port — hook firing is invisible to them.
-  const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen);
-  const updateDraft = new UpdateDraftUseCase(entries, schemasByName, clock);
+  const createDraft = new CreateDraftUseCase(entries, schemasByName, clock, idgen, siteConfig);
+  const updateDraft = new UpdateDraftUseCase(entries, schemasByName, clock, siteConfig);
   const getEntry = new GetEntryUseCase(entries);
   const listEntries = new ListEntriesUseCase(entries, schemasByName);
   const contentPublishEffects = { publishOrchestrator, siteConfig, templates };
@@ -230,6 +265,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     schemasByName,
     clock,
     contentPublishEffects,
+    siteConfig,
   );
   const unpublish = new UnpublishUseCase(entries, clock, contentPublishEffects);
   const archive = new ArchiveUseCase(entries, schemasByName, clock, contentPublishEffects);
@@ -252,14 +288,28 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   );
   const validateBoot = new ValidateBootUseCase();
 
+  const media = args.mediaStorage
+    ? {
+        storage: args.mediaStorage,
+        createUpload: new CreateMediaUploadUseCase(
+          args.mediaStorage,
+          args.kv,
+          clock,
+          { allowSvg: args.mediaAllowSvg ?? false, maxBytes: args.mediaMaxBytes },
+        ),
+        commitUpload: new CommitMediaUploadUseCase(
+          args.mediaStorage,
+          args.kv,
+          clock,
+          { maxBytes: args.mediaMaxBytes },
+        ),
+      }
+    : null;
+
   return {
     db: args.db,
     kv: args.kv,
-    sessions: args.sessions,
     assets: args.assets,
-    oauth: args.oauth,
-    users: args.users,
-    staff: args.staff,
 
     createDraft,
     updateDraft,
@@ -281,6 +331,8 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     publishOrchestrator,
     siteConfig,
     publicPathResolver,
+    media,
+    runDeferredHook,
 
     registry,
     templates,

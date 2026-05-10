@@ -35,6 +35,10 @@ export interface EntryRepository {
   /** Find one entry by a top-level JSON data field. Used for runtime
    *  referential checks such as `Schema.spec.translates`. */
   findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null>;
+  /** Find one entry by a composite set of top-level JSON data fields.
+   *  Used to enforce `Schema.spec.uniqueIndexes` at the shared
+   *  authoring chokepoint. */
+  findByDataFields(args: FindEntryByDataFieldsArgs): Promise<EntryRow | null>;
 }
 
 /**
@@ -106,4 +110,11 @@ export interface FindEntryByDataFieldArgs {
   readonly status?: ContentState;
   readonly field: string;
   readonly value: unknown;
+}
+
+export interface FindEntryByDataFieldsArgs {
+  readonly collection: string;
+  readonly status?: ContentState;
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly excludeId?: string;
 }

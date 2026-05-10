@@ -302,13 +302,13 @@ forces it.
   handler function
 - `spec.handler.{kind: builtin, op: <create | update | upsert |
   delete>, schema: <Schema name>}` — SDK-supplied CRUD shortcut
-  (promoted to v0.1.0; runtime ships in commit 4.3)
+  (promoted to v0.1.0; runtime implemented by `InvokeBuiltinUseCase`)
 
 **Trigger (v0.1)**:
 - `spec.source.kind: http` — public HTTP endpoint
 - `spec.source.{method, path}` (when `kind: http`)
 - `spec.source.kind: lifecycle` — entry-writer hook (promoted to
-  v0.1.0; runtime ships in commit 4.2)
+  v0.1.0; runtime implemented by `LifecycleHookingEntryRepository`)
 - `spec.source.{schema, on, errorPolicy}` (when `kind: lifecycle`)
 - `spec.target.procedure:`
 

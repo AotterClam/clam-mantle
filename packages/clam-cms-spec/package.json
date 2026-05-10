@@ -1,6 +1,6 @@
 {
   "name": "@aotterclam/clam-cms-spec",
-  "version": "0.0.6-alpha",
+  "version": "0.0.7-alpha",
   "description": "Spec engine for clam-cms: types + manifest YAML parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env / adapter deps.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/clam-cms-spec",
@@ -26,7 +26,10 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "prebuild": "rm -rf dist .tsbuildinfo",
     "build": "tsc -b tsconfig.lib.json",

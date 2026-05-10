@@ -395,7 +395,7 @@ spec:
 
   it("includes the context label in the error envelope when supplied", () => {
     expect(() =>
-      parseManifestsOrThrow("not even yaml: : :", { context: "starters/blog" }),
-    ).toThrow(/Manifest parse failed in starters\/blog/);
+      parseManifestsOrThrow("not even yaml: : :", { context: "starters/publication" }),
+    ).toThrow(/Manifest parse failed in starters\/publication/);
   });
 });

@@ -1,14 +1,14 @@
 ---
 name: clam-cms customize-design
-description: Layer custom design over starters/blog using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
+description: Layer custom design over the publication/site starter at starters/publication using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
 when_to_invoke: |
-  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to starters/blog only — starters/blank has no UI to customize.
-applies_to: clam-cms@v0.1.0 + starters/blog
+  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to starters/publication only — starters/blank has no UI to customize.
+applies_to: clam-cms@v0.1.0 + starters/publication
 ---
 
-# Customize the design of a clam-cms blog
+# Customize the design of a clam-cms publication site
 
-You are layering a consumer theme over `starters/blog/`. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
+You are layering a consumer theme over `starters/publication/`. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
 
 ## Layer cheatsheet
 
@@ -18,7 +18,8 @@ You are layering a consumer theme over `starters/blog/`. The baseline lives at `
 | **L2** extraCss | `src/theme/index.ts:extraCss` | extra CSS rules (border-radius, hero size, etc.) |
 | **L2** icons | `src/theme/icons.ts` | replace baseline icons by name; add new ones |
 | **L2** i18n | `src/theme/i18n/<locale>.json` | retitle UI strings per locale (deep-merge) |
-| **L3** components | `src/theme/components/{Header,Footer}.tsx` | replace chrome wholesale |
+| **L3** components — chrome | `src/theme/components/{Header,Footer}.tsx` | swap navigation chrome (logo, nav, language switcher, footer copy) |
+| **L3** components — body layout | `src/theme/components/PageShell.tsx` | reshape body layout: sidebar variants, sticky CTAs, full-bleed hero, alternative Header / `<main>` / Footer arrangement |
 | **L4** templates | `src/theme/templates/<name>.tsx` | replace a page kind end-to-end |
 
 ## Conversation pattern
@@ -73,7 +74,7 @@ const overrides: ThemeOverride = {
 };
 ```
 
-`Layout` is intentionally NOT a customization slot — `Theme.ts` only allows Header / Footer overrides. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If you need to change `<head>` content beyond what tokens / extraCss can express, the path is L4 fork on every template (each takes responsibility for its own envelope), or pick another starter.
+`Layout` is intentionally NOT a customization slot — `Theme.ts` accepts Header, Footer, and PageShell overrides only. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If the user wants to reshape body layout (sidebar, sticky CTA, full-bleed sections, alternative Header / `<main>` / Footer arrangement), use the PageShell slot at L3. If they need to change `<head>` content beyond what tokens / extraCss can express, that crosses the starter-family line — switch starter rather than fork every template.
 
 Revert: `pnpm theme:reset tokens.ts`.
 
@@ -142,7 +143,7 @@ pnpm theme:fork components/Header.tsx
 pnpm theme:fork components/Footer.tsx
 ```
 
-Only `Header` and `Footer` are supported component slots — `theme:fork components/Layout.tsx` (or any other component name) fails fast with a clear error. Edit `src/theme/components/Header.tsx`. Key contracts:
+Use this when the user wants different chrome — different brand mark, different nav arrangement, different language switcher, custom footer copy — but the page body still reads top → main → bottom. Edit `src/theme/components/Header.tsx`. Key contracts:
 
 - Don't change the props signature: `Header(props: HeaderProps)`.
 - `props.site.brand`, `props.site.locales`, `props.locale`, `props.current` are available.
@@ -152,6 +153,30 @@ Same shape for `Footer`.
 
 Revert: `pnpm theme:reset components/Header.tsx`.
 
+### L3 — PageShell (body layout)
+
+```bash
+pnpm theme:fork components/PageShell.tsx
+```
+
+Use this when the user wants to reshape the **body layout** rather than just swap chrome — for example:
+
+- Sidebar with table-of-contents alongside `<main>` for docs-lite pages
+- Sticky CTA bar between `<main>` and `<Footer>`
+- Full-bleed hero section above Header on the home page
+- Different Header / `<main>` / Footer ordering (e.g., side-rail logo)
+- Custom `<main>` container width or padding rules per template kind
+
+The forked PageShell takes ownership of how (or whether) to render the Header / Footer overrides. The baseline composes them in the conventional top → main → bottom order; a consumer-supplied PageShell can ignore or recompose them as the new shape requires.
+
+`Layout` (the document envelope — `<html>` / `<head>` / `<body>` + SEO meta + theme bootstrap) is NOT forkable. `theme:fork components/Layout.tsx` fails fast with a clear error. SEO emission order, charset, viewport, and theme-bootstrap timing are concerns that cross the starter-family line and shouldn't be redefined per page.
+
+Revert: `pnpm theme:reset components/PageShell.tsx`.
+
+### Other component forks fail fast
+
+Only `Header`, `Footer`, and `PageShell` are supported component slots. `theme:fork components/Layout.tsx` or any other name exits with a clear error pointing at PageShell as the body-layout escape hatch. Don't try to override Layout by hand-editing `src/theme/components/Layout.tsx` outside the fork machinery — the override surface won't register it.
+
 ### L4 — whole template (escape hatch)
 
 ```bash
@@ -160,7 +185,7 @@ pnpm theme:fork templates/post.tsx
 
 Edit `src/theme/templates/post.tsx`. The forked file imports baseline Layout via `../../theme.default/components/Layout.js`. If you also forked Layout (rare — only if you also went L3 on every template), manually rewrite that import to your version.
 
-L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really a blog any more — would you like a docs site (`starters/docs`, v0.2) instead?"
+L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really `publication` any more — it sounds closer to `community` (member posts), `micro-shop` (catalog + orders), or `leads-inbox` (lead pipeline). The publication family covers landing / articles / docs-lite / basic contact; once you cross those lines, switching starter family is cheaper than forking more templates."
 
 Revert: `pnpm theme:reset templates/post.tsx`.
 

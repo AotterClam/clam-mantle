@@ -1,6 +1,6 @@
 {
   "name": "@aotterclam/starter-blank",
-  "version": "0.0.6-alpha",
+  "version": "0.0.7-alpha",
   "private": true,
   "description": "Headless CMS starter for clam-cms — API + MCP only, no public HTML rendering. Bring your own frontend.",
   "type": "module",

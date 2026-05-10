@@ -6,7 +6,6 @@
  */
 export * from "./persistence/index.js";
 export * from "./render/index.js";
-export * from "./auth/index.js";
 export * from "./mcp/index.js";
 export * from "./boot/index.js";
 export * from "./http/index.js";

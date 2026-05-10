@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: AI contributor contract
+    url: https://github.com/AotterClam/clam-cms/blob/develop/CLAUDE.md
+    about: Read this before asking an AI agent to contribute to clam-cms.
+  - name: ADR index
+    url: https://github.com/AotterClam/clam-cms/blob/develop/docs/adr/README.md
+    about: Architecture decisions and rules that may already answer your question.
+  - name: Report a vulnerability
+    url: https://github.com/AotterClam/clam-cms/security/advisories/new
+    about: Use a private security advisory for vulnerability reports.

@@ -1,0 +1,26 @@
+# Test profile env vars — loaded by `wrangler dev --env test`.
+#
+# Copy to `.dev.vars.test` (gitignored) before running
+# `pnpm test:integration`. Integration smokes authenticate via a
+# fixture-minted Better Auth MCP access token (apply-shared.ts seeds
+# `oauthApplication` + `oauthAccessToken` rows pointed at the test
+# editor when `seedStaffEditor=true`); no real GitHub OAuth round-trip
+# fires during smoke.
+
+TURNSTILE_SECRET_KEY=dev-stub
+CLAM_LOCAL_DEV=1
+
+# Better Auth signing secret. Any value works for tests — sessions /
+# bearers are pre-minted in fixture SQL, not signed at runtime.
+BETTER_AUTH_SECRET=test-stub-secret-not-for-production-use-zzzzzzzz
+
+# Test profile runs on port 8788 (see [env.test.dev] in wrangler.toml).
+PUBLIC_ORIGIN=http://localhost:8788
+
+# ensureBootstrapOwner reads this. Smokes don't OAuth-login, so the
+# value is unused — but the runtime reads it at boot.
+ADMIN_GITHUB_LOGIN=test-admin
+
+# OAuth client creds — stubs (sign-in flow not exercised by smokes).
+GITHUB_CLIENT_ID=test-stub-client-id
+GITHUB_CLIENT_SECRET=test-stub-client-secret

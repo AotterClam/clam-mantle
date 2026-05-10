@@ -3,14 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotterclam/clam-cms-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
-import { StubOAuthVerifier } from "../src/bindings/StubOAuthVerifier.js";
 import { InMemoryDatabase } from "../../clam-cms-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
-  StubSessionRepository,
-  StubStaffRepository,
-  StubUserRepository,
+  stubAuth,
 } from "./fakes/runtime-bindings.js";
 
 /**
@@ -81,12 +78,9 @@ function harness(seed?: (db: InMemoryDatabase) => void) {
     bindings: {
       db,
       kv: new InMemoryKv(),
-      sessions: new StubSessionRepository(),
-      users: new StubUserRepository(),
-      staff: new StubStaffRepository(),
       assets: new StubAssetServer(),
-      oauth: new StubOAuthVerifier({ CLAM_ALLOW_STUB_OAUTH: "1" }),
     },
+    auth: stubAuth,
   });
   const app = new Hono();
   mountServerEndpoints(app, ref);

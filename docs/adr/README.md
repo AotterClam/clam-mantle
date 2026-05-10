@@ -12,8 +12,11 @@ Records of *why* clam-cms ended up shaped this way. The numbering preserves POC 
 | [0008](0008-structured-diagnostic-shape.md) | Diagnostic shape: code, phase, severity, path, value, expected, message, candidates, suggestion. zod-translation per PR #81. | Accepted (refreshed) |
 | [0009](0009-consumer-supplied-manifests.md) | Consumers ship their own manifest YAML. SDK parses + caches; never embeds. | Accepted (refreshed) |
 | [0010](0010-locale-and-translates.md) | Locale 3-layer (manifest / D1 site_config / data field) + translates pattern. Boot decoupled from `site_config` (issue #60 fix). | Accepted (refreshed) |
-| [0011](0011-adapter-port-spec.md) | Adapter port spec. 5 ports (DB / KV / Session / Assets / OAuth) defined in `clam-cms-runtime`. CF impl + Netlify stub. | Accepted (new) |
+| [0011](0011-adapter-port-spec.md) | Adapter port spec. Required runtime ports plus optional feature ports. CF impl + Netlify stub. | Accepted (new) |
 | [0012](0012-views-as-public-rest.md) | Views auto-expose `GET /api/views/<name>` as the public REST read surface. Schemas never get a public REST endpoint. Filter `eq.value` accepts a `{ $param: <name> }` sentinel; `?page=&show=` reserved for pagination. | Accepted (new) |
+| [0013](0013-agent-provisioned-consumer-projects.md) | Agent-provisioned consumer projects: website prompt → Skill → npm packages → starter setup → first-run provision/seed → owner/MCP handoff. | Accepted (new) |
+| [0014](0014-auth-better-auth-and-multi-tenant-mcp.md) | Better Auth replaces both hand-rolled GitHub OAuth and `@cloudflare/workers-oauth-provider`. `staff` table → `user.role` via admin plugin. MCP splits into `/staff/mcp` (write, scope `mcp:staff`, admin-role) and `/mcp` (read + future user writes, scope `mcp:read`, any signed-in user); surface partition derives from `Procedure.requires.auth.all` predicate, not config flags. Auth port disappears; runtime takes Better Auth instance directly. Platform-agnostic — Netlify / Bun / Deno adapters get the surface for free. | Accepted (new) |
+| [0015](0015-website-archetypes-and-starter-selection.md) | Official-site selector uses website archetypes (`presence`, `publication`, `intake`, `transaction`, `reservation`, `community`, `membership`) as product language. Starters are implementation presets; agents map archetype → closest starter + consumer extension instead of creating starter sprawl. | Accepted (new) |
 
 ## Reading order
 
@@ -24,11 +27,14 @@ If you're new to the codebase:
 3. **0007** — what running the SDK feels like as an AI author (and as the operator agent).
 4. **0011** — the boundary between the runtime and the adapter (most load-bearing for the rebuild).
 5. **0010** — how locale flows through the system.
-6. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
+6. **0013** — how the website prompt, Skills, npm packages, starters, seed, provision, and handoff fit together.
+7. **0015** — how the official site asks what the user wants to build, and how that maps to starters.
+8. **0002, 0008** — the two ADRs that touch every diagnostic and every binding.
 
 ## What's NOT here (and why)
 
-POC had 16 ADRs. The rebuild ports 6, writes 1 fresh, and folds / drops the rest:
+POC had 16 ADRs. The rebuild ports the durable ones, writes fresh ADRs
+for new v0.1.0 boundaries, and folds / drops the rest:
 
 - **POC ADR-0003** OpenAPI emission → folded into `clam-cms-spec` README (the *what* is implementation; the *why* was already captured by ADR-0001's grammar lock).
 - **POC ADR-0004** D1 today, Hyperdrive PG tomorrow → folded into `clam-cms-cloudflare` README (now a v0.2 roadmap item, not an architectural decision).
@@ -37,15 +43,15 @@ POC had 16 ADRs. The rebuild ports 6, writes 1 fresh, and folds / drops the rest
 - **POC ADR-0011** lifecycle binary opt-in → distilled to a §"Lifecycle" subsection in `docs/design-atoms.md`. v0.1.0 ships `simple` only; `editorial` is a v0.1.x feature.
 - **POC ADR-0012** strategic posture vs adjacent CMS designs → strategic / marketing material, lives in `README.md` if anywhere.
 - **POC ADR-0013** role-split surfaces (coder agent vs operator agent) → folded into ADR-0007 (Part B).
-- **POC ADR-0014** builtin handlers and lifecycle Triggers → **promoted to v0.1.0 (commit 4.1)**. Grammar lives in v0.1.0 and the parser accepts both shapes; runtime ships in commits 4.2 (`Trigger.source.kind: lifecycle` via `LifecycleHookingEntryRepository` decorator) and 4.3 (`handler.kind: builtin` via `InvokeBuiltinUseCase`). Until those land the boot validator emits the feature-named code (`LIFECYCLE_NOT_IN_V010` / `HANDLER_BUILTIN_NOT_IN_V010`) so authors get a clear "runtime not yet" instead of a silent no-op. Full shape spec in `docs/design-atoms.md` § "Roadmap" (the subsections retain their v0.1.x-committed framing for shape; only the gate moved).
+- **POC ADR-0014** builtin handlers and lifecycle Triggers → promoted to v0.1.0 and implemented in the rebuild via `LifecycleHookingEntryRepository` and `InvokeBuiltinUseCase`. Editorial lifecycle remains v0.1.x-gated. Full shape spec lives in `docs/design-atoms.md`.
 - **POC ADR-0015** cms-astro internal seam discipline → POC-specific to a package that no longer exists; replaced by ADR-0011 (adapter port spec).
 - **POC ADR-0029** drop Astro from cms-cloudflare → POC-specific historical record; the rebuild starts post-Astro.
 
-The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accumulated multiple *aspirational* boundaries (POC ADR-0015 was one; references in CLAUDE.md were another) without a single normative spec. ADR-0011 makes the boundary explicit and reviewable.
+The rebuild's ADR-0011 (new) is the most load-bearing addition — the POC accumulated multiple *aspirational* boundaries (POC ADR-0015 was one; references in CLAUDE.md were another) without a single normative spec. ADR-0011 makes the boundary explicit and reviewable. ADR-0012 and ADR-0013 capture newer v0.1.0 product/runtime seams that were not present in the POC.
 
 ## Contributing a new ADR
 
-1. Pick the next number (currently 0013).
+1. Pick the next number (currently 0016).
 2. File: `docs/adr/<NNNN>-<kebab-title>.md`.
 3. Sections: Status, Date, Context, Decision, Consequences, Alternatives, How to apply, Implementation status.
 4. Link from this README's table.

@@ -1,12 +1,18 @@
 import type { LifecycleHook } from "@aotterclam/clam-cms-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { HandlerContext } from "../../domain/model/HandlerContext.js";
+import {
+  ctxSnapshotFrom,
+  type DeferredHookDispatcher,
+  type DeferredHookEnvelope,
+} from "../../domain/port/DeferredHookDispatcher.js";
 import type {
   ArchiveEntryArgs,
   CreateEntryArgs,
   DeleteEntryArgs,
   EntryRepository,
   FindEntryByDataFieldArgs,
+  FindEntryByDataFieldsArgs,
   ListEntriesArgs,
   MutationHookFields,
   TransitionStatusArgs,
@@ -48,6 +54,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     private readonly inner: EntryRepository,
     private readonly triggers: TriggerIndex,
     private readonly hooks: LifecycleHookRunner,
+    private readonly deferred?: DeferredHookDispatcher,
   ) {}
 
   async create(args: CreateEntryArgs): Promise<EntryRow> {
@@ -160,22 +167,32 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     return this.inner.findByDataField(args);
   }
 
+  findByDataFields(args: FindEntryByDataFieldsArgs): Promise<EntryRow | null> {
+    return this.inner.findByDataFields(args);
+  }
+
   /**
-   * After-hook execution. Rides on `ctx.waitUntil` when the adapter
-   * populated it (Cloudflare Workers extends the request lifetime past
-   * the response); otherwise inline-awaits because Workers without
-   * `ExecutionContext` (older Astro / non-Workers runtimes / tests)
-   * cancel detached promises when the response is sent. POC PR #41
-   * carry-forward — the inline-await branch trades response latency
-   * for hook-fire reliability.
+   * After-hook execution. Tries delivery rungs in order:
+   *
+   *   1. `deferred.enqueue(envelope)` — adapter-backed deferred path
+   *      (CF Workers Queues, Inngest, pg-boss, …). Survives isolate
+   *      death; consume invocation rehydrates the envelope and re-fires
+   *      via `CmsRuntime.runDeferredHook`. A rejection downgrades to
+   *      the next rung rather than dropping the hook silently.
+   *   2. `ctx.waitUntil(promise)` — adapter-populated fire-and-forget
+   *      bridge (CF Workers `ExecutionContext`). Fast but non-durable:
+   *      isolate death between response and resolution loses the work.
+   *   3. inline `await promise` — non-Workers runtimes (Bun / Node /
+   *      tests) where detached promises get cancelled with the request.
+   *      Trades response latency for hook-fire reliability.
    *
    * Hook throws are surfaced via `RunLifecycleHooksUseCase`'s
    * `errorPolicy` semantics; for `continue` the runner already
-   * `console.error`s and swallows. Anything that escapes here is an
-   * abort-policy throw on a before_* (impossible — the parser rejects
-   * `errorPolicy: abort` on after_* hooks) or an unexpected internal
-   * error; we log and swallow so the mutation result still reaches the
-   * caller.
+   * `console.error`s and swallows. Anything that escapes the inline
+   * branch here is an abort-policy throw on a before_* (impossible —
+   * the parser rejects `errorPolicy: abort` on after_* hooks) or an
+   * unexpected internal error; we log and swallow so the mutation
+   * result still reaches the caller.
    */
   private async fireAfter(
     hook: LifecycleHook,
@@ -183,6 +200,24 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     ctx: HandlerContext,
     args: MutationHookFields,
   ): Promise<void> {
+    if (this.deferred && this.triggers.forHook(entry.collection, hook).length > 0) {
+      const envelope: DeferredHookEnvelope = {
+        hook,
+        schema: entry.collection,
+        entry,
+        originalInput: args.originalInput,
+        ctxSnapshot: ctxSnapshotFrom(ctx),
+      };
+      try {
+        await this.deferred.enqueue(envelope);
+        return;
+      } catch (err) {
+        console.error(
+          `[lifecycle] deferred enqueue for ${hook} on ${entry.collection}/${entry.id} failed; falling back`,
+          err,
+        );
+      }
+    }
     const promise = this.hooks.run({
       hook,
       schema: entry.collection,

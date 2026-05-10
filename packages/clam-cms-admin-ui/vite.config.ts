@@ -20,7 +20,7 @@ const rootPackage = JSON.parse(
  * if the SPA grows past ~1 MB.
  *
  * Dev workflow (one port, 8787):
- *   Terminal 1:  cd starters/blog && pnpm dev
+ *   Terminal 1:  cd starters/publication && pnpm dev
  *   Terminal 2:  pnpm -F @aotterclam/clam-cms-admin-ui watch
  *
  * `watch` runs `vite build --watch` so every source edit auto-rebuilds

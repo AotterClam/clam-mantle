@@ -3,6 +3,8 @@ import {
   redactForWire,
   type ContentState,
   type SchemaManifest,
+  type StaffRole,
+  type ViewManifest,
 } from "@aotterclam/clam-cms-spec";
 import {
   ArchiveUseCase,
@@ -14,12 +16,19 @@ import {
   UnpublishUseCase,
   UpdateDraftUseCase,
 } from "../../usecase/content/index.js";
+import {
+  CommitMediaUploadUseCase,
+  CreateMediaUploadUseCase,
+} from "../../usecase/media/index.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
+import { ExecuteViewUseCase } from "../../usecase/view/index.js";
 import {
   CREATE_DRAFT_PREFIX,
+  QUERY_VIEW_PREFIX,
   UPDATE_DRAFT_PREFIX,
   buildMcpToolCatalog,
   extractCollectionSegment,
+  type McpToolSurface,
   type McpToolDefinition,
 } from "./McpToolCatalog.js";
 import {
@@ -27,31 +36,14 @@ import {
   jsonRpcOk,
   jsonRpcOkRaw,
 } from "./McpResponses.js";
-import type { Staff } from "../../domain/model/Staff.js";
 
-/**
- * `McpJsonRpcDispatcher` — JSON-RPC dispatcher for the MCP transport.
- * Env-agnostic — the adapter resolves the caller's identity via
- * `OAuthVerifier.verifyAccessToken` and hands `dispatch` a
- * `McpAuthContext` plus the use-case bag.
- *
- * v0.1.0 surfaces a per-collection authoring catalog
- * (`create_draft_<collection>`, `update_draft_<collection>` for each
- * Schema in the manifest set, with the Schema's properties inlined
- * into the tool's `inputSchema`) plus generic read/status tools
- * (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`,
- * `archive_entry`).
- * Boot validation refuses Schemas whose names mangle to the same
- * tool-name suffix.
- *
- * Thin adapter per the clean-arch rule — JSON-RPC envelope handling
- * only, no business logic.
- */
+/** JSON-RPC dispatcher for the MCP transport. Env-agnostic; the
+ *  adapter resolves the caller's identity and hands `dispatch` a
+ *  `McpAuthContext` plus the use-case bag. */
 export interface McpAuthContext {
   readonly userId: string;
-  /** Resolved staff row for the authenticated user. Null when the user
-   *  is not staff (e.g. a service-account token with no staff row). */
-  readonly staff: Staff | null;
+  /** Caller's staff role; null for non-staff bearers. */
+  readonly staff: { readonly userId: string; readonly role: StaffRole } | null;
 }
 
 /**
@@ -68,6 +60,13 @@ export interface McpUseCases {
   readonly unpublish: UnpublishUseCase;
   readonly archive: ArchiveUseCase;
   readonly deleteEntry: DeleteEntryUseCase;
+  readonly executeView?: ExecuteViewUseCase;
+  /** Optional. When set, `create_media_upload` and `commit_media_upload`
+   *  appear in the catalog and route here. */
+  readonly media?: {
+    readonly createUpload: CreateMediaUploadUseCase;
+    readonly commitUpload: CommitMediaUploadUseCase;
+  };
 }
 
 export class McpJsonRpcDispatcher {
@@ -78,16 +77,28 @@ export class McpJsonRpcDispatcher {
    *  segment from the tool name and recovers the canonical
    *  collection name. */
   private readonly schemaBySegment: ReadonlyMap<string, string>;
+  private readonly viewBySegment: ReadonlyMap<string, ViewManifest>;
 
   constructor(
     private readonly useCases: McpUseCases,
     private readonly schemas: ReadonlyArray<SchemaManifest>,
+    private readonly options: {
+      readonly surface?: McpToolSurface;
+      readonly views?: ReadonlyArray<ViewManifest>;
+    } = {},
   ) {
-    this.catalog = buildMcpToolCatalog(schemas);
+    this.catalog = buildMcpToolCatalog(schemas, {
+      surface: options.surface ?? "staff",
+      mediaEnabled: useCases.media !== undefined,
+      views: options.views,
+    });
     this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;
     const map = new Map<string, string>();
     for (const s of schemas) map.set(mcpToolNameSegment(s.metadata.name), s.metadata.name);
     this.schemaBySegment = map;
+    const views = new Map<string, ViewManifest>();
+    for (const v of options.views ?? []) views.set(mcpToolNameSegment(v.metadata.name), v);
+    this.viewBySegment = views;
   }
 
   async dispatch(req: Request, auth: McpAuthContext): Promise<Response> {
@@ -111,7 +122,7 @@ export class McpJsonRpcDispatcher {
         return jsonRpcOk(id, {
           protocolVersion: "2025-03-26",
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "@aotterclam/clam-cms-runtime/mcp", version: "0.0.6-alpha" },
+          serverInfo: { name: "@aotterclam/clam-cms-runtime/mcp", version: "0.0.7-alpha" },
         });
       case "tools/list":
         return jsonRpcOkRaw(id, this.catalogWireJson);
@@ -148,7 +159,11 @@ export class McpJsonRpcDispatcher {
       if (e instanceof DiagnosticError) {
         return jsonRpcError(reqId, -32000, e.diagnostic.message, redactForWire(e.diagnostic));
       }
-      return jsonRpcError(reqId, -32000, (e as Error).message);
+      // Don't leak raw exception strings to MCP clients — adapter
+      // exceptions can carry binding / driver detail. Real cause goes
+      // to server-side logs; the wire stays opaque.
+      console.error("[McpJsonRpcDispatcher] unhandled tool-call error", e);
+      return jsonRpcError(reqId, -32000, "Internal error.");
     }
   }
 
@@ -157,6 +172,23 @@ export class McpJsonRpcDispatcher {
     args: Record<string, unknown>,
     auth: McpAuthContext,
   ): Promise<unknown | typeof UNKNOWN_TOOL | typeof MISSING_ARG> {
+    if ((this.options.surface ?? "staff") === "public") {
+      const viewSegment = extractCollectionSegment(name, QUERY_VIEW_PREFIX);
+      if (!viewSegment) return UNKNOWN_TOOL;
+      const view = this.viewBySegment.get(viewSegment);
+      if (!view || !this.useCases.executeView) return UNKNOWN_TOOL;
+      const result = await this.useCases.executeView.execute({
+        view,
+        options: {
+          params: stripViewReservedArgs(args),
+          page: typeof args["page"] === "number" ? args["page"] : undefined,
+          show: typeof args["show"] === "number" ? args["show"] : undefined,
+        },
+        pathPrefix: `MCP ${name}`,
+      });
+      return result;
+    }
+
     switch (name) {
       case "list_entries": {
         const collection = args["collection"];
@@ -187,6 +219,31 @@ export class McpJsonRpcDispatcher {
         const expected = args["expected_version"];
         if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
         return this.useCases.archive.execute({ id, expectedVersion: expected });
+      }
+      case "create_media_upload": {
+        if (!this.useCases.media) return UNKNOWN_TOOL;
+        const filename = args["filename"];
+        const mimeType = args["mimeType"];
+        if (typeof filename !== "string" || typeof mimeType !== "string") return MISSING_ARG;
+        return this.useCases.media.createUpload.execute({
+          filename,
+          mimeType,
+          byteSize: typeof args["byteSize"] === "number" ? args["byteSize"] : undefined,
+          alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
+          caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
+          purpose: typeof args["purpose"] === "string" ? args["purpose"] : undefined,
+        });
+      }
+      case "commit_media_upload": {
+        if (!this.useCases.media) return UNKNOWN_TOOL;
+        const uploadId = args["uploadId"];
+        if (typeof uploadId !== "string") return MISSING_ARG;
+        return this.useCases.media.commitUpload.execute({
+          uploadId,
+          alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
+          caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
+          checksum: typeof args["checksum"] === "string" ? args["checksum"] : undefined,
+        });
       }
       default: {
         // Per-collection authoring tools: `create_draft_<segment>` /
@@ -253,6 +310,12 @@ function stripReservedArgs(args: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
+const VIEW_RESERVED_ARG_KEYS: readonly string[] = ["page", "show"];
+function stripViewReservedArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (VIEW_RESERVED_ARG_KEYS.includes(k)) continue;
+    out[k] = v;
+  }
+  return out;
 }

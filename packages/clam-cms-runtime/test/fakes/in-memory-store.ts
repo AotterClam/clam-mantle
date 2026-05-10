@@ -11,6 +11,7 @@ import type {
   DeleteEntryArgs,
   EntryRepository,
   FindEntryByDataFieldArgs,
+  FindEntryByDataFieldsArgs,
   ListEntriesArgs,
   TransitionStatusArgs,
   UpdateEntryArgs,
@@ -121,6 +122,18 @@ export class InMemoryEntryRepository implements EntryRepository {
       .filter((row) => row.collection === args.collection)
       .filter((row) => (args.status ? row.status === args.status : true))
       .filter((row) => row.data[args.field] === args.value)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return matches[0] ?? null;
+  }
+
+  async findByDataFields(args: FindEntryByDataFieldsArgs): Promise<EntryRow | null> {
+    const fields = Object.entries(args.fields);
+    if (fields.length === 0) return null;
+    const matches = [...this.rows.values()]
+      .filter((row) => row.collection === args.collection)
+      .filter((row) => (args.status ? row.status === args.status : true))
+      .filter((row) => (args.excludeId ? row.id !== args.excludeId : true))
+      .filter((row) => fields.every(([field, value]) => row.data[field] === value))
       .sort((a, b) => b.updatedAt - a.updatedAt);
     return matches[0] ?? null;
   }

@@ -1,0 +1,55 @@
+name: Feature request
+description: Request a concrete new capability.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or agent job is blocked?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should clam-cms do?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - area:runtime
+        - area:spec
+        - area:cf
+        - area:starters
+        - area:skills
+        - area:admin-ui
+        - area:docs
+        - area:adapter
+        - unknown
+    validations:
+      required: true
+  - type: textarea
+    id: agent_dx
+    attributes:
+      label: AI-author DX
+      description: How does this make agent-authored projects safer or clearer?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gates
+      options:
+        - label: This changes manifest grammar or closed enums and needs `needs-grammar-revise`.
+        - label: This changes architecture or a trust boundary and needs `needs-adr`.
+        - label: This is not converged and needs `needs-discussion`.
+        - label: This is exploratory and should be labeled `spike`.

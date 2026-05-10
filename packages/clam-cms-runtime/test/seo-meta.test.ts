@@ -9,12 +9,12 @@ import { ComposeEntrySeoMetaUseCase } from "../src/usecase/render/ComposeEntrySe
 import { InMemoryDatabase } from "./fakes/database.js";
 
 const site: SiteConfig = {
-  title: "Clam Blog",
+  title: "Clam Publication",
   description: "Reference starter",
   origin: "https://example.com",
   locales: ["en", "zh-TW"],
   canonicalLocale: "en",
-  brand: "Clam Blog",
+  brand: "Clam Publication",
 };
 
 function makeEntry(overrides: Partial<Entry> = {}): Entry {
