@@ -73,7 +73,7 @@ function rewriteJson(path, fn) {
 
 function readPackageVersion() {
   const json = JSON.parse(readFileSync("package.json", "utf8"));
-  return json.version ?? "0.0.6-alpha";
+  return json.version ?? "0.0.7-alpha";
 }
 
 function rewriteWorkspaceMantleDeps(deps, version) {
