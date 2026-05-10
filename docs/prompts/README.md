@@ -26,7 +26,7 @@ Prompts use `{name}` placeholders for values the official site collects from the
 - `{description}` — one-line site description
 - `{github_username}` — the user's GitHub login (becomes `ADMIN_GITHUB_LOGIN`)
 - `{locales}` — JSON array, e.g. `["en", "zh-TW"]`
-- `{mantle_version}` — pinned npm package version, e.g. `0.0.6-alpha`
+- `{mantle_version}` — pinned npm package version, e.g. `0.0.7-alpha`
 - `{template_ref}` — Git ref for starter template copy, e.g. `main` or a release tag
 - `{skill_url}` — raw GitHub URL for the install Skill, pinned to the same ref
 
