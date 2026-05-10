@@ -26,7 +26,7 @@ The prompt should include these fields. Parse them before asking the user anythi
 
 ```yaml
 clam_cms_request:
-  clam_cms_version: "0.0.6-alpha"
+  clam_cms_version: "0.0.7-alpha"
   template_ref: "main"
   skill_url: "https://raw.githubusercontent.com/AotterClam/clam-cms/<ref>/skills/install/SKILL.md"
   starter: "publication" # publication | blank (others are roadmap; see Starter Families)
@@ -225,7 +225,7 @@ Normalize:
 - `starter`: `publication` or `blank` for v0.1.0 install. Other family slugs (`leads-inbox`, `micro-shop`, etc.) only valid for documented-variant install paths or future v0.2+ starters.
 - `locales`: keep order. First locale is canonical.
 - `brand`, `description`, `origin`: pass confirmed public copy to `setup:site`. `origin` may stay `https://example.com` until provision knows the Workers URL.
-- `clam_cms_version`: npm package version. Default to the version from the website prompt, currently `0.0.6-alpha`.
+- `clam_cms_version`: npm package version. Default to the version from the website prompt, currently `0.0.7-alpha`.
 - `template_ref`: Git ref used only to copy starter files. For the current npm-first alpha, use `main` unless the website prompt provides a newer release tag. Avoid floating `develop` unless the user is explicitly testing unreleased code.
 
 ### 2. Fetch the pinned starter template

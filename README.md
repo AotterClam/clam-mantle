@@ -4,7 +4,7 @@
 
 Agent-native headless CMS where AI agents are first-class authors — locked-grammar manifests, structured JSON diagnostics, and static `.md` mirrors every agent can crawl without auth. Most CMSes treat AI as a content editor; clam-cms treats it as the developer.
 
-> **0.0.6-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/AotterClam/clam-cms/issues/1).
+> **0.0.7-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/AotterClam/clam-cms/issues/1).
 
 ## Part of CLAM
 

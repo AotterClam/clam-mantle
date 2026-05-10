@@ -1,6 +1,6 @@
 {
   "name": "@aotterclam/starter-publication",
-  "version": "0.0.6-alpha",
+  "version": "0.0.7-alpha",
   "private": true,
   "description": "Reference publication starter for clam-cms v0.1.0 — owner-published content (articles / pages / docs-lite / basic contact form). Localized posts via translates; contact form via builtin + lifecycle hooks. Runs on wrangler dev with local D1 + KV.",
   "type": "module",

@@ -116,4 +116,4 @@ steps unless they are debugging a failed provision.
   current agent workflow.
 - `starters/blog` and `starters/blank` both ship `setup:site`.
 - `starters/blog` ships `provision:up` and `seed:initial`.
-- `0.0.6-alpha` npm packages are the current install target.
+- `0.0.7-alpha` npm packages are the current install target.
