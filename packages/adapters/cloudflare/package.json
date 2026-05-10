@@ -3,11 +3,11 @@
   "version": "0.0.7-alpha",
   "description": "Cloudflare Workers adapter for mantle. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Better Auth (admin + mcp plugins) for sign-in + bearer-token validation.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/aotter/mantle/tree/main/packages/mantle-cloudflare",
+  "homepage": "https://github.com/aotter/mantle/tree/main/packages/adapters/cloudflare",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aotter/mantle.git",
-    "directory": "packages/mantle-cloudflare"
+    "directory": "packages/adapters/cloudflare"
   },
   "type": "module",
   "sideEffects": false,

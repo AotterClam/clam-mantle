@@ -125,7 +125,7 @@ mkdir -p /private/tmp/mantle-pack-check
 pnpm -C packages/mantle-spec pack --pack-destination /private/tmp/mantle-pack-check
 pnpm -C packages/mantle-admin-ui pack --pack-destination /private/tmp/mantle-pack-check
 pnpm -C packages/mantle-runtime pack --pack-destination /private/tmp/mantle-pack-check
-pnpm -C packages/mantle-cloudflare pack --pack-destination /private/tmp/mantle-pack-check
+pnpm -C packages/adapters/cloudflare pack --pack-destination /private/tmp/mantle-pack-check
 ```
 
 Confirm each tarball contains only intended `dist`, `README.md`,

@@ -29,7 +29,7 @@ This README declares the public commitment to a second adapter. PR reviewers can
 - `AssetServer` → Netlify static publish dir (consumes `mantle-admin-ui` dist same as Cloudflare)
 - Better Auth factory → Netlify-compatible database adapter, GitHub/social providers, and MCP OAuth/DCR
 
-The port interface is documented in [`docs/adr/0011-adapter-port-spec.md`](../../docs/adr/0011-adapter-port-spec.md).
+The adapter implementation entry point is [`docs/adapter-guide.md`](../../docs/adapter-guide.md). The port contract is documented in [`docs/adr/0011-adapter-port-spec.md`](../../docs/adr/0011-adapter-port-spec.md).
 
 ## Want this sooner?
 
@@ -37,4 +37,4 @@ Open an issue. Implementation work for the second adapter is a discrete chunk; o
 
 ## Until v0.2
 
-Use [`@aotter/mantle-cloudflare`](../mantle-cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).
+Use [`@aotter/mantle-cloudflare`](../cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).

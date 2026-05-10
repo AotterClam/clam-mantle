@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotter/mantle-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
-import { InMemoryDatabase } from "../../mantle-runtime/test/fakes/database.js";
+import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,
