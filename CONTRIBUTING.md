@@ -52,7 +52,7 @@ Use these prefixes:
 - `docs/issue-NN-topic` for documentation-only changes.
 - `chore/issue-NN-topic` for tooling, metadata, dependency, or maintenance work.
 
-If no issue exists, create one first unless the change is obviously trivial.
+If no issue exists, create one first unless the change is obviously trivial. For trivial no-issue work, omit the `issue-NN` segment and keep the branch descriptive, for example `docs/spec-readme-typo` or `chore/update-ci-comment`.
 
 ## Commits
 
@@ -97,6 +97,7 @@ Open PRs against `develop`. A useful PR body includes:
 - Why the change is needed.
 - Scope and non-goals.
 - Test plan with commands actually run.
+- Any standard checks that were not run, marked as not applicable with a short reason.
 - Follow-ups that should not block this PR.
 - Related issues, ADRs, and docs.
 
