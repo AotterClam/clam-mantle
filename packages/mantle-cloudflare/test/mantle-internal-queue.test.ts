@@ -122,6 +122,46 @@ describe("createQueueHandler", () => {
     expect(messages.every((m) => !m.retried)).toBe(true);
   });
 
+  it("retryAll()s the batch and increments per-message attempts when cmsRef.get rejects", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cmsRef = {
+      get: async (): Promise<CmsRuntime> => {
+        throw new Error("d1 unreachable");
+      },
+    };
+    const handler = createQueueHandler<unknown>(cmsRef);
+    let retryAllCalled = false;
+    const messages = [
+      { acked: false, retried: false },
+      { acked: false, retried: false },
+    ];
+    const batch = {
+      queue: "mantle_internal",
+      messages: messages.map((m, i) => ({
+        id: `msg-${i}`,
+        timestamp: new Date(),
+        body: sampleEnvelope,
+        attempts: 1,
+        ack: () => {
+          m.acked = true;
+        },
+        retry: () => {
+          m.retried = true;
+        },
+      })),
+      ackAll: () => {},
+      retryAll: () => {
+        retryAllCalled = true;
+        for (const m of messages) m.retried = true;
+      },
+    } as unknown as MessageBatch<AfterHookEnvelope>;
+    await handler(batch, {});
+    expect(retryAllCalled).toBe(true);
+    // Per-message ack/retry MUST NOT have been called — the loop never started.
+    expect(messages.every((m) => !m.acked)).toBe(true);
+    errSpy.mockRestore();
+  });
+
   it("retry()s the message and continues the batch when the hook throws", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     let callCount = 0;
