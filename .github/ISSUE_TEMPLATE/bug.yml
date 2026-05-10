@@ -1,0 +1,82 @@
+name: Bug report
+description: Report broken, surprising, or unsafe behavior.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include secrets or vulnerability details here; use Security Advisories for security reports.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Include commands, manifest snippets, requests, or minimal repo steps.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - area:runtime
+        - area:spec
+        - area:cf
+        - area:starters
+        - area:skills
+        - area:admin-ui
+        - area:docs
+        - area:adapter
+        - unknown
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Logs or diagnostics
+      description: Paste structured diagnostics, stack traces, or command output.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Package version, Node, pnpm, platform, adapter, and browser if relevant.
+      placeholder: |
+        package/version:
+        node:
+        pnpm:
+        adapter:
+        platform:
+    validations:
+      required: true
+  - type: checkboxes
+    id: gates
+    attributes:
+      label: Gates
+      options:
+        - label: This may involve manifest grammar or closed enums.
+        - label: This may involve auth, MCP, HTTP, persistence, or another trust boundary.
+        - label: I checked existing issues and ADRs.
