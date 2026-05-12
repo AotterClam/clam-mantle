@@ -9,7 +9,7 @@ applies_to: mantle@v0.1.0
 
 # `publication` archetype
 
-Follow [Mantle persona](../SKILL.md). This file only adds the archetype-specific register hints.
+Follow [the install SKILL](../SKILL.md). The Mantle voice rules from that SKILL apply only when writing the welcome letter — the register hints below feed into `card1` and `card3` of that letter.
 
 ## What this is
 
