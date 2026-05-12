@@ -1,6 +1,6 @@
 {
   "name": "@aotter/create-mantle",
-  "version": "0.0.7-alpha",
+  "version": "0.0.8-alpha",
   "description": "npx scaffolder for mantle consumer projects. Fetches the starters monorepo tarball, merges _common/ + <archetype>/ into the user's directory, fills {{PLACEHOLDER}} macros, and prints RUN_NOTES JSON for the Mantle install skill.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/aotter/mantle/tree/main/packages/create-mantle",
