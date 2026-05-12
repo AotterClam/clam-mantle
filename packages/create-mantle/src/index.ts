@@ -9,12 +9,30 @@ import {
 } from "node:fs";
 import { join, relative } from "node:path";
 import { findLeftovers, substitute, type PlaceholderValues } from "./placeholder.js";
-import { resolveSource, type ArchetypeSource } from "./sources.js";
+import {
+  fetchSourcesJson,
+  resolveArchetype,
+  resolveTheme,
+  STALE_FALLBACK_SOURCES,
+  type ArchetypeSource,
+  type SourcesJson,
+  type ThemeSource,
+} from "./sources.js";
 import { cleanupTempDir, downloadAndExtractTarball } from "./tarball.js";
 
-export type { ArchetypeSource } from "./sources.js";
+export type { ArchetypeSource, SourcesJson, ThemeSource } from "./sources.js";
 export type { PlaceholderValues } from "./placeholder.js";
-export { SOURCES, ROADMAP_ARCHETYPES, resolveSource } from "./sources.js";
+export {
+  STARTERS_REPO,
+  PREMIUM_REPO,
+  STALE_FALLBACK_SOURCES,
+  SOURCES,
+  ROADMAP_ARCHETYPES,
+  fetchSourcesJson,
+  resolveArchetype,
+  resolveTheme,
+  resolveSource,
+} from "./sources.js";
 export { substitute, findLeftovers } from "./placeholder.js";
 
 export interface CreateOptions {
@@ -26,6 +44,8 @@ export interface CreateOptions {
   readonly locales: ReadonlyArray<string>;
   readonly githubOwner: string;
   readonly summary: string;
+  /** Optional theme overlay key (resolves against `sources.themes`). */
+  readonly theme?: string | null;
   /** Override the starter ref (e.g., release tag); defaults to `main`. */
   readonly starterRef?: string;
   /** Skip `pnpm install` (used in tests). */
@@ -36,7 +56,9 @@ export interface CreateOptions {
 
 export interface RunNotes {
   readonly archetype: string;
+  readonly theme: string | null;
   readonly starter_source: string;
+  readonly theme_source: string | null;
   readonly overlays: ReadonlyArray<string>;
   readonly files_written: ReadonlyArray<string>;
   readonly next_step: string;
@@ -68,16 +90,19 @@ const FILE_EXTENSIONS_FOR_SUBSTITUTION = new Set([
 
 /**
  * Bootstrap a new mantle consumer project from the starters
- * monorepo. Returns a RunNotes shape the install Skill prints to the
- * user via Mantle persona handoff.
+ * monorepo. Fetches `sources.json` at the requested ref, downloads
+ * the tarball, merges `_common/` + `<archetype>/` + (optional)
+ * `themes/<theme-key>/` into the destination, substitutes
+ * `{{PLACEHOLDER}}` macros, and returns a RunNotes shape.
  */
 export async function createMantle(opts: CreateOptions): Promise<RunNotes> {
-  const source = resolveSource(opts.archetype);
   const ref = opts.starterRef ?? "main";
+  const sources = await fetchSourcesJson(ref);
+  const source = resolveArchetype(opts.archetype, sources);
 
   const extractedRoot = downloadAndExtractTarball(source, ref);
   try {
-    return installFromExtractedRoot({ ...opts, extractedRoot });
+    return installFromExtractedRoot({ ...opts, extractedRoot, sources });
   } finally {
     cleanupTempDir(extractedRoot);
   }
@@ -86,15 +111,22 @@ export async function createMantle(opts: CreateOptions): Promise<RunNotes> {
 /**
  * Pure-local variant for tests + reuse: given an already-extracted
  * starters tree, merge + substitute + finalize against `destination`.
- * Skips git init and pnpm install when those opts are set.
+ * `sources` defaults to the bundled stale fallback when omitted.
  */
 export function installFromExtractedRoot(
-  opts: CreateOptions & { extractedRoot: string },
+  opts: CreateOptions & {
+    extractedRoot: string;
+    sources?: SourcesJson;
+  },
 ): RunNotes {
-  const source = resolveSource(opts.archetype);
+  const sources = opts.sources ?? STALE_FALLBACK_SOURCES;
+  const source = resolveArchetype(opts.archetype, sources);
+  const themeSource = resolveTheme(opts.theme ?? null, sources);
+
   const filesWritten = mergeStarterIntoDestination({
     extractedRoot: opts.extractedRoot,
     source,
+    themeSource,
     destination: opts.destination,
   });
   const values = buildPlaceholderValues(opts);
@@ -109,7 +141,9 @@ export function installFromExtractedRoot(
   }
   return {
     archetype: opts.archetype,
+    theme: opts.theme ?? null,
     starter_source: `${source.repo}/${source.path}`,
+    theme_source: themeSource ? `${source.repo}/${themeSource.path}` : null,
     overlays: source.overlays ?? [],
     files_written: filesWritten,
     next_step:
@@ -134,12 +168,16 @@ function buildPlaceholderValues(opts: CreateOptions): PlaceholderValues {
 function mergeStarterIntoDestination(args: {
   extractedRoot: string;
   source: ArchetypeSource;
+  themeSource: ThemeSource | null;
   destination: string;
 }): ReadonlyArray<string> {
   const layers: string[] = [join(args.extractedRoot, "_common")];
   layers.push(join(args.extractedRoot, args.source.path));
   for (const overlay of args.source.overlays ?? []) {
     layers.push(join(args.extractedRoot, overlay));
+  }
+  if (args.themeSource) {
+    layers.push(join(args.extractedRoot, args.themeSource.path));
   }
   const writtenSet = new Set<string>();
   for (const layer of layers) {

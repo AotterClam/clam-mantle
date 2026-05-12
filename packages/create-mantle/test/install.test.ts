@@ -179,4 +179,71 @@ describe("installFromExtractedRoot", () => {
       }),
     ).toThrow(/unsubstituted/);
   });
+
+  it("applies a theme overlay on top of the archetype starter", () => {
+    const extractedRoot = fixtureExtractedRoot();
+    // Add a theme overlay that overrides the archetype's mantleConfig.ts
+    // and adds a token file the base doesn't carry.
+    mkdirSync(join(extractedRoot, "themes", "l4-test", "src", "theme"), {
+      recursive: true,
+    });
+    writeFile(
+      join(extractedRoot, "themes", "l4-test", "src", "mantleConfig.ts"),
+      `export const config = { brand: "{{BRAND}}", origin: "{{SITE_URL}}", theme: "l4-test" };\n`,
+    );
+    writeFile(
+      join(extractedRoot, "themes", "l4-test", "src", "theme", "tokens.ts"),
+      `export const TOKENS_CSS = "--paper: #fff; --ink: #111;";\n`,
+    );
+
+    const destination = join(tempRoot, "out-theme");
+    mkdirSync(destination, { recursive: true });
+
+    const notes = installFromExtractedRoot({
+      ...commonOpts(),
+      archetype: "publication",
+      theme: "l4-test",
+      destination,
+      extractedRoot,
+      sources: {
+        archetypes: { publication: { path: "publication" } },
+        themes: { "l4-test": { path: "themes/l4-test" } },
+        roadmap: [],
+      },
+    });
+
+    expect(notes.theme).toBe("l4-test");
+    expect(notes.theme_source).toBe(
+      "aotter/mantle-starters/themes/l4-test",
+    );
+
+    // Theme overlay wins: mantleConfig.ts now has `theme: "l4-test"`.
+    const cfg = readFileSync(
+      join(destination, "src", "mantleConfig.ts"),
+      "utf8",
+    );
+    expect(cfg).toContain('theme: "l4-test"');
+    expect(cfg).toContain('brand: "Lab Cafe"');
+
+    // Theme-added file is present.
+    expect(
+      existsSync(join(destination, "src", "theme", "tokens.ts")),
+    ).toBe(true);
+  });
+
+  it("reports theme: null and theme_source: null when no theme requested", () => {
+    const extractedRoot = fixtureExtractedRoot();
+    const destination = join(tempRoot, "out-no-theme");
+    mkdirSync(destination, { recursive: true });
+
+    const notes = installFromExtractedRoot({
+      ...commonOpts(),
+      archetype: "publication",
+      destination,
+      extractedRoot,
+    });
+
+    expect(notes.theme).toBeNull();
+    expect(notes.theme_source).toBeNull();
+  });
 });
