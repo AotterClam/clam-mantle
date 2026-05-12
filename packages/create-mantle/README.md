@@ -1,9 +1,10 @@
 # `@aotter/create-mantle`
 
-npx scaffolder for mantle v0.1.0 consumer projects.
+npx scaffolder for mantle v0.1.0 consumer projects. **Not published to npm** — distributed as a tarball attached to each `mantle` GitHub release. `npx` resolves the URL directly, so installs don't require an npm registry round-trip.
 
 ```bash
-npx @aotter/create-mantle@<version> <archetype> \
+npx https://github.com/aotter/mantle/releases/download/v0.0.8-alpha/aotter-create-mantle-0.0.8-alpha.tgz \
+  <archetype> \
   --project-name <name> \
   --brand "<brand>" \
   --description "<one-line>" \
@@ -11,6 +12,8 @@ npx @aotter/create-mantle@<version> <archetype> \
   --github-owner <gh-login> \
   --summary "<Mantle's one-line install description>"
 ```
+
+The Mantle install skill ([`skills/install/SKILL.md`](../../skills/install/SKILL.md)) interpolates this URL pinned to the release the skill itself is read from.
 
 ## What it does
 

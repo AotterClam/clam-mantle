@@ -72,10 +72,11 @@ If anything below that is missing, ask one more concrete question. Above that, s
 ## When to act
 
 1. Confirm the synthesized draft. The user accepts or corrects.
-2. Run `create-mantle` non-interactively:
+2. Run `create-mantle` non-interactively. The package is distributed as a tarball attached to the matching `mantle` GitHub release — `npx` eats the release URL directly, no npm publish required:
 
 ```bash
-npx @aotter/create-mantle@<version> <archetype> \
+npx https://github.com/aotter/mantle/releases/download/v0.0.8-alpha/aotter-create-mantle-0.0.8-alpha.tgz \
+  <archetype> \
   --project-name "<lowercase-hyphenated>" \
   --brand "<brand>" \
   --description "<one line>" \
@@ -84,7 +85,7 @@ npx @aotter/create-mantle@<version> <archetype> \
   --summary "<your one-line install description>"
 ```
 
-The package handles tarball fetch, `_common/` + `<archetype>/` merge, `{{PLACEHOLDER}}` substitution per [ADR-0016](../../docs/adr/0016-site-semantic-layer.md), `.template` renames, `git init`, and `pnpm install`. It prints a `RUN_NOTES` JSON shape on stdout when done.
+Pin against the same release tag as the SKILL URL you're reading from — the landing page interpolates both. The package handles tarball fetch (of `mantle-starters`), `_common/` + `<archetype>/` merge, `{{PLACEHOLDER}}` substitution per [ADR-0016](../../docs/adr/0016-site-semantic-layer.md), `.template` renames, `git init`, and `pnpm install`. It prints a `RUN_NOTES` JSON shape on stdout when done.
 
 3. Read the RUN_NOTES. The `files_written` list tells you what landed. `mantle/site.md` is the one you now own.
 
