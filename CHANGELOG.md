@@ -6,6 +6,26 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.8-alpha] - 2026-05-12
+
+### Added
+
+- ADR-0016 site semantic layer: `AGENTS.md` (cross-tool entry) + `mantle/site.md` (Mantle's frontmatter + section bodies), filled from `{{PLACEHOLDER}}` templates and updated atomically (#107).
+- `@aotter/create-mantle` npx scaffolder: fetches the starters monorepo tarball, merges `_common/` + `<archetype>/`, substitutes ADR-0016 placeholders, prints RUN_NOTES JSON. Replaces the manual `curl … | tar -xzf` + `setup:site` ritual (#109).
+- 8 archetype briefs under `skills/install/archetypes/` — 4 ready/extension (`presence`, `publication`, `intake`, `blank`) + 4 roadmap-refuse (`transaction`, `reservation`, `community`, `membership`) (#110).
+
+### Changed
+
+- `skills/install/SKILL.md` rewritten as a Mantle-persona interview brief (~140 lines, down from 396); no more `mantle_request:` YAML block — Mantle gathers `brand` / `locales` / GitHub identity by conversation (#110).
+- `skills/provision/SKILL.md` realigned to Mantle voice on user-facing strings; updates `mantle/site.md` `site_url:` + `revisions:` after deploy per ADR-0016. Stale `--seed-file` / `seed:initial` references removed (#111).
+- `docs/prompts/` collapsed to single-sentence two-URL format; SKILL_INSTALL_URL + SKILL_ARCHETYPE_URL replace the YAML block (#110).
+- CLAUDE.md table points at the starters monorepo `aotter/mantle-starters` (admin rename of `mantle-starters` is pending; auto-redirect keeps the old URL working).
+
+### Removed
+
+- `starters/blank/` migrated out of this SDK monorepo into `aotter/mantle-starters/blank/`. SDK keeps a stub README pointing outward, same engineering forcing function as `packages/adapters/netlify/` (#108).
+- `pnpm-workspace.yaml` no longer includes `starters/*`; root `check:starters` script removed.
+
 ## [0.0.7-alpha] - 2026-05-10
 
 ### Added
@@ -28,6 +48,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 - Alpha rebuild packages and starters for the v0.1.0 development line.
 
-[Unreleased]: https://github.com/aotter/mantle/compare/v0.0.7-alpha...HEAD
+[Unreleased]: https://github.com/aotter/mantle/compare/v0.0.8-alpha...HEAD
+[0.0.8-alpha]: https://github.com/aotter/mantle/compare/v0.0.7-alpha...v0.0.8-alpha
 [0.0.7-alpha]: https://github.com/aotter/mantle/compare/v0.0.6-alpha...v0.0.7-alpha
 [0.0.6-alpha]: https://github.com/aotter/mantle/releases/tag/v0.0.6-alpha
