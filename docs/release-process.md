@@ -111,6 +111,15 @@ repo remote, and uses npm as the runtime dependency source.
 
 Do **not** publish `@aotterclam/clam-cms-netlify` while it is a stub.
 
+`@aotterclam/create-clam-cms` is **not** published to npm — it ships as
+a `pnpm pack` tarball attached to each GitHub release, and the install
+skill invokes it via `npx <release-tarball-url>`. The
+`release-create-clam-cms` workflow builds + uploads the tarball
+automatically on every `v*-alpha` / `v*-beta.*` / `v*.*.*` tag push;
+no manual `npm publish` step. The scaffolder evolves on a faster
+cadence than the SDK and is intentionally outside the published
+library surface.
+
 ### Pre-publish checks
 
 Run the full gate before publishing:

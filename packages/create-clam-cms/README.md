@@ -1,9 +1,10 @@
 # `@aotterclam/create-clam-cms`
 
-npx scaffolder for clam-cms v0.1.0 consumer projects.
+npx scaffolder for clam-cms v0.1.0 consumer projects. **Not published to npm** — distributed as a tarball attached to each `clam-cms` GitHub release. `npx` resolves the URL directly, so installs don't require an npm registry round-trip.
 
 ```bash
-npx @aotterclam/create-clam-cms@<version> <archetype> \
+npx https://github.com/AotterClam/clam-cms/releases/download/v0.0.8-alpha/aotterclam-create-clam-cms-0.0.8-alpha.tgz \
+  <archetype> \
   --project-name <name> \
   --brand "<brand>" \
   --description "<one-line>" \
@@ -11,6 +12,8 @@ npx @aotterclam/create-clam-cms@<version> <archetype> \
   --github-owner <gh-login> \
   --summary "<Mantle's one-line install description>"
 ```
+
+The Mantle install skill ([`skills/install/SKILL.md`](../../skills/install/SKILL.md)) interpolates this URL pinned to the release the skill itself is read from.
 
 ## What it does
 
