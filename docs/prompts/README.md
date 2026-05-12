@@ -1,42 +1,55 @@
 # Starting prompts
 
-Localized starting-prompt drafts for each starter family (`publication` available; others arrive when the family lands).
+Localized two-URL starting-prompt drafts, one per archetype + locale.
 
 ## What these are
 
-Text the user pastes into Claude Code / Cursor / Codex / any MCP-capable agent to bootstrap a new mantle project. Each prompt is one localized human-language brief plus a structured `mantle_request:` YAML block the install Skill parses. Agents that read [`skills/install/SKILL.md`](../../skills/install/SKILL.md) recognize the YAML block as the source of truth and skip the long intake interview.
+The single sentence the user pastes into Claude Code / Cursor / Codex / any MCP-capable agent to bootstrap a new mantle project. Format is always:
+
+```
+<localized verb> <SKILL_INSTALL_URL> <localized connector> <SKILL_ARCHETYPE_URL> <localized "for this purpose">: <Archetype name>.
+```
+
+Two URLs, no YAML, no form fields. The skill reads both URLs, then [Mantle](../../skills/install/SKILL.md) conducts a soft conversation to gather the rest. The official landing page ([`aotter/mantle-landing`](https://github.com/aotter/mantle-landing)) generates this string dynamically from `src/starterArchetypes.ts` — the files in this directory are direct-paste fallbacks and references for documentation.
 
 ## File naming
 
 ```
-docs/prompts/<starter-family>.<locale>.md
+docs/prompts/<archetype>.<locale>.md
 ```
 
-- `<starter-family>` matches the `starter:` enum from the Skill handoff contract — currently `publication` or `blank`.
-- `<locale>` follows BCP 47 — `en`, `zh-TW`, `zh-CN`, `ja`, etc. The first locale in the prompt's `mantle_request.locales` list is the canonical site locale; the prompt itself is written in `<locale>`.
+- `<archetype>` matches a file in [`skills/install/archetypes/`](../../skills/install/archetypes/).
+- `<locale>` follows BCP 47. The locale of the prompt only affects the verb / connector phrasing; the site's canonical locale is set later through Mantle's interview.
 
-The file is referenced by the official starter site (#61) when it ships, and by direct users via the raw GitHub URL.
+## URL convention
 
-## Variable convention
+- `SKILL_INSTALL_URL` = `https://raw.githubusercontent.com/aotter/mantle/<ref>/skills/install/SKILL.md`
+- `SKILL_ARCHETYPE_URL` = `https://raw.githubusercontent.com/aotter/mantle/<ref>/skills/install/archetypes/<archetype>.md`
 
-Prompts use `{name}` placeholders for values the official site collects from the user:
+`<ref>` is a pinned release tag (preferred) or `main`. The landing page uses the pinned tag.
 
-- `{project_name}` — worker-safe name (lowercase letters, numbers, hyphens)
-- `{brand}` — public-facing site name
-- `{description}` — one-line site description
-- `{github_username}` — the user's GitHub login (becomes `ADMIN_GITHUB_LOGIN`)
-- `{locales}` — JSON array, e.g. `["en", "zh-TW"]`
-- `{mantle_version}` — pinned npm package version, e.g. `0.0.7-alpha`
-- `{template_ref}` — Git ref for starter template copy, e.g. `main` or a release tag
-- `{skill_url}` — raw GitHub URL for the install Skill, pinned to the same ref
+## What the prompt does NOT carry
 
-Substitution happens at request time in the official site's frontend JS — no admin lint, no manifest grammar concept. See [#61's sync](https://github.com/aotter/mantle/issues/61) for the rationale.
+These used to live in a `mantle_request:` YAML block. They are now gathered by Mantle's interview:
 
-## Production smoke
+- `project_name`
+- `brand`
+- `description`
+- `github_username`
+- `locales`
 
-Before treating a prompt as production-ready, walk it on a fresh empty
-directory + a clean Cloudflare account. For `publication`, download a
-pinned source tarball from
-<https://github.com/aotter/mantle-starters>, extract
-it into the empty directory, and initialize a fresh user-owned Git repo.
-Do not leave `origin` pointed at the starter template repo.
+The Mantle thesis says the runtime carries complexity — Mantle, here, gathers what install needs without a pre-flight form.
+
+## Adding a prompt
+
+When a new archetype lands in [`skills/install/archetypes/`](../../skills/install/archetypes/):
+
+1. Add `docs/prompts/<archetype>.<locale>.md` for each supported locale.
+2. Update `mantle-landing/src/starterArchetypes.ts` `promptEn` / `promptZh` for the same archetype.
+3. Keep the format consistent across locales — only the verb / connector localize.
+
+## See also
+
+- [Epic #97](https://github.com/aotter/mantle/issues/97) — landing-page-prompt no-YAML pivot.
+- [`skills/install/SKILL.md`](../../skills/install/SKILL.md) — what the agent does after receiving the prompt.
+- [ADR-0013](../adr/0013-agent-provisioned-consumer-projects.md) — the broader install / provision / handoff flow.
