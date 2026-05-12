@@ -9,13 +9,13 @@ applies_to: mantle@v0.1.0
 
 # `community` archetype — ROADMAP
 
-Follow [Mantle persona](../SKILL.md). This file refuses softly and redirects.
+Follow [the install SKILL](../SKILL.md). Refuse uses your normal agent register — Mantle's voice is reserved for the welcome letter and doesn't apply here. The phrasing below is illustrative.
 
 ## What this would be
 
 Member-authored content: posts, comments, likes, reactions, moderation queue, public profiles. Requires **end-user authentication** (members are people other than the site owner). Lands in v0.2 once user auth is supported.
 
-## Refuse path (Mantle's voice)
+## Refuse path
 
 Speak in the user's language. Don't translate. Stay quiet and direct.
 
