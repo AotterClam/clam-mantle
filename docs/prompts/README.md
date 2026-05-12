@@ -34,4 +34,9 @@ Substitution happens at request time in the official site's frontend JS — no a
 
 ## Production smoke
 
-Before treating a prompt as production-ready, walk it on a fresh empty directory + a clean Cloudflare account. For `publication`, use the cloneable starter repo: <https://github.com/aotter/mantle-starters>.
+Before treating a prompt as production-ready, walk it on a fresh empty
+directory + a clean Cloudflare account. For `publication`, download a
+pinned source tarball from
+<https://github.com/aotter/mantle-starters>, extract
+it into the empty directory, and initialize a fresh user-owned Git repo.
+Do not leave `origin` pointed at the starter template repo.

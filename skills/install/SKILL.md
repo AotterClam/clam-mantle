@@ -27,7 +27,7 @@ The prompt should include these fields. Parse them before asking the user anythi
 ```yaml
 mantle_request:
   mantle_version: "0.0.7-alpha"
-  template_ref: "main"
+  template_ref: "v0.0.7-alpha"
   skill_url: "https://raw.githubusercontent.com/aotter/mantle/<ref>/skills/install/SKILL.md"
   starter: "publication" # publication | blank (others are roadmap; see Starter Families)
   github_username: "<verified-by-website>"
@@ -46,103 +46,63 @@ I will create <project_name> using starters/<starter>, bootstrap GitHub user <gi
 
 If a field is missing, ask the minimum question needed. Do not ask the user to choose a starter if the prompt already chose one.
 
-## Public Copy Intake
+## Site Defaults Intake
 
-The user is not a copywriter. Your job here is to act as a PM: extract enough signal to draft confidently, then make the user react to drafts. Drafting is the default mode. Asking is the exception.
+The user is not a copywriter. During install, collect only the site defaults needed to make the project runnable: brand, one-line description/tagline, locales, and optional visual mood. Do not draft or seed real content during install.
 
 ### The rule
 
-**Once you have brand + tagline + mood, draft all four pages (home / about / contact / welcome post) before asking the user anything else.** Show drafts as a compact preview, not full text:
+If brand / description / mood are missing, ask one compact question:
 
 ```
-Home    標題 「蚌殼」｜intro 一句話 / body 三句話介紹網站
-About   標題 「關於蚌殼」｜講為什麼開這個網站 + 你會寫什麼
-Contact 標題 「聯絡」｜email + 一句話歡迎來信
-Welcome 標題「水獺與蚌殼的相遇」｜講這個網站的命名故事
+跟我說這個網站給誰看、叫什麼、想讓人感覺如何。先一句話就好。
 ```
 
-Then ask: "這個方向對嗎？哪一塊想改？" — single question. The user reacts; you adjust.
+Then synthesize:
+
+```
+brand: <site name>
+description: <one-line public description>
+mood: <warm | editorial | playful | technical | minimal>
+```
+
+Ask the user to confirm or correct those values. Stop there for content. First real pages/posts are created only after provision, owner sign-in, and Staff MCP/admin authoring.
 
 ### Bad vs good
 
-**Bad** (questionnaire — what we want to stop):
+**Bad** (content questionnaire during install — what we want to stop):
 
-> 4. 首頁介紹：訪客第一眼看到這個網站，你想讓他們讀到什麼？
-> 5. About 頁面：這個網站或你自己，你想怎麼介紹？
-> 6. Contact 頁面：你希望訪客怎麼聯絡你？
-> 7. 第一篇 welcome post：想跟第一個讀者說什麼？
+> 首頁要寫什麼？About 要寫什麼？第一篇 welcome post 要寫什麼？
 
-**Good** (draft + react):
+**Good** (site defaults only):
 
-> 根據「蚌殼」/「水獺敲蚌殼」/活潑這三個訊號，我幫你起草了四個頁面的方向：[four-line preview]。哪一塊想換掉或補東西？
+> 我會先把站點設成「蚌殼」，描述「水獺敲蚌殼」，語氣偏 playful。內容等部署和 owner 登入完成後，再問你要不要我幫你寫第一批頁面和文章。
 
 ### Opening when nothing is known
 
-If brand / tagline / mood are not yet set (no website prompt, no prior session), open with **one** question:
+If brand / description / mood are not yet set (no website prompt, no prior session), open with **one** question:
 
 > "跟我說說這個網站是給誰看的、你想讓他們感受到什麼？不用想太多，就當聊天。"
 
-Listen, synthesize, and propose brand + tagline + mood as drafts. Then proceed to draft the four pages.
+Listen, synthesize, and propose brand + description + mood as drafts. Then continue install.
 
 ### Resuming from partial state
 
-If brand / tagline / mood come from RUN_NOTES, prior session context, or the website prompt: **draft immediately**, do not re-interview, do not switch into gap-filling questionnaire mode.
+If brand / description / mood come from RUN_NOTES, prior session context, or the website prompt: use them, do not re-interview, and do not switch into page/post copywriting.
 
 ### When the user says "up to you"
 
-Generate considered neutral content that fits project name + locales + any signal you have. Present the same compact preview. Move on unless they object.
+Choose conservative site defaults from project name + locales + any signal you have. Move on unless they object.
 
 ### End state
 
-Before writing `initial-seed.json`, you must have resolved:
+Before running `setup:site`, you must have resolved:
 
 - `brand` — site name (not onboarding copy like "my first AI site")
-- `tagline` — footer/metadata one-liner
+- `description` — metadata one-liner
 - `mood` — one of `warm`, `editorial`, `playful`, `technical`, `minimal`; infer from conversation, use closest English equivalent if user described in another language
-- home / about / contact / welcome post copy — agent-drafted, user-approved (or user-modified)
-- cover image — user-provided URL, or agent picks a neutral Unsplash image that fits the mood
 
-**Multi-locale**: for every locale in `locales`, produce distinct copy. If the user only spoke one language, generate the translations yourself and include them in the preview. Do not ask the user to write the second locale. Do not silently duplicate one locale into all locales.
-
-Write `initial-seed.json` in the consumer root. This is public content, not a secret. Required shape (example for `locales: ["zh-TW", "en"]`):
-
-```json
-{
-  "brand": "蚌殼",
-  "tagline": "水獺敲蚌殼",
-  "origin": "https://example.com",
-  "locales": ["zh-TW", "en"],
-  "mood": "playful",
-  "home": {
-    "translations": {
-      "zh-TW": { "title": "蚌殼", "intro": "水獺敲蚌殼。", "body": "歡迎來到蚌殼..." },
-      "en":    { "title": "Mantle Shell", "intro": "An otter knocks on a mantle.", "body": "Welcome to Mantle Shell..." }
-    }
-  },
-  "about": {
-    "translations": {
-      "zh-TW": { "title": "關於", "intro": "關於蚌殼。", "body": "..." },
-      "en":    { "title": "About", "intro": "About Mantle Shell.", "body": "..." }
-    }
-  },
-  "contact": {
-    "translations": {
-      "zh-TW": { "title": "聯絡", "intro": "與我們聯絡。", "body": "..." },
-      "en":    { "title": "Contact", "intro": "Get in touch.", "body": "..." }
-    }
-  },
-  "welcomePost": {
-    "slug": "welcome",
-    "coverUrl": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200",
-    "translations": {
-      "zh-TW": { "title": "第一篇：歡迎", "body": "..." },
-      "en":    { "title": "First post: welcome", "body": "..." }
-    }
-  }
-}
-```
-
-Every key in `translations` must appear in `locales`. Do not invent fake credentials, fake staff names, or "AI-generated first site" language.
+Do not create `initial-seed.json` for real-user install. `seed:initial` and fixtures are contributor/test utilities only. After provision, the operating agent should interview the owner and ask whether to create the first pages/posts through Staff MCP or admin authoring.
 
 ## POC-Proven Flow Invariants
 
@@ -175,7 +135,7 @@ Six top-level families define the product taxonomy (#58). Pick the closest fit a
 
 Classify the request as one of:
 
-- **Within starter shape** — customize copy / theme / seed only. Start the chosen starter, run `setup:site`, seed initial content, done. Most installs land here.
+- **Within starter shape** — customize site defaults / theme only. Start the chosen starter, run `setup:site`, validate, then let provision + MCP/admin authoring handle first content. Most installs land here.
 - **Near starter shape** — keep the starter and add small schemas / views / procedures / starter-side custom routes inside the project. Example: `publication` + a public prompt-generator page + one extra Schema. Do **not** fork the starter to do this.
 - **Outside starter shape** — switch to a better-fitting starter, or use `blank` and interview for custom 4-atom design. Don't silently mutate `publication` into a shop or community app.
 
@@ -183,7 +143,7 @@ Classify the request as one of:
 
 For v0.1.0 first-run bootstrap, the only directly-installable starters are `publication` and `blank`:
 
-- **`publication`** — primary path. It is fixed-manifest during bootstrap; do **not** ask the user to redesign Schemas / Views / Procedures / Triggers. Ask for public copy, visual mood, home/about/contact text, and the welcome post, then seed those into the existing publication model. It currently carries the full Better Auth GitHub OAuth + MCP OAuth/DCR wiring required for MCP.
+- **`publication`** — primary path. It is fixed-manifest during bootstrap; do **not** ask the user to redesign Schemas / Views / Procedures / Triggers. Configure site defaults and optional visual mood only. First real home/about/contact/article content is created after provision through Staff MCP/admin authoring. It currently carries the full Better Auth GitHub OAuth + MCP OAuth/DCR wiring required for MCP.
 - **`blank`** — only when the user explicitly wants a headless reference (e.g. they're shipping their own Next.js / Astro frontend). It has the same Better Auth + dual MCP mount shape, but no public HTML.
 - **`leads-inbox` / `micro-shop`** — v0.1.0 verticals but ship initially as **documented variants of `publication`** (extra schemas + custom routes added in-project), not as their own starter directory. Do not silently mix vertical-specific schemas into the base `publication` starter; they live in the consumer project.
 - **`booking` / `community` / `fan-club`** — refuse for v0.1.0; explain to the user the family lands in v0.2+ and offer `blank` or `publication`-extension as a holding pattern.
@@ -198,13 +158,15 @@ Run these checks:
 node --version
 pnpm --version
 git --version
+curl --version
 ```
 
 Requirements:
 
 - Node.js >= 20.
 - pnpm >= 9.
-- Git available for copying the public starter template.
+- Git available to initialize the user-owned consumer project after extraction.
+- curl + tar available to download and extract the public starter tarball without preserving the starter repo's Git remote.
 - Wrangler does not need to be globally installed before scaffold. The copied starter installs Wrangler as a dev dependency; after `pnpm install`, use `pnpm exec wrangler --version`.
 
 GitHub CLI is not required for the npm-first install path. If the website already verified GitHub identity, treat `github_username` as the owner bootstrap value; provision will set it as the `ADMIN_GITHUB_LOGIN` Worker secret.
@@ -226,29 +188,40 @@ Normalize:
 - `locales`: keep order. First locale is canonical.
 - `brand`, `description`, `origin`: pass confirmed public copy to `setup:site`. `origin` may stay `https://example.com` until provision knows the Workers URL.
 - `mantle_version`: npm package version. Default to the version from the website prompt, currently `0.0.7-alpha`.
-- `template_ref`: Git ref used only to copy starter files. For the current npm-first alpha, use `main` unless the website prompt provides a newer release tag. Avoid floating `develop` unless the user is explicitly testing unreleased code.
+- `template_ref`: Git ref used only to download starter files. Prefer a release tag such as `v0.0.7-alpha`. Use `main` only when explicitly testing the latest template. Avoid floating `develop` unless the user is explicitly testing unreleased code.
 
 ### 2. Fetch the pinned starter template
 
 Use public GitHub repos only as starter template sources. Do not build the `mantle` SDK monorepo inside the consumer project.
 
-For `publication`, clone the standalone starter repo directly:
+For `publication`, download a tarball of the standalone starter repo and strip the top-level archive directory:
 
 ```bash
-git clone --depth 1 --branch <template_ref> https://github.com/aotter/mantle-starters.git .
+curl -L "https://codeload.github.com/aotter/mantle-starters/tar.gz/<template_ref>" -o /tmp/mantle-starters.tgz
+tar -xzf /tmp/mantle-starters.tgz --strip-components=1
 ```
 
-For `blank`, use the monorepo development mirror until its standalone starter repo exists:
+This intentionally avoids leaving `origin` pointed at `aotter/mantle-starters`. After extraction, initialize a fresh user-owned repo without adding a remote:
 
 ```bash
-git clone --depth 1 --branch <template_ref> https://github.com/aotter/mantle.git .mantle-template
+git init
 ```
 
-If `git` is unavailable, ask the user to install Git or download the tagged source zip. Do not require GitHub CLI or tokens for public starter install.
+Commit after `setup:site`, install, and validation succeed. Only set `origin` after creating or selecting the user's own GitHub repo. Never push back to the starter template source.
+
+For `blank`, use the monorepo development mirror until its standalone starter repo exists, but still download it as a tarball:
+
+```bash
+mkdir -p .mantle-template
+curl -L "https://codeload.github.com/aotter/mantle/tar.gz/<template_ref>" -o /tmp/mantle-template.tgz
+tar -xzf /tmp/mantle-template.tgz -C .mantle-template --strip-components=1
+```
+
+If `curl` or `tar` is unavailable, ask the user to download the tagged source zip from GitHub and extract it into the target directory. Do not require GitHub CLI or tokens for public starter install.
 
 ### 3. Copy the starter into the consumer root
 
-For `publication`, skip this step; the starter repo was cloned directly into the consumer root.
+For `publication`, skip this step; the starter tarball was extracted directly into the consumer root.
 
 For `blank`, run from the empty target directory:
 
@@ -295,7 +268,7 @@ Do not commit `.dev.vars`.
 
 ### 4.2. Apply visual mood (if user specified one)
 
-If the user answered the "What mood should the site have?" question in Public Copy Intake, apply it now using the theme fork system. **Do not defer this to later and do not touch `src/theme.default/`.**
+If the user confirmed a visual mood during Site Defaults Intake, apply a light token-level adjustment now using the theme fork system. **Do not defer this to later and do not touch `src/theme.default/`.**
 
 The starter ships with a read-only baseline at `src/theme.default/`. Consumer overrides live at `src/theme/`. The two directories must never be mixed. The rule is simple:
 
@@ -325,12 +298,6 @@ The override is appended after the baseline, so only declare vars you want to ch
 
 If the user wants no design customization at install time, skip this step entirely. Design can be applied later via `skills/customize-design/SKILL.md`.
 
-### 4.5. Prepare initial content seed file
-
-Create `initial-seed.json` from the Public Copy Intake. Keep `origin` as `https://example.com` until provision discovers the real Workers URL.
-
-Do not run `seed:initial` yet. The copied starter has not installed `tsx` or the workspace packages until the next step.
-
 ### 5. Install and validate the standalone project
 
 ```bash
@@ -340,21 +307,13 @@ pnpm validate
 pnpm typecheck
 ```
 
-After `pnpm install`, verify the seed file renders:
-
-```bash
-pnpm run seed:initial -- --seed-file initial-seed.json --dry-run
-```
-
-This writes `.mantle-seed.sql` and `.mantle-seed.kv.json` as generated artifacts. They are ignored by git. Do not apply this seed to production during install; provision will run it against remote D1/KV.
-
 For `publication`, fixture data is optional. Use it only if the user wants a local demo site before deployment:
 
 ```bash
 pnpm fixture
 ```
 
-Do not treat fixture data as the end-user success path. The v0.1.0 proof uses `initial-seed.json` for first content during provision; MCP is for ongoing operation after owner bootstrap.
+Do not treat fixture data as the end-user success path. Real first content is created after provision and owner sign-in through Staff MCP/admin authoring.
 
 Then preview:
 
@@ -387,16 +346,16 @@ github_username: "<github_username>"
 locales: ["<canonical>", "..."]
 mantle_version: "<mantle_version>"
 template_ref: "<template_ref>"
-seed_file: "initial-seed.json"
 ```
 
-Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secrets, deploy, updating seed origin, applying initial content directly to D1/KV, post-deploy smoke, and returning the Staff/User MCP URLs.
+Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secrets, deploy, post-deploy smoke, and returning the public URL plus Staff/User MCP URLs. After owner sign-in, the operating agent should interview the owner and ask whether to create the first pages/posts through MCP/admin authoring.
 
 ## Diagnostic Recipes
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `git clone` cannot access the starter repo | Network or Git installation issue | Confirm Git is installed and the repo is public. For publication, use `https://github.com/aotter/mantle-starters`. |
+| Starter tarball download fails | Network issue, bad `template_ref`, or GitHub outage | Verify `template_ref` exists on `aotter/mantle-starters`; retry the `codeload.github.com` URL or download the tagged source zip manually. |
+| `git remote -v` points at `aotter/mantle-starters` | The project was cloned instead of extracted from tarball | Remove the remote before any push: `git remote remove origin`, then set `origin` only to the user's own repo. |
 | `pnpm run setup:site` is missing | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag. |
 | `pnpm install` cannot resolve `workspace:*` | The consumer project was copied from the monorepo mirror and `setup:site` was skipped before install | Run `pnpm run setup:site -- ... --mantle-version "<version>"`, then `pnpm install` again. Publication installs from the standalone starter repo should not hit this. |
 | `tsc` tries to read `../../tsconfig.base.json` | Starter was copied from an older template ref | Re-copy from `main` or a newer release tag, or set `extends` to `./tsconfig.base.json`. |
@@ -404,7 +363,6 @@ Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secr
 | `pnpm validate` exits with `MANIFEST_ROOT_NOT_FOUND` | Not running from consumer root | `cd` to the directory containing `manifests/`. |
 | `wrangler dev` boots but admin sign-in fails | GitHub OAuth vars or `BETTER_AUTH_SECRET` missing | Fill `.dev.vars` with `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and `BETTER_AUTH_SECRET`, then restart dev. |
 | Publication `/llms.txt` or post route 404s locally | Fixture data was not applied | Run `pnpm fixture` and restart `pnpm dev`. |
-| `pnpm run seed:initial -- --dry-run` fails on content | `initial-seed.json` is missing required public copy | Add `brand`, `origin`, `locales`, `home`, `about`, and `welcomePost`. |
 | Design customization was applied but `src/theme.default/` was edited directly | Agent searched for token file and edited the baseline copy instead of forking | Run `git checkout src/theme.default/` to restore the baseline, then `pnpm theme:fork tokens.ts` and re-apply edits to `src/theme/tokens.ts`. |
 
 ## Don't
@@ -414,7 +372,8 @@ Provision is responsible for D1/KV creation, GitHub OAuth App setup, Worker secr
 - Don't put `ADMIN_GITHUB_LOGIN`, GitHub client secret, Turnstile secret, or Cloudflare API tokens in git.
 - Don't reintroduce stub bearer auth or `MANTLE_ALLOW_STUB_OAUTH`.
 - Don't keep `.mantle-template` in the consumer repo after copying the starter.
-- Don't write directly to D1 for normal content operations; use runtime/MCP tools. The starter-owned `seed:initial` script is the v0.1.0 exception for first content only.
+- Don't leave `origin` pointed at the starter template repo. Real installs start from a tarball, then initialize a user-owned Git repo.
+- Don't write directly to D1 for real-user content operations; use runtime/MCP/admin authoring. The starter-owned `seed:initial` script is for tests and contributor local dev only.
 - Don't add public Schema reads. Public reads go through Views.
 - **Don't edit `src/theme.default/`.** It is read-only baseline. Run `pnpm theme:fork <file>` and edit the copy at `src/theme/` instead. Editing `src/theme.default/` directly will be overwritten when the SDK updates and silently diverges from the override system.
 
