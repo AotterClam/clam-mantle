@@ -55,17 +55,24 @@ standard template fields. Agents should not hand-edit `wrangler.toml`,
 starter script exists. Hand edits are reserved for actual product
 customization.
 
-First-run content is seeded before the owner has an MCP client. The
-publication starter writes `initial-seed.json`, then `seed:initial`
-applies that public content directly to remote D1/KV during
-provisioning. This is an explicit bootstrap exception; ongoing content
-operations go through MCP or admin surfaces after owner sign-in.
+Starter source is copied from pinned public GitHub refs by downloading
+source tarballs, not by leaving a normal clone in place. The extracted
+project initializes its own Git repo and should only set `origin` after
+the user creates or selects a user-owned repository. This avoids agents
+accidentally pushing back to the template source.
+
+First-run content is not seeded during real-user install/provision.
+Provision creates the operating surface first: public site, owner
+sign-in, and Staff/User MCP URLs. After owner sign-in, the operating
+agent interviews the owner and asks whether to create initial
+pages/posts through Staff MCP or admin authoring. `seed:initial` and
+fixture data are reserved for tests and contributor local dev.
 
 Cloudflare provisioning is owned by the starter's provision script. It
 creates the required free-path resources, writes bindings/secrets,
-deploys once with the real origin, applies the seed, and returns the
-handoff URLs. Agents should not decompose this into ad-hoc Wrangler
-steps unless they are debugging a failed provision.
+deploys once with the real origin, and returns the handoff URLs.
+Agents should not decompose this into ad-hoc Wrangler steps unless
+they are debugging a failed provision.
 
 ## Consequences
 
@@ -79,7 +86,9 @@ steps unless they are debugging a failed provision.
   `file:` or workspace dependencies are acceptable only for local SDK
   development.
 - The first-run success criterion is product-level: public site,
-  owner sign-in, and MCP URL. A deployed but empty site is not success.
+  owner sign-in, MCP URL, and an owner-approved path to create initial
+  content through MCP/admin authoring. A deployed but unauthored site
+  can be a valid intermediate checkpoint, not a direct-seed failure.
 - Provisioning must preserve the no-credit-card path. Optional paid or
   billing-gated features must be opt-in after the site is already live.
 
@@ -91,9 +100,10 @@ steps unless they are debugging a failed provision.
 - **Git dependency only.** Rejected for the default path because private
   repos and Git authentication add friction. Git refs remain useful for
   copying starter files, not for installed runtime dependencies.
-- **MCP creates the initial content.** Rejected because MCP requires the
-  deployed OAuth/owner loop to exist first. Initial seed is the bridge
-  from generated project to operational site.
+- **Direct seed creates the initial content.** Rejected for real-user
+  onboarding because it bypasses the same operating path we want to
+  validate. MCP/admin authoring after owner sign-in is the product
+  loop; fixtures and seed utilities remain for tests/local dev.
 - **One universal starter.** Rejected. The current publication starter
   is intentionally fixed-manifest during bootstrap; custom workflows
   belong in `blank` or future dedicated starters.
@@ -104,16 +114,19 @@ steps unless they are debugging a failed provision.
   directly and only confirm public/resource-name-impacting details.
 - Run the starter's `setup:site` script before installing
   dependencies.
+- Download starter source as a pinned tarball/zip, extract it, run
+  `git init`, and only add a remote that belongs to the user.
 - Keep first-run provision scripts on the free Cloudflare path unless
   the user explicitly opts into a paid feature.
-- Treat `initial-seed.json` as public bootstrap content, not a secret.
 - After provisioning, hand the user to: view the site, sign in as
-  owner, then connect an MCP-capable agent.
+  owner, then connect an MCP-capable agent to create/operate content.
 
 ## Implementation status
 
 - `skills/install/SKILL.md` and `skills/provision/SKILL.md` encode the
   current agent workflow.
-- `starters/blog` and `starters/blank` both ship `setup:site`.
-- `starters/blog` ships `provision:up` and `seed:initial`.
+- `aotter/mantle-starters` and `starters/blank` both
+  ship `setup:site`.
+- The publication starter ships `provision:up`; `seed:initial` remains
+  a test/contributor utility, not part of real-user provisioning.
 - `0.0.7-alpha` npm packages are the current install target.

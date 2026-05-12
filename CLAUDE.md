@@ -34,11 +34,12 @@ This is the lens for every architectural decision in this codebase.
 | `packages/mantle-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
 | `packages/mantle-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
 | `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
-| `packages/mantle-cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
-| `packages/mantle-netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| `starters/publication/` | Reference `publication` starter — Hono + theme stack (`theme.default/` + `theme/`) + i18n + contact form + sitemap + SEO/AEO. Owner-published content (articles / pages / docs-lite / basic contact). One of six starter families per #58. |
-| `starters/blank/` | Headless API + MCP starter. No UI, no theme stack — drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
-| `starters/_archive/` | Frozen snapshots of retired starters. Excluded from workspace via `pnpm-workspace.yaml` negation; not maintained. |
+| `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
+| `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
+| `packages/create-mantle/` | npx scaffolder. Fetches the starters monorepo tarball, merges `_common/` + `<archetype>/` into the user's directory, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. Replaces the manual `curl … \| tar -xzf` + `setup:site` ritual in the install Skill. |
+| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, and `blank/`. Real-user installs run `npx @aotter/create-mantle <archetype>`, which downloads a tagged tarball, merges `_common/` + `<archetype>/` into the user's empty directory, and initializes a user-owned Git repo so `origin` never points back to the template source. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium). Note: GitHub repo rename from `mantle-starters` is pending; the old URL auto-redirects until completed. |
+| `starters/blank/` | **README stub.** Migrated to `mantle-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
+| `starters/_archive/` | Frozen snapshots of retired starters. Not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
@@ -83,7 +84,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 - One barrel `index.ts` per folder.
 - Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
-- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `mantle-runtime/src/domain/port/`. Auth is supplied by adapters via the Better Auth `Auth` instance on `CmsConfig` (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `RemoteMediaFetcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`mantle-cloudflare`, future `mantle-netlify`).
+- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `mantle-runtime/src/domain/port/`. Auth is owned by adapters via Better Auth mount wiring (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `DeferredHookDispatcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`packages/adapters/cloudflare`, future `packages/adapters/netlify`).
 
 ### Spec/runtime type boundary (separate from layer rules)
 

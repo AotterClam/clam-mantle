@@ -17,7 +17,7 @@ prompt that a coding agent can act on.
 
 The early taxonomy mixed several levels:
 
-- concrete starter directories (`starters/publication`,
+- concrete starter locations (`aotter/mantle-starters`,
   `starters/blank`)
 - planned vertical starters (`leads-inbox`, `micro-shop`,
   `fan-club`)
@@ -71,9 +71,9 @@ Initial mapping:
 
 | Archetype | v0.1 implementation path |
 |---|---|
-| `presence` | `starters/publication` with landing/page-heavy prompt. |
-| `publication` | `starters/publication` with article/docs-heavy prompt. |
-| `intake` | `starters/publication` extension for basic forms; future dedicated intake starter when qualification/assignment/workflow becomes central. |
+| `presence` | `aotter/mantle-starters` with landing/page-heavy prompt. |
+| `publication` | `aotter/mantle-starters` with article/docs-heavy prompt. |
+| `intake` | `aotter/mantle-starters` extension for basic forms; future dedicated intake starter when qualification/assignment/workflow becomes central. |
 | `transaction` | Planned v0.1 vertical proof as a consumer-project extension; future dedicated commerce/transaction starter once order/payment primitives stabilize. |
 | `reservation` | v0.2+; offer `publication` + intake fallback for simple RSVP only. |
 | `community` | v0.2+; requires end-user auth and moderation workflow. |
@@ -161,7 +161,7 @@ mantle_request:
 
 ## Implementation status
 
-- `starters/publication` currently supports the `presence` and
+- `aotter/mantle-starters` currently supports the `presence` and
   `publication` archetypes directly.
 - Basic contact capture inside `publication` covers the lightest
   `intake` cases.

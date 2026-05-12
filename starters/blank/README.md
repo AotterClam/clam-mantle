@@ -1,85 +1,30 @@
-# `starters/blank`
+# `starters/blank` — moved
 
-**Headless CMS starter.** Ships zero UI. Use this when you have your own
-frontend (Next.js, Astro, SvelteKit, native iOS/Android, partner
-integration) and want mantle purely as a content + auth + MCP backend.
+The `blank` starter now lives in the standalone starters monorepo:
 
-If you want a working public site out of the box with HTML chrome,
-i18n, theme stack, and contact form, use [`starters/publication`](../publication)
-instead.
+[`aotter/mantle-starters/blank/`](https://github.com/aotter/mantle-starters/tree/main/blank)
 
-## URL surface
+(Repo URL above is the post-rename name; if your tooling still pins
+the original `mantle-starters`, GitHub auto-redirects.)
 
-```
-GET  /api/views/<name>            view REST per View atom
-METHOD <trigger path>             manifest-declared HTTP Trigger routes
-ALL  /staff/mcp                   Staff MCP JSON-RPC dispatcher
-ALL  /mcp                         User/read MCP JSON-RPC dispatcher
-```
+## Why this moved
 
-No public read routes (`/{locale}/...`, `/sitemap.xml`, `.md` mirrors,
-`llms.txt`). Add `mountPublicRoutes` from
-`@aotter/mantle-cloudflare` if you change your mind.
+Real-user installs go through `@aotter/create-mantle`, which
+fetches a tagged tarball of the starters monorepo and merges
+`_common/` + `<archetype>/` into the user's empty directory. Keeping
+`starters/blank` inside this SDK monorepo created two problems:
 
-### Auth
+- Workspace-rooted `workspace:*` deps that don't resolve when
+  end-users extract the starter standalone.
+- A second source of truth for the headless API surface — anything
+  added to `publication/` had to be remembered for `blank/` too.
 
-MCP requests must carry a verified bearer token. The runtime's
-Cloudflare adapter now uses Better Auth for browser sign-in and MCP
-OAuth/DCR. `publication` wires the production-ready dual MCP surface
-(`/staff/mcp` for staff authoring, `/mcp` for end-user/read tools).
-`blank` wires the same Better Auth factory and dual mounts, but ships
-no public HTML. Add your own frontend and policy surface before
-claiming a custom production workflow.
+Moving the starter into the monorepo fixes both. The same engineering
+forcing function we use for `packages/adapters/netlify/` (#99): a
+stub README points outward, so PR reviewers can spot a coupling slip
+before it ships.
 
-## Layout
+## See also
 
-```
-starters/blank/
-├── manifests/example.yaml     # one-file demo: Schema + View
-├── src/
-│   ├── index.ts               # worker entrypoint (mountServerEndpoints + mountMcp)
-│   ├── mantleConfig.ts          # env + manifests + handlers wiring
-│   ├── loadManifests.ts
-│   ├── handlers/index.ts      # empty registry — add Procedure handlers here
-│   └── types.d.ts
-├── package.json
-├── tsconfig.json
-└── wrangler.toml
-```
-
-## Getting started
-
-```bash
-pnpm run setup:site -- \
-  --project-name "mantle-blank" \
-  --brand "Mantle Blank" \
-  --description "Headless CMS — bring your own frontend." \
-  --locales "en" \
-  --origin "https://example.com"
-pnpm install
-pnpm dev      # wrangler dev — http://localhost:8787
-```
-
-Hit `GET http://localhost:8787/api/views/published-notes` to see the
-example View executing against an empty `notes` collection.
-
-## Replacing the example
-
-1. Open `manifests/example.yaml`.
-2. Edit or replace the `Schema` and `View` to match your content.
-3. If you need server-side Procedures (form handlers, webhooks, etc.),
-   add a `Procedure` atom, bind it with a `Trigger.source.kind: http`,
-   and register the handler in `src/handlers/index.ts`.
-4. Validate with `pnpm validate` (runs the spec CLI).
-
-## What you get from the npm packages
-
-`@aotter/mantle-cloudflare` mounts the routes above against
-`@aotter/mantle-runtime` use cases. Nothing is starter-specific
-once you've wired the bindings — bearer-token MCP auth, view executor,
-and HTTP Trigger dispatcher all come straight from the runtime packages.
-
-If your frontend renders posts (or anything you'd like to expose for
-LLM crawlers), the runtime can ship an `.md` mirror of any entry; see
-`@aotter/mantle-runtime/serializeEntryAsMarkdown` and
-`composeLlmsTxt`.
+- [`packages/adapters/netlify/README.md`](../../packages/adapters/netlify/README.md) — same stub pattern, different reason.
+- [`aotter/mantle#97`](https://github.com/aotter/mantle/issues/97) — Epic that moved the starters out.

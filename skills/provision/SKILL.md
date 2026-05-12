@@ -8,7 +8,7 @@ applies_to: mantle@v0.1.0
 
 # Provision a mantle project for production
 
-You are taking an installed consumer project from local files to a user-owned Cloudflare Worker. The v0.1.0 proof does not require an admin UI. It requires owner bootstrap, GitHub OAuth/DCR, staff-gated MCP, deploy, initial public content, and a second-agent handoff.
+You are taking an installed consumer project from local files to a user-owned Cloudflare Worker. The v0.1.0 proof does not require an admin UI. It requires owner bootstrap, GitHub OAuth/DCR, staff-gated MCP, deploy, and a second-agent handoff. Initial content is **not** seeded by provision — that happens after sign-in through Staff MCP / admin authoring.
 
 End state for this Skill:
 
@@ -16,29 +16,23 @@ End state for this Skill:
 - `wrangler.toml` points at those resource IDs.
 - Worker secrets are set.
 - The Worker deploys with Better Auth-backed GitHub OAuth + MCP OAuth/DCR.
-- For `starter: publication`, initial home/about/contact/welcome content is seeded directly to D1/KV.
-- Public URL, Staff MCP URL, and User MCP URL are printed.
+- `mantle/site.md` frontmatter `site_url:` + `revisions:` updated; `AGENTS.md` `Public site:` updated (per ADR-0016).
+- Public URL, Staff MCP URL, and User MCP URL are printed; handoff text points the user at `mantle/site.md` as the return-context surface.
 - Post-deploy smoke proves unauthenticated MCP is rejected.
-- The user has instructions for connecting a second AI agent to MCP.
 
 ## Required Inputs
 
-Use values from the website-generated starting prompt or the install Skill handoff:
+The values land in the project via `create-mantle` and the install skill. Confirm only what affects resource names or the OAuth identity:
 
 ```yaml
-project_name: "<worker-safe-name>"
-starter: "publication" # publication | blank
-github_username: "<verified-by-website>"
-locales: ["en", "zh-TW"]
-origin: "https://example.com" # may be replaced after deploy
-seed_file: "initial-seed.json"
+project_name: "<worker-safe-name>"   # used as the worker name
+archetype:    "presence"             # presence | publication | intake | blank
+github_username: "<gh login>"        # becomes ADMIN_GITHUB_LOGIN
 ```
 
-If `github_username` was verified by the website, still confirm local `gh auth status`; the Worker secret must match the GitHub login that signs in through OAuth.
+If `github_username` was set by Mantle during install, still confirm local `gh auth status` — the Worker secret must match the GitHub login that signs in through OAuth.
 
-For the first v0.1.0 production proof, `starter: publication` is the supported path. It assumes the copied publication manifests stay fixed during bootstrap; provision only deploys infra, applies initial public content, bootstraps the owner, and proves MCP operation.
-
-`starters/blank` is the right surface for bootstrap-time workflow design. If the user wants to define their own Schemas, Views, Procedures, or Triggers before first deploy, switch to the blank/custom-app path instead of mutating `publication`. Blank must have the same real OAuth/DCR wiring as `publication` before claiming production MCP operation.
+For v0.1.0, the `publication`, `presence`, and `intake` archetypes share the publication starter and the provision flow below. The `blank` archetype must have the same Better Auth factory, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and dual MCP mounts as publication before its production proof can claim MCP operation.
 
 ## POC-Proven Flow Invariants
 
@@ -86,23 +80,41 @@ Guide the user step by step:
 
 ### How the user sends you the token
 
-Present **both** paths at once. Do not show only the terminal path — many users will not understand it and will get stuck. Frame it like this:
+Follow [Mantle persona](../install/SKILL.md). Quiet, technical, no cheerleading. Show both paths in one short message. Use the user's language; don't translate.
 
-> 拿到 token 後，有兩種方式給我：
+Render in the user's language at native register. The intent of the message is:
+
+- Two ways to send the token: terminal (stdin, doesn't enter chat log) and chat-paste.
+- Terminal: the exact `! read -rsp ... && export ...` line, and "say `ok` when done."
+- Chat-paste: a single line on why it's safe this once — IP filter + 1-day TTL + revocation reminder — without re-litigating it.
+
+zh-TW illustrative:
+> Token 給我兩種方式。
 >
-> **方式 A（推薦）**：在 terminal 輸入這行，token 不會進對話紀錄。
+> Terminal（推薦，token 不會進對話紀錄）：
 >
 > ```
 > ! read -rsp "Cloudflare API token: " CLOUDFLARE_API_TOKEN && export CLOUDFLARE_API_TOKEN && printf "\n"
 > ```
 >
-> 完成後跟我說「ok」就好。
+> 跑完跟我說「ok」。
 >
-> **方式 B（看不懂方式 A 就用這個）**：直接貼進對話框。
->
-> 一般情況下憑證不該貼對話，因為對話紀錄會留下副本。但你剛剛建的 token 已經設了 IP 限制和 1 天 TTL，外洩出去也沒人能用，做完我會提醒你撤銷。所以這次貼進對話是安全的，不用糾結。
+> 或直接貼。剛剛設了 IP 限制和 1 天 TTL，這次貼進對話是安全的，做完我會提醒你撤銷。
 
-If the user picks B and pastes, accept it without lecturing further, set the env var in a single command without echoing:
+EN illustrative:
+> Token comes to me two ways.
+>
+> Terminal (preferred, token stays out of chat):
+>
+> ```
+> ! read -rsp "Cloudflare API token: " CLOUDFLARE_API_TOKEN && export CLOUDFLARE_API_TOKEN && printf "\n"
+> ```
+>
+> Say `ok` when it's done.
+>
+> Or paste it. The IP filter + 1-day TTL make this paste safe — I'll remind you to revoke when we finish.
+
+If the user picks paste, accept it without lecturing further, set the env var in a single command without echoing:
 
 ```bash
 read -rs CLOUDFLARE_API_TOKEN
@@ -128,13 +140,16 @@ export GITHUB_CLIENT_SECRET
 pnpm run provision:up -- \
   --project-name "<project_name>" \
   --github-username "<github_username>" \
-  --client-id "<client-id>" \
-  --seed-file initial-seed.json
+  --client-id "<client-id>"
 ```
 
-If an agent safety classifier refuses to run the command because it involves credentials, do not hand the user a long secret-bearing command. Say:
+If an agent safety classifier refuses to run the command because it involves credentials, do not hand the user a long secret-bearing command. Render this in the user's language (intent: explain that you'd run the secret via stdin/env without writing it to file / RUN_NOTES / command line, and ask for explicit authorization to proceed).
 
-> 這一步會設定 GitHub Client Secret。若你明確授權我在 terminal 代跑，我可以用不回顯的 stdin/env 方式執行；secret 不會寫進檔案、RUN_NOTES 或命令列。請回覆「我授權你代跑 provision:up」。
+zh-TW illustrative:
+> 這步要設 GitHub Client Secret。如果你授權我在 terminal 代跑，我會用 stdin/env 不回顯的方式執行；secret 不會進檔案、RUN_NOTES、或命令列。要授權嗎？
+
+EN illustrative:
+> This step sets the GitHub Client Secret. With your explicit OK, I can run it via stdin/env without echoing — the secret never lands in any file, RUN_NOTES, or command line. Authorize?
 
 After that explicit authorization, run the env-var form above. Only use `--client-secret` inline for non-interactive CI-style automation where the caller already controls logging and history.
 
@@ -160,7 +175,7 @@ The script reads `CLOUDFLARE_API_TOKEN` from env, looks up the workers.dev subdo
 - The exact Workers URL (no first deploy needed to discover it).
 - GitHub OAuth App fields, with the precomputed callback URL.
 
-It does not create anything. Make sure `initial-seed.json` already exists at the consumer root (built during install per the Public Copy Intake).
+It does not create anything.
 
 ### 2. User creates the GitHub OAuth App
 
@@ -173,27 +188,30 @@ read -rsp "GitHub Client Secret: " GITHUB_CLIENT_SECRET && export GITHUB_CLIENT_
 pnpm run provision:up -- \
   --project-name "<project_name>" \
   --github-username "<github_username>" \
-  --client-id "<client-id>" \
-  --seed-file initial-seed.json
+  --client-id "<client-id>"
 ```
 
 This single command:
 
 1. Creates D1 and render KV via CF API.
 2. Creates the Turnstile widget via CF API.
-3. Writes resource IDs, `PUBLIC_ORIGIN`, and the Turnstile site key into `wrangler.toml`.
-4. Reads `initial-seed.json` public copy and reruns `setup:site` so `src/mantleConfig.ts` `siteDefaults` matches the seeded brand, description, locales, and real Workers URL.
-5. Rewrites `initial-seed.json.origin` to the real Workers URL so the consumer repo snapshot is not left with `https://example.com`.
-6. `pnpm run deploy` (single deploy — origin is already correct).
-7. Pipes worker secrets via `wrangler secret put`:
+3. Writes resource IDs, `PUBLIC_ORIGIN`, and the Turnstile site key into `wrangler.toml`; updates `src/mantleConfig.ts` `origin`.
+4. `pnpm run deploy` (single deploy — origin is already correct).
+5. Pipes worker secrets via `wrangler secret put`:
    - `ADMIN_GITHUB_LOGIN` (bootstrap owner)
    - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
    - `BETTER_AUTH_SECRET` (generated fresh by the script)
    - `TURNSTILE_SECRET_KEY`
-8. Runs `seed:initial --remote` against the deployed worker URL.
-9. Prints the public URL, Staff MCP URL, User MCP URL, sign-in URL, and a token-revocation reminder.
+6. Updates the site semantic layer per [ADR-0016](../../docs/adr/0016-site-semantic-layer.md):
+   - `mantle/site.md` frontmatter `site_url:` → real Workers URL
+   - Append `revisions:` entry `{ at: <iso>, by: provision, summary: "deployed to <url>" }`
+   - `AGENTS.md` `Public site:` line → real Workers URL
+   - No-op if those files don't exist (legacy installs predating Mantle).
+7. Prints the public URL, Staff MCP URL, User MCP URL, sign-in URL, and a token-revocation reminder. The final stdout block points the user at `mantle/site.md` as the return-context handoff surface.
 
-Do not run individual `wrangler` or seed commands when this script can do it. Do not deploy twice — `provision:up` deploys once after origin is already correct.
+Provision does **not** seed initial content. First real content is created after owner sign-in through Staff MCP / admin authoring.
+
+Do not run individual `wrangler` commands when this script can do it. Do not deploy twice — `provision:up` deploys once after origin is already correct.
 
 If any step fails, the script exits non-zero. Resources already created are not rolled back; their IDs are printed so the user can clean up via dashboard or rerun after fixing the issue. Do not silently retry.
 
@@ -257,7 +275,7 @@ Expected:
 
 Do not submit real contact/order forms as smoke unless the user asked for test records.
 
-Do not treat an empty publication as product success. If public pages are empty, fix `initial-seed.json` and re-run `seed:initial --remote` before handoff.
+A freshly-provisioned publication site has no posts yet — that is expected. First content is created after the next step (owner sign-in + Staff MCP / admin authoring), not by provision.
 
 ### 6. Second-agent operating proof
 
@@ -282,27 +300,49 @@ For `blank`:
 - List it through MCP.
 - Confirm the relevant View/API behavior.
 
-Only run the `blank` production proof after its `src/mantleConfig.ts` uses the same Better Auth factory, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and dual MCP mounts as `starters/publication`.
+Only run the `blank` production proof after its `src/mantleConfig.ts` uses the same Better Auth factory, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `ADMIN_GITHUB_LOGIN`, and dual MCP mounts as the publication starter repo.
 
 This second-agent proof is the release gate. Do not call the install production-ready until this works.
 
-## Friendly Final Handoff
+## Final Handoff
 
-Do not end with only infra URLs. Use product language:
+Follow [Mantle persona](../install/SKILL.md). Quiet, no performance.
 
-```text
-Your site is online:
-<worker_url>
+The `provision:up` script already updates the site semantic layer per [ADR-0016](../../docs/adr/0016-site-semantic-layer.md): it rewrites `mantle/site.md` frontmatter `site_url:` from the install placeholder to the real Workers URL, and appends a `revisions:` entry stamped `by: provision`. The same update lands in `AGENTS.md` `Public site:`. Confirm both wrote (`git status -- mantle/site.md AGENTS.md`) before the handoff message.
 
-Open it first. If the title, footer sentence, colors, tone, or first content feels wrong, tell me what to change and I can keep adjusting it.
+Render the handoff in the user's language. Intent:
 
-Next, sign in as the site owner:
-<worker_url>/admin/sign-in
+- The site is online at `<worker_url>`. Two short reasons to look first: read it as a visitor, then sign in at `<worker_url>/admin/sign-in`.
+- I wrote the URL into `mantle/site.md`. Next time you want me back, paste those contents into a conversation — I read it whole on return. (`.well-known/mantle/` route is deferred.)
+- The admin sidebar exposes the Staff MCP URL; only print the raw URL after pointing at the admin path.
+- Acknowledge the admin 5-card render is deferred (#50) — the welcome letter currently lives in `mantle/site.md` `## welcome`.
+- If a Cloudflare API token was used, remind to revoke.
 
-After sign-in, the admin console will show the Staff MCP URL and the next prompts for letting another AI agent manage content.
-```
+zh-TW illustrative:
+> 站起來了：`<worker_url>`。
+>
+> 先以訪客身份打開看一下，再到 `<worker_url>/admin/sign-in` 用 GitHub 登入。
+>
+> 我把這個網址寫進了 `mantle/site.md`。下次想找我，把那檔內容貼進對話就好。（之後會做 `.well-known/mantle/` 的網址版，目前先用貼的。）
+>
+> Staff MCP 的網址在 admin 側欄會看到；原始連結是 `<worker_url>/staff/mcp`。
+>
+> （首頁 5 張卡片的 admin 渲染還沒做，內容已經寫在 `mantle/site.md` 的 `## welcome` 裡了。）
+>
+> Cloudflare token 記得到 `https://dash.cloudflare.com/profile/api-tokens` 撤銷。
 
-Only print the raw Staff MCP URL after explaining that the admin console also shows it.
+EN illustrative:
+> Site is up: `<worker_url>`.
+>
+> Look at it as a visitor first, then sign in at `<worker_url>/admin/sign-in` with GitHub.
+>
+> I wrote the URL into `mantle/site.md`. Next time you want me back, paste those contents into a conversation — I read it whole on return. (A URL form via `.well-known/mantle/` is deferred; for now the paste does it.)
+>
+> The Staff MCP URL is in the admin sidebar; raw link is `<worker_url>/staff/mcp`.
+>
+> (The admin 5-card render isn't shipped yet; the welcome letter lives in `mantle/site.md` `## welcome`.)
+>
+> Revoke the Cloudflare token at `https://dash.cloudflare.com/profile/api-tokens` when you're done.
 
 ## Diagnostic Recipes
 
@@ -315,7 +355,7 @@ Only print the raw Staff MCP URL after explaining that the admin console also sh
 | Worker boots but `/staff/mcp` returns 500 | OAuth secrets failed to set | Re-pipe the secrets manually: `printf '%s' '<v>' \| pnpm exec wrangler secret put GITHUB_CLIENT_ID` (etc.); redeploy. |
 | Owner signs in but MCP consent returns 403 | `ADMIN_GITHUB_LOGIN` does not match GitHub login | Update with `wrangler secret put ADMIN_GITHUB_LOGIN`; sign in again. |
 | GitHub OAuth callback shows mismatch/error | OAuth App callback URL was registered wrong | Edit the OAuth App callback to exactly `<worker_url>/admin/auth/github/callback`. |
-| Public publication has no posts | Initial seed step failed during provision | Run `pnpm run seed:initial -- --seed-file initial-seed.json --origin "<worker_url>" --remote` directly. Do not run fixture against prod. |
+| Public publication has no posts after provision | Expected — provision doesn't seed | Sign in at `<worker_url>/admin/sign-in` and use Staff MCP / admin authoring to create the first post. Do not run `fixture` or `seed:initial` against prod. |
 
 ## Don't
 
@@ -330,13 +370,13 @@ Only print the raw Staff MCP URL after explaining that the admin console also sh
 
 ## When You're Done
 
-Print:
+Follow [Mantle persona](../install/SKILL.md). Quiet, plain.
 
-- Public URL: `<worker_url>`.
-- Staff MCP URL: `<worker_url>/staff/mcp`.
-- User MCP URL: `<worker_url>/mcp`.
-- Bootstrap owner GitHub username.
+Report in the user's language. Intent:
+
+- Public URL, Staff MCP URL, User MCP URL, sign-in URL.
+- Bootstrap owner GitHub username (so the user can sanity-check it before signing in).
 - Post-deploy smoke results.
-- Whether second-agent MCP operation passed.
-
-If second-agent MCP operation has not run yet, say exactly that and make it the next required step. Also invite the user to ask for content, copy, and design changes in plain language.
+- Whether second-agent MCP operation passed; if not, name it as the next required step.
+- That `mantle/site.md` was updated; the user can paste it into a future conversation to summon Mantle back.
+- Invite the user to ask for content, copy, or design changes in plain language — content goes through Staff MCP / admin authoring (the Editor); design through `customize-design`; site logic through Mantle.
