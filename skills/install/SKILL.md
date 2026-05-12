@@ -89,21 +89,57 @@ Pin against the same release tag as the SKILL URL you're reading from — the la
 
 3. Read the RUN_NOTES. The `files_written` list tells you what landed. `mantle/site.md` is the one you now own.
 
-4. Replace the HTML comments in `mantle/site.md` sections with prose drawn from the interview. Sections to fill:
+4. **Adjustment window** (optional, see § Adjustment window below). If the interview surfaced a clear deletion the scaffolded project still carries — a manifest the user explicitly opted out of, a field obviously missing on an existing Schema — propose the edit, confirm with the user, apply it. Don't speculate; stay on what was said. After any edit, run `pnpm validate`. If it's clean, commit the adjustment as its own commit before the prose-fill below.
+
+5. Replace the HTML comments in `mantle/site.md` sections with prose drawn from the interview. Sections to fill:
    - `## site` — one paragraph in the user's language, reflecting their reason.
    - `## voice` — a few lines of specific register markers.
    - `## welcome` — exactly five cards (`### card1` … `### card5`). The arc: prove I listened → install daily helper → meet them → call me back when site itself changes → done. The archetype file carries per-archetype register hints (verb for card1; first-prompt body for card3).
    - `## editor` `first_prompt: |` — card3 body as plain text.
    - `## history` — one paragraph: what was decided, what the user said, what's open.
 
-5. Verify locally:
+6. Verify locally — `pnpm validate` is the trust boundary before provision. `pnpm typecheck` catches TS shape errors before the user wastes wall-clock on a deploy that will fail:
 
 ```bash
 pnpm validate
 pnpm typecheck
 ```
 
-6. Single commit. Conventional message body; mention install only.
+If either exits non-zero, read the diagnostics. `validate` emits structured JSON; don't paraphrase, surface the codes (e.g. `MANIFEST_FIELD_UNKNOWN`, `LOCALE_NOT_IN_SITE_CONFIG`) to the user verbatim and act on the `suggestion:` field when present.
+
+7. Commit. Conventional message body; if step 4 produced an adjustment, that's its own commit first (`adjust: drop contact form per interview`) and the prose-fill is a second commit (`mantle: notes from install interview`). If no adjustment ran, one commit covers scaffold + prose-fill.
+
+## Adjustment window — between scaffold and provision
+
+After `create-mantle` returns and before `provision`, you have a permitted modification turn. This is where the interview pays off — small, concrete edits to make the scaffolded project match what the user actually said. Two reasons to use it:
+
+- **Deletion**: the user said "no contact form", but `publication` shipped `manifests/contact.yaml` + the contact handler. Delete the manifest, drop the handler from `src/handlers/index.ts`, run `validate`. Don't carry a feature the user opted out of.
+- **Targeted field tweak**: the interview surfaced a concrete gap on an existing Schema (e.g., user explicitly mentioned tracking "event date" on posts). Add the one field. Don't speculate beyond what was said.
+
+### What's in-scope here
+
+| Action | OK? | Why |
+|---|---|---|
+| Delete a manifest the user explicitly said they don't need | yes | Honesty over inertia |
+| Add a single field to an existing Schema, from a concrete interview signal | yes | Small, validated, recoverable |
+| Edit `src/mantleConfig.ts` site defaults beyond what `create-mantle` set | yes | Site-shape, fits Mantle's surface |
+| Tweak `src/theme/` tokens if the user gave a strong visual register | yes | But prefer deferring design to [`customize-design`](../customize-design/SKILL.md) unless the user explicitly asked at install time |
+
+### What's NOT in-scope here — route elsewhere
+
+| Action | Route to |
+|---|---|
+| Add a new Schema (beyond a single field on an existing one) | [`skills/extend/SKILL.md`](../extend/SKILL.md) — happens after first deploy |
+| Add a new View / Procedure / Trigger | [`skills/extend/SKILL.md`](../extend/SKILL.md) |
+| Substantial theme work (template fork, layout reshape) | [`skills/customize-design/SKILL.md`](../customize-design/SKILL.md) — after first deploy |
+| Anything touching DRAFT grammar keys (see [CLAUDE.md hard invariants](../../CLAUDE.md#hard-invariants-cross-cutting-never-violate)) | **never at install time** — grammar is locked at v0.1 |
+
+### Discipline
+
+- **Run `pnpm validate` after every adjustment.** If it fails, fix or revert; do not advance to provision with a non-clean tree.
+- **Show the user the diff before applying.** Even small edits — a deleted file, an added field — deserve a one-line confirm.
+- **Don't speculate.** "I think you might also want X" is generation, not interview. Stay on what the user actually said.
+- **Don't batch adjustments into the prose-fill commit.** Adjustments commit first (`adjust: drop contact form per interview`), prose-fill is its own commit (`mantle: notes from install interview`). Cleaner audit trail; easier to revert one without the other.
 
 ## Card briefs (the prose you write into ## welcome)
 
