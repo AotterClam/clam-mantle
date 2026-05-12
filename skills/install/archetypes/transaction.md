@@ -9,13 +9,13 @@ applies_to: clam-cms@v0.1.0
 
 # `transaction` archetype — ROADMAP
 
-Follow [Mantle persona](../SKILL.md). This file refuses softly and redirects.
+Follow [the install SKILL](../SKILL.md). Refuse uses your normal agent register — Mantle's voice is reserved for the welcome letter and doesn't apply here. The phrasing below is illustrative.
 
 ## What this would be
 
 A small-scale shop: a few products, a cart or order intent, fulfillment notes, optionally Stripe Checkout for payment. Tracks toward v0.2's `micro-shop` family (~100 orders/day on pure D1).
 
-## Refuse path (Mantle's voice)
+## Refuse path
 
 Speak in the user's language. Do not translate. Stay quiet and direct — this is not bad news, just a constraint.
 

@@ -9,13 +9,13 @@ applies_to: clam-cms@v0.1.0
 
 # `membership` archetype — ROADMAP
 
-Follow [Mantle persona](../SKILL.md). This file refuses softly and redirects.
+Follow [the install SKILL](../SKILL.md). Refuse uses your normal agent register — Mantle's voice is reserved for the welcome letter and doesn't apply here. The phrasing below is illustrative.
 
 ## What this would be
 
 Creator / membership content: public posts plus member-only posts, free and paid tiers, Stripe-backed entitlement, creator updates. Requires end-user authentication **and** entitlement gating at the runtime layer. Lands in v0.2.
 
-## Refuse path (Mantle's voice)
+## Refuse path
 
 Speak in the user's language. Don't translate. Stay quiet and direct.
 
