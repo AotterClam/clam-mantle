@@ -12,6 +12,7 @@ interface ParsedArgs {
   readonly canonicalLocale: string;
   readonly githubOwner: string;
   readonly summary: string;
+  readonly theme?: string | null;
   readonly starterRef?: string;
 }
 
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
     locales: args.locales,
     githubOwner: args.githubOwner,
     summary: args.summary,
+    theme: args.theme ?? null,
     starterRef: args.starterRef,
   });
   process.stdout.write(`${JSON.stringify(notes, null, 2)}\n`);
@@ -65,7 +67,7 @@ function parseArgs(argv: ReadonlyArray<string>): ParsedArgs {
   const archetype = positional[0];
   if (!archetype) {
     throw new Error(
-      "Usage: create-clam-cms <archetype> --project-name <name> --brand <...> --description <...> --locales <a,b> --github-owner <login> --summary <one-line>",
+      "Usage: create-clam-cms <archetype> --project-name <name> --brand <...> --description <...> --locales <a,b> --github-owner <login> --summary <one-line> [--theme <key>] [--ref <git-ref>]",
     );
   }
   const projectName = required(flags, "project-name");
@@ -79,6 +81,11 @@ function parseArgs(argv: ReadonlyArray<string>): ParsedArgs {
   const canonicalLocale = flags["canonical-locale"] ?? locales[0]!;
   const githubOwner = required(flags, "github-owner");
   const summary = required(flags, "summary");
+  // `--ref` and `--starter-ref` are aliases; `--ref` is the canonical
+  // public flag (per Epic #116). `--starter-ref` retained for
+  // back-compat with v0.0.8-alpha install Skill invocations.
+  const ref = flags["ref"] ?? flags["starter-ref"];
+  const theme = flags["theme"];
   return {
     archetype,
     projectName,
@@ -88,7 +95,8 @@ function parseArgs(argv: ReadonlyArray<string>): ParsedArgs {
     canonicalLocale,
     githubOwner,
     summary,
-    ...(flags["starter-ref"] !== undefined ? { starterRef: flags["starter-ref"]! } : {}),
+    ...(theme !== undefined ? { theme } : {}),
+    ...(ref !== undefined ? { starterRef: ref } : {}),
   };
 }
 
