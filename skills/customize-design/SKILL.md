@@ -2,8 +2,8 @@
 name: clam-cms customize-design
 description: Layer custom design over a clam-cms publication starter project using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
 when_to_invoke: |
-  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to projects cloned from AotterClam/clam-cms-starter-publication — starters/blank has no UI to customize.
-applies_to: clam-cms@v0.1.0 + AotterClam/clam-cms-starter-publication
+  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to projects bootstrapped from the `publication` archetype in [`AotterClam/clam-cms-starters`](https://github.com/AotterClam/clam-cms-starters); the `blank` archetype has no UI to customize.
+applies_to: clam-cms@v0.1.0 + AotterClam/clam-cms-starters/publication
 ---
 
 # Customize the design of a clam-cms publication site

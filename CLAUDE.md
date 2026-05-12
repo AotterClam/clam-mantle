@@ -36,9 +36,9 @@ This is the lens for every architectural decision in this codebase.
 | `packages/clam-cms-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| [`AotterClam/clam-cms-starter-publication`](https://github.com/AotterClam/clam-cms-starter-publication) | End-user `publication` starter template repo. Real-user installs download a tagged tarball, extract it, then initialize a user-owned Git repo so `origin` never points back to the template source. Publication starter code lives outside this SDK monorepo. |
-| `starters/blank/` | Headless API + MCP starter. No UI, no theme stack — drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
-| `starters/_archive/` | Frozen snapshots of retired starters. Excluded from workspace via `pnpm-workspace.yaml` negation; not maintained. |
+| [`AotterClam/clam-cms-starters`](https://github.com/AotterClam/clam-cms-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, and `blank/`. Real-user installs run `npx @aotterclam/create-clam-cms <archetype>`, which downloads a tagged tarball, merges `_common/` + `<archetype>/` into the user's empty directory, and initializes a user-owned Git repo so `origin` never points back to the template source. Premium / per-customer starters live in the private sibling [`AotterClam/clam-cms-starters-premium`](https://github.com/AotterClam/clam-cms-starters-premium). Note: GitHub repo rename from `clam-cms-starter-publication` is pending; the old URL auto-redirects until completed. |
+| `starters/blank/` | **README stub.** Migrated to `clam-cms-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
+| `starters/_archive/` | Frozen snapshots of retired starters. Not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
