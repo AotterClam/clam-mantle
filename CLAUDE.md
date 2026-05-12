@@ -136,6 +136,7 @@ Two grammar items that were originally committed as v0.1.x are in v0.1.0:
 - **Adapter coupling creep.** A PR adds a "small convenience" import of `D1Database` in `mantle-runtime`. Reject. The whole point of the 5-port boundary is that runtime stays portable.
 - **Grammar speculation.** Marking new keys DRAFT until a real use case applies pressure. Locked grammar is more valuable than complete grammar.
 - **Doctrine bloat.** Two ways to do the same thing because "doctrine resolves it." Pick one. POC accumulated several of these (Procedure.expose: shortcut, scaffold/ subdir, virtual:cms-config); the rebuild starts clean.
+- **ADR proliferation.** ADRs are for genuinely path-dependent decisions where the *why* would be lost in code ("we picked X over Y, X is irreversible"). File-format specs, taxonomies, and skill behavior contracts live elsewhere — reference docs, inline `> why:` comments, or PR descriptions. If a change ships and the ADR is mostly redescribing the diff, the ADR isn't load-bearing — delete it. (See Epic #116 for the cleanup that retired ADR-0015 and slimmed ADR-0016.)
 
 ## Migration shape
 
