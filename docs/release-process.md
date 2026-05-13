@@ -111,14 +111,12 @@ repo remote, and uses npm as the runtime dependency source.
 
 Do **not** publish `@aotter/mantle-netlify` while it is a stub.
 
-`@aotter/create-mantle` is **not** published to npm — it ships as
-a `pnpm pack` tarball attached to each GitHub release, and the install
-skill invokes it via `npx <release-tarball-url>`. The
-`release-create-mantle` workflow builds + uploads the tarball
-automatically on every `v*-alpha` / `v*-beta.*` / `v*.*.*` tag push;
-no manual `npm publish` step. The scaffolder evolves on a faster
-cadence than the SDK and is intentionally outside the published
-library surface.
+`@aotter/create-mantle` lives in `aotter/mantle-starters`,
+not here. The scaffolder couples to starter content (sources.json,
+merge layout, placeholder macros) and has zero coupling to SDK runtime,
+so it ships from the starters repo. Releases on this SDK repo no longer
+attach a create-mantle tarball — that asset is on the starters repo's
+matching release tag.
 
 ### Pre-publish checks
 
