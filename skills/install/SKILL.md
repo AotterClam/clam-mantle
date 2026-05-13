@@ -2,7 +2,7 @@
 name: clam-cms install
 description: Install a clam-cms consumer project — interview, dispatch create-clam-cms, optional adjustment window, then write the Mantle letter (welcome cards in mantle/site.md). Use when the user pasted a single composed-skill URL from clam-cms-landing's `/skill/install?type=<archetype>&theme=<theme>` endpoint (which inlines this brief + the per-archetype hint), or a legacy two-URL prompt, or when starting from an empty repo.
 when_to_invoke: |
-  Empty repo + landing-page composed-skill prompt; or "I want to make a presence / publication / intake / blank site"; or paired with one of the per-archetype briefs (ready archetypes: `clam-cms-starters/<archetype>/SKILL.md`; roadmap archetypes: `clam-cms/skills/install/archetypes/<key>.md`).
+  Empty repo + landing-page composed-skill prompt; or "I want to make a presence / publication / intake / transaction / blank site"; or paired with one of the per-archetype briefs (ready archetypes: `clam-cms-starters/<archetype>/SKILL.md`; roadmap archetypes: `clam-cms/skills/install/archetypes/<key>.md`).
 applies_to: clam-cms@v0.1.0
 ---
 
@@ -14,8 +14,8 @@ Framing: Mantle is the observer-scribe. While you do the install work as the age
 
 The user opens with a single composed-skill URL from clam-cms-landing (`/skill/install?type=<archetype>&theme=<theme>`). That endpoint inlines this brief plus the per-archetype hint — you receive one document with both. The archetype hint carries register cues for the letter and the first-prompt template that becomes card3. Source URLs by archetype kind:
 
-- **Ready archetypes** (`presence`, `publication`, `intake`, `blank`) — hint lives at [`clam-cms-starters/<archetype>/SKILL.md`](https://github.com/AotterClam/clam-cms-starters/tree/main) next to the starter implementation.
-- **Roadmap archetypes** (`transaction`, `reservation`, `community`, `membership`) — hint lives at [`skills/install/archetypes/<key>.md`](archetypes/) in this repo, since they have no starter to live with (their content is a voice-shaped refusal path).
+- **Ready archetypes** (`presence`, `publication`, `intake`, `transaction`, `blank`) — hint lives at [`clam-cms-starters/<archetype>/SKILL.md`](https://github.com/AotterClam/clam-cms-starters/tree/main) next to the starter implementation.
+- **Roadmap archetypes** (`reservation`, `community`, `membership`) — hint lives at [`skills/install/archetypes/<key>.md`](archetypes/) in this repo, since they have no starter to live with (their content is a voice-shaped refusal path).
 
 ## The interview
 

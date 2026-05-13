@@ -79,13 +79,14 @@ With a theme applied:
     "presence":    { "path": "presence" },
     "publication": { "path": "publication" },
     "intake":      { "path": "intake" },
+    "transaction": { "path": "transaction" },
     "blank":       { "path": "blank" }
   },
   "themes": {
     "l4-minimal-ink":    { "path": "themes/l4-minimal-ink" },
     "l4-editorial-warm": { "path": "themes/l4-editorial-warm" }
   },
-  "roadmap": ["transaction", "reservation", "community", "membership"]
+  "roadmap": ["reservation", "community", "membership"]
 }
 ```
 

@@ -44,23 +44,23 @@ export interface ArchetypeSource extends ArchetypeSourceEntry {
 
 /**
  * Bundled stale snapshot of `sources.json`. Matches the **current**
- * `clam-cms-starters` layout: publication starter shared across the
- * presence / publication / intake archetypes, with `intake` carrying
- * a layered overlay. After the 1:1 starter split lands in
- * `clam-cms-starters` (Epic #116 sub-issue #6), the live
- * `sources.json` will drop overlays and add 1:1 dirs — runtime fetch
- * picks that up automatically; this fallback only matters when GH
- * is unreachable.
+ * `clam-cms-starters` layout: 1:1 archetype-to-directory mapping
+ * (post-Epic #116 split), `transaction` ready (PR #29 in starters),
+ * `reservation` / `community` / `membership` still roadmap. Refresh
+ * this whenever the live shape shifts significantly; runtime fetch
+ * picks up live changes automatically, so this only matters when
+ * GH is unreachable.
  */
 export const STALE_FALLBACK_SOURCES: SourcesJson = {
   archetypes: {
-    presence: { path: "publication" },
+    presence: { path: "presence" },
     publication: { path: "publication" },
-    intake: { path: "publication", overlays: ["intake"] },
+    intake: { path: "intake" },
+    transaction: { path: "transaction" },
     blank: { path: "blank" },
   },
   themes: {},
-  roadmap: ["transaction", "reservation", "community", "membership"],
+  roadmap: ["reservation", "community", "membership"],
 };
 
 /**
