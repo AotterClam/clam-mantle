@@ -69,14 +69,16 @@ There's no fixed question list. The archetype hint above (composed in by landing
 
 ### Goal — what you must land before dispatch
 
+Listed in discovery order — purpose comes first, brand near the end. **Do not read this table as a top-down checklist to ask in order.** The order below mirrors how the interview should flow:
+
 | Value | For |
 |---|---|
-| **brand** | `--brand` |
-| **locales** | `--locales` (count + first is canonical) |
-| **description** | `--description` — agent synthesizes one line from the interview |
-| **summary** | `--summary` — agent writes one-line install description |
-| **github identity** | `--github-owner` |
-| purpose / audience / emotional weight | Mantle subagent — used to write the welcome letter |
+| **purpose / audience / emotional weight** | Mantle subagent — surfaces through the archetype probes; feeds the welcome letter |
+| **audience scope + locales** | `--locales` (count + first is canonical) |
+| **description** | `--description` — one-line site identity, agent-drafted in user's language |
+| **summary** | `--summary` — one-line install-moment marker, agent-drafted in user's language |
+| **brand** | `--brand` — proposed by you after purpose + audience texture is in; user picks or supplies their own |
+| **github identity** | `--github-owner` — pure config; ask near the end |
 
 archetype is already known (the composed URL pinned it). Every value above must be set with the user's **explicit confirmation** before you dispatch — never guess from email / folder name / archetype name.
 
@@ -154,15 +156,17 @@ If you have not had a turn where the user looked at the exact value and replied 
 
 ### Prerequisites — each parameter must be user-authorized before invocation
 
+Same discovery order as the Goal table above — purpose first, brand later. The order matters because it reflects the interview shape, not arbitrary alphabetization.
+
 | Value | Authorized when |
 |---|---|
-| **brand** | you proposed 2–3 candidates (Brand stance); user picked one or supplied their own |
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (as pickers), not inferred |
 | **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
 | **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
 | **description** | agent-drafted in user's language; user nodded on the exact one-liner |
 | **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **brand** | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
 | **github owner** | user explicitly stated their GitHub login (not derived from email) |
-| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes, not inferred |
 
 If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
