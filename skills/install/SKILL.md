@@ -46,6 +46,25 @@ pnpm validate         # grammar + cross-ref check; structured JSON diagnostics
 
 Diagnostics are structured JSON with `code` + `suggestion` fields — surface both verbatim, don't paraphrase.
 
+## Preflight — before the interview
+
+Verify the environment can run the flow. Don't waste the user's time interviewing for a site we can't build:
+
+```bash
+node --version    # need ≥ 20
+pnpm --version    # need ≥ 9
+git --version     # any recent
+```
+
+If any is missing or below the minimum, surface install hints once and stop until the user confirms tools are ready:
+- node ≥ 20: nvm (`nvm install 20 && nvm use 20`), Homebrew, or the official installer at nodejs.org
+- pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
+- git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
+
+Also confirm the current working directory is empty (or contains only files the user already accepted as part of the install). `create-mantle` writes into this directory directly; collisions with pre-existing files are surprising and rarely what the user wanted.
+
+Don't proceed to the interview until preflight passes.
+
 ## The interview
 
 This Skill is interview-driven. **Ask.** Even if the user said earlier "don't ask clarifying questions" — that was scoped to other contexts. Here, ASK. Defaults guessed from email or folder name are the wrong move.
