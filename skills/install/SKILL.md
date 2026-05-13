@@ -84,13 +84,13 @@ archetype is already known (the composed URL pinned it). Every value above must 
 
 **Brand — propose if blocked.** Once you've heard enough purpose to suggest a name, offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each. Don't make the user invent a name cold — that's the worst opening move.
 
-**Locales — infer the user's preferred language, default to monolingual, confirm.**
+**Audience + locales — ask, don't infer.**
 
-Detect the user's preferred language from the signals available — the language they're writing in, the landing-prompt language (rendered for the visitor), any runtime-level locale preference your environment carries. Propose monolingual in that language. Whatever language; no implied menu.
+Audience scope drives the locale choice and feeds Mantle. Ask the user explicitly who this site is for — is it a domestic audience (and if so, which country / region), or an international audience? Don't infer audience from the user's own writing language alone; a user writing to you in one language may be building for readers in another.
 
-- If the interview surfaces an international / foreign-facing audience (overseas users, foreign customers, multilingual readership), propose **bilingual** with the user's primary language as canonical and the audience's language as secondary.
-- Mixed signals with no internationalization cue → ask once: "monolingual `<primary-language>` or bilingual?"
-- Always confirm before locking in.
+- Domestic audience → propose monolingual in the audience's primary language. Confirm.
+- International audience → propose bilingual, canonical = the user's working language, secondary = the audience's language. Confirm.
+- Ambiguous (mixed signals, user not sure) → ask once: monolingual `<primary>` or bilingual `<primary>+<secondary>`?
 - Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
 
 **Description + summary — different roles, both agent-synthesized in the user's language.**
@@ -121,6 +121,20 @@ Surface `description` and `summary` as separate one-line drafts for the user to 
 If the archetype hint says `status: roadmap`, follow its **Refuse path** — the hint specifies the framing (honest "not yet" → two holding paths → write intent into `mantle/site.md` `futures:`). Move to the holding path the user picks. Skip the rest of the interview steps below.
 
 ## When to act
+
+**Prerequisites — don't enter step 1 until the interview has produced all of these, each explicitly confirmed by the user:**
+
+| Value | Source |
+|---|---|
+| **brand** | proposed by you (Brand stance) and accepted/replaced by user |
+| **audience scope** | user-stated: domestic (which country / region) or international |
+| **locales** | derived from audience scope; user confirmed |
+| **description** | one-line site identity, agent-drafted, user confirmed |
+| **summary** | one-line install-moment marker, agent-drafted, user confirmed |
+| **github owner** | user-stated GitHub login |
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — captured during archetype probes |
+
+If any value is missing or guessed-from-context, the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language — never the moment you start collecting values.
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
