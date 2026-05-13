@@ -1,4 +1,4 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join, resolve, relative } from "node:path";
 import { exit, stdout, stderr, cwd } from "node:process";
 import {
@@ -139,9 +139,21 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
     );
   }
 
-  const diagnostics = [...parseErrors, ...result.diagnostics, ...cliWarnings];
-  const errorCount = result.errorCount + parseErrors.filter((d) => d.severity === "error").length;
-  const warningCount = result.warningCount + cliWarnings.length + parseErrors.filter((d) => d.severity === "warning").length;
+  // The Mantle welcome letter check — only fires when mantle/site.md
+  // exists at the cwd (legacy projects predating ADR-0016 skip silently).
+  // See § Mantle letter check below for why this lives here.
+  const mantleDiagnostics = await runMantleLetterCheck();
+
+  const diagnostics = [...parseErrors, ...result.diagnostics, ...cliWarnings, ...mantleDiagnostics];
+  const errorCount =
+    result.errorCount +
+    parseErrors.filter((d) => d.severity === "error").length +
+    mantleDiagnostics.filter((d) => d.severity === "error").length;
+  const warningCount =
+    result.warningCount +
+    cliWarnings.length +
+    parseErrors.filter((d) => d.severity === "warning").length +
+    mantleDiagnostics.filter((d) => d.severity === "warning").length;
 
   // 4. Emit.
   if (args.format === "json") {
@@ -179,6 +191,62 @@ async function loadHandlerSource(root: string): Promise<string> {
   }
   await walk(root);
   return chunks.join("\n");
+}
+
+/**
+ * Mantle welcome letter check (ADR-0016).
+ *
+ * `mantle/site.md` is the agent-memory semantic layer. Its `## welcome`
+ * section ships with 5 HTML-comment placeholders (`<!-- Mantle: ... -->`)
+ * inside `### card1` … `### card5` that the install agent's Mantle
+ * subagent replaces with prose. If those placeholders still exist at
+ * validate time, the welcome letter wasn't written — block deploy.
+ *
+ * Lives in the CLI rather than ValidateManifestsUseCase because it's a
+ * filesystem-state check (mantle/site.md presence + contents), not a
+ * manifest grammar check.
+ *
+ * Silently no-ops on projects without `mantle/site.md` (legacy installs
+ * predating ADR-0016).
+ */
+async function runMantleLetterCheck(): Promise<ReadonlyArray<Diagnostic>> {
+  const path = resolve(cwd(), "mantle", "site.md");
+  try {
+    const s = await stat(path);
+    if (!s.isFile()) return [];
+  } catch {
+    return [];
+  }
+  let content: string;
+  try {
+    content = await readFile(path, "utf8");
+  } catch {
+    return [];
+  }
+  const cardsWithPlaceholder: number[] = [];
+  for (let n = 1; n <= 5; n++) {
+    const cardRe = new RegExp(
+      `### card${n}\\s*\\n([\\s\\S]*?)(?=\\n### card|\\n## |$)`,
+    );
+    const m = content.match(cardRe);
+    if (!m) continue;
+    const body = m[1] ?? "";
+    if (/<!--[\s\S]*?-->/.test(body) || body.trim() === "") {
+      cardsWithPlaceholder.push(n);
+    }
+  }
+  if (cardsWithPlaceholder.length === 0) return [];
+  return [
+    validateDiagnostic({
+      code: "MANTLE_LETTER_NOT_WRITTEN",
+      severity: "error",
+      path: `mantle/site.md#welcome:${cardsWithPlaceholder.map((n) => `card${n}`).join(",")}`,
+      expected: "all 5 ## welcome cards (card1..card5) written in Mantle's voice",
+      suggestion:
+        "Run `pnpm mantle:prompt > /tmp/mantle-letter-prompt.md`, then dispatch the Mantle subagent with that prompt body to fill the cards. See the install Skill for the full flow.",
+      message: `Mantle welcome letter incomplete — card${cardsWithPlaceholder.length === 1 ? "" : "s"} ${cardsWithPlaceholder.join(", ")} still contain template placeholders.`,
+    }),
+  ];
 }
 
 function emitText(

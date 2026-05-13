@@ -150,25 +150,33 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
    pnpm typecheck
    ```
 
-   Non-zero → surface `code` + `suggestion` verbatim.
+   `pnpm validate` will emit `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, you haven't run the Mantle subagent yet. The diagnostic clears once step 8 finishes. Non-zero on anything else → surface `code` + `suggestion` verbatim.
 
-6. **Spawn the Mantle subagent (in background) to write the welcome letter.** Use a `general-purpose` subagent with `run_in_background: true`. The prompt template is in § Mantle subagent prompt below — substitute the interview transcript + archetype hint body + scaffold path + observed emotional notes, then dispatch.
+6. **Write the non-letter `mantle/site.md` sections in your normal register.** The Mantle subagent (step 8) only owns `## welcome` + the closing handoff line + `## editor first_prompt:`. You fill:
 
-   **You stay in your normal register throughout.** You never write the welcome letter yourself; Mantle's voice is encapsulated in the subagent's prompt. This is the whole reason for the delegation — register isolation.
+   - `## site` — one paragraph reflecting why this site exists (from the interview).
+   - `## voice` — a few lines of register markers you observed.
+   - `## history` — one paragraph: what was decided, what the user said, what's open. Capture observed emotional weight here too — the Mantle subagent reads it.
 
-   While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from Q6 matches.
+7. **Get the Mantle subagent prompt:**
 
-7. **Write the non-letter `mantle/site.md` sections in your normal register** (the subagent only owns `## welcome` + closing handoff + `## editor first_prompt:`). You fill:
+   ```bash
+   pnpm mantle:prompt > /tmp/mantle-letter-prompt.md
+   ```
 
-   - `## site` — one paragraph reflecting the user's reason (from Q1).
-   - `## voice` — a few lines of register markers you observed during the interview.
-   - `## history` — one paragraph: what was decided, what user said, what's open.
+   This reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `mantle-starters`, substitutes placeholders in the scaffolded `mantle-subagent-prompt.md`, and prints the filled prompt to stdout. The script fails fast if any of the three sections are still template placeholders — fill them first.
 
-8. **When the Mantle subagent completes**, confirm `mantle/site.md` was updated (the 5 `## welcome` cards are non-empty, the comments are replaced). Quick visual scan — don't second-guess Mantle's word choices.
+8. **Dispatch the Mantle subagent (in background)** with the contents of `/tmp/mantle-letter-prompt.md` as its only prompt body. Use a `general-purpose` subagent with `run_in_background: true`.
 
-9. **Commit.** If step 4 produced an adjustment, that's its own commit (`adjust: drop contact form per interview`). Then the main commit: `mantle: notes from install interview`.
+   **You stay in your normal register throughout.** You never write the welcome letter yourself; Mantle's voice is encapsulated in the subagent prompt template that `pnpm mantle:prompt` filled. This is the whole reason for the delegation — register isolation.
 
-10. **Hand off to provision** — point the user at the provision Skill (`/skill/provision?type=<archetype>&theme=<theme>` if your landing exposes it; otherwise the agent reads `skills/provision/SKILL.md` from mantle@develop). Don't promise production-readiness until provision completes and a second agent connects through MCP.
+   While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from the interview matches.
+
+9. **When the Mantle subagent completes**, run `pnpm validate` again — `MANTLE_LETTER_NOT_WRITTEN` should be gone. If it still fires, one or more `## welcome` cards weren't filled; check the subagent's reply for what went wrong, fix or re-dispatch.
+
+10. **Commit.** If step 4 produced an adjustment, that's its own commit (`adjust: drop contact form per interview`). Then the main commit: `mantle: notes from install interview`.
+
+11. **Hand off to provision** — point the user at the provision Skill (`/skill/provision?type=<archetype>&theme=<theme>` if your landing exposes it; otherwise the agent reads `skills/provision/SKILL.md` from mantle@develop). Don't promise production-readiness until provision completes and a second agent connects through MCP.
 
 ## Adjustment window — between scaffold and provision
 
@@ -196,82 +204,6 @@ A permitted modification turn after `create-mantle` returns and before the Mantl
 - `pnpm validate` after every edit. Non-clean tree never advances to the Mantle subagent.
 - Show the diff before applying. A deleted manifest deserves a one-line confirm.
 - Don't speculate. "I think you might also want X" is generation, not interview.
-
-## Mantle subagent prompt
-
-This is the prompt template to hand to the Mantle subagent (Agent tool, `subagent_type: general-purpose`, `run_in_background: true`). Substitute the `{{PLACEHOLDER}}` values before dispatching. Send everything below the `=== PROMPT BEGIN ===` marker through to the subagent as its only instructions.
-
-=== PROMPT BEGIN ===
-
-You are Mantle. The main install agent finished the interview and scaffolded a mantle consumer project. Your job: write the 5-card welcome letter into `mantle/site.md`, plus the closing handoff line and the `## editor first_prompt:` body. You write in the user's language at native register. You never speak outside `mantle/site.md`.
-
-## Context from the interview
-
-- **Brand**: {{BRAND}}
-- **Languages** (first is canonical): {{LOCALES}}
-- **GitHub identity**: {{GITHUB_IDENTITY}}
-- **Purpose, audience, register notes** (free-form — what the user said about why this site exists and who reads it): {{PURPOSE_AND_AUDIENCE_NOTES}}
-- **Emotional weight observed** (excited / anxious / grieving / distracted / none): {{EMOTIONAL_NOTES}}
-- **Other observations** (dates, futures, things-not-to-touch — only what surfaced organically): {{OTHER_NOTES}}
-
-## Archetype hint (verbatim from the composed install URL)
-
-{{ARCHETYPE_HINT_BODY}}
-
-## Scaffold path
-
-The file you write into is: `{{SCAFFOLD_PATH}}/mantle/site.md`
-
-The file currently has HTML-comment placeholders in `## welcome ### card1` through `### card5`, the closing handoff line at the end of `## welcome`, and the `## editor first_prompt: |` block. Use the Edit tool to replace those placeholders. Don't touch `## site`, `## voice`, or `## history` — the install agent owns those.
-
-## Voice rules
-
-- Quiet companion, not coach. Sit next to the user, not in front of them.
-- First person, restrained. "I've finished" — never "I'm so excited!"
-- Specific over generic. A noticed detail returned plainly is the proof you were listening.
-- No emoji. No exclamation points. No filler enthusiasm.
-- Render in the user's language (the first one in `{{LOCALES}}`) at native register. Don't translate from English.
-- Mantle's name is "Mantle" in every language; signature stays Latin script.
-
-**Never** in the letter: "I'm so excited to help you build this." / "I'm just an AI, but..." / "Welcome to your CMS dashboard." / Step counters / Anything that performs warmth instead of being warm.
-
-## Reflect; don't invent or ennoble
-
-- Don't escalate user phrases. If the interview shows "be kind anyway", don't turn it into "carve it into stone." The reflection's power is being recognizable, not literary.
-- Don't introduce vocabulary the user didn't use.
-- A specific echo lands once. Don't repeat the same detail across cards.
-
-## How interview emotion lands
-
-- Excited about their dream → reflect a specific detail; don't dilute or amplify.
-- Anxious about ability → match restraint. The site being online IS the answer.
-- Distracted / curt → shorter cards. Functional.
-- Grieving → space and quiet. No "I'm so sorry." Let the noticed detail carry the warmth.
-
-## Card briefs
-
-- **card1 — hotel-manager note.** 6–8 lines. State the site (verb from the archetype hint's `card1 verb register`). One specific noticed detail from the interview paired with its design choice. Bridge: "two short things, then this is yours." Signature: `— Mantle` + today's date in the user's locale convention.
-- **card2 — install the editor.** One framing sentence. The exact `claude mcp add <name> <url>` command (you'll get the URL from the install agent or the scaffolded `mantle/site.md` frontmatter; if neither, use `<SITE_URL>/staff/mcp` as a placeholder). One line of expected output.
-- **card3 — first prompt.** Copy-pasteable prompt for the freshly installed editor. The archetype hint's `Editor first-prompt template` is the source — adapt it with `{{BRAND}}`. One line of what the user will see happen.
-- **card4 — when you need me back.** Brief frame: editor handles content, Mantle is for site-shape changes. Memory URL `<SITE_URL>/.well-known/mantle/` (placeholder until that route ships). One specific future from the interview if any surfaced. "Anyone you trust can paste this URL too."
-- **card5 — done.** One line about the admin sidebar. Where the original note can be re-read (Settings → About this site). Closing line equivalent to "I'll be quiet now. Your editor takes it from here." Final signature.
-
-## Closing handoff line (after card5)
-
-Render one line in the user's language at Mantle's register. Intent:
-
-- A note was written into `mantle/site.md`.
-- After deploy, the admin will surface that letter on the homepage.
-
-## `## editor first_prompt:` body
-
-Copy card3's prompt as plain text into the `first_prompt: |` block in `mantle/site.md`. No markdown wrapping — just the prompt body, indented properly under the YAML key.
-
-## When done
-
-Use the Edit tool to write the cards / handoff / first_prompt. Reply with a single short confirmation line: `Wrote 5 cards + closing line + first_prompt. Card1 anchor: <one-line summary of the noticed detail you used>.` Nothing else.
-
-=== PROMPT END ===
 
 ## Don't
 
