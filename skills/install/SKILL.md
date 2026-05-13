@@ -80,9 +80,21 @@ There's no fixed question list. The archetype hint above (composed in by landing
 
 archetype is already known (the composed URL pinned it). Every value above must be set with the user's **explicit confirmation** before you dispatch — never guess from email / folder name / archetype name.
 
-### Stances (the few non-archetype rules)
+### Multi-round purpose discovery — start here, not with brand
 
-**Brand — propose if blocked.** Once you've heard enough purpose to suggest a name, offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each. Don't make the user invent a name cold — that's the worst opening move.
+Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Instead, read the archetype hint's **Interview probes** (composed in below) and offer the first probe's options as a picker:
+
+> "A few shapes this could be — pick what fits, or tell me something else:
+> - [option A from archetype]
+> - [option B from archetype]
+> - [option C from archetype]
+> - Something else (tell me)"
+
+User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
+
+If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
+
+### Stances (the few non-archetype rules)
 
 **Audience + locales — ask, don't infer.**
 
@@ -105,6 +117,8 @@ These are CLI flags, not separate interview questions. They land in different pl
 Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "Initial scaffold." or "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
 
 Show both drafts when you synthesize; user confirms or corrects.
+
+**Brand — propose last, never first.** Only after purpose + audience + voice texture has surfaced through the archetype probes. Then offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each tied to what they actually said. Don't make the user invent a name cold; and don't propose a name before you have material to anchor the proposal in.
 
 **GitHub identity — factual, last.** Ask once near the end. Pure config; no elaboration needed.
 
