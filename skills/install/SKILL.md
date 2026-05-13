@@ -161,10 +161,10 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 7. **Get the Mantle subagent prompt:**
 
    ```bash
-   pnpm mantle:prompt > /tmp/mantle-letter-prompt.md
+   pnpm -s mantle:prompt > /tmp/mantle-letter-prompt.md
    ```
 
-   This reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `mantle-starters`, substitutes placeholders in the scaffolded `mantle-subagent-prompt.md`, and prints the filled prompt to stdout. The script fails fast if any of the three sections are still template placeholders — fill them first.
+   `-s` (silent) suppresses pnpm's per-script banner so the file is just the prompt body. The script reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `mantle-starters`, substitutes `<<MANTLE_*>>` placeholders in the scaffolded `mantle-subagent-prompt.md`, and prints the filled prompt to stdout. It fails fast if any of the three sections are still template placeholders — fill them first.
 
 8. **Dispatch the Mantle subagent (in background)** with the contents of `/tmp/mantle-letter-prompt.md` as its only prompt body. Use a `general-purpose` subagent with `run_in_background: true`.
 
