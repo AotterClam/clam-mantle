@@ -69,14 +69,14 @@ archetype is already known (the composed URL pinned it). Every value above must 
 
 **Brand — propose if blocked.** Once you've heard enough purpose to suggest a name, offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each. Don't make the user invent a name cold — that's the worst opening move.
 
-**Locales — infer from conversation language, default to monolingual, confirm.**
+**Locales — infer the user's preferred language, default to monolingual, confirm.**
 
-Detect the language the user is speaking with you. Propose monolingual in **that** language first — whatever it is. Examples (the menu is not exhausted by these): 繁體中文 → `zh-TW only`; English → `en only`; Türkçe → `tr only`; 日本語 → `ja only`; Español → `es-ES only`. **Don't bias toward Chinese or English because those happen to be the examples elsewhere in this Skill.** A Turkish user gets a Turkish proposal, not a Chinese one.
+Detect the user's preferred language from the signals available — the language they're writing in, the landing-prompt language (rendered for the visitor), any runtime-level locale preference your environment carries. Propose monolingual in that language. Whatever language; no implied menu.
 
-- If the interview surfaces an international / foreign-facing audience (overseas users, foreign customers, "面向國際", multilingual readership), propose **bilingual** with the user's conversation language as canonical and the audience's language as secondary.
-- Mixed-language conversation with no internationalization signal → ask: "monolingual `<primary-conv-lang>` or bilingual?"
-- Always confirm before locking in. Don't just assume.
-- Use BCP 47 language + 2-letter region. Script subtags (Hant, Hans, Latn, Cyrl) are not accepted by the runtime canonicalizer — use `zh-TW` not `zh-Hant`; `sr-RS` not `sr-Latn`; `tr` or `tr-TR` is fine.
+- If the interview surfaces an international / foreign-facing audience (overseas users, foreign customers, multilingual readership), propose **bilingual** with the user's primary language as canonical and the audience's language as secondary.
+- Mixed signals with no internationalization cue → ask once: "monolingual `<primary-language>` or bilingual?"
+- Always confirm before locking in.
+- Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
 
 **Description + summary — agent synthesizes, user confirms.** These are CLI flags, not separate interview questions. Once you have the purpose, write a draft one-line description (in the user's language) and a one-line install summary (in English — internal log). Show both back when you synthesize. User confirms or corrects.
 
