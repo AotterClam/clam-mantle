@@ -122,19 +122,35 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
 ## When to act
 
-**Prerequisites — don't enter step 1 until the interview has produced all of these, each explicitly confirmed by the user:**
+### Why `npx create-mantle` is a destructive action under Auto Mode
 
-| Value | Source |
+Invoking `npx create-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/mantleConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
+
+- every page's SEO `<meta description>`
+- locale routing for the entire site (canonical + redirects)
+- Mantle's welcome-card surface in `## welcome`
+- 22 starter files' `{{PLACEHOLDER}}` substitution
+- `revisions[0]` — the permanent install-moment entry in the changelog
+
+Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
+
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each of the six parameters passed to `npx create-mantle` must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these six values.
+
+If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
+
+### Prerequisites — each parameter must be user-authorized before invocation
+
+| Value | Authorized when |
 |---|---|
-| **brand** | proposed by you (Brand stance) and accepted/replaced by user |
-| **audience scope** | user-stated: domestic (which country / region) or international |
-| **locales** | derived from audience scope; user confirmed |
-| **description** | one-line site identity, agent-drafted, user confirmed |
-| **summary** | one-line install-moment marker, agent-drafted, user confirmed |
-| **github owner** | user-stated GitHub login |
-| **purpose / audience / emotional weight** | enough texture for Mantle's letter — captured during archetype probes |
+| **brand** | you proposed 2–3 candidates (Brand stance); user picked one or supplied their own |
+| **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
+| **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
+| **description** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **github owner** | user explicitly stated their GitHub login (not derived from email) |
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes, not inferred |
 
-If any value is missing or guessed-from-context, the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language — never the moment you start collecting values.
+If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
