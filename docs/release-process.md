@@ -29,8 +29,12 @@ and early consumer projects that can tolerate churn.
 - Git tag: `v0.0.7-alpha`.
 - GitHub Release: mark as prerelease.
 - npm dist-tag: `alpha`.
-- npm `latest`: do not intentionally move `latest` unless the owner
-  explicitly decides alpha should be the default install path.
+- npm `latest` (pre-v0.1.0 policy): `latest` tracks the most
+  user-useful pre-release for default `npm install` (no tag) calls.
+  Concretely: when a beta exists, `latest` follows the most recent
+  beta; otherwise it follows the most recent alpha. Once v0.1.0
+  stable ships, `latest` switches to stable-only and never points
+  at a prerelease again.
 - Required before publish: `pnpm run check`, changelog entry,
   release PR merged to `main`, tag pushed.
 
