@@ -8,7 +8,7 @@ applies_to: clam-cms@v0.1.0
 
 # clam-cms install
 
-You're installing a clam-cms site. **This is an interview-driven Skill.** The interview *is* the work; the scaffold is what falls out of it. Even if the user said earlier "don't ask clarifying questions" — that was scoped to other contexts. Here, ASK. Defaults guessed from email or folder name are the wrong move.
+You're installing a clam-cms site. **This is an interview-driven Skill** — the interview is the work; the scaffold is what falls out of it. Don't substitute defaults guessed from email, folder name, or archetype name.
 
 The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
 
@@ -67,9 +67,7 @@ Don't proceed to the interview until preflight passes.
 
 ## The interview
 
-This Skill is interview-driven. **Ask.** Even if the user said earlier "don't ask clarifying questions" — that was scoped to other contexts. Here, ASK. Defaults guessed from email or folder name are the wrong move.
-
-There's no fixed question list in this Skill. The archetype hint above (composed in by landing) carries **Interview probes to emphasize** — 4 archetype-tailored questions written for this specific archetype's concerns. That's your spine. Free-form follow-ups based on what surfaces. You decide order. You decide when you have enough.
+There's no fixed question list. The archetype hint above (composed in by landing) carries **Interview probes to emphasize** — 4 archetype-tailored questions written for this specific archetype's concerns. That's your spine. Free-form follow-ups based on what surfaces. You decide order. You decide when you have enough.
 
 ### Goal — what you must land before dispatch
 
@@ -97,7 +95,18 @@ Detect the user's preferred language from the signals available — the language
 - Always confirm before locking in.
 - Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
 
-**Description + summary — agent synthesizes, user confirms, both in user's language.** These are CLI flags, not separate interview questions. Once you have the purpose, write a draft one-line description and a one-line install summary. **Both in the user's language** — `description` lands in `mantle/site.md` frontmatter and `summary` lands in `mantle/site.md` `revisions:`, both of which the user re-reads when summoning Mantle back. Show both drafts when you synthesize; user confirms or corrects.
+**Description + summary — different roles, both agent-synthesized in the user's language.**
+
+These are CLI flags, not separate interview questions. They land in different places and serve different purposes:
+
+| Field | Lands in | Role |
+|---|---|---|
+| `description` | `mantle/site.md` frontmatter → `siteDefaults.description` → SEO `<meta description>` on every page | **Site brochure** — what the site *is* (perpetual). |
+| `summary` | `mantle/site.md` `revisions[0].summary` | **Changelog entry** — what *this install moment* did. Provision / extend / customize-design append their own later. |
+
+Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "首次安裝。" / "Initial scaffold." / "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
+
+Show both drafts when you synthesize; user confirms or corrects.
 
 **GitHub identity — factual, last.** Ask once near the end. Pure config; no elaboration needed.
 
