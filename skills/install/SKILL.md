@@ -92,6 +92,8 @@ Open with **what's this site for** — not the brand name. Don't ask cold ("desc
 > - [option C from archetype]
 > - Something else (tell me)"
 
+The archetype hint's option labels are written in EN as placeholders. **Translate them — and your framing question — into whatever language the user is writing to you in, before presenting.** Don't paste English labels at a user writing in another language; the picker should read as natural prose in their register.
+
 User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
 
 If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
