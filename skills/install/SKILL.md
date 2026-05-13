@@ -2,7 +2,7 @@
 name: clam-cms install
 description: Install a clam-cms consumer project — interview, dispatch create-clam-cms, optional adjustment window, then write the Mantle welcome letter (5 cards in mantle/site.md). Use when the user pasted a composed-skill URL from clam-cms-landing's `/skill/install?type=<archetype>&theme=<theme>` endpoint, or when starting from an empty repo.
 when_to_invoke: |
-  Empty repo + landing-page composed-skill prompt; or "I want to make a presence / publication / intake / blank site". The composed URL already inlined the per-archetype hint with this brief.
+  Empty repo + landing-page composed-skill prompt; or the user describes a site they want to build. The composed URL already inlined the per-archetype hint with this brief.
 applies_to: clam-cms@v0.1.0
 ---
 
@@ -21,7 +21,7 @@ You're installing a clam-cms site. The composed URL inlined this brief plus the 
 | **Procedure** | `CREATE FUNCTION` | none directly; needs a Trigger to bind it |
 | **Trigger** | `CREATE TRIGGER` + cron + REST route + LISTEN/NOTIFY | binding atom — turns Procedures into HTTP / lifecycle / MCP surfaces |
 
-Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript.
+Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/AotterClam/clam-cms/develop/docs/design-atoms.md>.
 
 After `create-clam-cms` runs, the scaffold's ground truth lives in:
 
@@ -71,10 +71,10 @@ Before running `create-clam-cms`, you need: archetype, brand, locales, GitHub id
 
 1. **Confirm the synthesized draft.**
 
-2. **Run `create-clam-cms` non-interactively.** Distributed as a tarball attached to the matching `clam-cms` GitHub release:
+2. **Run `create-clam-cms` non-interactively.** Distributed as a tarball attached to a `clam-cms-starters` GitHub release:
 
    ```bash
-   npx https://github.com/AotterClam/clam-cms/releases/download/v0.0.8-alpha/aotterclam-create-clam-cms-0.0.8-alpha.tgz \
+   npx https://github.com/AotterClam/clam-cms-starters/releases/download/v0.0.8-alpha/aotterclam-create-clam-cms-0.0.8-alpha.1.tgz \
      <archetype> \
      --project-name "<lowercase-hyphenated>" \
      --brand "<brand>" \
@@ -84,7 +84,7 @@ Before running `create-clam-cms`, you need: archetype, brand, locales, GitHub id
      --summary "<one-line install description>"
    ```
 
-   Pin against the same release tag as the SKILL URL you're reading from — the landing interpolates both. The package fetches the `clam-cms-starters` tarball (sources.json at runtime, bundled stale fallback for offline), merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
+   The package fetches `sources.json` at runtime from `clam-cms-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
 3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files above — at minimum `manifests/`, `src/clamConfig.ts`, `mantle/site.md` — before deciding anything else.
 

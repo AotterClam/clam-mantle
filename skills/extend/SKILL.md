@@ -15,7 +15,7 @@ The 4-atom manifest model:
 - **Procedure** — the typed callable
 - **Trigger** — the event binding (HTTP / lifecycle / cron)
 
-Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts.
+Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts, or read the full grammar reference at <https://raw.githubusercontent.com/AotterClam/clam-cms/develop/docs/design-atoms.md>.
 
 ## Match the user's request to atoms
 
