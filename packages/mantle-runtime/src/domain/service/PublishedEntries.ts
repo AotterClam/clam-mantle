@@ -94,8 +94,43 @@ export async function readEntryBySlug(
   db: DatabaseDriver,
   args: ReadEntryBySlugArgs,
 ): Promise<Entry | null> {
-  const conditions: string[] = ["collection = ?", `json_extract(data, '$.slug') = ?`];
-  const binds: unknown[] = [args.collection, args.slug];
+  return readEntryByDataField(db, {
+    collection: args.collection,
+    field: "slug",
+    value: args.slug,
+    locale: args.locale,
+    status: args.status,
+  });
+}
+
+/** Lookup an entry by an arbitrary `data.<field>` value. Generalizes
+ *  `readEntryBySlug` for the parent-join code path: `translates.on`
+ *  is conventionally "slug" but the grammar permits other field names,
+ *  so the join reader must not hard-code `$.slug`. */
+export interface ReadEntryByDataFieldArgs {
+  readonly collection: string;
+  readonly field: string;
+  readonly value: string;
+  readonly locale?: string | null;
+  readonly status?: ContentState;
+}
+
+const SAFE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+export async function readEntryByDataField(
+  db: DatabaseDriver,
+  args: ReadEntryByDataFieldArgs,
+): Promise<Entry | null> {
+  if (!SAFE_FIELD_RE.test(args.field)) {
+    throw new Error(
+      `readEntryByDataField: field name ${JSON.stringify(args.field)} fails ${SAFE_FIELD_RE} — schema field names must be plain identifiers`,
+    );
+  }
+  const conditions: string[] = [
+    "collection = ?",
+    `json_extract(data, '$.${args.field}') = ?`,
+  ];
+  const binds: unknown[] = [args.collection, args.value];
   if (args.locale === null) {
     conditions.push(`json_extract(data, '$.locale') IS NULL`);
   } else if (typeof args.locale === "string") {
