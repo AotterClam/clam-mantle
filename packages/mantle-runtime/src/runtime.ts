@@ -251,6 +251,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     args.kv,
     publicPathResolver,
     composeEntrySeoMeta,
+    schemasByName,
   );
 
   // Content / view / boot use cases. They see `entries` only as the
@@ -278,13 +279,15 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     templates,
     publicPathResolver,
     composeEntrySeoMeta,
+    schemasByName,
   );
-  const renderListLive = new RenderListLiveUseCase(args.db, templates);
+  const renderListLive = new RenderListLiveUseCase(args.db, templates, schemasByName);
   const previewEntry = new PreviewEntryUseCase(
     args.db,
     templates,
     publicPathResolver,
     composeEntrySeoMeta,
+    schemasByName,
   );
   const validateBoot = new ValidateBootUseCase();
 

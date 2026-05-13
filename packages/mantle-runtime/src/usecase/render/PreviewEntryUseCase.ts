@@ -1,8 +1,9 @@
-import type { ContentState, Entry } from "@aotter/mantle-spec";
+import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
+import { joinParentIfTranslation } from "../../domain/service/JoinedEntryReader.js";
 import { renderEntryHtml } from "../../domain/service/HtmlRenderer.js";
 import { injectPreviewBanner } from "../../domain/service/PreviewBanner.js";
 import type { PreviewEntryRequest } from "../dto/render/PreviewEntryRequest.js";
@@ -35,21 +36,27 @@ export class PreviewEntryUseCase {
     private readonly templates: TemplateRegistry,
     private readonly paths: PublicPathResolver | null,
     private readonly composeSeo: SeoComposer,
+    private readonly schemas: ReadonlyMap<string, SchemaManifest>,
   ) {}
 
   async execute(request: PreviewEntryRequest): Promise<string | null> {
     const order = request.statusOrder ?? DEFAULT_PREVIEW_STATUS_ORDER;
-    let entry: Entry | null = null;
+    let raw: Entry | null = null;
     for (const status of order) {
-      entry = await readEntryBySlug(this.db, {
+      raw = await readEntryBySlug(this.db, {
         collection: request.collection,
         slug: request.slug,
         locale: request.locale,
         status,
       });
-      if (entry) break;
+      if (raw) break;
     }
-    if (!entry) return null;
+    if (!raw) return null;
+    // Preview can show drafts; parent lookup intentionally omits status
+    // filter so a draft translation can still preview against its
+    // already-published parent. RequestPublishUseCase enforces the
+    // published-parent invariant at publish time.
+    const entry = await joinParentIfTranslation(this.db, this.schemas, raw);
     const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, request.site);
     const html = renderEntryHtml({
       entry,

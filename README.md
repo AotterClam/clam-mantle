@@ -4,7 +4,7 @@
 
 Agent-native headless CMS where AI agents are first-class authors — locked-grammar manifests, structured JSON diagnostics, and static `.md` mirrors every agent can crawl without auth. Most CMSes treat AI as a content editor; mantle treats it as the developer.
 
-> **0.0.7-alpha prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux. Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
+> **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
 ## Part of Mantle
 
@@ -69,7 +69,10 @@ End-user starters live in the [`aotter/mantle-starters`](https://github.com/aott
 
 ## Repo conventions
 
-See [`CLAUDE.md`](CLAUDE.md) for in-repo conventions when contributing (PR base branch, manifest grammar lock, ADR discipline, etc.).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — workflow contract for AI + human contributors (branch prefixes, commit shape, PR template, architecture gates).
+- [`CLAUDE.md`](CLAUDE.md) — in-repo conventions for agents writing code (PR base branch, manifest grammar lock, ADR discipline, clean-architecture rules).
+- [`docs/release-process.md`](docs/release-process.md) — release + publish discipline (channels, dist-tags, deprecation policy, pre-publish checks).
+- [`CHANGELOG.md`](CHANGELOG.md) — versioned change log.
 
 ## License
 

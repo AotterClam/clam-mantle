@@ -30,14 +30,16 @@ This is the lens for every architectural decision in this codebase.
 | `docs/design-references/` | Preserved visual systems from retired starter experiments. Design reference only; not runnable templates. |
 | `docs/design-atoms.md` | The 4-atom manifest reference. (Stubbed during v0.1.0 dev.) |
 | `docs/getting-started.md` | Human Quickstart. (Stubbed during v0.1.0 dev.) |
-| `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / extend / provision flows. Discoverable by URL — no Claude plugin install required. |
+| `docs/release-process.md` | Release + publish discipline. Branch model (`develop` → `main`), channel rules (alpha / beta / RC / stable), npm dist-tags, dependency-order publish, deprecation policy. Read before any version bump or publish. |
+| `CONTRIBUTING.md` | Workflow contract for AI + human contributors. Branch prefixes, commit shape, PR template, architecture gates. Entry point for anyone (or any agent) about to file an issue or open a PR. |
+| `CHANGELOG.md` | Versioned change log. Each release tag gets an entry here before the release PR merges. |
+| `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / provision / extend / customize-design flows. Discoverable by URL — no Claude plugin install required. |
 | `packages/mantle-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
 | `packages/mantle-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
 | `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| `packages/create-mantle/` | npx scaffolder. Fetches the starters monorepo tarball, merges `_common/` + `<archetype>/` into the user's directory, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. Replaces the manual `curl … \| tar -xzf` + `setup:site` ritual in the install Skill. |
-| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, and `blank/`. Real-user installs run `npx @aotter/create-mantle <archetype>`, which downloads a tagged tarball, merges `_common/` + `<archetype>/` into the user's empty directory, and initializes a user-owned Git repo so `origin` never points back to the template source. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium). Note: GitHub repo rename from `mantle-starters` is pending; the old URL auto-redirects until completed. |
+| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, `blank/`, etc. Also hosts `packages/create-mantle` — the npx scaffolder that fetches the starters tarball, merges `_common/` + `<archetype>/`, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. **The scaffolder is intentionally not on npm**; consumers run it via `npx https://github.com/aotter/mantle-starters/releases/download/<tag>/aotter-create-mantle-<tag>.tgz` per `skills/install/SKILL.md`. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium). |
 | `starters/blank/` | **README stub.** Migrated to `mantle-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
 | `starters/_archive/` | Frozen snapshots of retired starters. Not maintained. |
 
@@ -136,6 +138,7 @@ Two grammar items that were originally committed as v0.1.x are in v0.1.0:
 - **Adapter coupling creep.** A PR adds a "small convenience" import of `D1Database` in `mantle-runtime`. Reject. The whole point of the 5-port boundary is that runtime stays portable.
 - **Grammar speculation.** Marking new keys DRAFT until a real use case applies pressure. Locked grammar is more valuable than complete grammar.
 - **Doctrine bloat.** Two ways to do the same thing because "doctrine resolves it." Pick one. POC accumulated several of these (Procedure.expose: shortcut, scaffold/ subdir, virtual:cms-config); the rebuild starts clean.
+- **ADR proliferation.** ADRs are for genuinely path-dependent decisions where the *why* would be lost in code ("we picked X over Y, X is irreversible"). File-format specs, taxonomies, and skill behavior contracts live elsewhere — reference docs, inline `> why:` comments, or PR descriptions. If a change ships and the ADR is mostly redescribing the diff, the ADR isn't load-bearing — delete it. (See Epic #116 for the cleanup that retired ADR-0015 and slimmed ADR-0016.)
 
 ## Migration shape
 

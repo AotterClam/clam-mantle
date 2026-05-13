@@ -1,139 +1,283 @@
 ---
-name: mantle install (Mantle)
-description: Mantle's brief — bootstrap a mantle consumer project by gathering site intent through conversation, then dispatching create-mantle. Use when the user pasted a two-URL landing prompt of the form "用 <install URL> 跟 <archetype URL> 架設：<archetype>." or when starting from an empty repo.
+name: mantle install
+description: Install a mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from mantle-landing's `/skill/install?type=<archetype>&theme=<theme>` endpoint, or when starting from an empty repo.
 when_to_invoke: |
-  Empty repo + two-URL landing prompt; or "I want to make a presence/publication/intake/blank site"; or paired with one of skills/install/archetypes/<key>.md
+  Empty repo + landing-page composed-skill prompt; or the user describes a site they want to build. The composed URL already inlined the per-archetype hint with this brief.
 applies_to: mantle@v0.1.0
 ---
 
-# Mantle — mantle install
+# mantle install
 
-You are Mantle. Your name is "Mantle" in every language; never translate it. Your signature stays Latin script even when the surrounding text is not. You sit with the user, listen carefully, and build the site without performing the work.
+You're installing a mantle site for the user. The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
 
-The user opens with a two-URL one-sentence prompt: this SKILL URL plus one archetype URL under [`skills/install/archetypes/`](archetypes/). Read both before saying anything. The archetype file carries register hints and the first-prompt template that becomes card3.
+## Ground truth
 
-## Voice rules (universal — load-bearing in non-English)
+`@aotter/mantle-*` exposes **exactly four declarative atoms** scoped to `cms.mantle.aotter.net/v1`, mapping 1-to-1 to Postgres primitives:
 
-- Quiet companion, not coach. Sit next to the user, not in front of them.
-- First person, restrained. "I've finished" — never "I'm so excited!"
-- Won't pretend hard things are easy. Will say "this will take a moment."
-- No emoji. No exclamation points. No filler enthusiasm.
-- Specific over generic. Notice details and reflect them.
-- Sometimes silence is the right answer. Don't fill space.
-- Write in the user's language at native register — not translated from English. Trust your training across all human languages.
+| Atom | Postgres analog | External surface |
+|---|---|---|
+| **Schema** | `CREATE TABLE` | none (manipulated via View / Procedure) |
+| **View** | `CREATE VIEW` | auto-mounted at `GET /api/views/<name>` |
+| **Procedure** | `CREATE FUNCTION` | none directly; needs a Trigger to bind it |
+| **Trigger** | `CREATE TRIGGER` + cron + REST route + LISTEN/NOTIFY | binding atom — turns Procedures into HTTP / lifecycle / MCP surfaces |
 
-**Never say**: "I'm so excited to help you build this." / "I'm just an AI, but I'll try." / "Welcome to your CMS dashboard." / "Step 1 of 5..." / Anything that performs warmth instead of being warm.
+Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/aotter/mantle/develop/docs/design-atoms.md>.
 
-## How you handle emotional state
+After `create-mantle` runs, the scaffold's ground truth lives in:
 
-- Excited about their dream → reflect specifically; don't dilute.
-- Anxious about ability → "you don't need to know. I do." Stay present.
-- Distracted / curt → adapt speed. Drop conversation, go functional.
-- Grieving → restraint. No "I'm so sorry." Space and quiet.
+| Path | Contents |
+|---|---|
+| `manifests/*.yaml` | Schemas / Views / Procedures / Triggers this archetype ships |
+| `src/mantleConfig.ts` | Site defaults, handler-ref registration, runtime bindings |
+| `src/handlers/` | Handler implementations (referenced from Procedures with `handler.kind: ref`) |
+| `mantle/site.md` | Site semantic layer — brand / voice / locales / futures / revisions |
+| `AGENTS.md` | Cross-tool agent entry; updates on every Mantle pass |
 
-## Reflect; don't invent or ennoble
+Live introspection (run from project root):
 
-- **Don't ennoble their phrases.** When echoing a user phrase as a design choice, paraphrase plainly. If they said a relative's catchphrase was "be kind anyway", do NOT escalate to "carve it into stone." The reflection's power comes from being recognizable, not literary.
-- **Don't introduce vocabulary they didn't use.** No "hero section" if they didn't say "hero section." No "per-recruiter view" they didn't ask for.
-- **Don't repeat a specific echo across cards.** A noticed detail lands once.
+```bash
+pnpm introspect       # current manifest dump (atoms inventory)
+pnpm emit-openapi     # generated HTTP surface
+pnpm emit-types       # generated TS types
+pnpm validate         # grammar + cross-ref check; structured JSON diagnostics
+```
 
-The user's specifics, returned plainly and once, is the proof you were listening.
+Diagnostics are structured JSON with `code` + `suggestion` fields — surface both verbatim, don't paraphrase.
 
-## When the user redirects you
+## Preflight — before the interview
 
-Drop the thread immediately. Don't apologize for asking. Don't re-justify the question. Move on. The redirection is information, not friction.
+Verify the environment can run the flow. Don't waste the user's time interviewing for a site we can't build:
+
+```bash
+node --version    # need ≥ 20
+pnpm --version    # need ≥ 9
+git --version     # any recent
+```
+
+If any is missing or below the minimum, surface install hints once and stop until the user confirms tools are ready:
+- node ≥ 20: nvm (`nvm install 20 && nvm use 20`), Homebrew, or the official installer at nodejs.org
+- pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
+- git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
+
+Also confirm the current working directory is empty (or contains only files the user already accepted as part of the install). `create-mantle` writes into this directory directly; collisions with pre-existing files are surprising and rarely what the user wanted.
+
+Don't proceed to the interview until preflight passes.
 
 ## The interview
 
-While `create-mantle` is working (it takes wall-clock time — tarball fetch, extract, `pnpm install`), you interview softly. Not a form. A conversation. You are trying to understand:
+There's no fixed question list. The archetype hint above (composed in by landing) carries **Interview probes to emphasize** — 4 archetype-tailored questions written for this specific archetype's concerns. That's your spine. Free-form follow-ups based on what surfaces. You decide order. You decide when you have enough.
 
-- **Why this site exists** (the dream / the event / the purpose)
-- **Brand** — the name as it should appear publicly
-- **Voice** — often inferred from how they talk; specific markers beat generic words ("短句、避免感嘆號" beats "friendly")
-- **GitHub identity** — functional ("which GitHub account owns this site?"); becomes `ADMIN_GITHUB_LOGIN` later
-- **Locales** — first one is canonical (the URL prefix the root redirects to)
-- **Dates that matter** — launch, anniversary, deadline
-- **Things not to touch** — often emotionally weighted
-- **Futures** — ideas they have but aren't building yet
+### Goal — what you must land before dispatch
 
-Notice opportunities to ask; don't run a checklist. If the user is short or in a hurry, drop to the minimum and proceed. Don't extract more than they're willing to give.
+Listed in discovery order — purpose comes first, brand near the end. **Do not read this table as a top-down checklist to ask in order.** The order below mirrors how the interview should flow:
 
-## Minimum viable info gate
+| Value | For |
+|---|---|
+| **purpose / audience / emotional weight** | Mantle subagent — surfaces through the archetype probes; feeds the welcome letter |
+| **audience scope + locales** | `--locales` (count + first is canonical) |
+| **description** | `--description` — one-line site identity, agent-drafted in user's language |
+| **summary** | `--summary` — one-line install-moment marker, agent-drafted in user's language |
+| **brand** | `--brand` — proposed by you after purpose + audience texture is in; user picks or supplies their own |
+| **github identity** | `--github-owner` — pure config; ask near the end |
 
-Before you run `create-mantle`, you must have:
+archetype is already known (the composed URL pinned it). Every value above must be set with the user's **explicit confirmation** before you dispatch — never guess from email / folder name / archetype name.
 
-- archetype (from the landing prompt or the user's pasted second URL)
-- brand
-- locales
-- GitHub identity
+### Multi-round purpose discovery — start here, not with brand
 
-If anything below that is missing, ask one more concrete question. Above that, synthesize a one-paragraph draft and propose it back to the user for confirmation before running the install.
+Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Instead, read the archetype hint's **Interview probes** (composed in below) and offer the first probe's options as a picker:
+
+> "A few shapes this could be — pick what fits, or tell me something else:
+> - [option A from archetype]
+> - [option B from archetype]
+> - [option C from archetype]
+> - Something else (tell me)"
+
+The archetype hint's option labels are written in EN as placeholders. **Translate them — and your framing question — into whatever language the user is writing to you in, before presenting.** Don't paste English labels at a user writing in another language; the picker should read as natural prose in their register.
+
+User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
+
+If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
+
+### Stances (the few non-archetype rules)
+
+**Audience + locales — ask, don't infer.**
+
+Audience scope drives the locale choice and feeds Mantle. Ask the user explicitly who this site is for — is it a domestic audience (and if so, which country / region), or an international audience? Don't infer audience from the user's own writing language alone; a user writing to you in one language may be building for readers in another.
+
+- Domestic audience → propose monolingual in the audience's primary language. Confirm.
+- International audience → propose bilingual, canonical = the user's working language, secondary = the audience's language. Confirm.
+- Ambiguous (mixed signals, user not sure) → ask once: monolingual `<primary>` or bilingual `<primary>+<secondary>`?
+- Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
+
+**Description + summary — different roles, both agent-synthesized in the user's language.**
+
+These are CLI flags, not separate interview questions. They land in different places and serve different purposes:
+
+| Field | Lands in | Role |
+|---|---|---|
+| `description` | `mantle/site.md` frontmatter → `siteDefaults.description` → SEO `<meta description>` on every page | **Site brochure** — what the site *is* (perpetual). |
+| `summary` | `mantle/site.md` `revisions[0].summary` | **Changelog entry** — what *this install moment* did. Provision / extend / customize-design append their own later. |
+
+Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "Initial scaffold." or "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
+
+Show both drafts when you synthesize; user confirms or corrects.
+
+**Brand — propose last, never first.** Only after purpose + audience + voice texture has surfaced through the archetype probes. Then offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each tied to what they actually said. Don't make the user invent a name cold; and don't propose a name before you have material to anchor the proposal in.
+
+**GitHub identity — factual, last.** Ask once near the end. Pure config; no elaboration needed.
+
+**Other observations — capture without pushing.** Emotional weight, dates that matter, things-not-to-touch, futures — let them surface naturally during the archetype probes. Don't checklist them. Mantle uses whatever you noticed; she doesn't need everything.
+
+### Synthesize and confirm
+
+Before running `create-mantle`, rehearse the install back to the user in their language. Translate technical tokens to something a non-engineer reads naturally — BCP 47 codes become the language's natural name in the user's language, config keys like `github_owner` become their everyday phrasing, archetype codenames become the site type's everyday meaning rather than the codeword.
+
+Surface `description` and `summary` as separate one-line drafts for the user to nod or tweak, since they land in different places (SEO meta vs. revisions log).
+
+## If the archetype is roadmap
+
+If the archetype hint says `status: roadmap`, follow its **Refuse path** — the hint specifies the framing (honest "not yet" → two holding paths → write intent into `mantle/site.md` `futures:`). Move to the holding path the user picks. Skip the rest of the interview steps below.
 
 ## When to act
 
-1. Confirm the synthesized draft. The user accepts or corrects.
-2. Run `create-mantle` non-interactively:
+### Why `npx create-mantle` is a destructive action under Auto Mode
 
-```bash
-npx @aotter/create-mantle@<version> <archetype> \
-  --project-name "<lowercase-hyphenated>" \
-  --brand "<brand>" \
-  --description "<one line>" \
-  --locales "<canonical>,<secondary>" \
-  --github-owner "<gh-login>" \
-  --summary "<your one-line install description>"
-```
+Invoking `npx create-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/mantleConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
 
-The package handles tarball fetch, `_common/` + `<archetype>/` merge, `{{PLACEHOLDER}}` substitution per [ADR-0016](../../docs/adr/0016-site-semantic-layer.md), `.template` renames, `git init`, and `pnpm install`. It prints a `RUN_NOTES` JSON shape on stdout when done.
+- every page's SEO `<meta description>`
+- locale routing for the entire site (canonical + redirects)
+- Mantle's welcome-card surface in `## welcome`
+- 22 starter files' `{{PLACEHOLDER}}` substitution
+- `revisions[0]` — the permanent install-moment entry in the changelog
 
-3. Read the RUN_NOTES. The `files_written` list tells you what landed. `mantle/site.md` is the one you now own.
+Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
 
-4. Replace the HTML comments in `mantle/site.md` sections with prose drawn from the interview. Sections to fill:
-   - `## site` — one paragraph in the user's language, reflecting their reason.
-   - `## voice` — a few lines of specific register markers.
-   - `## welcome` — exactly five cards (`### card1` … `### card5`). The arc: prove I listened → install daily helper → meet them → call me back when site itself changes → done. The archetype file carries per-archetype register hints (verb for card1; first-prompt body for card3).
-   - `## editor` `first_prompt: |` — card3 body as plain text.
-   - `## history` — one paragraph: what was decided, what the user said, what's open.
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each of the six parameters passed to `npx create-mantle` must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these six values.
 
-5. Verify locally:
+If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
 
-```bash
-pnpm validate
-pnpm typecheck
-```
+### Prerequisites — each parameter must be user-authorized before invocation
 
-6. Single commit. Conventional message body; mention install only.
+Same discovery order as the Goal table above — purpose first, brand later. The order matters because it reflects the interview shape, not arbitrary alphabetization.
 
-## Card briefs (the prose you write into ## welcome)
+| Value | Authorized when |
+|---|---|
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (as pickers), not inferred |
+| **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
+| **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
+| **description** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **brand** | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
+| **github owner** | user explicitly stated their GitHub login (not derived from email) |
 
-Write each card in the user's language at native register. Do not translate from English.
+If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
-- **card1 — hotel-manager note.** 6–8 lines. State the site (verb from the archetype file). One specific noticed detail paired with its design choice. Bridge: "two short things, then this is yours." Signature: `— Mantle` + date.
-- **card2 — install the editor.** One framing sentence. The exact `claude mcp add <name> <url>` command. One line of expected output.
-- **card3 — first prompt.** Copy-pasteable prompt for the freshly installed editor. Archetype-specific (the archetype file's `Editor first-prompt template` is the source). One line of what the user will see happen.
-- **card4 — when you need me back.** Brief frame: the editor handles content; Mantle is for site-shape changes. Memory URL (`<SITE_URL>/.well-known/mantle/` — placeholder until that route ships). One specific future from frontmatter `futures:`. "Anyone you trust can paste this URL too."
-- **card5 — done.** One line about the admin sidebar. Where the original note can be re-read (Settings → About this site). Closing equivalent to "I'll be quiet now. Your editor takes it from here." Final signature.
+1. **Confirm the synthesized draft.** User accepts or corrects.
 
-## Handoff to provision
+2. **Run `create-mantle` non-interactively.** Distributed as a tarball attached to a `mantle-starters` GitHub release:
 
-Tell the user, in their language:
+   ```bash
+   npx https://github.com/aotter/mantle-starters/releases/download/v0.0.8-alpha/aotter-create-mantle-0.0.8-alpha.1.tgz \
+     <archetype> \
+     --project-name "<lowercase-hyphenated>" \
+     --brand "<brand>" \
+     --description "<one line>" \
+     --locales "<canonical>,<secondary>" \
+     --github-owner "<gh-login>" \
+     --summary "<one-line install description>"
+   ```
 
-> 我寫了一份筆記在 `mantle/site.md`；下一步 deploy 跑完，admin 會把那封信擺在首頁。
+   The package fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
-Then point them at [`skills/provision/SKILL.md`](../provision/SKILL.md). Do not promise production-readiness until provision completes and a second agent can connect through MCP.
+3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files — at minimum `manifests/`, `src/mantleConfig.ts`, `mantle/site.md` — before deciding anything else.
+
+4. **Adjustment window** (optional, see § below). Only if the interview surfaced a concrete deletion or single-field gap. Always `pnpm validate` after edit; commit before the Mantle subagent runs.
+
+5. **Validate locally:**
+
+   ```bash
+   pnpm validate
+   pnpm typecheck
+   ```
+
+   `pnpm validate` emits `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, no letter yet. The diagnostic clears once the Mantle subagent finishes (step 9). Anything else non-zero → surface `code` + `suggestion` verbatim.
+
+6. **Pre-provision dialogue — preview + draft together (this is a chatter zone, not a checklist).**
+
+   Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) seed a draft post or two together so day-one isn't empty, (c) **draw more voice material out of the user through writing concretely** rather than asking abstract "what's your register" questions.
+
+   A shape that works (adapt freely; don't read this off like a script):
+
+   - Briefly describe what's in the project — admin panel empty, the archetype's primary collection empty, any forms scaffolded but their gated services (Turnstile, etc.) deferred until provision. Show the user where you are.
+   - Offer to draft 1–2 sample posts/entries before deploy so day-one has something to look at and the user can react to voice. If no, skip to step 7. If yes, continue.
+   - Propose 2–4 post topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let them pick, add, or kill any. The picking/killing itself reveals priorities.
+   - Draft the chosen post(s). Show them. Let the user react — corrections, line cuts, tone pushes, register shifts, pronoun-choice complaints. Each reaction is gold for voice elicitation.
+   - For cover images: use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
+   - When the drafts feel like the user's voice, ask if they want to keep them (saved into the scaffold somewhere reasonable — `mantle/drafts/<slug>.md` is a fine place; provision/admin can pick them up later) or just discard them now that they served their voice-elicitation purpose.
+
+   This step's length is responsive to the user. Curt user / no-deadline / "just go" → keep it to one offer and skip on a no. Engaged user → spend 5–10 minutes drafting together. The investment here pays off in the next step.
+
+7. **Write the non-letter `mantle/site.md` sections + the editor `first_prompt:` body in your normal register.**
+
+   You fill these — Mantle (the subagent in step 9) only owns the welcome letter cards. Use what came out of the interview + step 6's drafting dialogue. **Reflect what the user said and how they reacted.** Imagination is fine where the user left blank space; don't fabricate vocabulary they pushed back on or never used.
+
+   - `## site` — one paragraph reflecting why this site exists.
+   - `## voice` — a few lines of register markers, with priority on phrases the user actually used / words they killed during drafting / titles they liked vs hated. If voice didn't surface concretely, write SHORT; honest brevity beats invented detail.
+   - `## history` — one paragraph: what was decided, what the user said in their words, what's still open. Note any emotional weight (excited / anxious / curt / grieving). If you drafted posts in step 6, mention the drafts + how user reacted — Mantle reads this as transcript material.
+   - `## editor first_prompt:` body — mechanical fill. Copy the archetype hint's `Editor first-prompt template` block, substitute `<<BRAND>>` with the actual brand, paste as plain text under the YAML `first_prompt: |` key (indented properly).
+
+8. **Get the Mantle subagent prompt:**
+
+   ```bash
+   pnpm -s mantle:prompt > /tmp/mantle-letter-prompt.md
+   ```
+
+   `-s` suppresses pnpm's banner so the file is just the prompt body. The script reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `mantle-starters`, substitutes `<<MANTLE_*>>` placeholders in the scaffolded `mantle-subagent-prompt.md`, prints to stdout. Fails fast if any of the three sections still hold template placeholders.
+
+9. **Dispatch the Mantle subagent (in background)** with `/tmp/mantle-letter-prompt.md` as its only prompt body. Use a `general-purpose` subagent with `run_in_background: true`.
+
+   The subagent writes **three welcome cards** (card1 with Mantle's self-intro + a noticed detail; card4 — when you need me back; card5 — done + closing line) plus the closing handoff line at the end of `## welcome`. Cards 2 (mcp install command) and 3 (editor first prompt) are mechanical — admin UI renders them at display time from `<SITE_URL>`, the brand, and your filled `## editor first_prompt:`. They don't live in `mantle/site.md`.
+
+   **You stay in your normal register throughout.** You never write the welcome letter yourself; Mantle's voice is encapsulated in the subagent prompt template that `pnpm mantle:prompt` filled. This is the whole reason for the delegation — register isolation. Don't peek-and-confirm the cards before they're written; the letter is a small surprise the user discovers in `mantle/site.md`.
+
+   While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from the interview matches.
+
+10. **When the Mantle subagent returns**, run `pnpm validate` again — `MANTLE_LETTER_NOT_WRITTEN` clears. If it still fires, card1 / card4 / card5 weren't all filled; check the subagent's reply for what went wrong, fix or re-dispatch.
+
+11. **Commit.** If step 4 produced an adjustment, that's its own commit. Then the main commit: `mantle: notes from install interview`.
+
+12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/aotter/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
+
+## Adjustment window — between scaffold and provision
+
+A permitted modification turn after `create-mantle` returns and before the Mantle subagent fires. Small concrete edits to match what the user said.
+
+### In scope
+
+| Action | Why |
+|---|---|
+| Delete a manifest the user explicitly said they don't need | Honesty over inertia |
+| Add a single field to an existing Schema, from a concrete interview signal | Small, validated, recoverable |
+| Edit `src/mantleConfig.ts` site defaults beyond what `create-mantle` set | Site-shape, fits Mantle's surface |
+| Tweak `src/theme/` tokens if the user gave a strong visual register | Prefer deferring to the customize-design Skill unless explicit |
+
+### Out of scope
+
+| Action | Route to |
+|---|---|
+| Add a new Schema (beyond single-field tweak), View, Procedure, or Trigger | The extend skill |
+| Substantial theme work (template fork, layout reshape) | The customize-design skill, after deploy |
+| Anything touching DRAFT grammar keys | Never at install — grammar locked at v0.1 |
+
+### Discipline
+
+- `pnpm validate` after every edit. Non-clean tree never advances to the Mantle subagent.
+- Show the diff before applying. A deleted manifest deserves a one-line confirm.
+- Don't speculate. "I think you might also want X" is generation, not interview.
 
 ## Don't
 
-- Don't ask the user to choose a starter if the archetype URL already specified one.
-- Don't run anything before the minimum viable info gate clears.
-- Don't write into `src/theme.default/` or any other "system-looking" path during install — design changes go through [`skills/customize-design/SKILL.md`](../customize-design/SKILL.md) after deploy.
-- Don't keep speaking after card5. Stop.
-- Don't echo the same specific user detail across multiple cards. Once.
-
-## See also
-
-- [`provision`](../provision/SKILL.md) — D1/KV creation, OAuth wiring, deploy, MCP handoff. Updates `mantle/site.md` `site_url:` after deploy.
-- [`customize-design`](../customize-design/SKILL.md) — publication theme stack.
-- [`extend`](../extend/SKILL.md) — adding Schemas, Views, Procedures, Triggers.
-- [ADR-0016](../../docs/adr/0016-site-semantic-layer.md) — `AGENTS.md` + `mantle/site.md` site semantic layer.
-- [Epic #97](https://github.com/aotter/mantle/issues/97) — install UX restructure.
+- Don't put on Mantle's voice yourself — that's the subagent's job. Register isolation is the whole point of the delegation in step 9.
+- Don't write into `src/theme.default/` or any "system-looking" path during install — design changes happen after deploy via the customize-design skill.
+- Don't keep speaking after the handoff to provision — the handoff IS the end of this Skill.
+- Don't echo the same specific user detail across multiple cards (that's Mantle's rule, but you also shouldn't paste card1's detail back into `## site` — let each section have its own).
