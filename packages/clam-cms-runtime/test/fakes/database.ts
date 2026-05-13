@@ -330,6 +330,13 @@ class InMemoryStatement implements PreparedStatement {
             if (data["slug"] !== want) return false;
           } else if (cond === `collection = ?`) {
             if (r.collection !== (p[pi++] as string)) return false;
+          } else if (/^json_extract\(data, '\$\.[A-Za-z_][A-Za-z0-9_]*'\) IN \(\?(?:, \?)*\)$/.test(cond)) {
+            const field = cond.match(/^json_extract\(data, '\$\.([A-Za-z_][A-Za-z0-9_]*)'\) IN /)![1]!;
+            const placeholderCount = (cond.match(/\?/g) ?? []).length;
+            const wantSet = new Set(p.slice(pi, pi + placeholderCount));
+            pi += placeholderCount;
+            const data = JSON.parse(r.data) as Record<string, unknown>;
+            if (!wantSet.has(data[field] as string)) return false;
           } else {
             throw new Error(`fake DB: unsupported cond '${cond}' in publish read SELECT`);
           }

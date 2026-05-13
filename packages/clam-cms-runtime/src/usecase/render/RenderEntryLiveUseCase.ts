@@ -1,7 +1,9 @@
+import type { SchemaManifest } from "@aotterclam/clam-cms-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
+import { joinParentIfTranslation } from "../../domain/service/JoinedEntryReader.js";
 import { renderEntryHtml } from "../../domain/service/HtmlRenderer.js";
 import type { RenderEntryLiveRequest } from "../dto/render/RenderEntryLiveRequest.js";
 import {
@@ -18,6 +20,11 @@ import {
  * meta block is composed and threaded into `EntryContext.seo` — so
  * live-rendered HTML carries the same meta KV-cached HTML does.
  *
+ * When the entry belongs to a collection with `translates.parent`,
+ * the parent's data is merged into the translation's data (ADR-0010)
+ * before rendering, so template fields living on the parent
+ * (`coverUrl`, `authorId`, `publishedAt`) reach the template.
+ *
  * Returns the full HTML document, or `null` when:
  *   - no entry matches `(collection, slug, locale, status)`
  *   - the collection has no registered entry template
@@ -29,16 +36,21 @@ export class RenderEntryLiveUseCase {
     private readonly templates: TemplateRegistry,
     private readonly paths: PublicPathResolver | null,
     private readonly composeSeo: SeoComposer,
+    private readonly schemas: ReadonlyMap<string, SchemaManifest>,
   ) {}
 
   async execute(request: RenderEntryLiveRequest): Promise<string | null> {
-    const entry = await readEntryBySlug(this.db, {
+    const status = request.status ?? "published";
+    const raw = await readEntryBySlug(this.db, {
       collection: request.collection,
       slug: request.slug,
       locale: request.locale,
-      status: request.status ?? "published",
+      status,
     });
-    if (!entry) return null;
+    if (!raw) return null;
+    const entry = await joinParentIfTranslation(this.db, this.schemas, raw, {
+      parentStatus: status,
+    });
     const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, request.site);
     return renderEntryHtml({
       entry,

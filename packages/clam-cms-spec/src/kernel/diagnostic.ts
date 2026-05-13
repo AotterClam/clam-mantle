@@ -85,7 +85,11 @@ export type DiagnosticCode =
   | "MEDIA_MIME_REJECTED"
   | "MEDIA_SIZE_EXCEEDED"
   | "MEDIA_SVG_REJECTED"
-  | "MEDIA_CHECKSUM_MISMATCH";
+  | "MEDIA_CHECKSUM_MISMATCH"
+  // Mantle agent-memory layer (ADR-0016). Validate-time CLI check
+  // gates deploy until the install agent's Mantle subagent has
+  // written the 5-card welcome letter into mantle/site.md.
+  | "MANTLE_LETTER_NOT_WRITTEN";
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;

@@ -111,6 +111,41 @@ repo remote, and uses npm as the runtime dependency source.
 
 Do **not** publish `@aotterclam/clam-cms-netlify` while it is a stub.
 
+`@aotterclam/create-clam-cms` lives in `AotterClam/clam-cms-starters`,
+not here. The scaffolder couples to starter content (sources.json,
+merge layout, placeholder macros) and has zero coupling to SDK runtime,
+so it ships from the starters repo. Releases on this SDK repo no longer
+attach a create-clam-cms tarball — that asset is on the starters repo's
+matching release tag.
+
+**The scaffolder is intentionally not published to npm.** Consumers
+invoke it via the GitHub release tarball URL directly:
+
+```bash
+npx https://github.com/AotterClam/clam-cms-starters/releases/download/<tag>/aotterclam-create-clam-cms-<tag>.tgz \
+  <archetype> \
+  --project-name "..." \
+  --brand "..." \
+  --description "..." \
+  --locales "..." \
+  --github-owner "..." \
+  --summary "..."
+```
+
+`skills/install/SKILL.md` carries the canonical invocation. Reasons
+for staying off npm:
+
+- The scaffolder fetches `sources.json` at runtime from the starters
+  repo's `main` branch, so its behavior is already pinned to a
+  starters ref. An npm version would add a second layer of pinning
+  without value.
+- Consumers run it exactly once per project (scaffold-then-discard).
+  npm cache hygiene doesn't help for one-shot runs.
+- Skipping npm avoids a class of supply-chain risk: a malicious npm
+  publish of the scaffolder name would intercept every install.
+  GitHub release tarballs are signed by repo authority and tied to
+  the matching release tag.
+
 ### Pre-publish checks
 
 Run the full gate before publishing:

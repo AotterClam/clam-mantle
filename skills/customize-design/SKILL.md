@@ -1,14 +1,14 @@
 ---
 name: clam-cms customize-design
-description: Layer custom design over a clam-cms publication starter project using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
+description: Layer custom design over a clam-cms publication starter project using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer+PageShell slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
 when_to_invoke: |
-  Indicators in user prompts: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to projects bootstrapped from the `publication` archetype in [`AotterClam/clam-cms-starters`](https://github.com/AotterClam/clam-cms-starters); the `blank` archetype has no UI to customize.
-applies_to: clam-cms@v0.1.0 + AotterClam/clam-cms-starters/publication
+  User says: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to the `publication` archetype; the `blank` archetype has no UI to customize.
+applies_to: clam-cms@v0.1.0 + publication archetype
 ---
 
 # Customize the design of a clam-cms publication site
 
-You are layering a consumer theme over a project cloned from `AotterClam/clam-cms-starter-publication`. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
+You are layering a consumer theme over a project built from the `publication` starter. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
 
 ## Layer cheatsheet
 
@@ -18,15 +18,15 @@ You are layering a consumer theme over a project cloned from `AotterClam/clam-cm
 | **L2** extraCss | `src/theme/index.ts:extraCss` | extra CSS rules (border-radius, hero size, etc.) |
 | **L2** icons | `src/theme/icons.ts` | replace baseline icons by name; add new ones |
 | **L2** i18n | `src/theme/i18n/<locale>.json` | retitle UI strings per locale (deep-merge) |
-| **L3** components — chrome | `src/theme/components/{Header,Footer}.tsx` | swap navigation chrome (logo, nav, language switcher, footer copy) |
+| **L3** components — chrome | `src/theme/components/{Header,Footer}.tsx` | swap navigation chrome |
 | **L3** components — body layout | `src/theme/components/PageShell.tsx` | reshape body layout: sidebar variants, sticky CTAs, full-bleed hero, alternative Header / `<main>` / Footer arrangement |
 | **L4** templates | `src/theme/templates/<name>.tsx` | replace a page kind end-to-end |
 
 ## Conversation pattern
 
-1. **Map the user's intent to a layer.** "Change the colors" → L1. "Different header structure" → L3. Tell the user the layer + the escape hatch ("I'll start at L1 since you want a different palette; if that doesn't get close enough, we can escalate to a custom Header at L3").
+1. **Map the user's intent to a layer.** "Change the colors" → L1. "Different header structure" → L3. Tell the user the layer + the escape hatch ("I'll start at L1; if it doesn't get close enough, we can escalate to a custom Header at L3").
 2. **Fork → edit → review.** Run `pnpm theme:fork <path>`, edit the new file in `src/theme/`, ask the user to reload `pnpm dev`.
-3. **On dissatisfaction, either iterate or revert.** `pnpm theme:reset <path>` removes the override and restores the baseline. The user can roll back any single layer without affecting others.
+3. **On dissatisfaction, iterate or revert.** `pnpm theme:reset <path>` removes the override and restores the baseline. The user can roll back any single layer without affecting others.
 
 ## Layer recipes
 
@@ -56,9 +56,9 @@ export const TOKENS_CSS = `
 `;
 ```
 
-The override is concatenated AFTER baseline tokens, so later declarations win on standard CSS specificity. You only need to redeclare the vars you want to change.
+The override is concatenated AFTER baseline tokens, so later declarations win on standard CSS specificity. Only redeclare the vars you want to change.
 
-**Custom web fonts**: if your `--font-display` references a font not in the system stack, register it with L2 `extraCss` using `@font-face`. Do **not** use CSS `@import` here: `extraCss` is appended after baseline rules, and browsers ignore late `@import` statements.
+**Custom web fonts**: if `--font-display` references a font not in the system stack, register it with L2 `extraCss` using `@font-face`. Don't use CSS `@import`: `extraCss` is appended after baseline rules, and browsers ignore late `@import` statements.
 
 ```ts
 const overrides: ThemeOverride = {
@@ -74,13 +74,11 @@ const overrides: ThemeOverride = {
 };
 ```
 
-`Layout` is intentionally NOT a customization slot — `Theme.ts` accepts Header, Footer, and PageShell overrides only. Forking `components/Layout.tsx` would copy the file but the override has nowhere to register. If the user wants to reshape body layout (sidebar, sticky CTA, full-bleed sections, alternative Header / `<main>` / Footer arrangement), use the PageShell slot at L3. If they need to change `<head>` content beyond what tokens / extraCss can express, that crosses the starter-family line — switch starter rather than fork every template.
-
 Revert: `pnpm theme:reset tokens.ts`.
 
 ### L2 — extraCss
 
-Edit `src/theme/index.ts` — set the `extraCss` field directly (no fork needed, this is just a string):
+Edit `src/theme/index.ts` — set the `extraCss` field directly (no fork needed, it's just a string):
 
 ```ts
 const overrides: ThemeOverride = {
@@ -112,7 +110,7 @@ const customIcons: Record<string, string> = {
 export default customIcons;
 ```
 
-Use in any template via the SDK's `icon()` resolver: `icon("logo", { size: 24 })`. SVG path content only — no `<svg>` wrapper. The fork ships a stub (not a copy of the baseline), since you're extending a registry, not replacing a function.
+Use in any template via `icon("logo", { size: 24 })`. SVG path content only — no `<svg>` wrapper. The fork ships a stub (not a copy of the baseline), since you're extending a registry.
 
 Revert: `pnpm theme:reset icons.ts`.
 
@@ -132,7 +130,7 @@ Edit `src/theme/i18n/en.json` — partial bundle, deep-merged over baseline:
 }
 ```
 
-Other keys carry forward from baseline. To support a new locale (`ja`, `de`, etc.), edit `src/i18n/<locale>.json` directly — i18n locale set is consumer-level, not a theme slot.
+Other keys carry forward from baseline. To support a new locale (`ja`, `de`, etc.), edit `src/i18n/<locale>.json` directly — locale set is consumer-level, not a theme slot.
 
 Revert: `pnpm theme:reset i18n/en.json`.
 
@@ -143,7 +141,7 @@ pnpm theme:fork components/Header.tsx
 pnpm theme:fork components/Footer.tsx
 ```
 
-Use this when the user wants different chrome — different brand mark, different nav arrangement, different language switcher, custom footer copy — but the page body still reads top → main → bottom. Edit `src/theme/components/Header.tsx`. Key contracts:
+Use this when the user wants different chrome — different brand mark, nav arrangement, language switcher, footer copy — but the page body still reads top → main → bottom. Key contracts:
 
 - Don't change the props signature: `Header(props: HeaderProps)`.
 - `props.site.brand`, `props.site.locales`, `props.locale`, `props.current` are available.
@@ -159,7 +157,7 @@ Revert: `pnpm theme:reset components/Header.tsx`.
 pnpm theme:fork components/PageShell.tsx
 ```
 
-Use this when the user wants to reshape the **body layout** rather than just swap chrome — for example:
+Use this to reshape the **body layout** rather than swap chrome — for example:
 
 - Sidebar with table-of-contents alongside `<main>` for docs-lite pages
 - Sticky CTA bar between `<main>` and `<Footer>`
@@ -167,15 +165,15 @@ Use this when the user wants to reshape the **body layout** rather than just swa
 - Different Header / `<main>` / Footer ordering (e.g., side-rail logo)
 - Custom `<main>` container width or padding rules per template kind
 
-The forked PageShell takes ownership of how (or whether) to render the Header / Footer overrides. The baseline composes them in the conventional top → main → bottom order; a consumer-supplied PageShell can ignore or recompose them as the new shape requires.
-
-`Layout` (the document envelope — `<html>` / `<head>` / `<body>` + SEO meta + theme bootstrap) is NOT forkable. `theme:fork components/Layout.tsx` fails fast with a clear error. SEO emission order, charset, viewport, and theme-bootstrap timing are concerns that cross the starter-family line and shouldn't be redefined per page.
+The forked PageShell takes ownership of how (or whether) to render the Header / Footer overrides. The baseline composes them top → main → bottom; a consumer-supplied PageShell can ignore or recompose them.
 
 Revert: `pnpm theme:reset components/PageShell.tsx`.
 
-### Other component forks fail fast
+### Layout is not forkable
 
-Only `Header`, `Footer`, and `PageShell` are supported component slots. `theme:fork components/Layout.tsx` or any other name exits with a clear error pointing at PageShell as the body-layout escape hatch. Don't try to override Layout by hand-editing `src/theme/components/Layout.tsx` outside the fork machinery — the override surface won't register it.
+Only `Header`, `Footer`, and `PageShell` are supported component slots. `theme:fork components/Layout.tsx` exits with a clear error pointing at PageShell as the body-layout escape hatch. Don't try to override Layout by hand-editing `src/theme/components/Layout.tsx` outside the fork machinery — the override surface won't register it.
+
+`Layout` (the document envelope — `<html>` / `<head>` / `<body>` + SEO meta + theme bootstrap) is locked. If the user needs to change `<head>` content beyond what tokens / extraCss can express, that crosses the starter-family line — switch starter rather than fork every template.
 
 ### L4 — whole template (escape hatch)
 
@@ -183,28 +181,27 @@ Only `Header`, `Footer`, and `PageShell` are supported component slots. `theme:f
 pnpm theme:fork templates/post.tsx
 ```
 
-Edit `src/theme/templates/post.tsx`. The forked file imports baseline Layout via `../../theme.default/components/Layout.js`. If you also forked Layout (rare — only if you also went L3 on every template), manually rewrite that import to your version.
+Edit `src/theme/templates/post.tsx`. The forked file imports baseline Layout via `../../theme.default/components/Layout.js`.
 
-L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really `publication` any more — it sounds closer to `community` (member posts), `micro-shop` (catalog + orders), or `leads-inbox` (lead pipeline). The publication family covers landing / articles / docs-lite / basic contact; once you cross those lines, switching starter family is cheaper than forking more templates."
+L4 is the last resort. If the user wants more than two L4 forks, suggest the conversation: "The shape you're describing isn't really `publication` any more — it sounds closer to `community` (member posts), `micro-shop` (catalog + orders), or `leads-inbox` (lead pipeline). Once you cross those lines, switching starter family is cheaper than forking more templates."
 
 Revert: `pnpm theme:reset templates/post.tsx`.
 
 ## Hard rules
 
 - Don't edit `src/theme.default/`. Use fork.
-- Don't add new top-level keys to `ThemeOverride` — extend through the six existing slots.
+- Don't add new top-level keys to `ThemeOverride` — extend through the existing slots.
 - `Layout` is locked — change envelope shape via L4 forks (every template) or pick another starter.
-- After a fork, the file is a normal `.ts` / `.tsx` / `.json` — TS errors will surface on `pnpm typecheck` as usual; resolve them like any code change.
+- After a fork, the file is a normal `.ts` / `.tsx` / `.json` — TS errors surface on `pnpm typecheck` as usual.
 
 ## Diagnostic recipes
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `pnpm theme:fork X` exits with "Override already exists" | Already forked | `pnpm theme:reset X` first |
-| `pnpm typecheck` fails in `src/theme/components/<Name>.tsx` after fork | A baseline import didn't auto-rewrite (rare; check `theme-fork.mjs`) | Manually change `from "../<sibling>"` to `from "../../theme.default/<sibling>"` |
-| Color change not visible after edit | Browser CSS cache | Hard reload (Cmd+Shift+R / Ctrl+F5); if persists, restart `pnpm dev` |
-| Forked `en.json` discards keys I didn't redeclare | Bundle isn't deep-merging | Verify `src/i18n/index.ts:deepMerge` — should be present (PR #5). If missing, the SDK shipped wrong; open an issue. |
-| Fork's `theme/index.ts` entry has wrong key shape | Old fork-script before PR #5 | Update to latest starter, re-fork. |
+| `pnpm typecheck` fails in `src/theme/components/<Name>.tsx` after fork | A baseline import didn't auto-rewrite | Manually change `from "../<sibling>"` to `from "../../theme.default/<sibling>"` |
+| Color change not visible after edit | Browser CSS cache | Hard reload (Cmd+Shift+R / Ctrl+F5); if it persists, restart `pnpm dev` |
+| Forked `en.json` discards keys I didn't redeclare | Bundle isn't deep-merging | Verify `src/i18n/index.ts:deepMerge` is present. If missing, update to latest starter |
 
 ## When you're done
 
