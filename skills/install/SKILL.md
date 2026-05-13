@@ -176,7 +176,7 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
 10. **Commit.** If step 4 produced an adjustment, that's its own commit (`adjust: drop contact form per interview`). Then the main commit: `mantle: notes from install interview`.
 
-11. **Hand off to provision** — point the user at the provision Skill (`/skill/provision?type=<archetype>&theme=<theme>` if your landing exposes it; otherwise the agent reads `skills/provision/SKILL.md` from mantle@develop). Don't promise production-readiness until provision completes and a second agent connects through MCP.
+11. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start of this Skill, keep the same `?type=` + `?theme=` query, fetch that URL (WebFetch / raw GH / however your runtime fetches markdown), and follow it. Fall back to `https://raw.githubusercontent.com/aotter/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in your working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job, not theirs. Don't promise production-readiness until provision completes and a second agent connects through MCP.
 
 ## Adjustment window — between scaffold and provision
 
