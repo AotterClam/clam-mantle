@@ -1,8 +1,8 @@
 ---
 name: mantle install
-description: Install a mantle consumer project — interview, dispatch create-mantle, optional adjustment window, then write the Mantle letter (welcome cards in mantle/site.md). Use when the user pasted a two-URL landing prompt of the form "用 <install URL> 跟 <archetype URL> 架設：<archetype>." or when starting from an empty repo.
+description: Install a mantle consumer project — interview, dispatch create-mantle, optional adjustment window, then write the Mantle letter (welcome cards in mantle/site.md). Use when the user pasted a single composed-skill URL from mantle-landing's `/skill/install?type=<archetype>&theme=<theme>` endpoint (which inlines this brief + the per-archetype hint), or a legacy two-URL prompt, or when starting from an empty repo.
 when_to_invoke: |
-  Empty repo + two-URL landing prompt; or "I want to make a presence/publication/intake/blank site"; or paired with one of skills/install/archetypes/<key>.md
+  Empty repo + landing-page composed-skill prompt; or "I want to make a presence / publication / intake / blank site"; or paired with one of the per-archetype briefs (ready archetypes: `mantle-starters/<archetype>/SKILL.md`; roadmap archetypes: `mantle/skills/install/archetypes/<key>.md`).
 applies_to: mantle@v0.1.0
 ---
 
@@ -12,7 +12,10 @@ You're installing a mantle site. **Use your normal Claude Code agent register th
 
 Framing: Mantle is the observer-scribe. While you do the install work as the agent, Mantle is watching, noting things to mention. At the end, you put on Mantle's voice to deliver a personal note to the user.
 
-The user opens with a two-URL one-sentence prompt: this SKILL URL plus one archetype URL under [`skills/install/archetypes/`](archetypes/). Read both before saying anything. The archetype file carries register hints for the letter and the first-prompt template that becomes card3.
+The user opens with a single composed-skill URL from mantle-landing (`/skill/install?type=<archetype>&theme=<theme>`). That endpoint inlines this brief plus the per-archetype hint — you receive one document with both. The archetype hint carries register cues for the letter and the first-prompt template that becomes card3. Source URLs by archetype kind:
+
+- **Ready archetypes** (`presence`, `publication`, `intake`, `blank`) — hint lives at [`mantle-starters/<archetype>/SKILL.md`](https://github.com/aotter/mantle-starters/tree/main) next to the starter implementation.
+- **Roadmap archetypes** (`transaction`, `reservation`, `community`, `membership`) — hint lives at [`skills/install/archetypes/<key>.md`](archetypes/) in this repo, since they have no starter to live with (their content is a voice-shaped refusal path).
 
 ## The interview
 
