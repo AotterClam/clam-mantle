@@ -8,9 +8,7 @@ applies_to: mantle@v0.1.0
 
 # mantle install
 
-You're installing a mantle site. **This is an interview-driven Skill** — the interview is the work; the scaffold is what falls out of it. Don't substitute defaults guessed from email, folder name, or archetype name.
-
-The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
+You're installing a mantle site for the user. The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
 
 ## Ground truth
 
@@ -104,7 +102,7 @@ These are CLI flags, not separate interview questions. They land in different pl
 | `description` | `mantle/site.md` frontmatter → `siteDefaults.description` → SEO `<meta description>` on every page | **Site brochure** — what the site *is* (perpetual). |
 | `summary` | `mantle/site.md` `revisions[0].summary` | **Changelog entry** — what *this install moment* did. Provision / extend / customize-design append their own later. |
 
-Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "首次安裝。" / "Initial scaffold." / "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
+Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "Initial scaffold." or "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
 
 Show both drafts when you synthesize; user confirms or corrects.
 
@@ -112,24 +110,11 @@ Show both drafts when you synthesize; user confirms or corrects.
 
 **Other observations — capture without pushing.** Emotional weight, dates that matter, things-not-to-touch, futures — let them surface naturally during the archetype probes. Don't checklist them. Mantle uses whatever you noticed; she doesn't need everything.
 
-### Synthesize and confirm — conversationally, not as a config table
+### Synthesize and confirm
 
-Before running `create-mantle`: rehearse the install back in the user's language as 2-3 plain sentences. Translate every technical token to something a non-engineer can read:
+Before running `create-mantle`, rehearse the install back to the user in their language. Translate technical tokens to something a non-engineer reads naturally — BCP 47 codes become the language's natural name in the user's language, config keys like `github_owner` become their everyday phrasing, archetype codenames become the site type's everyday meaning rather than the codeword.
 
-- `zh-TW` → "繁體中文（台灣）"
-- `en` → "英文"
-- `github_owner` → "GitHub 帳號"
-- `--locales zh-TW,en` → "主要中文，附帶英文版"
-- archetype names → use the site type's everyday meaning ("內容發佈站" / "個人介紹站" / "需求收集表"), not the codeword
-
-Example rehearsal: "OK 我整理一下：你要開的是『拎杯有練』，一個用繁體中文、給台灣讀者看的內容發佈站；網站歸到你 guyspy 這個 GitHub 帳號管。對嗎？"
-
-Then surface description + summary drafts as separate sentences for the user to nod / tweak:
-
-- "網站描述（會放在每頁的 SEO 標籤）：『...一行...』"
-- "首次安裝的紀錄條目：『首次安裝。』 或想換句別的也行"
-
-The user confirms or tweaks in natural language. Pull dispatch values out of the exchange. **Don't run `create-mantle` until the user has nodded at the rehearsal.** Never dump a `field: value` config table — that's an engineering surface, not a user-facing one.
+Surface `description` and `summary` as separate one-line drafts for the user to nod or tweak, since they land in different places (SEO meta vs. revisions log).
 
 ## If the archetype is roadmap
 
@@ -173,10 +158,10 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
    A shape that works (adapt freely; don't read this off like a script):
 
-   - Briefly describe what's in the project — "後台空的，posts collection 空的，contact 表單還掛著但 Turnstile 之後 provision 才接". Show the user where you are.
-   - Offer: "deploy 之前我可以幫你寫 1–2 篇 draft 放著，你 deploy 後登入就有東西看，順便對一下語氣。要不要？" If no, skip to step 7. If yes, continue.
+   - Briefly describe what's in the project — admin panel empty, the archetype's primary collection empty, any forms scaffolded but their gated services (Turnstile, etc.) deferred until provision. Show the user where you are.
+   - Offer to draft 1–2 sample posts/entries before deploy so day-one has something to look at and the user can react to voice. If no, skip to step 7. If yes, continue.
    - Propose 2–4 post topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let them pick, add, or kill any. The picking/killing itself reveals priorities.
-   - Draft the chosen post(s). Show them. Let the user react — "再狂一點 / 太裝 / 這句砍掉 / 第一人稱不要拘謹". Each reaction is gold for voice elicitation.
+   - Draft the chosen post(s). Show them. Let the user react — corrections, line cuts, tone pushes, register shifts, pronoun-choice complaints. Each reaction is gold for voice elicitation.
    - For cover images: use Unsplash. Pick a keyword from the draft content. **Verify every Unsplash URL resolves (HEAD request → 200 + content-type starting `image/`) before embedding.** Don't fabricate image IDs from training memory; if you can't verify, leave the cover slot empty and tell the user.
    - When the drafts feel like the user's voice, ask if they want to keep them (saved into the scaffold somewhere reasonable — `mantle/drafts/<slug>.md` is a fine place; provision/admin can pick them up later) or just discard them now that they served their voice-elicitation purpose.
 
@@ -242,9 +227,7 @@ A permitted modification turn after `create-mantle` returns and before the Mantl
 
 ## Don't
 
-- Don't skip the interview. This Skill exists to elicit context — the structured questions are the work.
-- Don't put on Mantle's voice yourself. That's the subagent's job; you stay in your normal register from interview through handoff.
-- Don't run `create-mantle` before all six questions are answered and the synthesized draft is confirmed.
+- Don't put on Mantle's voice yourself — that's the subagent's job. Register isolation is the whole point of the delegation in step 9.
 - Don't write into `src/theme.default/` or any "system-looking" path during install — design changes happen after deploy via the customize-design skill.
-- Don't keep speaking after the handoff to provision.
+- Don't keep speaking after the handoff to provision — the handoff IS the end of this Skill.
 - Don't echo the same specific user detail across multiple cards (that's Mantle's rule, but you also shouldn't paste card1's detail back into `## site` — let each section have its own).
