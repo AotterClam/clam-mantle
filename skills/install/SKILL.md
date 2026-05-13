@@ -70,12 +70,13 @@ archetype is already known (the composed URL pinned it). Every value above must 
 **Brand — propose if blocked.** Once you've heard enough purpose to suggest a name, offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each. Don't make the user invent a name cold — that's the worst opening move.
 
 **Locales — infer from conversation language, default to monolingual, confirm.**
-- Conversation in 繁體中文 → propose **`zh-TW only`** first.
-- Conversation in English → propose **`en only`** first.
-- If the interview surfaces an international or foreign-facing audience (the user mentions overseas users, foreign customers, "面向國際", a multilingual readership), propose **bilingual** instead and let them pick canonical.
-- Mixed-language conversation with no internationalization signal → ask once: "monolingual `<conv-lang>` or bilingual?"
+
+Detect the language the user is speaking with you. Propose monolingual in **that** language first — whatever it is. Examples (the menu is not exhausted by these): 繁體中文 → `zh-TW only`; English → `en only`; Türkçe → `tr only`; 日本語 → `ja only`; Español → `es-ES only`. **Don't bias toward Chinese or English because those happen to be the examples elsewhere in this Skill.** A Turkish user gets a Turkish proposal, not a Chinese one.
+
+- If the interview surfaces an international / foreign-facing audience (overseas users, foreign customers, "面向國際", multilingual readership), propose **bilingual** with the user's conversation language as canonical and the audience's language as secondary.
+- Mixed-language conversation with no internationalization signal → ask: "monolingual `<primary-conv-lang>` or bilingual?"
 - Always confirm before locking in. Don't just assume.
-- Use BCP 47 language + 2-letter region (`zh-TW`, not `zh-Hant`).
+- Use BCP 47 language + 2-letter region. Script subtags (Hant, Hans, Latn, Cyrl) are not accepted by the runtime canonicalizer — use `zh-TW` not `zh-Hant`; `sr-RS` not `sr-Latn`; `tr` or `tr-TR` is fine.
 
 **Description + summary — agent synthesizes, user confirms.** These are CLI flags, not separate interview questions. Once you have the purpose, write a draft one-line description (in the user's language) and a one-line install summary (in English — internal log). Show both back when you synthesize. User confirms or corrects.
 
