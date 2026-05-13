@@ -1,6 +1,6 @@
 {
   "name": "@aotterclam/clam-cms-cloudflare",
-  "version": "0.0.8-alpha",
+  "version": "0.0.8-beta.1",
   "description": "Cloudflare Workers adapter for clam-cms. Hono-based mountServerEndpoints / mountMcp / mountPublicRoutes. Better Auth (admin + mcp plugins) for sign-in + bearer-token validation.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/adapters/cloudflare",
