@@ -78,7 +78,7 @@ Detect the user's preferred language from the signals available — the language
 - Always confirm before locking in.
 - Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
 
-**Description + summary — agent synthesizes, user confirms.** These are CLI flags, not separate interview questions. Once you have the purpose, write a draft one-line description (in the user's language) and a one-line install summary (in English — internal log). Show both back when you synthesize. User confirms or corrects.
+**Description + summary — agent synthesizes, user confirms, both in user's language.** These are CLI flags, not separate interview questions. Once you have the purpose, write a draft one-line description and a one-line install summary. **Both in the user's language** — `description` lands in `mantle/site.md` frontmatter and `summary` lands in `mantle/site.md` `revisions:`, both of which the user re-reads when summoning Mantle back. Show both drafts when you synthesize; user confirms or corrects.
 
 **GitHub identity — factual, last.** Ask once near the end. Pure config; no elaboration needed.
 
@@ -92,7 +92,7 @@ Before running `create-clam-cms`: write back a 2-3 sentence recap in the user's 
 - brand: `<from interview>`
 - locales: `<list>` (canonical: `<first>`)
 - description: `<one-line draft, user's language>`
-- summary: `<one-line install description, English>`
+- summary: `<one-line install description, user's language>`
 - github identity: `<gh-login>`
 
 The user confirms or corrects each value. **Don't run `create-clam-cms` until every CLI dispatch value above is set and explicitly confirmed.**
