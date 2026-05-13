@@ -8,7 +8,7 @@ applies_to: clam-cms@v0.1.0
 
 # Extend a clam-cms project
 
-The 4-atom manifest model: **Schema** is the entity (table), **View** is the read API, **Procedure** is the typed callable, **Trigger** is the event binding. Read [`docs/design-atoms.md`](../../docs/design-atoms.md) once if you don't already know which atom fits.
+The 4-atom manifest model: **Schema** is the entity (table), **View** is the read API, **Procedure** is the typed callable, **Trigger** is the event binding. Read [`docs/design-atoms.md`](../../docs/design-atoms.md) once if you don't already know which atom fits. Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) live in [ADR-0002](../../docs/adr/0002-closed-enums-for-bindings.md); diagnostic shape + full code catalog in [ADR-0008](../../docs/adr/0008-structured-diagnostic-shape.md).
 
 ## Match the user's request to atoms
 
