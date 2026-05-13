@@ -8,9 +8,7 @@ applies_to: mantle@v0.1.0
 
 # mantle install
 
-You're installing a mantle site. **This is an interview-driven Skill** — the interview is the work; the scaffold is what falls out of it. Don't substitute defaults guessed from email, folder name, or archetype name.
-
-The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
+You're installing a mantle site for the user. The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
 
 ## Ground truth
 
@@ -71,28 +69,44 @@ There's no fixed question list. The archetype hint above (composed in by landing
 
 ### Goal — what you must land before dispatch
 
+Listed in discovery order — purpose comes first, brand near the end. **Do not read this table as a top-down checklist to ask in order.** The order below mirrors how the interview should flow:
+
 | Value | For |
 |---|---|
-| **brand** | `--brand` |
-| **locales** | `--locales` (count + first is canonical) |
-| **description** | `--description` — agent synthesizes one line from the interview |
-| **summary** | `--summary` — agent writes one-line install description |
-| **github identity** | `--github-owner` |
-| purpose / audience / emotional weight | Mantle subagent — used to write the welcome letter |
+| **purpose / audience / emotional weight** | Mantle subagent — surfaces through the archetype probes; feeds the welcome letter |
+| **audience scope + locales** | `--locales` (count + first is canonical) |
+| **description** | `--description` — one-line site identity, agent-drafted in user's language |
+| **summary** | `--summary` — one-line install-moment marker, agent-drafted in user's language |
+| **brand** | `--brand` — proposed by you after purpose + audience texture is in; user picks or supplies their own |
+| **github identity** | `--github-owner` — pure config; ask near the end |
 
 archetype is already known (the composed URL pinned it). Every value above must be set with the user's **explicit confirmation** before you dispatch — never guess from email / folder name / archetype name.
 
+### Multi-round purpose discovery — start here, not with brand
+
+Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Instead, read the archetype hint's **Interview probes** (composed in below) and offer the first probe's options as a picker:
+
+> "A few shapes this could be — pick what fits, or tell me something else:
+> - [option A from archetype]
+> - [option B from archetype]
+> - [option C from archetype]
+> - Something else (tell me)"
+
+The archetype hint's option labels are written in EN as placeholders. **Translate them — and your framing question — into whatever language the user is writing to you in, before presenting.** Don't paste English labels at a user writing in another language; the picker should read as natural prose in their register.
+
+User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
+
+If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
+
 ### Stances (the few non-archetype rules)
 
-**Brand — propose if blocked.** Once you've heard enough purpose to suggest a name, offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each. Don't make the user invent a name cold — that's the worst opening move.
+**Audience + locales — ask, don't infer.**
 
-**Locales — infer the user's preferred language, default to monolingual, confirm.**
+Audience scope drives the locale choice and feeds Mantle. Ask the user explicitly who this site is for — is it a domestic audience (and if so, which country / region), or an international audience? Don't infer audience from the user's own writing language alone; a user writing to you in one language may be building for readers in another.
 
-Detect the user's preferred language from the signals available — the language they're writing in, the landing-prompt language (rendered for the visitor), any runtime-level locale preference your environment carries. Propose monolingual in that language. Whatever language; no implied menu.
-
-- If the interview surfaces an international / foreign-facing audience (overseas users, foreign customers, multilingual readership), propose **bilingual** with the user's primary language as canonical and the audience's language as secondary.
-- Mixed signals with no internationalization cue → ask once: "monolingual `<primary-language>` or bilingual?"
-- Always confirm before locking in.
+- Domestic audience → propose monolingual in the audience's primary language. Confirm.
+- International audience → propose bilingual, canonical = the user's working language, secondary = the audience's language. Confirm.
+- Ambiguous (mixed signals, user not sure) → ask once: monolingual `<primary>` or bilingual `<primary>+<secondary>`?
 - Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
 
 **Description + summary — different roles, both agent-synthesized in the user's language.**
@@ -104,38 +118,59 @@ These are CLI flags, not separate interview questions. They land in different pl
 | `description` | `mantle/site.md` frontmatter → `siteDefaults.description` → SEO `<meta description>` on every page | **Site brochure** — what the site *is* (perpetual). |
 | `summary` | `mantle/site.md` `revisions[0].summary` | **Changelog entry** — what *this install moment* did. Provision / extend / customize-design append their own later. |
 
-Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "首次安裝。" / "Initial scaffold." / "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
+Don't write the same one-liner twice. `description` is a one-sentence site identity. `summary` is a one-line install-moment marker — terse, factual, often as short as "Initial scaffold." or "Site created from publication archetype." The site's actual identity already lives in `description`; `summary` is the timestamp's caption, not a second pitch.
 
 Show both drafts when you synthesize; user confirms or corrects.
+
+**Brand — propose last, never first.** Only after purpose + audience + voice texture has surfaced through the archetype probes. Then offer two paths: "Tell me a name, or I can propose 2-3 based on what you've described." If user picks the second, propose 2-3 with a one-line rationale each tied to what they actually said. Don't make the user invent a name cold; and don't propose a name before you have material to anchor the proposal in.
 
 **GitHub identity — factual, last.** Ask once near the end. Pure config; no elaboration needed.
 
 **Other observations — capture without pushing.** Emotional weight, dates that matter, things-not-to-touch, futures — let them surface naturally during the archetype probes. Don't checklist them. Mantle uses whatever you noticed; she doesn't need everything.
 
-### Synthesize and confirm — conversationally, not as a config table
+### Synthesize and confirm
 
-Before running `create-mantle`: rehearse the install back in the user's language as 2-3 plain sentences. Translate every technical token to something a non-engineer can read:
+Before running `create-mantle`, rehearse the install back to the user in their language. Translate technical tokens to something a non-engineer reads naturally — BCP 47 codes become the language's natural name in the user's language, config keys like `github_owner` become their everyday phrasing, archetype codenames become the site type's everyday meaning rather than the codeword.
 
-- `zh-TW` → "繁體中文（台灣）"
-- `en` → "英文"
-- `github_owner` → "GitHub 帳號"
-- `--locales zh-TW,en` → "主要中文，附帶英文版"
-- archetype names → use the site type's everyday meaning ("內容發佈站" / "個人介紹站" / "需求收集表"), not the codeword
-
-Example rehearsal: "OK 我整理一下：你要開的是『拎杯有練』，一個用繁體中文、給台灣讀者看的內容發佈站；網站歸到你 guyspy 這個 GitHub 帳號管。對嗎？"
-
-Then surface description + summary drafts as separate sentences for the user to nod / tweak:
-
-- "網站描述（會放在每頁的 SEO 標籤）：『...一行...』"
-- "首次安裝的紀錄條目：『首次安裝。』 或想換句別的也行"
-
-The user confirms or tweaks in natural language. Pull dispatch values out of the exchange. **Don't run `create-mantle` until the user has nodded at the rehearsal.** Never dump a `field: value` config table — that's an engineering surface, not a user-facing one.
+Surface `description` and `summary` as separate one-line drafts for the user to nod or tweak, since they land in different places (SEO meta vs. revisions log).
 
 ## If the archetype is roadmap
 
 If the archetype hint says `status: roadmap`, follow its **Refuse path** — the hint specifies the framing (honest "not yet" → two holding paths → write intent into `mantle/site.md` `futures:`). Move to the holding path the user picks. Skip the rest of the interview steps below.
 
 ## When to act
+
+### Why `npx create-mantle` is a destructive action under Auto Mode
+
+Invoking `npx create-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/mantleConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
+
+- every page's SEO `<meta description>`
+- locale routing for the entire site (canonical + redirects)
+- Mantle's welcome-card surface in `## welcome`
+- 22 starter files' `{{PLACEHOLDER}}` substitution
+- `revisions[0]` — the permanent install-moment entry in the changelog
+
+Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
+
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each of the six parameters passed to `npx create-mantle` must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these six values.
+
+If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
+
+### Prerequisites — each parameter must be user-authorized before invocation
+
+Same discovery order as the Goal table above — purpose first, brand later. The order matters because it reflects the interview shape, not arbitrary alphabetization.
+
+| Value | Authorized when |
+|---|---|
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (as pickers), not inferred |
+| **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
+| **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
+| **description** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
+| **brand** | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
+| **github owner** | user explicitly stated their GitHub login (not derived from email) |
+
+If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
@@ -173,11 +208,11 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
    A shape that works (adapt freely; don't read this off like a script):
 
-   - Briefly describe what's in the project — "後台空的，posts collection 空的，contact 表單還掛著但 Turnstile 之後 provision 才接". Show the user where you are.
-   - Offer: "deploy 之前我可以幫你寫 1–2 篇 draft 放著，你 deploy 後登入就有東西看，順便對一下語氣。要不要？" If no, skip to step 7. If yes, continue.
+   - Briefly describe what's in the project — admin panel empty, the archetype's primary collection empty, any forms scaffolded but their gated services (Turnstile, etc.) deferred until provision. Show the user where you are.
+   - Offer to draft 1–2 sample posts/entries before deploy so day-one has something to look at and the user can react to voice. If no, skip to step 7. If yes, continue.
    - Propose 2–4 post topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let them pick, add, or kill any. The picking/killing itself reveals priorities.
-   - Draft the chosen post(s). Show them. Let the user react — "再狂一點 / 太裝 / 這句砍掉 / 第一人稱不要拘謹". Each reaction is gold for voice elicitation.
-   - For cover images: use Unsplash. Pick a keyword from the draft content. **Verify every Unsplash URL resolves (HEAD request → 200 + content-type starting `image/`) before embedding.** Don't fabricate image IDs from training memory; if you can't verify, leave the cover slot empty and tell the user.
+   - Draft the chosen post(s). Show them. Let the user react — corrections, line cuts, tone pushes, register shifts, pronoun-choice complaints. Each reaction is gold for voice elicitation.
+   - For cover images: use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
    - When the drafts feel like the user's voice, ask if they want to keep them (saved into the scaffold somewhere reasonable — `mantle/drafts/<slug>.md` is a fine place; provision/admin can pick them up later) or just discard them now that they served their voice-elicitation purpose.
 
    This step's length is responsive to the user. Curt user / no-deadline / "just go" → keep it to one offer and skip on a no. Engaged user → spend 5–10 minutes drafting together. The investment here pays off in the next step.
@@ -242,9 +277,7 @@ A permitted modification turn after `create-mantle` returns and before the Mantl
 
 ## Don't
 
-- Don't skip the interview. This Skill exists to elicit context — the structured questions are the work.
-- Don't put on Mantle's voice yourself. That's the subagent's job; you stay in your normal register from interview through handoff.
-- Don't run `create-mantle` before all six questions are answered and the synthesized draft is confirmed.
+- Don't put on Mantle's voice yourself — that's the subagent's job. Register isolation is the whole point of the delegation in step 9.
 - Don't write into `src/theme.default/` or any "system-looking" path during install — design changes happen after deploy via the customize-design skill.
-- Don't keep speaking after the handoff to provision.
+- Don't keep speaking after the handoff to provision — the handoff IS the end of this Skill.
 - Don't echo the same specific user detail across multiple cards (that's Mantle's rule, but you also shouldn't paste card1's detail back into `## site` — let each section have its own).

@@ -2,6 +2,7 @@ import {
   DiagnosticError,
   runtimeDiagnostic,
   type Entry,
+  type SchemaManifest,
   type SiteConfig,
 } from "@aotter/mantle-spec";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
@@ -21,6 +22,10 @@ import {
   readEntryById,
   readPublishedEntries,
 } from "../../domain/service/PublishedEntries.js";
+import {
+  joinParentForList,
+  joinParentIfTranslation,
+} from "../../domain/service/JoinedEntryReader.js";
 import { serializeEntryAsMarkdown } from "../../domain/service/MarkdownSerializer.js";
 import {
   renderEntryHtml,
@@ -53,13 +58,14 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     private readonly kv: KvCache,
     private readonly paths: PublicPathResolver | null,
     private readonly composeSeo: ComposeEntrySeoMetaUseCase,
+    private readonly schemas: ReadonlyMap<string, SchemaManifest>,
   ) {
     this.composeLlmsTxt = new ComposeLlmsTxtUseCase(db);
   }
 
   async publish(request: PublishEntryRequest): Promise<void> {
-    const entry = await readEntryById(this.db, request.entryId);
-    if (!entry) {
+    const raw = await readEntryById(this.db, request.entryId);
+    if (!raw) {
       throw new DiagnosticError(
         runtimeDiagnostic({
           code: "NOT_FOUND",
@@ -71,6 +77,12 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
         }),
       );
     }
+    // Materialize parent fields into the translation's data before
+    // rendering (ADR-0010). RequestPublishUseCase has already asserted
+    // the parent is published, so a status filter is safe here.
+    const entry = await joinParentIfTranslation(this.db, this.schemas, raw, {
+      parentStatus: "published",
+    });
     const indexLocale = entry.locale ?? null;
     const doctype = request.htmlDoctype ?? DEFAULT_DOCTYPE;
 
@@ -130,7 +142,10 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     templates: TemplateRegistry,
     doctype: string,
   ): Promise<void> {
-    const entries = await readPublishedEntries(this.db, { locale, collection });
+    const raw = await readPublishedEntries(this.db, { locale, collection });
+    const entries = await joinParentForList(this.db, this.schemas, raw, {
+      parentStatus: "published",
+    });
     const html = renderListHtml({
       collection,
       locale: locale ?? "",

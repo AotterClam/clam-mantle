@@ -5,6 +5,7 @@
 export * from "./PublishKeys.js";
 export * from "./MarkdownSerializer.js";
 export * from "./PublishedEntries.js";
+export * from "./JoinedEntryReader.js";
 export * from "./SitemapSerializer.js";
 export * from "./HtmlRenderer.js";
 export * from "./PreviewBanner.js";
