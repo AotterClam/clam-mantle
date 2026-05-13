@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { SchemaManifest } from "@aotter/mantle-spec";
-import { joinParentIfTranslation } from "../src/domain/service/JoinedEntryReader.js";
+import type { Entry, SchemaManifest } from "@aotter/mantle-spec";
+import {
+  joinParentForList,
+  joinParentIfTranslation,
+} from "../src/domain/service/JoinedEntryReader.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { postsSchema } from "./fakes/manifests.js";
 
@@ -181,5 +184,78 @@ describe("joinParentIfTranslation", () => {
 
     const result = await joinParentIfTranslation(db, schemas, translation);
     expect(result).toBe(translation);
+  });
+});
+
+describe("joinParentForList", () => {
+  const schemas = new Map<string, SchemaManifest>([
+    ["posts", postsSchema()],
+    ["post-translations", translationsSchema()],
+  ]);
+
+  function makeTranslation(args: { id: string; slug: string; locale: string }): Entry {
+    return {
+      id: args.id,
+      collection: "post-translations",
+      locale: args.locale,
+      status: "published",
+      version: 1,
+      data: { slug: args.slug, locale: args.locale, title: args.id, body: "x" },
+      createdAt: 1,
+      updatedAt: 2,
+    };
+  }
+
+  it("dedups parent reads when many translations share a slug", async () => {
+    const db = new InMemoryDatabase();
+    seedEntry(db, {
+      id: "p1",
+      collection: "posts",
+      data: { slug: "shared", coverUrl: "shared.jpg" },
+    });
+    seedEntry(db, {
+      id: "p2",
+      collection: "posts",
+      data: { slug: "other", coverUrl: "other.jpg" },
+    });
+    const translations: Entry[] = [
+      makeTranslation({ id: "t-en", slug: "shared", locale: "en" }),
+      makeTranslation({ id: "t-zh", slug: "shared", locale: "zh-TW" }),
+      makeTranslation({ id: "t-ja", slug: "shared", locale: "ja" }),
+      makeTranslation({ id: "t-other", slug: "other", locale: "en" }),
+    ];
+
+    const merged = await joinParentForList(db, schemas, translations, {
+      parentStatus: "published",
+    });
+
+    expect(merged).toHaveLength(4);
+    for (const m of merged.slice(0, 3)) {
+      expect(m.data["coverUrl"]).toBe("shared.jpg");
+    }
+    expect(merged[3]!.data["coverUrl"]).toBe("other.jpg");
+  });
+
+  it("returns empty list for empty input", async () => {
+    const db = new InMemoryDatabase();
+    const result = await joinParentForList(db, schemas, []);
+    expect(result).toEqual([]);
+  });
+
+  it("returns entries unchanged when collection has no translates declaration", async () => {
+    const db = new InMemoryDatabase();
+    const standalone: Entry[] = [
+      {
+        id: "p1",
+        collection: "posts",
+        status: "published",
+        version: 1,
+        data: { slug: "hi", coverUrl: "p.jpg" },
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ];
+    const result = await joinParentForList(db, schemas, standalone);
+    expect(result).toEqual(standalone);
   });
 });

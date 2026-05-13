@@ -1,34 +1,24 @@
 import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../port/DatabaseDriver.js";
-import { readEntryByDataField } from "./PublishedEntries.js";
+import {
+  readEntriesByDataFieldIn,
+  readEntryByDataField,
+} from "./PublishedEntries.js";
 
 /**
- * `joinParentIfTranslation` — implements ADR-0010's promise that
- * "the public render path joins this Schema to its parent on the
- * declared field." When `entry.collection` has a `translates.parent`
- * declaration, reads the parent entry and merges its data into the
- * child translation's data (translation wins on key conflicts), so
- * the renderer sees a single denormalized view.
- *
- * Why this lives here:
- *  - All 4 render paths (`RenderEntryLive`, `RenderListLive`,
- *    `PreviewEntry`, `HtmlPublishOrchestrator`) hit the same gap —
- *    they each read translation rows from D1 then pass them straight
- *    to `renderEntryHtml`. Without this join, fields that live on
- *    the parent (e.g. `posts.coverUrl`, `posts.authorId`,
- *    `posts.publishedAt`) never reach the template even though the
- *    template expects them in `entry.data`.
- *  - Templates already read from `entry.data.<field>` — keeping the
- *    join inside data preserves the template contract; no signature
- *    changes downstream.
+ * `joinParentIfTranslation` — when `entry.collection` declares
+ * `translates.parent`, fetch the parent and merge its data into the
+ * child's data (translation wins on key conflict). Implements
+ * ADR-0010's promise that public render paths join translations to
+ * their parent on the declared field, so parent-only fields like
+ * `posts.coverUrl` reach templates that read `data.coverUrl`.
  *
  * Status filter: parent must be in the same lifecycle bucket as the
- * child (typically "published"). If the parent is unpublished, the
- * `RequestPublishUseCase` already refuses to publish the translation
- * — so at render time a published translation always has a published
- * parent. But during preview the child can be draft; in that case
- * we look up parent without status filter (preview reads the most
- * recent parent regardless).
+ * child (typically "published"). `RequestPublishUseCase` already
+ * blocks publishing a translation whose parent isn't published, so at
+ * render time `parentStatus: "published"` always finds the parent.
+ * Preview omits the filter — a draft translation can preview against
+ * its already-published parent.
  */
 export async function joinParentIfTranslation(
   db: DatabaseDriver,
@@ -47,6 +37,8 @@ export async function joinParentIfTranslation(
     collection: translates.parent,
     field: translates.on,
     value: joinValue,
+    // Parent is non-localized by ADR-0010 contract (CrossSchemaChecker
+    // enforces `parent.localized: false` when a child has `translates`).
     locale: null,
     status: options.parentStatus,
   });
@@ -54,24 +46,64 @@ export async function joinParentIfTranslation(
 
   return {
     ...entry,
-    data: {
-      ...parent.data,
-      ...entry.data,
-    },
+    data: { ...parent.data, ...entry.data },
   };
 }
 
-/** Batch helper for list paths. Maps each entry through
- *  `joinParentIfTranslation` in parallel. Safe to call on a list of
- *  non-translation entries — the function short-circuits when no
- *  `translates` declaration exists. */
+/**
+ * Batch sibling for list paths. Issues one `IN (...)` query for all
+ * parent lookups across the list, deduplicating join values — so a
+ * 20-locale list keyed off the same parent slug costs 1 D1 read, not
+ * 20. Assumes all entries share a single collection (the contract of
+ * `RenderListLiveUseCase` / `HtmlPublishOrchestrator.renderList`); if
+ * mixed collections ever land here, fall back path-per-entry would
+ * be needed.
+ */
 export async function joinParentForList(
   db: DatabaseDriver,
   schemas: ReadonlyMap<string, SchemaManifest>,
   entries: readonly Entry[],
   options: { readonly parentStatus?: ContentState } = {},
 ): Promise<Entry[]> {
-  return Promise.all(
-    entries.map((entry) => joinParentIfTranslation(db, schemas, entry, options)),
-  );
+  if (entries.length === 0) return [];
+
+  const probe = schemas.get(entries[0]!.collection);
+  const translates = probe?.spec.translates;
+  if (!translates) return [...entries];
+
+  const joinValues = new Set<string>();
+  for (const entry of entries) {
+    const value = entry.data[translates.on];
+    if (typeof value === "string" && value !== "") joinValues.add(value);
+  }
+  if (joinValues.size === 0) return [...entries];
+
+  const parents = await readEntriesByDataFieldIn(db, {
+    collection: translates.parent,
+    field: translates.on,
+    values: [...joinValues],
+    locale: null,
+    status: options.parentStatus,
+  });
+  // Multiple rows per joinValue are sorted updated_at DESC by the
+  // query; first occurrence wins (matches single-entry path which
+  // does LIMIT 1).
+  const parentByValue = new Map<string, Entry>();
+  for (const parent of parents) {
+    const key = parent.data[translates.on];
+    if (typeof key === "string" && !parentByValue.has(key)) {
+      parentByValue.set(key, parent);
+    }
+  }
+
+  return entries.map((entry) => {
+    const value = entry.data[translates.on];
+    if (typeof value !== "string") return entry;
+    const parent = parentByValue.get(value);
+    if (!parent) return entry;
+    return {
+      ...entry,
+      data: { ...parent.data, ...entry.data },
+    };
+  });
 }

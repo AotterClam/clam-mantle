@@ -117,15 +117,19 @@ export interface ReadEntryByDataFieldArgs {
 
 const SAFE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+function assertSafeField(field: string): void {
+  if (!SAFE_FIELD_RE.test(field)) {
+    throw new Error(
+      `field name ${JSON.stringify(field)} fails ${SAFE_FIELD_RE} — schema field names must be plain identifiers (SQL-injection backstop for json_extract path interpolation)`,
+    );
+  }
+}
+
 export async function readEntryByDataField(
   db: DatabaseDriver,
   args: ReadEntryByDataFieldArgs,
 ): Promise<Entry | null> {
-  if (!SAFE_FIELD_RE.test(args.field)) {
-    throw new Error(
-      `readEntryByDataField: field name ${JSON.stringify(args.field)} fails ${SAFE_FIELD_RE} — schema field names must be plain identifiers`,
-    );
-  }
+  assertSafeField(args.field);
   const conditions: string[] = [
     "collection = ?",
     `json_extract(data, '$.${args.field}') = ?`,
@@ -146,6 +150,49 @@ export async function readEntryByDataField(
     ` FROM entries WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC LIMIT 1`;
   const row = await db.prepare(sql).bind(...binds).first<EntryDbRow>();
   return row ? rowToEntry(row) : null;
+}
+
+/** Batch sibling to `readEntryByDataField`. Issues a single
+ *  `... WHERE data.<field> IN (?, ?, ...)` query, returning one row per
+ *  distinct value (most-recently-updated when multiple rows share the
+ *  same value). Used by the list-render parent-join to avoid N+1 reads
+ *  when a list of translations shares parents on a small set of join
+ *  values. */
+export interface ReadEntriesByDataFieldInArgs {
+  readonly collection: string;
+  readonly field: string;
+  readonly values: readonly string[];
+  readonly locale?: string | null;
+  readonly status?: ContentState;
+}
+
+export async function readEntriesByDataFieldIn(
+  db: DatabaseDriver,
+  args: ReadEntriesByDataFieldInArgs,
+): Promise<Entry[]> {
+  if (args.values.length === 0) return [];
+  assertSafeField(args.field);
+  const placeholders = args.values.map(() => "?").join(", ");
+  const conditions: string[] = [
+    "collection = ?",
+    `json_extract(data, '$.${args.field}') IN (${placeholders})`,
+  ];
+  const binds: unknown[] = [args.collection, ...args.values];
+  if (args.locale === null) {
+    conditions.push(`json_extract(data, '$.locale') IS NULL`);
+  } else if (typeof args.locale === "string") {
+    conditions.push(`json_extract(data, '$.locale') = ?`);
+    binds.push(args.locale);
+  }
+  if (args.status) {
+    conditions.push("status = ?");
+    binds.push(args.status);
+  }
+  const sql =
+    `SELECT id, collection, status, version, data, created_at, updated_at` +
+    ` FROM entries WHERE ${conditions.join(" AND ")} ORDER BY updated_at DESC`;
+  const rows = await db.prepare(sql).bind(...binds).all<EntryDbRow>();
+  return rows.map(rowToEntry);
 }
 
 function rowToEntry(row: EntryDbRow): Entry {
