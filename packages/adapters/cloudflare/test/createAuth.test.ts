@@ -29,26 +29,38 @@ const NULL_SENDER: EmailSender = {
   },
 };
 
+const GITHUB_METHOD_FIXTURE = {
+  kind: "social",
+  provider: "github",
+  clientId: "g",
+  clientSecret: "g",
+} as const satisfies AuthMethodConfig;
+
+/**
+ * `buildSocialProviders` returns `BetterAuthOptions["socialProviders"]`
+ * — a union of per-provider option types under named keys. Tests assert
+ * against arbitrary keys, so cast once at the boundary.
+ */
+function asProviderMap(
+  out: ReturnType<typeof buildSocialProviders>,
+): Record<string, Record<string, unknown>> {
+  return out as unknown as Record<string, Record<string, unknown>>;
+}
+
 function fakeDb(): D1Database {
-  // Better Auth probes the D1 binding during construction (the
-  // adapter wraps it in a kysely-shaped wrapper that calls `.prepare`
-  // / `.exec` to introspect). A bare `{}` triggers an async
-  // `BetterAuthError: Failed to initialize database adapter` after
-  // construction. We provide minimal no-op stubs that satisfy the
-  // probe; tests that actually exercise queries are out of scope
-  // here (would need miniflare).
-  const noopStatement = {
-    bind: () => noopStatement,
-    first: async () => null,
+  // Better Auth probes the D1 binding during construction (its kysely
+  // wrapper calls `.prepare(sql).bind(...).all()` to introspect). A
+  // bare `{}` raises `BetterAuthError: Failed to initialize database
+  // adapter` as an unhandled rejection. Tests that actually exercise
+  // queries are out of scope here (would need miniflare).
+  const stmt = {
+    bind: () => stmt,
     all: async () => ({ results: [], success: true, meta: {} }),
-    run: async () => ({ success: true, meta: {} }),
-    raw: async () => [],
   };
   return {
-    prepare: () => noopStatement,
+    prepare: () => stmt,
     exec: async () => ({ count: 0, duration: 0 }),
     batch: async () => [],
-    dump: async () => new ArrayBuffer(0),
   } as unknown as D1Database;
 }
 
@@ -59,14 +71,7 @@ function baseConfig(
     database: fakeDb(),
     baseURL: "https://example.test",
     secret: "x".repeat(40),
-    methods: [
-      {
-        kind: "social",
-        provider: "github",
-        clientId: "gh_id",
-        clientSecret: "gh_secret",
-      },
-    ],
+    methods: [GITHUB_METHOD_FIXTURE],
     ...overrides,
   };
 }
@@ -116,14 +121,7 @@ describe("validateBootstrap", () => {
     expect(() =>
       validateBootstrap(
         { match: "github-login", value: "alice" },
-        [
-          {
-            kind: "social",
-            provider: "github",
-            clientId: "x",
-            clientSecret: "y",
-          },
-        ],
+        [GITHUB_METHOD_FIXTURE],
       ),
     ).not.toThrow();
   });
@@ -223,10 +221,12 @@ describe("shouldPromoteToOwner", () => {
 
 describe("buildSocialProviders", () => {
   it("emits per-provider config keyed by provider id", () => {
-    const out = buildSocialProviders([
-      { kind: "social", provider: "github", clientId: "g_id", clientSecret: "g_s" },
-      { kind: "social", provider: "google", clientId: "o_id", clientSecret: "o_s" },
-    ]) as Record<string, Record<string, unknown>>;
+    const out = asProviderMap(
+      buildSocialProviders([
+        { kind: "social", provider: "github", clientId: "g_id", clientSecret: "g_s" },
+        { kind: "social", provider: "google", clientId: "o_id", clientSecret: "o_s" },
+      ]),
+    );
     expect(out.github?.clientId).toBe("g_id");
     expect(out.github?.clientSecret).toBe("g_s");
     expect(out.google?.clientId).toBe("o_id");
@@ -234,10 +234,12 @@ describe("buildSocialProviders", () => {
   });
 
   it("injects mapProfileToUser shim only for github", () => {
-    const out = buildSocialProviders([
-      { kind: "social", provider: "github", clientId: "g", clientSecret: "g" },
-      { kind: "social", provider: "google", clientId: "o", clientSecret: "o" },
-    ]) as Record<string, Record<string, unknown>>;
+    const out = asProviderMap(
+      buildSocialProviders([
+        GITHUB_METHOD_FIXTURE,
+        { kind: "social", provider: "google", clientId: "o", clientSecret: "o" },
+      ]),
+    );
     const ghMap = out.github?.mapProfileToUser as (p: {
       login?: string;
     }) => Record<string, unknown>;
@@ -247,30 +249,34 @@ describe("buildSocialProviders", () => {
   });
 
   it("merges extras into the provider config", () => {
-    const out = buildSocialProviders([
-      {
-        kind: "social",
-        provider: "microsoft-entra-id",
-        clientId: "m",
-        clientSecret: "m",
-        extras: { tenantId: "common", prompt: "select_account" },
-      },
-    ]) as Record<string, Record<string, unknown>>;
+    const out = asProviderMap(
+      buildSocialProviders([
+        {
+          kind: "social",
+          provider: "microsoft-entra-id",
+          clientId: "m",
+          clientSecret: "m",
+          extras: { tenantId: "common", prompt: "select_account" },
+        },
+      ]),
+    );
     expect(out["microsoft-entra-id"]?.tenantId).toBe("common");
     expect(out["microsoft-entra-id"]?.prompt).toBe("select_account");
   });
 
   it("includes redirectURI and scope only when set", () => {
-    const out = buildSocialProviders([
-      {
-        kind: "social",
-        provider: "google",
-        clientId: "g",
-        clientSecret: "g",
-        redirectURI: "https://example.test/cb",
-        scope: ["openid", "profile", "email"],
-      },
-    ]) as Record<string, Record<string, unknown>>;
+    const out = asProviderMap(
+      buildSocialProviders([
+        {
+          kind: "social",
+          provider: "google",
+          clientId: "g",
+          clientSecret: "g",
+          redirectURI: "https://example.test/cb",
+          scope: ["openid", "profile", "email"],
+        },
+      ]),
+    );
     expect(out.google?.redirectURI).toBe("https://example.test/cb");
     expect(out.google?.scope).toEqual(["openid", "profile", "email"]);
   });
@@ -296,10 +302,12 @@ describe("buildSocialProviders", () => {
   });
 
   it("ignores non-social methods", () => {
-    const out = buildSocialProviders([
-      { kind: "email-otp", sender: NULL_SENDER },
-      { kind: "magic-link", sender: NULL_SENDER },
-    ]) as Record<string, unknown>;
+    const out = asProviderMap(
+      buildSocialProviders([
+        { kind: "email-otp", sender: NULL_SENDER },
+        { kind: "magic-link", sender: NULL_SENDER },
+      ]),
+    );
     expect(Object.keys(out)).toHaveLength(0);
   });
 });
@@ -368,12 +376,7 @@ describe("createAuth — boot invariants", () => {
     const auth = createAuth(
       baseConfig({
         methods: [
-          {
-            kind: "social",
-            provider: "github",
-            clientId: "g",
-            clientSecret: "g",
-          },
+          GITHUB_METHOD_FIXTURE,
           { kind: "email-otp", sender: NULL_SENDER },
           { kind: "magic-link", sender: NULL_SENDER },
           {
@@ -408,12 +411,7 @@ describe("AuthMethodConfig — type narrowing smoke", () => {
   // Lives as a test so a future refactor that accidentally widens
   // the union surfaces here.
   it("narrows social method to social fields", () => {
-    const method: AuthMethodConfig = {
-      kind: "social",
-      provider: "github",
-      clientId: "g",
-      clientSecret: "g",
-    };
+    const method: AuthMethodConfig = GITHUB_METHOD_FIXTURE;
     if (method.kind === "social") {
       // `provider` only exists on the social variant
       expect(method.provider).toBe("github");
