@@ -89,9 +89,11 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
 
   // Well-known OAuth endpoints (RFC 8414 + RFC 9728) used to be
   // forwarded to Better Auth's mcp() plugin here. With the carve-out
-  // to @cloudflare/workers-oauth-provider, the consumer wires those
-  // via `mountOAuthEndpoints` (AS metadata) + `mountMcp` (resource-
-  // specific PRM). No SDK-level forwarder needed.
+  // to @cloudflare/workers-oauth-provider (PR #193), the top-level
+  // `OAuthProvider` serves AS metadata and per-resource PRM
+  // automatically — adopters wire it via `createOAuthProvider` +
+  // `createMcpApiHandler` from the package index. No SDK-level
+  // forwarder needed in `mountServerEndpoints`.
 
   for (const path of [
     "/admin",
@@ -153,8 +155,8 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     return jsonResponse(200, {
       ...site,
       publicUrl: site.origin || url.origin,
-      mcpUrl: `${url.origin}/staff/mcp`,
-      staffMcpUrl: `${url.origin}/staff/mcp`,
+      mcpUrl: `${url.origin}/mcp/staff`,
+      staffMcpUrl: `${url.origin}/mcp/staff`,
       userMcpUrl: `${url.origin}/mcp`,
     });
   });
