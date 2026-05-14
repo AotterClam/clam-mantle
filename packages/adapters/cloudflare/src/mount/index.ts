@@ -1,6 +1,6 @@
 export { mountServerEndpoints } from "./mountServerEndpoints.js";
 export { type CmsRuntimeRef, createCmsRef } from "./bootRuntimeOnce.js";
-export { mountMcp } from "./mountMcp.js";
+export { mountMcp, protectedResourceMetadataPath } from "./mountMcp.js";
 export {
   mountPublicRoutes,
   type CollectionRouteConfig,
