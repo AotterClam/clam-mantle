@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
-import { mountMcp } from "../src/mount/mountMcp.js";
+import { mountMcp, protectedResourceMetadataPath } from "../src/mount/mountMcp.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import { InMemoryDatabase } from "../../../clam-cms-runtime/test/fakes/database.js";
 import {
@@ -64,7 +64,7 @@ describe("MCP OAuth discovery metadata", () => {
 
     expect(res.status).toBe(401);
     expect(res.headers.get("www-authenticate")).toContain(
-      'resource_metadata="https://site.test/staff/mcp/.well-known/oauth-protected-resource"',
+      'resource_metadata="https://site.test/.well-known/oauth-protected-resource/staff/mcp"',
     );
     expect(res.headers.get("www-authenticate")).toContain('scope="mcp:staff"');
   });
@@ -72,8 +72,8 @@ describe("MCP OAuth discovery metadata", () => {
   it("serves per-route protected resource metadata for staff and public MCP", async () => {
     const app = harness();
 
-    const staff = await app.request("https://site.test/staff/mcp/.well-known/oauth-protected-resource");
-    const user = await app.request("https://site.test/mcp/.well-known/oauth-protected-resource");
+    const staff = await app.request("https://site.test/.well-known/oauth-protected-resource/staff/mcp");
+    const user = await app.request("https://site.test/.well-known/oauth-protected-resource/mcp");
 
     await expect(staff.json()).resolves.toMatchObject({
       resource: "https://site.test/staff/mcp",
@@ -118,5 +118,39 @@ describe("MCP OAuth discovery metadata", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("image/svg+xml");
     await expect(res.text()).resolves.toContain("<svg");
+  });
+});
+
+describe("protectedResourceMetadataPath (RFC 9728 §3.1)", () => {
+  it("returns the bare well-known suffix for root resources", () => {
+    expect(protectedResourceMetadataPath("")).toBe("/.well-known/oauth-protected-resource");
+    expect(protectedResourceMetadataPath("/")).toBe("/.well-known/oauth-protected-resource");
+  });
+
+  it("appends the resource path AFTER the well-known suffix", () => {
+    expect(protectedResourceMetadataPath("/mcp")).toBe(
+      "/.well-known/oauth-protected-resource/mcp",
+    );
+    expect(protectedResourceMetadataPath("/staff/mcp")).toBe(
+      "/.well-known/oauth-protected-resource/staff/mcp",
+    );
+    expect(protectedResourceMetadataPath("/a/b/c")).toBe(
+      "/.well-known/oauth-protected-resource/a/b/c",
+    );
+  });
+
+  it("normalizes trailing slashes off the resource path", () => {
+    expect(protectedResourceMetadataPath("/mcp/")).toBe(
+      "/.well-known/oauth-protected-resource/mcp",
+    );
+    expect(protectedResourceMetadataPath("/staff/mcp///")).toBe(
+      "/.well-known/oauth-protected-resource/staff/mcp",
+    );
+  });
+
+  it("prepends a leading slash if the caller omits it", () => {
+    expect(protectedResourceMetadataPath("mcp")).toBe(
+      "/.well-known/oauth-protected-resource/mcp",
+    );
   });
 });

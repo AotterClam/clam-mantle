@@ -6,6 +6,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.8-beta.5] - 2026-05-14
+
+### Breaking
+
+- **`@aotterclam/clam-cms-cloudflare`**: `mountMcp` now serves the OAuth Protected Resource Metadata document at the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) §3.1 standard URL — `/.well-known/oauth-protected-resource<resource-path>` instead of the previous (non-standard) `<resource-path>/.well-known/oauth-protected-resource`. Example: a staff MCP at `/staff/mcp` now publishes metadata at `/.well-known/oauth-protected-resource/staff/mcp`. The `WWW-Authenticate: Bearer ... resource_metadata=` hint emitted on 401 responses also points at the new URL, so MCP clients that follow the hint (Claude Code does) re-discover automatically on next call; spec-strict clients that compose the well-known URL themselves now succeed. New helper `protectedResourceMetadataPath()` is exported from the package index for downstream consumers that need to compute the URL themselves (#188).
+
 ## [0.0.8-beta.4] - 2026-05-14
 
 ### Added
