@@ -1,7 +1,8 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { admin, mcp } from "better-auth/plugins";
+import { admin, emailOTP, mcp } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
+import type { EmailSender } from "@aotter/mantle-runtime";
 
 export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
@@ -26,6 +27,21 @@ export type AuthMethodConfig =
        *  redirect to. The consumer is then responsible for forwarding
        *  requests at that URI to `auth.handler`. */
       readonly redirectURI?: string;
+    }
+  | {
+      readonly kind: "email-otp";
+      /** Transactional-email sender. SDK never owns body templates;
+       *  the locale is passed through so the sender can branch. */
+      readonly sender: EmailSender;
+      /** OTP length (Better Auth default 6). */
+      readonly otpLength?: number;
+      /** OTP TTL in seconds (Better Auth default 300 = 5 min). */
+      readonly expiresInSeconds?: number;
+      /** Allowed attempts before the OTP locks (Better Auth default 3). */
+      readonly allowedAttempts?: number;
+      /** Fallback locale when the request carries no Accept-Language —
+       *  typically the site's canonical locale. BCP 47. Defaults to "en". */
+      readonly fallbackLocale?: string;
     };
 
 /**
@@ -75,28 +91,61 @@ function buildSocialProviders(
 ): BetterAuthOptions["socialProviders"] {
   const out: BetterAuthOptions["socialProviders"] = {};
   for (const method of methods) {
-    switch (method.kind) {
-      case "github":
-        out.github = {
-          clientId: method.clientId,
-          clientSecret: method.clientSecret,
-          mapProfileToUser: (profile) => ({
-            githubLogin: profile.login,
-          }),
-          ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
-        };
-        break;
-      default: {
-        // Runtime guard for unknown `kind` values. The compile-time
-        // exhaustiveness check activates the moment PR-B adds a
-        // second union variant — until then there's nothing for
-        // TypeScript to narrow into `never`.
-        const kind = (method as { kind: string }).kind;
-        throw new Error(`createAuth: unhandled AuthMethodConfig.kind '${kind}'`);
-      }
+    if (method.kind === "github") {
+      out.github = {
+        clientId: method.clientId,
+        clientSecret: method.clientSecret,
+        mapProfileToUser: (profile) => ({
+          githubLogin: profile.login,
+        }),
+        ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
+      };
     }
   }
   return out;
+}
+
+/**
+ * Read the request's preferred locale off `Accept-Language`. Picks
+ * the first language tag; ignores quality values for v0.1 simplicity.
+ * Falls back to the configured `fallbackLocale` when no useful header
+ * is present.
+ */
+function pickLocale(req: Request | undefined, fallback: string): string {
+  const header = req?.headers.get("accept-language");
+  if (!header) return fallback;
+  const first = header.split(",")[0]?.split(";")[0]?.trim();
+  return first && first.length > 0 ? first : fallback;
+}
+
+const OTP_CATEGORY_BY_TYPE: Readonly<Record<string, string>> = {
+  "sign-in": "auth.email-otp.sign-in",
+  "email-verification": "auth.email-otp.email-verification",
+  "forget-password": "auth.email-otp.forget-password",
+  "change-email": "auth.email-otp.change-email",
+};
+
+function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-otp" }>) {
+  const fallback = method.fallbackLocale ?? "en";
+  return emailOTP({
+    ...(method.otpLength !== undefined ? { otpLength: method.otpLength } : {}),
+    ...(method.expiresInSeconds !== undefined
+      ? { expiresIn: method.expiresInSeconds }
+      : {}),
+    ...(method.allowedAttempts !== undefined
+      ? { allowedAttempts: method.allowedAttempts }
+      : {}),
+    sendVerificationOTP: async (data, ctx) => {
+      const locale = pickLocale(ctx?.request, fallback);
+      await method.sender.send({
+        to: data.email,
+        subject: `Your sign-in code: ${data.otp}`,
+        text: `Your one-time code is ${data.otp}. It expires shortly. If you didn't request this, ignore this email.`,
+        locale,
+        category: OTP_CATEGORY_BY_TYPE[data.type] ?? `auth.email-otp.${data.type}`,
+      });
+    },
+  });
 }
 
 /**
@@ -106,6 +155,10 @@ function buildSocialProviders(
  * `match: "github-login"` with no `github` method registered. Throws
  * at construction so vibe-coders see the mistake before the first
  * sign-in attempt.
+ *
+ * `match: "email"` is permissive — every Better Auth method that
+ * creates a user populates `email`, including GitHub (via the
+ * upstream profile). No registration constraint to enforce.
  */
 function validateBootstrap(
   rule: BootstrapOwnerRule,
@@ -120,9 +173,6 @@ function validateBootstrap(
       );
     }
   }
-  // `match: "email"` is permissive — every Better Auth method that
-  // creates a user populates `email`, including GitHub (via the
-  // upstream profile). No registration constraint to enforce.
 }
 
 function shouldPromoteToOwner(
@@ -149,6 +199,16 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const socialProviders = buildSocialProviders(config.methods);
   const bootstrap = config.bootstrapOwner;
+  const emailOtpMethods = config.methods.filter(
+    (m): m is Extract<AuthMethodConfig, { kind: "email-otp" }> =>
+      m.kind === "email-otp",
+  );
+  if (emailOtpMethods.length > 1) {
+    throw new Error(
+      "createAuth: more than one `email-otp` method registered. Combine into one.",
+    );
+  }
+  const emailOtpMethod = emailOtpMethods[0];
 
   return betterAuth({
     database: config.database,
@@ -195,6 +255,7 @@ function buildAuth(config: CreateAuthConfig) {
           },
         },
       }),
+      ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
     ],
     databaseHooks: {
       user: {
