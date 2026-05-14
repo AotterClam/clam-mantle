@@ -19,6 +19,9 @@ importers:
       '@aotter/mantle-spec':
         specifier: workspace:*
         version: link:../../mantle-spec
+      '@cloudflare/workers-oauth-provider':
+        specifier: ^0.6.0
+        version: 0.6.0
       aws4fetch:
         specifier: ^1.0.20
         version: 1.0.20
@@ -27,7 +30,7 @@ importers:
         version: 1.6.9(@cloudflare/workers-types@4.20260511.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@22.19.19)(vite@8.0.10(@types/node@22.19.19)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
       hono:
         specifier: ^4.6.20
-        version: 4.12.16
+        version: 4.12.18
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260508.1
@@ -361,6 +364,9 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-oauth-provider@0.6.0':
+    resolution: {integrity: sha512-KOkTWEjwVjfYGU78eyapKziuPuzKw9gIg4LpxbGmxWhNl4bAdiJzWXeV3nepFr+vmkEiTMEGk99Llj5j0tH2cw==}
 
   '@cloudflare/workers-types@4.20260511.1':
     resolution: {integrity: sha512-FA+si7cOq9i/gtCHhIc0XJL0l1F/ApF+m00752Aj7WZFJrj3ZulT2T8/+rT3BabMT0QEnqFEGIqCgrmqhgEfMg==}
@@ -1823,8 +1829,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  hono@4.12.16:
-    resolution: {integrity: sha512-jN0ZewiNAWSe5khM3EyCmBb250+b40wWbwNILNfEvq84VREWwOIkuUsFONk/3i3nqkz7Oe1PcpM2mwQEK2L9Kg==}
+  hono@4.12.18:
+    resolution: {integrity: sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ==}
     engines: {node: '>=16.9.0'}
 
   is-number@7.0.0:
@@ -1991,6 +1997,10 @@ packages:
 
   postcss@8.5.13:
     resolution: {integrity: sha512-qif0+jGGZoLWdHey3UFHHWP0H7Gbmsk8T5VEqyYFbWqPr1XqvLGBbk/sl8V5exGmcYJklJOhOQq1pV9IcsiFag==}
+    engines: {node: ^10 || ^12 || >=14}
+
+  postcss@8.5.14:
+    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
 
   react-dom@19.2.5:
@@ -2541,6 +2551,8 @@ snapshots:
 
   '@cloudflare/workerd-windows-64@1.20260508.1':
     optional: true
+
+  '@cloudflare/workers-oauth-provider@0.6.0': {}
 
   '@cloudflare/workers-types@4.20260511.1': {}
 
@@ -3681,7 +3693,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  hono@4.12.16: {}
+  hono@4.12.18: {}
 
   is-number@7.0.0: {}
 
@@ -3800,6 +3812,12 @@ snapshots:
   picomatch@4.0.4: {}
 
   postcss@8.5.13:
+    dependencies:
+      nanoid: 3.3.12
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
+
+  postcss@8.5.14:
     dependencies:
       nanoid: 3.3.12
       picocolors: 1.1.1
@@ -4038,7 +4056,7 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.13
+      postcss: 8.5.14
       rolldown: 1.0.0-rc.17
       tinyglobby: 0.2.16
     optionalDependencies:

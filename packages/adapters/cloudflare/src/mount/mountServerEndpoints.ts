@@ -25,8 +25,15 @@ import { AOTTER_FAVICON_SVG } from "../assets/aotterFavicon.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
-/** Mount HTTP Triggers + Views + the Better Auth admin surface. */
-export function mountServerEndpoints(app: Hono, ref: CmsRuntimeRef): void {
+/** Mount HTTP Triggers + Views + the Better Auth admin surface.
+ *  HTTP Trigger bearer-token authentication is delegated to the OAuth
+ *  provider lib (via `createMcpApiHandler`) — if a Trigger needs
+ *  identity, route it under an MCP `apiHandler` instead of a Hono
+ *  catch-all. */
+export function mountServerEndpoints(
+  app: Hono,
+  ref: CmsRuntimeRef,
+): void {
   for (const t of ref.manifests) {
     if (t.kind !== "Trigger") continue;
     const source = t.spec.source;
@@ -80,39 +87,11 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     }),
   );
 
-  for (const path of [
-    "/.well-known/oauth-authorization-server",
-    "/.well-known/oauth-protected-resource",
-  ]) {
-    app.get(path, async (c) => {
-      const url = new URL(c.req.url);
-      url.pathname = `/api/auth${url.pathname}`;
-      const res = await auth.handler(
-        new Request(url.toString(), { method: "GET", headers: c.req.raw.headers }),
-      );
-      if (!res.ok) return res;
-      const origin = new URL(c.req.url).origin;
-      const body = await res.json() as Record<string, unknown>;
-      if (path !== "/.well-known/oauth-authorization-server") {
-        return Response.json({
-          ...body,
-          logo_uri: `${origin}/favicon.svg`,
-        });
-      }
-      return Response.json({
-        ...body,
-        logo_uri: `${origin}/favicon.svg`,
-        scopes_supported: [
-          "openid",
-          "profile",
-          "email",
-          "offline_access",
-          "mcp:read",
-          "mcp:staff",
-        ],
-      });
-    });
-  }
+  // Well-known OAuth endpoints (RFC 8414 + RFC 9728) used to be
+  // forwarded to Better Auth's mcp() plugin here. With the carve-out
+  // to @cloudflare/workers-oauth-provider, the consumer wires those
+  // via `mountOAuthEndpoints` (AS metadata) + `mountMcp` (resource-
+  // specific PRM). No SDK-level forwarder needed.
 
   for (const path of [
     "/admin",
@@ -412,22 +391,17 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
 }
 
 async function buildHandlerContext(
-  req: Request,
-  auth: Auth,
+  _req: Request,
+  _auth: Auth,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<HandlerContext> {
   const wu = waitUntil ? { waitUntil } : {};
-  const unauth: HandlerContext = { user: null, staff: null, env: {}, ...wu };
-  // Fast path: skip the D1 query for public Triggers (no bearer).
-  if (!req.headers.get("authorization")?.startsWith("Bearer ")) return unauth;
-  const session = await auth.getMcpSession(req);
-  if (!session) return unauth;
-  const role = await auth.getUserRole(session.userId);
-  const staff =
-    role && ADMIN_ROLE_SET.has(role)
-      ? { id: session.userId, role: role as AdminRole }
-      : null;
-  return { user: { id: session.userId }, staff, env: {}, ...wu };
+  // HTTP Triggers run on `defaultHandler` (Hono), which the OAuth lib
+  // does NOT route through token verification. Bearer-authenticated
+  // identity is only available on apiHandlers registered with
+  // `createOAuthProvider`. Triggers that need identity should migrate
+  // to an MCP tool, or read it from the caller frontend layer.
+  return { user: null, staff: null, env: {}, ...wu };
 }
 
 function openApiToHono(path: string): string {

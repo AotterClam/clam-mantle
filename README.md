@@ -47,7 +47,7 @@ You're an agent helping a (likely non-technical) user install or extend a mantle
 End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.dev` with:
 
 - `/admin` — React admin SPA, role-gated after sign-in (GitHub / Google / Apple / 30+ social providers, email-OTP, magic-link — adopter picks the methods)
-- `/staff/mcp` — staff MCP endpoint, owner/editor agents connect here to edit content
+- `/mcp/staff` — staff MCP endpoint, owner/editor agents connect here to edit content
 - `/mcp` — end-user/read MCP endpoint for public View tools and future member flows
 - `/<locale>/<collection>/<slug>` — per-entry HTML
 - `/<locale>/<collection>/<slug>.md` — agent-friendly markdown mirror
