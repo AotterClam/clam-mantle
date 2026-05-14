@@ -197,7 +197,8 @@ const SOCIAL_EXTRAS_RESERVED_KEYS: ReadonlySet<string> = new Set([
   "mapProfileToUser",
 ]);
 
-function buildSocialProviders(
+/** @internal exported for unit tests; not part of the public API. */
+export function buildSocialProviders(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): BetterAuthOptions["socialProviders"] {
   // Better Auth's typed `socialProviders` shape names every provider
@@ -245,7 +246,8 @@ function buildSocialProviders(
  * First tag off `Accept-Language`, quality values ignored. Locale
  * contract lives in `EmailSender.ts`.
  */
-function pickLocale(req: Request | undefined, fallback: string): string {
+/** @internal exported for unit tests; not part of the public API. */
+export function pickLocale(req: Request | undefined, fallback: string): string {
   const header = req?.headers.get("accept-language");
   if (!header) return fallback;
   const first = header.split(",")[0]?.split(";")[0]?.trim();
@@ -328,7 +330,8 @@ function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-ot
  * creates a user populates `email`, including GitHub (via the
  * upstream profile). No registration constraint to enforce.
  */
-function validateBootstrap(
+/** @internal exported for unit tests; not part of the public API. */
+export function validateBootstrap(
   rule: BootstrapOwnerRule,
   methods: ReadonlyArray<AuthMethodConfig>,
 ): void {
@@ -345,7 +348,8 @@ function validateBootstrap(
   }
 }
 
-function shouldPromoteToOwner(
+/** @internal exported for unit tests; not part of the public API. */
+export function shouldPromoteToOwner(
   rule: BootstrapOwnerRule,
   user: { readonly email?: string | null; readonly githubLogin?: string | null },
 ): boolean {
