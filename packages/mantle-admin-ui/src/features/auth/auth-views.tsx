@@ -64,7 +64,14 @@ export function AccessDeniedView({
   );
 }
 
-type AuthMethodKind = "github" | "email-otp" | "magic-link";
+// Mirrors `AuthMethodInfo` exported from `@aotter/mantle-cloudflare`
+// (see `createAuth.ts`). Duplicated here because the admin SPA is built
+// adapter-agnostic and can't import from the adapter package; the
+// `/api/auth/methods` endpoint is the wire contract between them.
+type AuthMethodInfo =
+  | { kind: "email-otp" }
+  | { kind: "magic-link" }
+  | { kind: "social"; provider: string };
 
 // Shared input styling for the email-otp form. Lives at module scope
 // so we don't reallocate the string on every render and so a future
@@ -93,7 +100,7 @@ export function SignInView(): React.ReactElement {
   const params = new URLSearchParams(window.location.search);
   const ret = params.get("return") ?? "/admin";
 
-  const [methods, setMethods] = React.useState<AuthMethodKind[] | null>(null);
+  const [methods, setMethods] = React.useState<AuthMethodInfo[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -102,7 +109,7 @@ export function SignInView(): React.ReactElement {
       try {
         const res = await fetch("/api/auth/methods", { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { methods?: AuthMethodKind[] };
+        const data = (await res.json()) as { methods?: AuthMethodInfo[] };
         if (cancelled) return;
         setMethods(data.methods ?? []);
       } catch (err: unknown) {
@@ -141,8 +148,12 @@ export function SignInView(): React.ReactElement {
           // Wrap so each section's `first:` selectors target the first
           // method in the list, not the first child of the card.
           <div>
-            {methods.map((kind) => (
-              <MethodSection key={kind} kind={kind} returnTo={ret} />
+            {methods.map((m) => (
+              <MethodSection
+                key={m.kind === "social" ? `social:${m.provider}` : m.kind}
+                method={m}
+                returnTo={ret}
+              />
             ))}
           </div>
         ) : null}
@@ -152,36 +163,99 @@ export function SignInView(): React.ReactElement {
 }
 
 function MethodSection({
-  kind,
+  method,
   returnTo,
 }: {
-  kind: AuthMethodKind;
+  method: AuthMethodInfo;
   returnTo: string;
 }): React.ReactElement {
-  // Exhaustive switch mirrors `shouldPromoteToOwner` in createAuth.ts.
-  // Adding a kind to the union turns the missing `case` into a TS
-  // error here. The `default` keeps a graceful fallback when the
-  // server's method list runs ahead of the SPA bundle.
-  switch (kind) {
-    case "github":
-      return <GitHubSignInSection returnTo={returnTo} />;
+  // Exhaustive switch — adding a kind to AuthMethodInfo without
+  // adding a case here is a TS error. `social` covers all OAuth
+  // providers (per Better Auth's socialProviders block); the
+  // `provider` discriminator picks the button label.
+  switch (method.kind) {
+    case "social":
+      return <SocialSignInSection provider={method.provider} returnTo={returnTo} />;
     case "email-otp":
       return <EmailOtpSection returnTo={returnTo} />;
     case "magic-link":
       return <MagicLinkSection returnTo={returnTo} />;
-    default:
-      return <UnknownMethodSection kind={kind} />;
+    default: {
+      const _exhaustive: never = method;
+      return <UnknownMethodSection kind={(_exhaustive as { kind: string }).kind} />;
+    }
   }
 }
 
-function GitHubSignInSection({ returnTo }: { returnTo: string }): React.ReactElement {
+/**
+ * Display-name table for Better Auth's social provider ids. Brand
+ * names don't translate, so this stays language-agnostic — the
+ * surrounding "Continue with …" template is the only translated
+ * piece. Mirrors the `SocialProviderId` union in
+ * `@aotter/mantle-cloudflare`; kept here (not split into a
+ * shared constants file) because adapters and the SPA evolve
+ * independently — the only consumer is one call site below.
+ */
+const SOCIAL_PROVIDER_DISPLAY_NAME: Readonly<Record<string, string>> = {
+  github: "GitHub",
+  google: "Google",
+  apple: "Apple",
+  "microsoft-entra-id": "Microsoft",
+  facebook: "Facebook",
+  discord: "Discord",
+  twitter: "Twitter / X",
+  linkedin: "LinkedIn",
+  spotify: "Spotify",
+  twitch: "Twitch",
+  gitlab: "GitLab",
+  tiktok: "TikTok",
+  reddit: "Reddit",
+  kick: "Kick",
+  vk: "VK",
+  naver: "Naver",
+  kakao: "Kakao",
+  line: "LINE",
+  slack: "Slack",
+  atlassian: "Atlassian",
+  zoom: "Zoom",
+  notion: "Notion",
+  figma: "Figma",
+  linear: "Linear",
+  vercel: "Vercel",
+  paypal: "PayPal",
+  huggingface: "Hugging Face",
+  cognito: "Cognito",
+  salesforce: "Salesforce",
+  polar: "Polar",
+  railway: "Railway",
+  roblox: "Roblox",
+  paybin: "Paybin",
+  wechat: "WeChat",
+  dropbox: "Dropbox",
+};
+
+/**
+ * Generic social-provider button. Label = template
+ * `auth.signIn.method.social.button` substituted with the provider's
+ * display name. Brand names don't translate; only the wrapper does.
+ * Unknown ids (a provider Better Auth adds before the SPA rebuilds)
+ * render with the raw id as the substitution.
+ */
+function SocialSignInSection({
+  provider,
+  returnTo,
+}: {
+  provider: string;
+  returnTo: string;
+}): React.ReactElement {
   const { language } = usePreferences();
-  const startGitHub = async (): Promise<void> => {
+  const displayName = SOCIAL_PROVIDER_DISPLAY_NAME[provider] ?? provider;
+  const startSocial = async (): Promise<void> => {
     const res = await fetch("/api/auth/sign-in/social", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider: "github", callbackURL: returnTo }),
+      body: JSON.stringify({ provider, callbackURL: returnTo }),
     });
     if (!res.ok) return;
     const data = (await res.json()) as { url?: string };
@@ -189,8 +263,8 @@ function GitHubSignInSection({ returnTo }: { returnTo: string }): React.ReactEle
   };
   return (
     <div className={SECTION_PLAIN}>
-      <Button onClick={() => void startGitHub()} className="w-full">
-        {t(language, "auth.signIn.method.github.button")}
+      <Button onClick={() => void startSocial()} className="w-full">
+        {t(language, "auth.signIn.method.social.button", { provider: displayName })}
       </Button>
     </div>
   );
