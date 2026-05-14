@@ -78,10 +78,19 @@ export type AuthMethodConfig =
        *  scopes for a Drive integration). */
       readonly scope?: ReadonlyArray<string>;
       /** Escape hatch for provider-specific options Better Auth
-       *  accepts but we don't surface as first-class fields — Apple's
-       *  `teamId` / `keyId` / `privateKey`, Microsoft Entra ID's
-       *  `tenantId`, Reddit's `duration`, etc. Merged into the
-       *  provider's config object verbatim. */
+       *  accepts but we don't surface as first-class fields —
+       *  Microsoft Entra ID's `tenantId`, Reddit's `duration`,
+       *  per-provider `prompt` / `accessType` knobs, etc. Merged
+       *  into the provider's config verbatim.
+       *
+       *  Reserved keys are rejected at construction so a stray entry
+       *  can't silently shadow first-class config: `clientId`,
+       *  `clientSecret`, `redirectURI`, `scope`, `mapProfileToUser`.
+       *  Use the first-class fields for those.
+       *
+       *  Note: Apple specifically does NOT accept teamId/keyId/
+       *  privateKey via Better Auth — its `clientSecret` is the
+       *  pre-signed ES256 JWT the adopter generates out-of-band. */
       readonly extras?: Readonly<Record<string, unknown>>;
     }
   | {
@@ -129,6 +138,13 @@ export type AuthMethodConfig =
  * `create.after` does not re-fire and the owner role is never
  * assigned. Match key first; the linked second method inherits the
  * role via the shared `user.id`.
+ *
+ * `match: "github-login"` is also brittle when multiple social
+ * methods are registered. Only the `github` provider's
+ * `mapProfileToUser` shim populates `user.githubLogin`; if the
+ * operator's first sign-in is via Google or another non-GitHub
+ * social, `githubLogin` is null and the rule silently no-ops. For
+ * mixed-social setups prefer `match: "email"`.
  */
 export type BootstrapOwnerRule =
   | { readonly match: "github-login"; readonly value: string }
@@ -167,6 +183,20 @@ const userAc = ac.newRole({
   session: [],
 });
 
+/**
+ * Keys that `extras` MUST NOT contain — they have first-class fields
+ * on `AuthMethodConfig` and / or are managed by this adapter (the
+ * github `mapProfileToUser` shim). Allowing them through would let a
+ * stray entry shadow credentials or break bootstrap promotion.
+ */
+const SOCIAL_EXTRAS_RESERVED_KEYS: ReadonlySet<string> = new Set([
+  "clientId",
+  "clientSecret",
+  "redirectURI",
+  "scope",
+  "mapProfileToUser",
+]);
+
 function buildSocialProviders(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): BetterAuthOptions["socialProviders"] {
@@ -177,6 +207,16 @@ function buildSocialProviders(
   const out: Record<string, Record<string, unknown>> = {};
   for (const method of methods) {
     if (method.kind !== "social") continue;
+    if (method.extras) {
+      for (const key of Object.keys(method.extras)) {
+        if (SOCIAL_EXTRAS_RESERVED_KEYS.has(key)) {
+          throw new Error(
+            `createAuth: social method '${method.provider}' has reserved key '${key}' in \`extras\`. ` +
+              `Use the first-class field instead — \`extras\` is for provider-specific options only.`,
+          );
+        }
+      }
+    }
     // GitHub-specific: stash the github login on `user.githubLogin`
     // so `bootstrapOwner: { match: "github-login" }` keeps working.
     // Other providers don't need an analogous shim because bootstrap
