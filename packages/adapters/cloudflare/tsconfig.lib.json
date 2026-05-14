@@ -5,6 +5,7 @@
     "outDir": "dist",
     "noEmit": false,
     "tsBuildInfoFile": "./.tsbuildinfo",
+    "stripInternal": true,
     "types": ["@cloudflare/workers-types"]
   },
   "include": ["src/**/*"],
