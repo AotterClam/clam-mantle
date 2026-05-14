@@ -164,23 +164,18 @@ export interface CreateAuthConfig {
   readonly rateLimit?: { readonly window: number; readonly max: number };
   /**
    * Escape hatch for raw Better Auth options the SDK doesn't surface
-   * as first-class fields. Per ADR-0014 § "Auth as contract, Better
-   * Auth as default" the SDK refuses to add a `CreateAuthConfig` field
-   * just to forward a Better Auth knob verbatim — adopters reach the
-   * unwrapped knobs through this passthrough.
+   * as first-class fields (e.g. `account.accountLinking`,
+   * `emailOTP.storeOTP`, extra plugins like `twoFactor()`). See
+   * ADR-0014 § "Auth as contract, Better Auth as default" for when
+   * to use this vs. asking for a first-class field.
    *
-   * Common uses: `account.accountLinking`, plugin-level options the
-   * SDK doesn't curate (`emailOTP.storeOTP` / `.resend` /
-   * `.disableSignUp`, extra plugins like `twoFactor()` / `passkey()`),
-   * `trustedOrigins` for IDPs the SDK doesn't auto-add.
-   *
-   * Conflict resolution: SDK-managed keys are merged AFTER
-   * `betterAuthOptions`, so a stray `socialProviders` /
-   * `databaseHooks.user.create.after` / `advanced.backgroundTasks` /
-   * `rateLimit` in `betterAuthOptions` can NOT shadow the
-   * SDK-managed wiring. `plugins` and `trustedOrigins` are arrays —
-   * concatenated, SDK plugins / origins added LAST so the
-   * deduper-by-id / dedupe-by-string keeps the SDK's wiring active.
+   * Merge semantics: `betterAuthOptions` is spread FIRST, then
+   * SDK-managed keys (`database` / `secret` / `baseURL` /
+   * `socialProviders` / `user` / `rateLimit` /
+   * `advanced.backgroundTasks` / `databaseHooks.user.create`) are
+   * re-asserted — adopter cannot shadow SDK wiring. `plugins` and
+   * `trustedOrigins` are array-merged (SDK contributions appended)
+   * so both survive.
    */
   readonly betterAuthOptions?: Partial<BetterAuthOptions>;
 }
@@ -420,14 +415,10 @@ const SOCIAL_PROVIDER_TRUSTED_ORIGINS: Readonly<
 function autoTrustedOriginsFor(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): string[] {
-  const seen = new Set<string>();
-  for (const m of methods) {
-    if (m.kind !== "social") continue;
-    const required = SOCIAL_PROVIDER_TRUSTED_ORIGINS[m.provider];
-    if (!required) continue;
-    for (const origin of required) seen.add(origin);
-  }
-  return Array.from(seen);
+  const origins = methods.flatMap((m) =>
+    m.kind === "social" ? SOCIAL_PROVIDER_TRUSTED_ORIGINS[m.provider] ?? [] : [],
+  );
+  return [...new Set(origins)];
 }
 
 function buildAuth(config: CreateAuthConfig) {
@@ -461,15 +452,16 @@ function buildAuth(config: CreateAuthConfig) {
   // `trustedOrigins`: adopter-supplied (via `betterAuthOptions`)
   // concatenated with the per-provider requirements the SDK auto-
   // computes (Apple needs `https://appleid.apple.com`). De-dup; both
-  // contributions survive.
-  const autoTrustedOrigins = autoTrustedOriginsFor(config.methods);
+  // contributions survive. Better Auth also allows a `(req) => ...`
+  // function form for `trustedOrigins` which we don't merge with —
+  // adopters using the function form lose the auto-append (rare).
   const adopterTrustedOrigins = config.betterAuthOptions?.trustedOrigins;
-  const adopterTrustedOriginsArray = Array.isArray(adopterTrustedOrigins)
-    ? adopterTrustedOrigins
-    : [];
-  const trustedOrigins = Array.from(
-    new Set([...adopterTrustedOriginsArray, ...autoTrustedOrigins]),
-  );
+  const trustedOrigins = [
+    ...new Set([
+      ...(Array.isArray(adopterTrustedOrigins) ? adopterTrustedOrigins : []),
+      ...autoTrustedOriginsFor(config.methods),
+    ]),
+  ];
 
   // `plugins`: adopter-supplied plugins first; SDK plugins appended.
   // Better Auth dedupes per `plugin.id` — SDK's `admin` / `mcp` /
