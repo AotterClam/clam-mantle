@@ -329,28 +329,37 @@ function MagicLinkSection({ returnTo }: { returnTo: string }): React.ReactElemen
   const [sent, setSent] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Mirrors EmailOtpSection's withBusy: identical busy / error-reset
+  // bookkeeping per submit. Kept inline (not module-scope) because the
+  // two sections have independent state setters; lifting it would
+  // require passing setBusy/setError in, which is more wiring than
+  // duplication saved.
+  const withBusy = async (run: () => Promise<void>): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await run();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendLink = (e: React.FormEvent): void => {
     e.preventDefault();
     if (!email) return;
-    setBusy(true);
-    setError(null);
-    void (async () => {
-      try {
-        const res = await fetch("/api/auth/sign-in/magic-link", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, callbackURL: returnTo }),
-        });
-        if (!res.ok) {
-          setError(t(language, "auth.signIn.method.magic-link.sendFailed"));
-          return;
-        }
-        setSent(true);
-      } finally {
-        setBusy(false);
+    void withBusy(async () => {
+      const res = await fetch("/api/auth/sign-in/magic-link", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, callbackURL: returnTo }),
+      });
+      if (!res.ok) {
+        setError(t(language, "auth.signIn.method.magic-link.sendFailed"));
+        return;
       }
-    })();
+      setSent(true);
+    });
   };
 
   return (
