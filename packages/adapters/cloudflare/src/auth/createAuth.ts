@@ -106,10 +106,8 @@ function buildSocialProviders(
 }
 
 /**
- * Read the request's preferred locale off `Accept-Language`. Picks
- * the first language tag; ignores quality values for v0.1 simplicity.
- * Falls back to the configured `fallbackLocale` when no useful header
- * is present.
+ * First tag off `Accept-Language`, quality values ignored. Locale
+ * contract lives in `EmailSender.ts`.
  */
 function pickLocale(req: Request | undefined, fallback: string): string {
   const header = req?.headers.get("accept-language");
@@ -117,13 +115,6 @@ function pickLocale(req: Request | undefined, fallback: string): string {
   const first = header.split(",")[0]?.split(";")[0]?.trim();
   return first && first.length > 0 ? first : fallback;
 }
-
-const OTP_CATEGORY_BY_TYPE: Readonly<Record<string, string>> = {
-  "sign-in": "auth.email-otp.sign-in",
-  "email-verification": "auth.email-otp.email-verification",
-  "forget-password": "auth.email-otp.forget-password",
-  "change-email": "auth.email-otp.change-email",
-};
 
 function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-otp" }>) {
   const fallback = method.fallbackLocale ?? "en";
@@ -142,7 +133,7 @@ function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-ot
         subject: `Your sign-in code: ${data.otp}`,
         text: `Your one-time code is ${data.otp}. It expires shortly. If you didn't request this, ignore this email.`,
         locale,
-        category: OTP_CATEGORY_BY_TYPE[data.type] ?? `auth.email-otp.${data.type}`,
+        category: `auth.email-otp.${data.type}`,
       });
     },
   });
@@ -199,10 +190,7 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const socialProviders = buildSocialProviders(config.methods);
   const bootstrap = config.bootstrapOwner;
-  const emailOtpMethods = config.methods.filter(
-    (m): m is Extract<AuthMethodConfig, { kind: "email-otp" }> =>
-      m.kind === "email-otp",
-  );
+  const emailOtpMethods = config.methods.filter((m) => m.kind === "email-otp");
   if (emailOtpMethods.length > 1) {
     throw new Error(
       "createAuth: more than one `email-otp` method registered. Combine into one.",
