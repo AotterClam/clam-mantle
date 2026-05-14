@@ -102,8 +102,8 @@ function staffAuth(): Auth {
       session: { id: "sess-1", userId: STAFF_USER.id, expiresAt: new Date(Date.now() + 60_000) },
       user: STAFF_USER,
     }),
-    getMcpSession: stubAuth.getMcpSession,
     getUserRole: async () => "owner",
+    methods: [],
   };
 }
 
