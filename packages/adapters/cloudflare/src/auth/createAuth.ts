@@ -9,24 +9,80 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
 
 /**
- * Auth method config (discriminated union). Adding a new method
- * (email-otp, google, passkey, ...) becomes a new case here, not a
- * new top-level key on `CreateAuthConfig` — per ADR-0014.
+ * Provider id for the `kind: "social"` method. Mirrors Better Auth's
+ * own `socialProviders` block keys for 1.6.9. Adding a provider that
+ * Better Auth supports = adding its id here; no other wiring needed
+ * (the config flows through to Better Auth as-is, plus the per-
+ * provider i18n label).
+ */
+export type SocialProviderId =
+  | "github"
+  | "google"
+  | "apple"
+  | "microsoft-entra-id"
+  | "facebook"
+  | "discord"
+  | "twitter"
+  | "linkedin"
+  | "spotify"
+  | "twitch"
+  | "gitlab"
+  | "tiktok"
+  | "reddit"
+  | "kick"
+  | "vk"
+  | "naver"
+  | "kakao"
+  | "line"
+  | "slack"
+  | "atlassian"
+  | "zoom"
+  | "notion"
+  | "figma"
+  | "linear"
+  | "vercel"
+  | "paypal"
+  | "huggingface"
+  | "cognito"
+  | "salesforce"
+  | "polar"
+  | "railway"
+  | "roblox"
+  | "paybin"
+  | "wechat"
+  | "dropbox";
+
+/**
+ * Auth method config (discriminated union). Each `kind` is one auth
+ * surface adopters can opt into; adding a new method = adding a new
+ * union case here, not a new top-level key on `CreateAuthConfig` —
+ * per ADR-0014.
  *
- * Written as a one-member union (leading `|`) deliberately — keeps
- * the switch in `buildSocialProviders` exhaustiveness-checked when
- * PR-B adds a second variant; a flat object type would silently
- * accept the new shape without firing the never-narrowing.
+ * `kind: "social"` is the OAuth-based bucket — `provider` discriminates
+ * the upstream IDP. We use one case rather than one-per-provider so
+ * adding (e.g.) Apple doesn't churn the union; Better Auth's
+ * provider-shaped quirks ride in `extras`.
  */
 export type AuthMethodConfig =
   | {
-      readonly kind: "github";
+      readonly kind: "social";
+      readonly provider: SocialProviderId;
       readonly clientId: string;
       readonly clientSecret: string;
-      /** Override the OAuth callback URL Better Auth tells GitHub to
+      /** Override the OAuth callback URL Better Auth tells the IDP to
        *  redirect to. The consumer is then responsible for forwarding
        *  requests at that URI to `auth.handler`. */
       readonly redirectURI?: string;
+      /** OAuth scopes. Defaults vary per provider; only set when the
+       *  default doesn't cover what you need (e.g. extra Google
+       *  scopes for a Drive integration). */
+      readonly scope?: ReadonlyArray<string>;
+      /** Escape hatch for provider-specific options Better Auth
+       *  accepts but we don't surface as first-class fields — Apple's
+       *  `teamId` / `keyId` / `privateKey`, Microsoft Entra ID's
+       *  `tenantId`, Reddit's `duration`, etc. Merged into the
+       *  provider's config object verbatim. */
+      readonly extras?: Readonly<Record<string, unknown>>;
     }
   | {
       readonly kind: "email-otp";
@@ -114,20 +170,31 @@ const userAc = ac.newRole({
 function buildSocialProviders(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): BetterAuthOptions["socialProviders"] {
-  const out: BetterAuthOptions["socialProviders"] = {};
+  // Cast through `Record` because Better Auth's typed
+  // `socialProviders` shape names every provider key individually;
+  // assigning by computed string requires the index signature.
+  const out = {} as Record<string, Record<string, unknown>>;
   for (const method of methods) {
-    if (method.kind === "github") {
-      out.github = {
-        clientId: method.clientId,
-        clientSecret: method.clientSecret,
-        mapProfileToUser: (profile) => ({
-          githubLogin: profile.login,
-        }),
-        ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
-      };
+    if (method.kind !== "social") continue;
+    const config: Record<string, unknown> = {
+      clientId: method.clientId,
+      clientSecret: method.clientSecret,
+      ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
+      ...(method.scope ? { scope: [...method.scope] } : {}),
+      ...(method.extras ?? {}),
+    };
+    // GitHub-specific: stash the github login on `user.githubLogin`
+    // so `bootstrapOwner: { match: "github-login" }` keeps working.
+    // Other providers don't need an analogous shim because
+    // bootstrap matches on email for them.
+    if (method.provider === "github") {
+      config.mapProfileToUser = (profile: { login?: string }) => ({
+        githubLogin: profile.login,
+      });
     }
+    out[method.provider] = config;
   }
-  return out;
+  return out as BetterAuthOptions["socialProviders"];
 }
 
 /**
@@ -222,11 +289,13 @@ function validateBootstrap(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): void {
   if (rule.match === "github-login") {
-    const hasGithub = methods.some((m) => m.kind === "github");
+    const hasGithub = methods.some(
+      (m) => m.kind === "social" && m.provider === "github",
+    );
     if (!hasGithub) {
       throw new Error(
-        "createAuth: bootstrapOwner.match='github-login' but no `github` method is registered. " +
-          "Either register a github method or switch to `bootstrapOwner: { match: 'email', value: '…' }`.",
+        "createAuth: bootstrapOwner.match='github-login' but no `social` method with provider='github' is registered. " +
+          "Either register a github social method or switch to `bootstrapOwner: { match: 'email', value: '…' }`.",
       );
     }
   }
@@ -401,6 +470,18 @@ function buildAuth(config: CreateAuthConfig) {
  */
 export type AuthMethodKind = AuthMethodConfig["kind"];
 
+/**
+ * Public-facing method descriptor exposed via `Auth.methods` and the
+ * `GET /api/auth/methods` endpoint. The `social` kind carries the
+ * upstream `provider` so the admin SPA can render a per-provider
+ * button (label + future brand icon). Secrets, senders, and per-
+ * provider extras stay private.
+ */
+export type AuthMethodInfo =
+  | { readonly kind: "email-otp" }
+  | { readonly kind: "magic-link" }
+  | { readonly kind: "social"; readonly provider: SocialProviderId };
+
 // Better Auth's full inferred type pulls plugin internals
 // (`MCPOptions`, `AdminOptions`) that aren't re-exported, so emitting
 // a .d.ts that names that type fails (TS4058). The structural facade
@@ -427,10 +508,12 @@ export interface Auth {
    *  (MCP, HTTP Triggers) need this because Better Auth's MCP access
    *  tokens carry userId + scopes but not the user's role. */
   readonly getUserRole: (userId: string) => Promise<string | null>;
-  /** Method kinds the consumer registered, in declaration order. The
-   *  admin SPA renders sign-in sections per this list. Secrets and
-   *  sender refs are intentionally excluded — UI doesn't need them. */
-  readonly methods: ReadonlyArray<AuthMethodKind>;
+  /** Methods the consumer registered, in declaration order. The admin
+   *  SPA renders sign-in sections per this list. Secrets, senders, and
+   *  per-provider extras are intentionally excluded — UI doesn't need
+   *  them. `social` methods carry the upstream `provider` id for
+   *  per-provider rendering. */
+  readonly methods: ReadonlyArray<AuthMethodInfo>;
 }
 
 export function createAuth(config: CreateAuthConfig): Auth {
@@ -461,6 +544,10 @@ export function createAuth(config: CreateAuthConfig): Auth {
         .first<{ role: string | null }>();
       return row?.role ?? null;
     },
-    methods: config.methods.map((m) => m.kind),
+    methods: config.methods.map<AuthMethodInfo>((m) =>
+      m.kind === "social"
+        ? { kind: "social", provider: m.provider }
+        : { kind: m.kind },
+    ),
   };
 }
