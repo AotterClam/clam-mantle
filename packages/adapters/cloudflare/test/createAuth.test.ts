@@ -264,6 +264,25 @@ describe("buildSocialProviders", () => {
     expect(out["microsoft-entra-id"]?.prompt).toBe("select_account");
   });
 
+  it("defensively copies the scope array — caller mutation doesn't leak", () => {
+    // `scope: [...method.scope]` in buildSocialProviders. Mutating
+    // the caller-side array must not affect what Better Auth sees.
+    const scopes = ["openid", "profile"];
+    const out = asProviderMap(
+      buildSocialProviders([
+        {
+          kind: "social",
+          provider: "google",
+          clientId: "g",
+          clientSecret: "g",
+          scope: scopes,
+        },
+      ]),
+    );
+    scopes.push("email");
+    expect(out.google?.scope).toEqual(["openid", "profile"]);
+  });
+
   it("includes redirectURI and scope only when set", () => {
     const out = asProviderMap(
       buildSocialProviders([
