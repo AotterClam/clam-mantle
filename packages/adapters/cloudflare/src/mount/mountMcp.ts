@@ -27,7 +27,7 @@ export interface CreateMcpApiHandlerOptions {
 /**
  * Build a Cloudflare Worker `ExportedHandler` that serves one MCP
  * resource path. Plug into `createOAuthProvider({ apiHandlers })`
- * keyed by the resource path (e.g. `/staff/mcp` or `/mcp`).
+ * keyed by the resource path (e.g. `/mcp/staff` or `/mcp`).
  *
  * The OAuthProvider lib verifies the bearer token, decrypts grant
  * props, and sets `ctx.props` BEFORE calling this handler. We read
