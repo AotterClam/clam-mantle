@@ -39,7 +39,7 @@
     "@aotterclam/clam-cms-spec": "workspace:*",
     "aws4fetch": "^1.0.20",
     "better-auth": "^1.6.9",
-    "hono": "^4.6.20"
+    "hono": "^4.12.18"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260508.1",
