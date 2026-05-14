@@ -225,6 +225,27 @@ function shouldPromoteToOwner(
   }
 }
 
+/**
+ * Find the at-most-one method of `kind`. Throws when adopters register
+ * the same kind twice — Better Auth's plugin layer accepts duplicates
+ * silently, which would mask the intent at boot. One helper covers
+ * every singleton-shaped method (email-otp, magic-link, future ones).
+ */
+function pickSingleton<K extends AuthMethodConfig["kind"]>(
+  methods: ReadonlyArray<AuthMethodConfig>,
+  kind: K,
+): Extract<AuthMethodConfig, { kind: K }> | undefined {
+  const matches = methods.filter(
+    (m): m is Extract<AuthMethodConfig, { kind: K }> => m.kind === kind,
+  );
+  if (matches.length > 1) {
+    throw new Error(
+      `createAuth: more than one \`${kind}\` method registered. Combine into one.`,
+    );
+  }
+  return matches[0];
+}
+
 function buildAuth(config: CreateAuthConfig) {
   if (config.methods.length === 0) {
     throw new Error(
@@ -236,21 +257,8 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const socialProviders = buildSocialProviders(config.methods);
   const bootstrap = config.bootstrapOwner;
-  const emailOtpMethods = config.methods.filter((m) => m.kind === "email-otp");
-  if (emailOtpMethods.length > 1) {
-    throw new Error(
-      "createAuth: more than one `email-otp` method registered. Combine into one.",
-    );
-  }
-  const emailOtpMethod = emailOtpMethods[0];
-
-  const magicLinkMethods = config.methods.filter((m) => m.kind === "magic-link");
-  if (magicLinkMethods.length > 1) {
-    throw new Error(
-      "createAuth: more than one `magic-link` method registered. Combine into one.",
-    );
-  }
-  const magicLinkMethod = magicLinkMethods[0];
+  const emailOtpMethod = pickSingleton(config.methods, "email-otp");
+  const magicLinkMethod = pickSingleton(config.methods, "magic-link");
 
   // Rate limit: Better Auth's per-route limits gate on
   // `process.env.NODE_ENV === "production"`, which is unset on
