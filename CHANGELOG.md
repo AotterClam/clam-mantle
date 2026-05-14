@@ -6,6 +6,27 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.9-alpha] - 2026-05-15
+
+### Breaking
+
+- **`@aotterclam/clam-cms-cloudflare`**: MCP OAuth surface carved out from Better Auth's `mcp()` plugin to `@cloudflare/workers-oauth-provider`. Better Auth keeps owning staff sign-in (D1 session, role, social/email-OTP/magic-link), but the OAuth AS surface (`/.well-known/oauth-*`, DCR, PKCE, token issue) is now served by `OAuthProvider` at the top level of the worker module. **Adopter migration**: `export default new Hono({...}).fetch` → `export default new OAuthProvider({...})`, where the Hono app becomes `defaultHandler` and each MCP endpoint becomes an entry in `apiHandlers`. New SDK exports: `createOAuthProvider`, `createMcpApiHandler`, `mountAuthorize`. Removed: `mountMcp`, `mountOAuthEndpoints`, `WorkersOAuthVerifier` (the lib does bearer verification internally before calling `apiHandler.fetch` with `ctx.props` set). See `docs/adr/0014-...md` § "Amendment 2026-05-15" for empirical context.
+- **`@aotterclam/clam-cms-cloudflare`**: staff MCP resource path renames from `/staff/mcp` to `/mcp/staff`. claude.ai's MCP OAuth client (verified 2026-05-15 against `cms.aotterclam.ai`) silently drops the session after a server-correct `/token` success when the resource path doesn't start with `/mcp`. `/mcp` for the public MCP endpoint is unchanged. The `/admin/api/site` response field `mcpUrl` / `staffMcpUrl` automatically reflect the new path, so admin UI copy-fields update without consumer code changes — adopter-hardcoded references (skill docs, custom routes) need to migrate.
+- **`@aotterclam/clam-cms-cloudflare`**: OAuth `scopes_supported` collapses from `["mcp:read", "mcp:staff"]` to a single `["mcp"]` (no colon). claude.ai silently omits `scope=` from `/authorize` when `scopes_supported` contains colons, producing a zero-scope token grant the client then rejects post-token. Staff vs public differentiation moves entirely server-side: the SDK enforces admin role via D1 lookup inside `createMcpApiHandler` based on the `surface: "staff" | "public"` option, not via OAuth scope. The default scope is overridable via `createOAuthProvider({ scopesSupported })`.
+- **`@aotterclam/clam-cms-cloudflare`**: OAuth endpoint URLs namespace under `/oauth/*` (was `/api/auth/mcp/*` via Better Auth). claude.ai web reads AS metadata (RFC 8414) so the namespace is followed correctly. Adopters who hard-coded `/api/auth/mcp/{authorize,token,register}` references in scripts or external configs need to update.
+- **`@aotterclam/clam-cms-cloudflare`**: `Auth.getMcpSession()` removed. The OAuth lib verifies bearer tokens against its KV grant store and sets `ctx.props` before calling `apiHandler.fetch` — adopters read identity from `ctx.props.{userId, role}`, no port indirection.
+- **`@aotterclam/clam-cms-cloudflare`**: `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` escape hatch (added in `0.0.8-beta.4` via PR #175) is removed. With the carved-out OAuth surface the SDK no longer needs adopters to reach un-curated Better Auth internals; the remaining adopter surface (`methods[]`, `rateLimit`, `bootstrapOwner`) is fully first-class. Apple's `trustedOrigins` auto-append and `sameSite=none` cookie injection stay; only the un-curated passthrough is retracted. ADR-0014 § "Auth as contract, Better Auth as default" framing remains correct — only the §"Implementation status" reference to `betterAuthOptions` is retracted.
+
+### Added
+
+- **`@aotterclam/clam-cms-cloudflare`**: new dependency `@cloudflare/workers-oauth-provider@^0.6.0`. Top-level OAuth provider library that owns DCR + PKCE + token issue + KV grant store. The SDK exports thin helpers (`createOAuthProvider`, `createMcpApiHandler`, `mountAuthorize`) so adopters compose the worker entrypoint declaratively.
+- **`@aotterclam/clam-cms-cloudflare`**: new SDK exports `createOAuthProvider({ defaultHandler, apiHandlers, scopesSupported? })`, `createMcpApiHandler({ ref, surface })`, `mountAuthorize({ auth, loginPath? })`, plus path constants `OAUTH_{AUTHORIZE,TOKEN,REGISTER}_PATH`.
+- **landing**: new `OAUTH_KV` binding alongside the existing `KV`. Holds the OAuth provider's clients / grants / tokens; separate namespace so future cleanup can wipe it independently.
+
+### Changed
+
+- **docs**: ADR-0014 amended with the empirical findings (§ "Amendment 2026-05-15"). `docs/adapter-guide.md` updated for the new MCP mount pattern. `skills/provision/SKILL.md` updated to point operators at `/mcp/staff`.
+
 ## [0.0.8-beta.5] - 2026-05-14
 
 ### Breaking

@@ -78,9 +78,9 @@ Don't run `wrangler d1 create` / `wrangler kv namespace create` / `wrangler secr
 
    Don't submit real contact/lead form posts as smoke; that creates test records in production storage.
 
-6. **Bootstrap owner + MCP consent.** Tell the user to open `<worker_url>/admin/sign-in` and complete GitHub OAuth. The callback creates the user and calls `ensureBootstrapOwner` using `ADMIN_GITHUB_LOGIN`. Then connect an MCP-capable client to `<worker_url>/staff/mcp` — DCR handles registration, browser opens the consent screen, staff membership is checked, tokens issue, `/staff/mcp` accepts the bearer.
+6. **Bootstrap owner + MCP consent.** Tell the user to open `<worker_url>/admin/sign-in` and complete GitHub OAuth. The callback creates the user and calls `ensureBootstrapOwner` using `ADMIN_GITHUB_LOGIN`. Then connect an MCP-capable client to `<worker_url>/mcp/staff` — DCR handles registration, browser opens the consent screen, staff membership is checked, tokens issue, `/mcp/staff` accepts the bearer.
 
-   `<worker_url>/mcp` is the end-user MCP resource — read-only View queries in v0.1. Authoring lives on `/staff/mcp`.
+   `<worker_url>/mcp` is the end-user MCP resource — read-only View queries in v0.1. Authoring lives on `/mcp/staff`.
 
 7. **Second-agent proof.** Connect a second agent through Staff MCP and run the starter's core workflow (list collections, create draft, update, publish, confirm public route). Publication: posts CRUD + `recent-posts` View. Intake: leads CRUD + `leads-recent` View. This is the v0.1.0 release gate — don't call the install production-ready until it works.
 
@@ -120,7 +120,7 @@ Render in the user's language. Intent:
 
 - Site is online at `<worker_url>`. Two short reasons to look first: read as a visitor, then sign in at `<worker_url>/admin/sign-in`.
 - `mantle/site.md` now has the URL written in. Pasting that file's contents into a future conversation summons Mantle back. (A URL form via `.well-known/mantle/` is deferred.)
-- Staff MCP URL is in the admin sidebar; raw link `<worker_url>/staff/mcp`.
+- Staff MCP URL is in the admin sidebar; raw link `<worker_url>/mcp/staff`.
 - Acknowledge if the admin 5-card render is deferred — letter lives in `mantle/site.md` `## welcome`.
 - If a Cloudflare API token was used, remind to revoke at `dash.cloudflare.com/profile/api-tokens`.
 
@@ -134,7 +134,7 @@ After the handoff, drop Mantle's voice.
 | `provision:plan` "workers.dev subdomain not set" | User never claimed a subdomain | `dash.cloudflare.com` → Workers & Pages → claim a subdomain → rerun |
 | `provision:up` fails on CF API call | Token missing a scope | Recreate with Workers Scripts Edit + Workers KV Storage Edit + D1 Edit + Turnstile Edit (last only if needed) |
 | `provision:up` fails after some resources created | Partial provision | IDs printed before failure — delete via dashboard and rerun, or update `wrangler.toml` manually with printed IDs and rerun the failing step. Don't silently retry |
-| Worker boots but `/staff/mcp` returns 500 | OAuth secrets failed to set | `printf '%s' '<v>' \| pnpm exec wrangler secret put GITHUB_CLIENT_ID` (etc.); redeploy |
+| Worker boots but `/mcp/staff` returns 500 | OAuth secrets failed to set | `printf '%s' '<v>' \| pnpm exec wrangler secret put GITHUB_CLIENT_ID` (etc.); redeploy |
 | Owner signs in but MCP consent returns 403 | `ADMIN_GITHUB_LOGIN` doesn't match the GitHub login that signed in | `wrangler secret put ADMIN_GITHUB_LOGIN`; sign in again |
 | GitHub OAuth callback shows mismatch error | OAuth App callback URL registered wrong | Edit OAuth App callback to exactly `<worker_url>/admin/auth/github/callback` |
 | Public publication has no posts after provision | Expected — provision doesn't seed | Sign in at `<worker_url>/admin/sign-in` and use Staff MCP / admin authoring. Don't run `fixture` or `seed:initial` against prod |

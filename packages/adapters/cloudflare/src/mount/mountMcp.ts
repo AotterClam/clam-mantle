@@ -1,21 +1,16 @@
-import type { Hono } from "hono";
 import { McpJsonRpcDispatcher } from "@aotterclam/clam-cms-runtime";
 import type { StaffRole, ViewManifest } from "@aotterclam/clam-cms-spec";
 import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
+import type { OAuthApiProps } from "../oauth/mountOAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
 /**
  * RFC 9728 §3.1: the OAuth Protected Resource Metadata document for a
  * resource at `<origin><path>` is served at
- * `<origin>/.well-known/oauth-protected-resource<path>` — the resource
- * path component goes AFTER the well-known suffix, not before.
- *
- * Examples (from the RFC):
- *   /        → /.well-known/oauth-protected-resource
- *   /mcp     → /.well-known/oauth-protected-resource/mcp
- *   /a/b     → /.well-known/oauth-protected-resource/a/b
- *
- * Trailing slashes on the resource path are normalized away.
+ * `<origin>/.well-known/oauth-protected-resource<path>`. The OAuth
+ * provider lib handles this automatically when it sits at top level
+ * (`export default new OAuthProvider(...)`); kept exported for
+ * consumers who want to inspect the path shape.
  */
 export function protectedResourceMetadataPath(resourcePath: string): string {
   const trimmed = resourcePath.replace(/\/+$/, "");
@@ -24,113 +19,82 @@ export function protectedResourceMetadataPath(resourcePath: string): string {
   return `/.well-known/oauth-protected-resource${normalized}`;
 }
 
-export function mountMcp(
-  app: Hono,
-  ref: CmsRuntimeRef,
-  options: {
-    path?: string;
-    surface?: "staff" | "public";
-    requiredScope?: "mcp:staff" | "mcp:read";
-  } = {},
-): void {
-  const auth = ref.auth;
-  const path = options.path ?? "/mcp";
-  const surface = options.surface ?? "staff";
-  const requiredScope = options.requiredScope ?? (surface === "staff" ? "mcp:staff" : "mcp:read");
-  const metadataPath = protectedResourceMetadataPath(path);
+export interface CreateMcpApiHandlerOptions {
+  readonly ref: CmsRuntimeRef;
+  readonly surface: "staff" | "public";
+}
+
+/**
+ * Build a Cloudflare Worker `ExportedHandler` that serves one MCP
+ * resource path. Plug into `createOAuthProvider({ apiHandlers })`
+ * keyed by the resource path (e.g. `/staff/mcp` or `/mcp`).
+ *
+ * The OAuthProvider lib verifies the bearer token, decrypts grant
+ * props, and sets `ctx.props` BEFORE calling this handler. We read
+ * `ctx.props.{userId, role}` (stashed at consent time by
+ * `mountAuthorize`) and gate staff surfaces on the D1 admin role.
+ *
+ * Note: OAuth scope distinction (`mcp:read` vs `mcp:staff`) used to
+ * differentiate surfaces here. Removed because claude.ai's MCP client
+ * silently omits `scope=` from /authorize when scopes contain colons,
+ * which broke the consent flow. Staff vs public is now purely D1-role
+ * driven.
+ */
+export function createMcpApiHandler(
+  options: CreateMcpApiHandlerOptions,
+): ExportedHandler<Record<string, unknown>> {
+  const { ref, surface } = options;
   let dispatcher: McpJsonRpcDispatcher | null = null;
 
-  app.get(metadataPath, (c) => {
-    const url = new URL(c.req.url);
-    return c.json({
-      resource: `${url.origin}${path}`,
-      authorization_servers: [url.origin],
-      jwks_uri: `${url.origin}/api/auth/mcp/jwks`,
-      logo_uri: `${url.origin}/favicon.svg`,
-      scopes_supported: [
-        "openid",
-        "profile",
-        "email",
-        "offline_access",
-        "mcp:read",
-        "mcp:staff",
-      ],
-      bearer_methods_supported: ["header"],
-      resource_signing_alg_values_supported: ["RS256", "none"],
-    });
-  });
-
-  app.all(path, async (c) => {
-    // Boot is independent of auth — fetch concurrently to save one
-    // D1 round-trip on the hot path.
-    const [session, runtime] = await Promise.all([
-      auth.getMcpSession(c.req.raw),
-      ref.get(),
-    ]);
-    if (!session) return new Response("unauthorized", unauthorized(c.req.url, requiredScope));
-    if (!hasRequiredScope(session.scopes, requiredScope)) {
-      return new Response("forbidden", forbidden(requiredScope));
-    }
-    const role = await auth.getUserRole(session.userId);
-    if (surface === "staff" && (!role || !ADMIN_ROLE_SET.has(role))) {
-      return new Response("forbidden", forbidden(requiredScope));
-    }
-    dispatcher ??= new McpJsonRpcDispatcher(
-      {
-        listEntries: runtime.listEntries,
-        getEntry: runtime.getEntry,
-        createDraft: runtime.createDraft,
-        updateDraft: runtime.updateDraft,
-        requestPublish: runtime.requestPublish,
-        unpublish: runtime.unpublish,
-        archive: runtime.archive,
-        deleteEntry: runtime.deleteEntry,
-        executeView: runtime.executeView,
-        media: runtime.media
-          ? {
-              createUpload: runtime.media.createUpload,
-              commitUpload: runtime.media.commitUpload,
-            }
-          : undefined,
-      },
-      [...runtime.schemasByName.values()],
-      {
-        surface,
-        views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
-      },
-    );
-    return dispatcher.dispatch(c.req.raw, {
-      userId: session.userId,
-      staff: role && ADMIN_ROLE_SET.has(role)
-        ? { userId: session.userId, role: role as StaffRole }
-        : null,
-    });
-  });
-}
-
-function hasRequiredScope(scopes: readonly string[], required: "mcp:staff" | "mcp:read"): boolean {
-  if (scopes.includes(required)) return true;
-  return required === "mcp:read" && scopes.includes("mcp:staff");
-}
-
-function unauthorized(requestUrl: string, requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
-  const url = new URL(requestUrl);
-  const metadataPath = protectedResourceMetadataPath(url.pathname);
   return {
-    status: 401,
-    headers: {
-      "www-authenticate": `Bearer realm="mcp", scope="${requiredScope}", resource_metadata="${url.origin}${metadataPath}"`,
-      "access-control-expose-headers": "WWW-Authenticate",
+    async fetch(request, _env, ctx) {
+      const props = (ctx as unknown as { props?: OAuthApiProps }).props;
+      if (!props?.userId) return forbidden();
+      const role = props.role;
+      if (surface === "staff" && (!role || !ADMIN_ROLE_SET.has(role))) {
+        return forbidden();
+      }
+      const runtime = await ref.get();
+      dispatcher ??= new McpJsonRpcDispatcher(
+        {
+          listEntries: runtime.listEntries,
+          getEntry: runtime.getEntry,
+          createDraft: runtime.createDraft,
+          updateDraft: runtime.updateDraft,
+          requestPublish: runtime.requestPublish,
+          unpublish: runtime.unpublish,
+          archive: runtime.archive,
+          deleteEntry: runtime.deleteEntry,
+          executeView: runtime.executeView,
+          media: runtime.media
+            ? {
+                createUpload: runtime.media.createUpload,
+                commitUpload: runtime.media.commitUpload,
+              }
+            : undefined,
+        },
+        [...runtime.schemasByName.values()],
+        {
+          surface,
+          views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
+        },
+      );
+      return dispatcher.dispatch(request, {
+        userId: props.userId,
+        staff: role && ADMIN_ROLE_SET.has(role)
+          ? { userId: props.userId, role: role as StaffRole }
+          : null,
+      });
     },
   };
 }
 
-function forbidden(requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
-  return {
+function forbidden(): Response {
+  return new Response("forbidden", {
     status: 403,
     headers: {
-      "www-authenticate": `Bearer realm="mcp", error="insufficient_scope", scope="${requiredScope}"`,
+      "www-authenticate": `Bearer realm="mcp", error="insufficient_scope"`,
       "access-control-expose-headers": "WWW-Authenticate",
     },
-  };
+  });
 }

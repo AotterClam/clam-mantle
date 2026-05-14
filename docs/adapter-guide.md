@@ -62,7 +62,7 @@ The runtime is a library, not an HTTP server. A new adapter must mount equivalen
 |---|---|---|
 | Public/admin HTTP endpoints | Route HTTP Triggers, View REST endpoints, admin SPA assets, and public render routes into runtime use cases. | `packages/adapters/cloudflare/src/mount/mountServerEndpoints.ts`, `mountPublicRoutes.ts` |
 | Auth endpoints | Own sign-in/session/OAuth metadata routes through the adapter's Better Auth integration. | `packages/adapters/cloudflare/src/auth/createAuth.ts`, `mountServerEndpoints.ts` |
-| MCP endpoints | Mount `/staff/mcp` and `/mcp`, validate bearer/session state, enforce staff/read scopes, then dispatch JSON-RPC. | `packages/adapters/cloudflare/src/mount/mountMcp.ts` |
+| MCP endpoints | Mount `/mcp/staff` and `/mcp` via `createOAuthProvider({ apiHandlers })`; the OAuth lib verifies bearer tokens against its KV grant store, then calls the matching apiHandler with `ctx.props` set. The adapter enforces the staff D1 role inside the apiHandler, then dispatches JSON-RPC. | `packages/adapters/cloudflare/src/mount/mountMcp.ts`, `oauth/oauthSingleton.ts`, `oauth/mountOAuth.ts` |
 
 Auth is not a runtime port. Per [ADR-0014](adr/0014-auth-better-auth-and-multi-tenant-mcp.md), the adapter owns Better Auth wiring and passes authenticated user/staff context into runtime dispatchers. Procedure handlers receive that data through `HandlerContext` in `packages/clam-cms-runtime/src/domain/model/HandlerContext.ts`.
 
@@ -78,8 +78,9 @@ Minimum HTTP behavior for a full adapter:
 Minimum auth/MCP behavior:
 
 - Provide Better Auth-compatible sign-in/session routes for the platform.
-- Validate `/staff/mcp` requests with an MCP staff scope plus an admin role.
-- Validate `/mcp` requests with the read scope.
+- Validate `/mcp/staff` requests with the staff D1 admin role (`owner`/`editor`/`contributor`).
+- Validate `/mcp` requests with any authenticated session (D1 role check is surface-driven, not OAuth-scope-driven — claude.ai rejects colon-shaped scopes).
+- Advertise a single non-colon scope (default `["mcp"]`) in `scopes_supported`. Per-surface enforcement happens server-side in the apiHandler.
 - Build `McpAuthContext` from the validated session and pass it to `McpJsonRpcDispatcher`.
 - Build procedure `HandlerContext` with `user`, `staff`, adapter `env`, and optional `waitUntil`.
 
@@ -97,7 +98,7 @@ Minimum auth/MCP behavior:
 - [ ] Mount HTTP Trigger and View REST surfaces.
 - [ ] Mount admin/public render routes and admin SPA assets.
 - [ ] Provide adapter-owned Better Auth wiring and session helpers.
-- [ ] Mount `/staff/mcp` and `/mcp` with role/scope checks.
+- [ ] Mount `/mcp/staff` and `/mcp` via the platform's OAuth provider lib (Cloudflare adapter uses `@cloudflare/workers-oauth-provider` at top level). Enforce staff D1 role inside the apiHandler.
 - [ ] Add optional `MediaStorage` or `DeferredHookDispatcher` only when the adapter supports those features.
 - [ ] Verify the runtime package still has no platform-specific imports.
 

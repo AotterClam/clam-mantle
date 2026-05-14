@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotterclam/clam-cms-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
-import { mountMcp } from "../src/mount/mountMcp.js";
 import { InMemoryDatabase } from "../../../clam-cms-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
@@ -155,7 +154,6 @@ function harness(opts: { captchaPasses: boolean }): Harness {
   });
   const app = new Hono();
   mountServerEndpoints(app, ref);
-  mountMcp(app, ref);
   return { app, db, captchaCalls, slackCalls };
 }
 
@@ -232,9 +230,4 @@ describe("smoke: HTTP Trigger → builtin → lifecycle hooks", () => {
     expect(h.slackCalls).toHaveLength(1);
   });
 
-  it("MCP /mcp without bearer returns 401", async () => {
-    const h = harness({ captchaPasses: true });
-    const res = await h.app.request("/mcp", { method: "POST" });
-    expect(res.status).toBe(401);
-  });
 });
