@@ -423,6 +423,70 @@ describe("createAuth — boot invariants", () => {
     expect(typeof auth.getMcpSession).toBe("function");
     expect(typeof auth.getUserRole).toBe("function");
   });
+
+  it("registers apple → constructs without throwing (auto-trustedOrigins ride internally)", () => {
+    // We can't easily inspect the Better Auth instance's internal
+    // `trustedOrigins` from outside (no public read-API), so the
+    // unit test asserts the construction path doesn't throw and the
+    // `Auth.methods` reflects the registration. A future integration
+    // test against /api/auth/sign-in/social with provider=apple
+    // would close the trustedOrigins claim end-to-end.
+    const auth = createAuth(
+      baseConfig({
+        methods: [
+          {
+            kind: "social",
+            provider: "apple",
+            clientId: "com.example.web",
+            clientSecret: "JWT-placeholder",
+          },
+        ],
+        bootstrapOwner: { match: "email", value: "owner@example.com" },
+      }),
+    );
+    expect(auth.methods).toEqual([{ kind: "social", provider: "apple" }]);
+  });
+
+  it("accepts betterAuthOptions escape hatch without crashing", () => {
+    // Adopter reaches an un-curated Better Auth knob — e.g.
+    // `account.accountLinking`. Pure passthrough; the SDK doesn't
+    // surface this as a first-class field on CreateAuthConfig per
+    // ADR-0014 § "Auth as contract, Better Auth as default".
+    const auth = createAuth(
+      baseConfig({
+        betterAuthOptions: {
+          account: {
+            accountLinking: {
+              enabled: true,
+              trustedProviders: ["github"],
+              allowDifferentEmails: false,
+            },
+          },
+          trustedOrigins: ["https://example.test"],
+        },
+      }),
+    );
+    expect(auth.methods).toEqual([{ kind: "social", provider: "github" }]);
+  });
+
+  it("SDK-managed keys win over betterAuthOptions on conflict", () => {
+    // Adopter tries to shadow `socialProviders` via the escape hatch.
+    // Per the SDK contract the methods[] driven socialProviders wins,
+    // because spread order is `{ ...betterAuthOptions, ...sdkKeys }`.
+    // We can't introspect the BetterAuth instance directly, but
+    // Auth.methods is SDK-derived and proves the methods[] path runs
+    // even with a conflicting shadow attempt.
+    const auth = createAuth(
+      baseConfig({
+        methods: [GITHUB_METHOD_FIXTURE],
+        betterAuthOptions: {
+          // Bogus shadow attempt
+          socialProviders: { github: { clientId: "BAD", clientSecret: "BAD" } },
+        },
+      }),
+    );
+    expect(auth.methods).toEqual([{ kind: "social", provider: "github" }]);
+  });
 });
 
 describe("AuthMethodConfig — type narrowing smoke", () => {

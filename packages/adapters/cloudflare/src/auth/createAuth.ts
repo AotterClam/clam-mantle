@@ -162,6 +162,27 @@ export interface CreateAuthConfig {
   /** Better Auth's built-in rate limit. Defaults off; production
    *  deployments should set it. */
   readonly rateLimit?: { readonly window: number; readonly max: number };
+  /**
+   * Escape hatch for raw Better Auth options the SDK doesn't surface
+   * as first-class fields. Per ADR-0014 § "Auth as contract, Better
+   * Auth as default" the SDK refuses to add a `CreateAuthConfig` field
+   * just to forward a Better Auth knob verbatim — adopters reach the
+   * unwrapped knobs through this passthrough.
+   *
+   * Common uses: `account.accountLinking`, plugin-level options the
+   * SDK doesn't curate (`emailOTP.storeOTP` / `.resend` /
+   * `.disableSignUp`, extra plugins like `twoFactor()` / `passkey()`),
+   * `trustedOrigins` for IDPs the SDK doesn't auto-add.
+   *
+   * Conflict resolution: SDK-managed keys are merged AFTER
+   * `betterAuthOptions`, so a stray `socialProviders` /
+   * `databaseHooks.user.create.after` / `advanced.backgroundTasks` /
+   * `rateLimit` in `betterAuthOptions` can NOT shadow the
+   * SDK-managed wiring. `plugins` and `trustedOrigins` are arrays —
+   * concatenated, SDK plugins / origins added LAST so the
+   * deduper-by-id / dedupe-by-string keeps the SDK's wiring active.
+   */
+  readonly betterAuthOptions?: Partial<BetterAuthOptions>;
 }
 
 const ac = createAccessControl(defaultStatements);
@@ -383,6 +404,32 @@ function pickSingleton<K extends AuthMethodConfig["kind"]>(
   return matches[0];
 }
 
+/**
+ * Origins each registered social provider needs in
+ * `trustedOrigins`. Adding a provider that demands an extra
+ * `trustedOrigins` entry = adding a row here. Apple is the only one
+ * in 1.6.9 that hard-requires this; if Better Auth ever drops the
+ * requirement, the entry stays harmless (Better Auth dedupes).
+ */
+const SOCIAL_PROVIDER_TRUSTED_ORIGINS: Readonly<
+  Partial<Record<SocialProviderId, ReadonlyArray<string>>>
+> = {
+  apple: ["https://appleid.apple.com"],
+};
+
+function autoTrustedOriginsFor(
+  methods: ReadonlyArray<AuthMethodConfig>,
+): string[] {
+  const seen = new Set<string>();
+  for (const m of methods) {
+    if (m.kind !== "social") continue;
+    const required = SOCIAL_PROVIDER_TRUSTED_ORIGINS[m.provider];
+    if (!required) continue;
+    for (const origin of required) seen.add(origin);
+  }
+  return Array.from(seen);
+}
+
 function buildAuth(config: CreateAuthConfig) {
   if (config.methods.length === 0) {
     throw new Error(
@@ -411,7 +458,68 @@ function buildAuth(config: CreateAuthConfig) {
     ? { ...config.rateLimit, enabled: true as const }
     : rateLimitDefault;
 
+  // `trustedOrigins`: adopter-supplied (via `betterAuthOptions`)
+  // concatenated with the per-provider requirements the SDK auto-
+  // computes (Apple needs `https://appleid.apple.com`). De-dup; both
+  // contributions survive.
+  const autoTrustedOrigins = autoTrustedOriginsFor(config.methods);
+  const adopterTrustedOrigins = config.betterAuthOptions?.trustedOrigins;
+  const adopterTrustedOriginsArray = Array.isArray(adopterTrustedOrigins)
+    ? adopterTrustedOrigins
+    : [];
+  const trustedOrigins = Array.from(
+    new Set([...adopterTrustedOriginsArray, ...autoTrustedOrigins]),
+  );
+
+  // `plugins`: adopter-supplied plugins first; SDK plugins appended.
+  // Better Auth dedupes per `plugin.id` — SDK's `admin` / `mcp` /
+  // `email-otp` / `magic-link` win over any adopter dup. Order in
+  // the array shouldn't matter for behavior, but the SDK-last
+  // ordering is consistent with the "SDK wiring takes precedence"
+  // rule from ADR-0014.
+  const adopterPlugins = config.betterAuthOptions?.plugins ?? [];
+  const sdkPlugins = [
+    admin({
+      defaultRole: "user",
+      adminRoles: [...ADMIN_ROLES],
+      ac,
+      roles: {
+        owner: ownerAc,
+        editor: editorAc,
+        contributor: contributorAc,
+        user: userAc,
+      },
+    }),
+    mcp({
+      loginPage: "/admin/sign-in",
+      oidcConfig: {
+        loginPage: "/admin/sign-in",
+        scopes: ["mcp:read", "mcp:staff"],
+        defaultScope: "openid profile email mcp:read",
+        metadata: {
+          scopes_supported: [
+            "openid",
+            "profile",
+            "email",
+            "offline_access",
+            "mcp:read",
+            "mcp:staff",
+          ],
+        },
+      },
+    }),
+    ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
+    ...(magicLinkMethod ? [buildMagicLinkPlugin(magicLinkMethod)] : []),
+  ];
+
+  // Adopter `betterAuthOptions` is spread FIRST; SDK-managed keys
+  // win on conflict. `trustedOrigins` + `plugins` are pre-merged
+  // above (arrays — concat + dedupe semantics). `database`,
+  // `secret`, `baseURL`, `socialProviders`, `user`, `rateLimit`,
+  // `advanced.backgroundTasks`, `databaseHooks.user.create` are
+  // SDK-managed and explicitly re-asserted after the spread.
   return betterAuth({
+    ...(config.betterAuthOptions ?? {}),
     database: config.database,
     secret: config.secret,
     baseURL: config.baseURL,
@@ -426,6 +534,7 @@ function buildAuth(config: CreateAuthConfig) {
       },
     },
     ...(rateLimit ? { rateLimit } : {}),
+    trustedOrigins,
     // Fire-and-forget for any callback that opts into background.
     // Better Auth's emailOTP plugin wraps `sendVerificationOTP` in
     // `runInBackgroundOrAwait` — without this hook it awaits, which
@@ -448,39 +557,7 @@ function buildAuth(config: CreateAuthConfig) {
         },
       },
     },
-    plugins: [
-      admin({
-        defaultRole: "user",
-        adminRoles: [...ADMIN_ROLES],
-        ac,
-        roles: {
-          owner: ownerAc,
-          editor: editorAc,
-          contributor: contributorAc,
-          user: userAc,
-        },
-      }),
-      mcp({
-        loginPage: "/admin/sign-in",
-        oidcConfig: {
-          loginPage: "/admin/sign-in",
-          scopes: ["mcp:read", "mcp:staff"],
-          defaultScope: "openid profile email mcp:read",
-          metadata: {
-            scopes_supported: [
-              "openid",
-              "profile",
-              "email",
-              "offline_access",
-              "mcp:read",
-              "mcp:staff",
-            ],
-          },
-        },
-      }),
-      ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
-      ...(magicLinkMethod ? [buildMagicLinkPlugin(magicLinkMethod)] : []),
-    ],
+    plugins: [...adopterPlugins, ...sdkPlugins],
     databaseHooks: {
       user: {
         create: {

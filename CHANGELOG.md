@@ -8,6 +8,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **`@aotter/mantle-cloudflare`**: `CreateAuthConfig` gains `betterAuthOptions?: Partial<BetterAuthOptions>` — the curated escape hatch for raw Better Auth options the SDK doesn't surface as first-class fields. Per ADR-0014 § "Auth as contract, Better Auth as default" we refuse to add `CreateAuthConfig` fields just to forward a Better Auth knob verbatim (e.g. `account.accountLinking.trustedProviders`, `emailOTP.storeOTP` / `.resend` / `.disableSignUp`, extra plugins like `twoFactor()`); adopters reach those via this passthrough. Conflict resolution: SDK-managed keys (`database`, `secret`, `baseURL`, `socialProviders`, `user`, `rateLimit`, `advanced.backgroundTasks`, `databaseHooks.user.create`) win on overlap; `plugins` + `trustedOrigins` are array-merged with adopter contributions appearing first (deduplicated where the underlying type allows).
+- **`@aotter/mantle-cloudflare`**: `createAuth` auto-appends `https://appleid.apple.com` to `trustedOrigins` when a `social` method with `provider: "apple"` is registered. Better Auth's Apple Sign-In flow rejects without this entry; the SDK now wires it implicitly so adopters following the recipe don't silently hit OAuth failures. Other social providers don't currently demand auto-origins (`SOCIAL_PROVIDER_TRUSTED_ORIGINS` table for additions).
+
+### Added
+
 - **`@aotter/mantle-cloudflare`**: new export `appleClientSecret()` — signs the ES256 JWT Apple requires for "Sign in with Apple". Apple's `clientSecret` field is a JWT derived from team id + key id + the `.p8` private key + the Services ID audience; the helper does it in ~80 LOC against `crypto.subtle` (no `node:crypto`, no third-party JWT lib). Defaults to a 30-day JWT lifetime; rejects above Apple's 180-day cap. Adopter usage: `await appleClientSecret({ teamId, keyId, privateKey, audience })` → feed the returned string as the Apple method's `clientSecret`. Accepts both PEM-wrapped `.p8` contents and bare base64 of the DER (#172).
 
 ### Breaking
