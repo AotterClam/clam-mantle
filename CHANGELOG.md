@@ -6,6 +6,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.8-beta.4] - 2026-05-14
+
 ### Added
 
 - **`@aotter/mantle-cloudflare`**: `CreateAuthConfig` gains `betterAuthOptions?: Partial<BetterAuthOptions>` — the curated escape hatch for raw Better Auth options the SDK doesn't surface as first-class fields. Per ADR-0014 § "Auth as contract, Better Auth as default" we refuse to add `CreateAuthConfig` fields just to forward a Better Auth knob verbatim (e.g. `account.accountLinking`, `emailOTP.storeOTP`/`.resend`/`.disableSignUp`, extra plugins like `twoFactor()`, `advanced.defaultCookieAttributes`); adopters reach those via this passthrough. Merge semantics: (a) top-level keys we don't manage pass through verbatim; (b) SDK-managed top-level keys (`database`, `secret`, `baseURL`, `socialProviders`, `rateLimit`) replace adopter values wholesale; (c) `advanced` / `user` / `databaseHooks` are MERGED one level deep — SDK leaves `advanced.backgroundTasks`, `user.additionalFields.githubLogin`, and `databaseHooks.user.create.after` SDK-owned (adopter's `create.after` composes BEFORE SDK's bootstrap promotion when both are set) while letting other entries pass through (`advanced.defaultCookieAttributes`, `user.additionalFields.foo`, `databaseHooks.session.*`); (d) `plugins` are concatenated with id-dedupe so adopter dups of SDK plugin ids (`admin`, `mcp`, `email-otp`, `magic-link`) are dropped — Better Auth does NOT dedupe internally so duplicates would double-fire hooks; (e) `trustedOrigins` is array-merged (Set dedupe), and function-form `(req?) => Awaitable<string[]>` is wrapped so SDK auto-origins still ride.
