@@ -1,6 +1,6 @@
-name: Discussion
-description: Converge on a decision before implementation.
-title: "[Discussion] "
+name: Convergence
+description: Converge on a decision before implementation (tracked-decision issue, not open Q&A — for open Q&A use Discussions).
+title: "[Convergence] "
 labels: ["question", "needs-discussion"]
 body:
   - type: textarea

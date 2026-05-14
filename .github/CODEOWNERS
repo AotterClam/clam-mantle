@@ -1,0 +1,25 @@
+# See https://docs.github.com/articles/about-codeowners
+# Owners listed here are auto-requested as reviewers on touching PRs.
+# (Solo-maintainer phase — entries are forward-looking for when co-maintainers join.)
+
+# Default
+* @guyspy
+
+# Engine packages
+/packages/mantle-spec/        @guyspy
+/packages/mantle-runtime/     @guyspy
+/packages/mantle-admin-ui/    @guyspy
+/packages/adapters/cloudflare/  @guyspy
+/packages/adapters/netlify/     @guyspy
+
+# Docs & governance
+/docs/adr/                      @guyspy
+/CONTRIBUTING.md                @guyspy
+/CLAUDE.md                      @guyspy
+
+# Agent surface
+/skills/                        @guyspy
+
+# CI / release plumbing
+/.github/                       @guyspy
+/scripts/                       @guyspy

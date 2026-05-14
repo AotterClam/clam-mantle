@@ -1,8 +1,23 @@
 # mantle
 
+[![CI](https://github.com/aotter/mantle/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/aotter/mantle/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
 **Build your content model by prompting, not configuring.**
 
 Agent-native headless CMS where AI agents are first-class authors — locked-grammar manifests, structured JSON diagnostics, and static `.md` mirrors every agent can crawl without auth. Most CMSes treat AI as a content editor; mantle treats it as the developer.
+
+## Try it cold
+
+```bash
+npx https://github.com/aotter/mantle-starters/releases/latest/download/aotter-create-mantle.tgz my-site
+cd my-site
+```
+
+The scaffolder asks for your archetype + theme + name and produces a Cloudflare-Worker-ready project. See [`skills/install/SKILL.md`](./skills/install/SKILL.md) for the agent-guided flow.
+
+Or paste a two-URL prompt from the landing page at [the legacy MCP test deployment](https://the legacy MCP test deployment/) into Claude Code / Cursor / Codex — same install, friendlier surface.
 
 > **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
@@ -31,7 +46,7 @@ You're an agent helping a (likely non-technical) user install or extend a mantle
 
 End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.dev` with:
 
-- `/admin` — GitHub-OAuth-gated React admin SPA
+- `/admin` — React admin SPA, role-gated after sign-in (GitHub / Google / Apple / 30+ social providers, email-OTP, magic-link — adopter picks the methods)
 - `/staff/mcp` — staff MCP endpoint, owner/editor agents connect here to edit content
 - `/mcp` — end-user/read MCP endpoint for public View tools and future member flows
 - `/<locale>/<collection>/<slug>` — per-entry HTML
@@ -48,7 +63,7 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 | `@aotter/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
 | `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
 | `@aotter/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
-| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS and owns Better Auth wiring. |
+| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS. Ships `createAuth()` — the Better Auth-backed *default* implementation of the SDK's `Auth` contract (see [ADR-0014](docs/adr/0014-auth-better-auth-and-multi-tenant-mcp.md) § "Auth as contract, Better Auth as default"); replace by passing your own `Auth` instance. |
 | `@aotter/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
 
 ## Starters

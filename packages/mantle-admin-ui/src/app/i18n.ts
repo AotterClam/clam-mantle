@@ -1,5 +1,20 @@
 import type { AdminLanguage } from "./preferences";
 
+/**
+ * Admin SPA string table. EN is the canonical source — every key is
+ * defined here, and other languages are partial maps that fall back
+ * per-key.
+ *
+ * Fallback chain (resolved in `t()`): `STRINGS[language][key]` →
+ * `STRINGS.en[key]` → key itself (would only happen if EN is missing
+ * the key, which TypeScript narrows away via `I18nKey`).
+ *
+ * Adding a new key: add it under `en:` first. Translations are
+ * additive — any language that doesn't carry the key renders the
+ * English text. No per-language drift errors.
+ *
+ * `{name}` placeholders are substituted by `t()`'s `vars` arg.
+ */
 const STRINGS = {
   en: {
     "auth.accessDenied.title": "Access denied",
@@ -8,8 +23,30 @@ const STRINGS = {
     "auth.error.title": "Something went wrong",
     "auth.signIn.eyebrow": "Mantle CMS admin",
     "auth.signIn.title": "Sign in",
-    "auth.signIn.body": "GitHub OAuth keeps this console limited to your staff list.",
-    "auth.signIn.github": "Continue with GitHub",
+    "auth.signIn.body": "Staff console. Access is gated by role after sign-in.",
+    "auth.signIn.methodsLoadFailed": "Couldn't load sign-in methods. Try refreshing.",
+    "auth.signIn.noMethods": "No sign-in methods are configured for this site.",
+    "auth.signIn.unknownMethod": "Unsupported sign-in method: {kind}.",
+    "auth.signIn.method.social.button": "Continue with {provider}",
+    "auth.signIn.method.email-otp.body": "Sign in with a one-time code sent to your email.",
+    "auth.signIn.method.email-otp.emailLabel": "Email address",
+    "auth.signIn.method.email-otp.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.email-otp.sendButton": "Send code",
+    "auth.signIn.method.email-otp.sendFailed": "Couldn't send the code. Check the email and try again.",
+    "auth.signIn.method.email-otp.sentTo": "We sent a code to {email}.",
+    "auth.signIn.method.email-otp.otpLabel": "One-time code",
+    "auth.signIn.method.email-otp.otpPlaceholder": "Enter the 6-digit code",
+    "auth.signIn.method.email-otp.verifyButton": "Verify and sign in",
+    "auth.signIn.method.email-otp.verifyFailed": "That code didn't match. Try again.",
+    "auth.signIn.method.email-otp.back": "Use a different email",
+    "auth.signIn.method.magic-link.body": "We'll email you a one-tap sign-in link.",
+    "auth.signIn.method.magic-link.emailLabel": "Email address",
+    "auth.signIn.method.magic-link.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.magic-link.sendButton": "Send sign-in link",
+    "auth.signIn.method.magic-link.sendFailed": "Couldn't send the link. Check the email and try again.",
+    "auth.signIn.method.magic-link.sentTo": "We sent a sign-in link to {email}.",
+    "auth.signIn.method.magic-link.clickHint": "Click the link in the email to finish signing in. The link expires shortly.",
+    "auth.signIn.method.magic-link.anotherEmail": "Use a different email",
     "common.signOut": "Sign out",
     "common.viewSite": "View site",
     "common.copy": "Copy",
@@ -88,8 +125,30 @@ const STRINGS = {
     "auth.error.title": "發生錯誤",
     "auth.signIn.eyebrow": "Mantle CMS 後台",
     "auth.signIn.title": "登入",
-    "auth.signIn.body": "GitHub OAuth 會把這個 console 限制給 staff 清單內的帳號。",
-    "auth.signIn.github": "使用 GitHub 繼續",
+    "auth.signIn.body": "Staff 後台。登入後依角色決定能用的範圍。",
+    "auth.signIn.methodsLoadFailed": "讀取登入方式失敗，請重新整理頁面。",
+    "auth.signIn.noMethods": "這個站台還沒設定任何登入方式。",
+    "auth.signIn.unknownMethod": "不支援的登入方式：{kind}。",
+    "auth.signIn.method.social.button": "使用 {provider} 繼續",
+    "auth.signIn.method.email-otp.body": "輸入 email，我們會寄一次性驗證碼給你。",
+    "auth.signIn.method.email-otp.emailLabel": "電子郵件",
+    "auth.signIn.method.email-otp.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.email-otp.sendButton": "寄送驗證碼",
+    "auth.signIn.method.email-otp.sendFailed": "驗證碼寄送失敗，請確認 email 後重試。",
+    "auth.signIn.method.email-otp.sentTo": "已寄驗證碼到 {email}。",
+    "auth.signIn.method.email-otp.otpLabel": "驗證碼",
+    "auth.signIn.method.email-otp.otpPlaceholder": "輸入 6 位驗證碼",
+    "auth.signIn.method.email-otp.verifyButton": "驗證並登入",
+    "auth.signIn.method.email-otp.verifyFailed": "驗證碼錯誤，請再試一次。",
+    "auth.signIn.method.email-otp.back": "用其他 email",
+    "auth.signIn.method.magic-link.body": "我們會寄一個一鍵登入連結給你。",
+    "auth.signIn.method.magic-link.emailLabel": "電子郵件",
+    "auth.signIn.method.magic-link.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.magic-link.sendButton": "寄送登入連結",
+    "auth.signIn.method.magic-link.sendFailed": "連結寄送失敗，請確認 email 後重試。",
+    "auth.signIn.method.magic-link.sentTo": "已將登入連結寄到 {email}。",
+    "auth.signIn.method.magic-link.clickHint": "請點 email 裡的連結完成登入。連結很快會過期。",
+    "auth.signIn.method.magic-link.anotherEmail": "用其他 email",
     "common.signOut": "登出",
     "common.viewSite": "查看網站",
     "common.copy": "複製",
@@ -356,6 +415,30 @@ const STRINGS = {
   },
   ja: {
     "auth.signIn.title": "サインイン",
+    "auth.signIn.body": "管理コンソールです。サインイン後にロールでアクセスを判定します。",
+    "auth.signIn.methodsLoadFailed": "サインイン方法を読み込めませんでした。再読み込みしてください。",
+    "auth.signIn.noMethods": "このサイトにはサインイン方法が設定されていません。",
+    "auth.signIn.unknownMethod": "未対応のサインイン方法: {kind}",
+    "auth.signIn.method.social.button": "{provider} でサインイン",
+    "auth.signIn.method.email-otp.body": "メールに届くワンタイムコードでサインインします。",
+    "auth.signIn.method.email-otp.emailLabel": "メールアドレス",
+    "auth.signIn.method.email-otp.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.email-otp.sendButton": "コードを送信",
+    "auth.signIn.method.email-otp.sendFailed": "コードの送信に失敗しました。メールを確認してもう一度お試しください。",
+    "auth.signIn.method.email-otp.sentTo": "{email} にコードを送信しました。",
+    "auth.signIn.method.email-otp.otpLabel": "ワンタイムコード",
+    "auth.signIn.method.email-otp.otpPlaceholder": "6 桁のコードを入力",
+    "auth.signIn.method.email-otp.verifyButton": "コードを確認してサインイン",
+    "auth.signIn.method.email-otp.verifyFailed": "コードが一致しません。もう一度入力してください。",
+    "auth.signIn.method.email-otp.back": "別のメールアドレスを使う",
+    "auth.signIn.method.magic-link.body": "ワンタップでサインインできるリンクをメールでお送りします。",
+    "auth.signIn.method.magic-link.emailLabel": "メールアドレス",
+    "auth.signIn.method.magic-link.emailPlaceholder": "you@example.com",
+    "auth.signIn.method.magic-link.sendButton": "サインインリンクを送信",
+    "auth.signIn.method.magic-link.sendFailed": "リンクの送信に失敗しました。メールを確認してもう一度お試しください。",
+    "auth.signIn.method.magic-link.sentTo": "{email} にサインインリンクを送信しました。",
+    "auth.signIn.method.magic-link.clickHint": "メール内のリンクをクリックしてサインインを完了してください。リンクはまもなく失効します。",
+    "auth.signIn.method.magic-link.anotherEmail": "別のメールアドレスを使う",
     "common.signOut": "サインアウト",
     "common.viewSite": "サイトを見る",
     "common.copy": "コピー",
