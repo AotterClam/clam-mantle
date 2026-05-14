@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+
+- **`@aotter/mantle-cloudflare`**: new export `appleClientSecret()` — signs the ES256 JWT Apple requires for "Sign in with Apple". Apple's `clientSecret` field is a JWT derived from team id + key id + the `.p8` private key + the Services ID audience; the helper does it in ~80 LOC against `crypto.subtle` (no `node:crypto`, no third-party JWT lib). Defaults to a 30-day JWT lifetime; rejects above Apple's 180-day cap. Adopter usage: `await appleClientSecret({ teamId, keyId, privateKey, audience })` → feed the returned string as the Apple method's `clientSecret`. Accepts both PEM-wrapped `.p8` contents and bare base64 of the DER (#172).
+
 ### Breaking
 
 - **`@aotter/mantle-cloudflare`**: `AuthMethodConfig` collapses the `kind: "github"` case into the new generic `kind: "social"` discriminated by `provider`. Mirrors Better Auth's own `socialProviders` block shape and unlocks ~35 upstream IDPs (`google`, `apple`, `microsoft-entra-id`, `facebook`, `discord`, `twitter`, `linkedin`, `spotify`, `twitch`, `gitlab`, `tiktok`, `reddit`, `kick`, `vk`, `naver`, `kakao`, `line`, `slack`, `atlassian`, `zoom`, `notion`, `figma`, `linear`, `vercel`, `paypal`, `huggingface`, `cognito`, `salesforce`, `polar`, `railway`, `roblox`, `paybin`, `wechat`, `dropbox`, plus `github`). Adopter migration: `{ kind: "github", clientId, clientSecret }` → `{ kind: "social", provider: "github", clientId, clientSecret }`. `bootstrapOwner: { match: "github-login" }` continues to work; the internal `mapProfileToUser` shim still populates `user.githubLogin` when `provider === "github"`. Provider-specific fields (Apple's `teamId` / `keyId` / `privateKey`, Microsoft Entra ID's `tenantId`, etc.) ride via the new `extras?: Record<string, unknown>` field merged verbatim into Better Auth's per-provider config (#166).
