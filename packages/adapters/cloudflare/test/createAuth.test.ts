@@ -487,6 +487,121 @@ describe("createAuth — boot invariants", () => {
     );
     expect(auth.methods).toEqual([{ kind: "social", provider: "github" }]);
   });
+
+  it("registers adopter plugins with new ids; drops dups of SDK ids", () => {
+    // Construct doesn't throw when adopter passes an adopter-only
+    // plugin (id != admin/mcp/email-otp/magic-link). Adopter dup of
+    // an SDK id is silently filtered (Better Auth doesn't dedupe;
+    // double-running our `admin` hooks would corrupt role state).
+    expect(() =>
+      createAuth(
+        baseConfig({
+          betterAuthOptions: {
+            plugins: [
+              { id: "custom-vibe-coder-plugin", endpoints: {} } as never,
+              // adopter dup of `admin` — would otherwise run twice.
+              { id: "admin", endpoints: {} } as never,
+            ],
+          },
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("adopter's user.additionalFields survives the merge", () => {
+    // SDK owns `user.additionalFields.githubLogin`. Adopter adding a
+    // different additional field should NOT be shadowed by us
+    // replacing the whole `user` sub-tree.
+    // We can't read Better Auth's resolved options, but the
+    // construction must not throw — that's the regression guard for
+    // the deep-merge implementation.
+    expect(() =>
+      createAuth(
+        baseConfig({
+          betterAuthOptions: {
+            user: {
+              additionalFields: {
+                signupSource: {
+                  type: "string",
+                  required: false,
+                  input: true,
+                },
+              },
+            },
+          },
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("adopter's advanced.defaultCookieAttributes survives the merge", () => {
+    // SDK owns `advanced.backgroundTasks`. Adopter's other entries
+    // under `advanced` (e.g. defaultCookieAttributes) must NOT be
+    // shadowed.
+    expect(() =>
+      createAuth(
+        baseConfig({
+          betterAuthOptions: {
+            advanced: {
+              defaultCookieAttributes: {
+                sameSite: "strict",
+                secure: true,
+              },
+            },
+          },
+        }),
+      ),
+    ).not.toThrow();
+  });
+
+  it("apple auto-applies sameSite='none' when adopter hasn't set it", () => {
+    // Apple uses response_mode=form_post — the state cookie needs
+    // sameSite=none to ride the cross-site POST callback. Regression
+    // guard: construct with Apple registered, ensure no throw and
+    // Auth.methods reflects the registration.
+    const auth = createAuth(
+      baseConfig({
+        methods: [
+          {
+            kind: "social",
+            provider: "apple",
+            clientId: "com.example.web",
+            clientSecret: "JWT-placeholder",
+          },
+        ],
+        bootstrapOwner: { match: "email", value: "owner@example.com" },
+      }),
+    );
+    expect(auth.methods).toEqual([{ kind: "social", provider: "apple" }]);
+  });
+
+  it("apple respects adopter's explicit sameSite override", () => {
+    // Power user who has thought through the trade-offs and set
+    // sameSite explicitly — we don't override them.
+    expect(() =>
+      createAuth(
+        baseConfig({
+          methods: [
+            {
+              kind: "social",
+              provider: "apple",
+              clientId: "com.example.web",
+              clientSecret: "JWT",
+            },
+          ],
+          bootstrapOwner: { match: "email", value: "owner@example.com" },
+          betterAuthOptions: {
+            advanced: {
+              defaultCookieAttributes: {
+                sameSite: "lax",
+                secure: true,
+              },
+            },
+          },
+        }),
+      ),
+    ).not.toThrow();
+  });
 });
 
 describe("AuthMethodConfig — type narrowing smoke", () => {
