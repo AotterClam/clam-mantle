@@ -11,16 +11,22 @@ export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
  * Auth method config (discriminated union). Adding a new method
  * (email-otp, google, passkey, ...) becomes a new case here, not a
  * new top-level key on `CreateAuthConfig` — per ADR-0014.
+ *
+ * Written as a one-member union (leading `|`) deliberately — keeps
+ * the switch in `buildSocialProviders` exhaustiveness-checked when
+ * PR-B adds a second variant; a flat object type would silently
+ * accept the new shape without firing the never-narrowing.
  */
-export type AuthMethodConfig = {
-  readonly kind: "github";
-  readonly clientId: string;
-  readonly clientSecret: string;
-  /** Override the OAuth callback URL Better Auth tells GitHub to
-   *  redirect to. The consumer is then responsible for forwarding
-   *  requests at that URI to `auth.handler`. */
-  readonly redirectURI?: string;
-};
+export type AuthMethodConfig =
+  | {
+      readonly kind: "github";
+      readonly clientId: string;
+      readonly clientSecret: string;
+      /** Override the OAuth callback URL Better Auth tells GitHub to
+       *  redirect to. The consumer is then responsible for forwarding
+       *  requests at that URI to `auth.handler`. */
+      readonly redirectURI?: string;
+    };
 
 /**
  * First-staff promotion rule. Decoupled from `methods[]` so switching
@@ -69,18 +75,54 @@ function buildSocialProviders(
 ): BetterAuthOptions["socialProviders"] {
   const out: BetterAuthOptions["socialProviders"] = {};
   for (const method of methods) {
-    if (method.kind === "github") {
-      out.github = {
-        clientId: method.clientId,
-        clientSecret: method.clientSecret,
-        mapProfileToUser: (profile) => ({
-          githubLogin: profile.login,
-        }),
-        ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
-      };
+    switch (method.kind) {
+      case "github":
+        out.github = {
+          clientId: method.clientId,
+          clientSecret: method.clientSecret,
+          mapProfileToUser: (profile) => ({
+            githubLogin: profile.login,
+          }),
+          ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
+        };
+        break;
+      default: {
+        // Runtime guard for unknown `kind` values. The compile-time
+        // exhaustiveness check activates the moment PR-B adds a
+        // second union variant — until then there's nothing for
+        // TypeScript to narrow into `never`.
+        const kind = (method as { kind: string }).kind;
+        throw new Error(`createAuth: unhandled AuthMethodConfig.kind '${kind}'`);
+      }
     }
   }
   return out;
+}
+
+/**
+ * Cross-check bootstrap rule against registered methods. Catches the
+ * silent-no-op case where the rule's discriminator can never match
+ * any signal a registered method actually produces — e.g.
+ * `match: "github-login"` with no `github` method registered. Throws
+ * at construction so vibe-coders see the mistake before the first
+ * sign-in attempt.
+ */
+function validateBootstrap(
+  rule: BootstrapOwnerRule,
+  methods: ReadonlyArray<AuthMethodConfig>,
+): void {
+  if (rule.match === "github-login") {
+    const hasGithub = methods.some((m) => m.kind === "github");
+    if (!hasGithub) {
+      throw new Error(
+        "createAuth: bootstrapOwner.match='github-login' but no `github` method is registered. " +
+          "Either register a github method or switch to `bootstrapOwner: { match: 'email', value: '…' }`.",
+      );
+    }
+  }
+  // `match: "email"` is permissive — every Better Auth method that
+  // creates a user populates `email`, including GitHub (via the
+  // upstream profile). No registration constraint to enforce.
 }
 
 function shouldPromoteToOwner(
@@ -101,6 +143,9 @@ function buildAuth(config: CreateAuthConfig) {
     throw new Error(
       "createAuth: methods[] is empty — register at least one AuthMethodConfig so staff can sign in.",
     );
+  }
+  if (config.bootstrapOwner) {
+    validateBootstrap(config.bootstrapOwner, config.methods);
   }
   const socialProviders = buildSocialProviders(config.methods);
   const bootstrap = config.bootstrapOwner;
