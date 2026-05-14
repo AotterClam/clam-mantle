@@ -157,8 +157,16 @@ export default {
       database: env.DB,
       baseURL: env.PUBLIC_ORIGIN,
       secret: env.BETTER_AUTH_SECRET,
-      github: { clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET },
-      adminGithubLogin: env.ADMIN_GITHUB_LOGIN,
+      methods: [
+        {
+          kind: "github",
+          clientId: env.GITHUB_CLIENT_ID,
+          clientSecret: env.GITHUB_CLIENT_SECRET,
+        },
+      ],
+      bootstrapOwner: env.ADMIN_GITHUB_LOGIN
+        ? { match: "github-login", value: env.ADMIN_GITHUB_LOGIN }
+        : undefined,
     });
     const cms = createCmsRef({
       manifests,
