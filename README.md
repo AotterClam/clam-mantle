@@ -3,6 +3,18 @@
 [![CI](https://github.com/aotter/mantle/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/aotter/mantle/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+[![Status: Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#status)
+
+> ⚠️ **Experimental — co-built with AI**
+>
+> mantle is co-developed with AI coding agents (Claude Code) and is
+> currently in **0.0.x / pre-1.0**. Treat everything here as experimental:
+> APIs, manifests, schema shapes, and runtime behavior **can break between
+> any two commits** without notice or migration path. Do not deploy this
+> for anything you cannot afford to rebuild from scratch.
+>
+> Review the code, run your own tests, and verify generated content before
+> trusting it. Pull requests welcome; bug reports especially welcome.
 
 **Build your content model by prompting, not configuring.**
 
