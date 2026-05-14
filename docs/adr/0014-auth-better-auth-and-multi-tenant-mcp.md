@@ -364,3 +364,55 @@ When reviewing or implementing a change that touches auth, MCP routing, or roles
 - [Better Auth changelog (1.5+)](https://better-auth.com/blog/1-5)
 - [RFC 7591 — Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591)
 - [RFC 9728 — Protected Resource Metadata](https://datatracker.ietf.org/doc/html/rfc9728)
+
+## Amendment — 2026-05-15: MCP carve-out to `@cloudflare/workers-oauth-provider`
+
+Empirical follow-up to the §"Decision" record above. After shipping the Better Auth `mcp()`-plugin path through `0.0.8-beta.5`, Claude Desktop and claude.ai (web) consistently failed at the OAuth handover even though the server-side dance was RFC-correct (DCR + PKCE + AS metadata + PRM all verified via `wrangler tail`). The Anthropic-side error always surfaced as a generic `ofid_*` reference; `/token` returned 200, then the MCP client never made the post-OAuth `/staff/mcp` POST.
+
+We built an isolated POC worker (`the deleted MCP POC worker`, since deleted) that ran `@cloudflare/workers-oauth-provider` at top level with a single dummy `echo` MCP tool. The POC connected to claude.ai cleanly. Migrating the same pattern back to `the legacy MCP test deployment`, three constraints were narrowed:
+
+1. **MCP resource path must start with `/mcp`.** `/staff/mcp` fails (claude.ai drops the session after a server-correct `/token` success). `/mcp/staff` works. Probably an Anthropic-side URL pattern check from an early MCP draft; not currently documented in any spec we found.
+2. **`scopes_supported` must not contain colons.** Advertising `["mcp:read", "mcp:staff"]` causes claude.ai to silently omit `scope=` from `/authorize`, yielding a zero-scope token grant that the client then rejects post-token. Single `["mcp"]` works. Per-surface differentiation moves server-side: staff role is checked in the apiHandler via D1 `getUserRole`, not via OAuth scope.
+3. **OAuth provider must be top-level worker entry.** `export default new OAuthProvider({...})` is required so the lib intercepts `/.well-known/oauth-*` + `/oauth/{authorize,token,register}` + `apiRoute(s)` before forwarding to `defaultHandler` (Hono). Side-mounting from inside Hono left the lib unable to inject `env.OAUTH_PROVIDER` for the consent handler.
+
+### Architectural change
+
+| Concern | Before (ADR-0014 §Decision) | After (this amendment) |
+|---|---|---|
+| Staff sign-in | Better Auth `admin` + social providers | Same — unchanged |
+| Session / user / role | Better Auth D1 tables | Same |
+| MCP OAuth AS surface | Better Auth `mcp()` plugin (opaque tokens, no JWKS) | `@cloudflare/workers-oauth-provider` (KV grants, lib-internal token format) |
+| MCP endpoints | `/staff/mcp` + `/mcp` mounted in Hono with `auth.api.getMcpSession()` | `/mcp/staff` + `/mcp` registered as `apiHandlers` on the top-level OAuthProvider; lib verifies bearer + sets `ctx.props` |
+| Scope | `mcp:staff` + `mcp:read` colon-namespaced | Single `["mcp"]` advertised; staff gating via D1 role lookup |
+| `auth.getMcpSession()` | Part of the SDK `Auth` interface | Removed; the OAuth lib owns token verification |
+| Consent UI | Better Auth's built-in | Adapter-mounted on Hono via `mountAuthorize`; reads `c.env.OAUTH_PROVIDER` helpers the lib injects, gates on `auth.getSession()` |
+| URL conventions | `/api/auth/mcp/*` | `/oauth/*` — namespaced (not bare) to avoid squatting on generic root paths |
+
+### Why Better Auth still wins the auth-side concerns
+
+The split is clean because the two libs answer different questions:
+
+- **Better Auth** answers "who logged into our backstage console?" — sign-in flows, social providers, session cookie, user/role state in D1.
+- **workers-oauth-provider** answers "how do we authorize a third-party OAuth client (MCP) to act on a backstage user's behalf?" — DCR, PKCE, consent, token issue, KV grant store.
+
+Removing Better Auth would force re-implementing all of (a) and gains nothing — Better Auth is uncontested for the staff sign-in surface. Removing workers-oauth-provider would force re-implementing all of (b) and was tried via Better Auth's `mcp()` plugin; the result didn't reach Anthropic-client compatibility within reasonable iterations.
+
+### Auth-as-contract is preserved without the escape hatch
+
+The companion `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` escape hatch from PR #175 is **removed**. Empirically it was a contested anti-pattern: the carved-out MCP surface no longer requires per-adopter Better Auth overrides (the OAuth surface is fully delegated), and the remaining adopter-facing knobs are all curated first-class fields on `CreateAuthConfig` (`methods[]`, `rateLimit`, `bootstrapOwner`). If a Better Auth knob is missing from the SDK contract, the answer is a curated first-class field, not the un-curated escape hatch.
+
+The original ADR-0014 §"Auth as contract, Better Auth as default" framing stays correct; only the §"Implementation status" reference to `betterAuthOptions` is retracted.
+
+### What didn't change
+
+- The auth port is still removed (the runtime takes the Better Auth instance directly).
+- Apple's `trustedOrigins` auto-append (`https://appleid.apple.com`) and `sameSite=none` cookie injection for cross-site `form_post` callback stay.
+- `appleClientSecret()` helper (from PR #173) stays.
+- All non-OAuth admin endpoints (`/api/auth/*`, `/api/auth/methods`, admin SPA mount) stay on Better Auth.
+- The `bootstrapOwner` + email-OTP + magic-link + `methods[]` carve-out stay.
+
+### Future work
+
+- A `@cloudflare/vitest-pool-workers`-based integration test covering the full OAuth flow (DCR → consent → token → MCP RPC). Node-vitest can't load `@cloudflare/workers-oauth-provider` because it imports from `cloudflare:workers`.
+- Starters (`aotter/mantle-starters`) migration to the same top-level OAuthProvider shape. All 8 archetypes currently use the pre-carve-out `mountMcp` API and need updating before the next starter tag.
+- Track whether Anthropic relaxes (1) the `/mcp` resource-path-prefix requirement and (2) the no-colon-in-scope requirement. Both are de-facto MCP client behaviors, not RFC requirements; if upstream relaxes them, the SDK can re-introduce `mcp:read` / `mcp:staff` scopes for finer-grained delegation.

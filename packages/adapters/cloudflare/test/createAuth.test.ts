@@ -416,11 +416,10 @@ describe("createAuth — boot invariants", () => {
     ]);
   });
 
-  it("returns an Auth surface with handler / getSession / getMcpSession / getUserRole", () => {
+  it("returns an Auth surface with handler / getSession / getUserRole", () => {
     const auth = createAuth(baseConfig());
     expect(typeof auth.handler).toBe("function");
     expect(typeof auth.getSession).toBe("function");
-    expect(typeof auth.getMcpSession).toBe("function");
     expect(typeof auth.getUserRole).toBe("function");
   });
 
@@ -447,114 +446,7 @@ describe("createAuth — boot invariants", () => {
     expect(auth.methods).toEqual([{ kind: "social", provider: "apple" }]);
   });
 
-  it("accepts betterAuthOptions escape hatch without crashing", () => {
-    // Adopter reaches an un-curated Better Auth knob — e.g.
-    // `account.accountLinking`. Pure passthrough; the SDK doesn't
-    // surface this as a first-class field on CreateAuthConfig per
-    // ADR-0014 § "Auth as contract, Better Auth as default".
-    const auth = createAuth(
-      baseConfig({
-        betterAuthOptions: {
-          account: {
-            accountLinking: {
-              enabled: true,
-              trustedProviders: ["github"],
-              allowDifferentEmails: false,
-            },
-          },
-          trustedOrigins: ["https://example.test"],
-        },
-      }),
-    );
-    expect(auth.methods).toEqual([{ kind: "social", provider: "github" }]);
-  });
-
-  it("SDK-managed keys win over betterAuthOptions on conflict", () => {
-    // Adopter tries to shadow `socialProviders` via the escape hatch.
-    // Per the SDK contract the methods[] driven socialProviders wins,
-    // because spread order is `{ ...betterAuthOptions, ...sdkKeys }`.
-    // We can't introspect the BetterAuth instance directly, but
-    // Auth.methods is SDK-derived and proves the methods[] path runs
-    // even with a conflicting shadow attempt.
-    const auth = createAuth(
-      baseConfig({
-        methods: [GITHUB_METHOD_FIXTURE],
-        betterAuthOptions: {
-          // Bogus shadow attempt
-          socialProviders: { github: { clientId: "BAD", clientSecret: "BAD" } },
-        },
-      }),
-    );
-    expect(auth.methods).toEqual([{ kind: "social", provider: "github" }]);
-  });
-
-  it("registers adopter plugins with new ids; drops dups of SDK ids", () => {
-    // Construct doesn't throw when adopter passes an adopter-only
-    // plugin (id != admin/mcp/email-otp/magic-link). Adopter dup of
-    // an SDK id is silently filtered (Better Auth doesn't dedupe;
-    // double-running our `admin` hooks would corrupt role state).
-    expect(() =>
-      createAuth(
-        baseConfig({
-          betterAuthOptions: {
-            plugins: [
-              { id: "custom-vibe-coder-plugin", endpoints: {} } as never,
-              // adopter dup of `admin` — would otherwise run twice.
-              { id: "admin", endpoints: {} } as never,
-            ],
-          },
-        }),
-      ),
-    ).not.toThrow();
-  });
-
-  it("adopter's user.additionalFields survives the merge", () => {
-    // SDK owns `user.additionalFields.githubLogin`. Adopter adding a
-    // different additional field should NOT be shadowed by us
-    // replacing the whole `user` sub-tree.
-    // We can't read Better Auth's resolved options, but the
-    // construction must not throw — that's the regression guard for
-    // the deep-merge implementation.
-    expect(() =>
-      createAuth(
-        baseConfig({
-          betterAuthOptions: {
-            user: {
-              additionalFields: {
-                signupSource: {
-                  type: "string",
-                  required: false,
-                  input: true,
-                },
-              },
-            },
-          },
-        }),
-      ),
-    ).not.toThrow();
-  });
-
-  it("adopter's advanced.defaultCookieAttributes survives the merge", () => {
-    // SDK owns `advanced.backgroundTasks`. Adopter's other entries
-    // under `advanced` (e.g. defaultCookieAttributes) must NOT be
-    // shadowed.
-    expect(() =>
-      createAuth(
-        baseConfig({
-          betterAuthOptions: {
-            advanced: {
-              defaultCookieAttributes: {
-                sameSite: "strict",
-                secure: true,
-              },
-            },
-          },
-        }),
-      ),
-    ).not.toThrow();
-  });
-
-  it("apple auto-applies sameSite='none' when adopter hasn't set it", () => {
+  it("apple auto-applies sameSite='none' when registered", () => {
     // Apple uses response_mode=form_post — the state cookie needs
     // sameSite=none to ride the cross-site POST callback. Regression
     // guard: construct with Apple registered, ensure no throw and
@@ -573,34 +465,6 @@ describe("createAuth — boot invariants", () => {
       }),
     );
     expect(auth.methods).toEqual([{ kind: "social", provider: "apple" }]);
-  });
-
-  it("apple respects adopter's explicit sameSite override", () => {
-    // Power user who has thought through the trade-offs and set
-    // sameSite explicitly — we don't override them.
-    expect(() =>
-      createAuth(
-        baseConfig({
-          methods: [
-            {
-              kind: "social",
-              provider: "apple",
-              clientId: "com.example.web",
-              clientSecret: "JWT",
-            },
-          ],
-          bootstrapOwner: { match: "email", value: "owner@example.com" },
-          betterAuthOptions: {
-            advanced: {
-              defaultCookieAttributes: {
-                sameSite: "lax",
-                secure: true,
-              },
-            },
-          },
-        }),
-      ),
-    ).not.toThrow();
   });
 });
 
