@@ -126,9 +126,15 @@ function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-ot
     ...(method.allowedAttempts !== undefined
       ? { allowedAttempts: method.allowedAttempts }
       : {}),
-    sendVerificationOTP: async (data, ctx) => {
+    // Return synchronously — the promise is fire-and-forget via the
+    // `advanced.backgroundTasks.handler` we wire in `buildAuth`. For
+    // `email-verification` / `forget-password` types Better Auth only
+    // calls this when the user exists, so awaiting would leak account
+    // existence through response latency. See Better Auth's own
+    // sendVerificationOTP docstring + reviewer finding in PR #161.
+    sendVerificationOTP: (data, ctx) => {
       const locale = pickLocale(ctx?.request, fallback);
-      await method.sender.send({
+      return method.sender.send({
         to: data.email,
         subject: `Your sign-in code: ${data.otp}`,
         text: `Your one-time code is ${data.otp}. It expires shortly. If you didn't request this, ignore this email.`,
@@ -198,6 +204,18 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const emailOtpMethod = emailOtpMethods[0];
 
+  // Rate limit: Better Auth's per-route limits gate on
+  // `process.env.NODE_ENV === "production"`, which is unset on
+  // Cloudflare Workers — leaving the limits silently off. When email
+  // is wired (free email-send-to-any-address surface) we ALWAYS turn
+  // limits on; adopter can override window/max via `config.rateLimit`.
+  const rateLimitDefault = emailOtpMethod
+    ? { window: 60, max: 10, enabled: true as const }
+    : null;
+  const rateLimit = config.rateLimit
+    ? { ...config.rateLimit, enabled: true as const }
+    : rateLimitDefault;
+
   return betterAuth({
     database: config.database,
     secret: config.secret,
@@ -212,7 +230,29 @@ function buildAuth(config: CreateAuthConfig) {
         },
       },
     },
-    ...(config.rateLimit ? { rateLimit: { ...config.rateLimit, enabled: true } } : {}),
+    ...(rateLimit ? { rateLimit } : {}),
+    // Fire-and-forget for any callback that opts into background.
+    // Better Auth's emailOTP plugin wraps `sendVerificationOTP` in
+    // `runInBackgroundOrAwait` — without this hook it awaits, which
+    // turns response latency into a user-existence oracle (Better
+    // Auth only calls the callback when the user exists for
+    // `email-verification` / `forget-password` types). With this
+    // hook the callback returns immediately. We don't have request-
+    // scoped `ctx.waitUntil` at this construction-time layer, so
+    // pending sends rely on the Worker isolate staying alive long
+    // enough — typical for ~100-500ms sends. A waitUntil-aware
+    // version is queued as a follow-up; until then fire-and-forget
+    // beats the timing leak.
+    advanced: {
+      backgroundTasks: {
+        handler: (p) => {
+          p.catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error("[better-auth backgroundTask]", err);
+          });
+        },
+      },
+    },
     plugins: [
       admin({
         defaultRole: "user",
