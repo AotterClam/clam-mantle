@@ -6,6 +6,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.8-beta.5] - 2026-05-14
+
+### Breaking
+
+- **`@aotter/mantle-cloudflare`**: `mountMcp` now serves the OAuth Protected Resource Metadata document at the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) §3.1 standard URL — `/.well-known/oauth-protected-resource<resource-path>` instead of the previous (non-standard) `<resource-path>/.well-known/oauth-protected-resource`. Example: a staff MCP at `/staff/mcp` now publishes metadata at `/.well-known/oauth-protected-resource/staff/mcp`. The `WWW-Authenticate: Bearer ... resource_metadata=` hint emitted on 401 responses also points at the new URL, so MCP clients that follow the hint (Claude Code does) re-discover automatically on next call; spec-strict clients that compose the well-known URL themselves now succeed. New helper `protectedResourceMetadataPath()` is exported from the package index for downstream consumers that need to compute the URL themselves (#188).
+
 ## [0.0.8-beta.4] - 2026-05-14
 
 ### Added
@@ -19,7 +25,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Breaking
 
-- **`@aotter/mantle-cloudflare`**: `mountMcp` now serves the OAuth Protected Resource Metadata document at the [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) §3.1 standard URL — `/.well-known/oauth-protected-resource<resource-path>` instead of the previous (non-standard) `<resource-path>/.well-known/oauth-protected-resource`. Example: a staff MCP at `/staff/mcp` now publishes metadata at `/.well-known/oauth-protected-resource/staff/mcp`. The `WWW-Authenticate: Bearer ... resource_metadata=` hint emitted on 401 responses also points at the new URL, so MCP clients that follow the hint (Claude Code does) re-discover automatically on next call; spec-strict clients that compose the well-known URL themselves now succeed. New helper `protectedResourceMetadataPath()` is exported from the package index for downstream consumers that need to compute the URL themselves (#188).
 - **repo**: `engines.node` bumped from `>=20` to `>=22`. Wrangler 4 requires Node 22+ at runtime; consumers, CI workflows, and contributor machines must update. Local: `nvm install 22 && nvm use 22`. CI step `actions/setup-node@v4` now sets `node-version: 22` (#170).
 - **`@aotter/mantle-cloudflare`**: dev dependency `wrangler` bumped from `^3.103.2` to `^4.0.0`, and peer-aligned `@cloudflare/workers-types` from `^4.20251101.0` to `^4.20260508.1`. Adopter starter projects deploying via the Cloudflare adapter inherit the Node 22 floor. Motivation: Cloudflare surfaces an explicit out-of-date warning for wrangler 3 on every deploy, and known v3 dev-server cleanup bugs (orphan `workerd` holding the local port across Ctrl+C / terminal close) won't be back-ported (#170).
 - **`@aotter/mantle-cloudflare`**: `AuthMethodConfig` collapses the `kind: "github"` case into the new generic `kind: "social"` discriminated by `provider`. Mirrors Better Auth's own `socialProviders` block shape and unlocks ~35 upstream IDPs (`google`, `apple`, `microsoft-entra-id`, `facebook`, `discord`, `twitter`, `linkedin`, `spotify`, `twitch`, `gitlab`, `tiktok`, `reddit`, `kick`, `vk`, `naver`, `kakao`, `line`, `slack`, `atlassian`, `zoom`, `notion`, `figma`, `linear`, `vercel`, `paypal`, `huggingface`, `cognito`, `salesforce`, `polar`, `railway`, `roblox`, `paybin`, `wechat`, `dropbox`, plus `github`). Adopter migration: `{ kind: "github", clientId, clientSecret }` → `{ kind: "social", provider: "github", clientId, clientSecret }`. `bootstrapOwner: { match: "github-login" }` continues to work; the internal `mapProfileToUser` shim still populates `user.githubLogin` when `provider === "github"`. Provider-specific fields (Apple's `teamId` / `keyId` / `privateKey`, Microsoft Entra ID's `tenantId`, etc.) ride via the new `extras?: Record<string, unknown>` field merged verbatim into Better Auth's per-provider config (#166).
