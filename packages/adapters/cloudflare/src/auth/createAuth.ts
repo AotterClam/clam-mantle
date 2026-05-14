@@ -162,6 +162,39 @@ export interface CreateAuthConfig {
   /** Better Auth's built-in rate limit. Defaults off; production
    *  deployments should set it. */
   readonly rateLimit?: { readonly window: number; readonly max: number };
+  /**
+   * Escape hatch for raw Better Auth options the SDK doesn't surface
+   * as first-class fields (e.g. `account.accountLinking`,
+   * `emailOTP.storeOTP`, extra plugins like `twoFactor()`,
+   * `advanced.defaultCookieAttributes`). See ADR-0014 § "Auth as
+   * contract, Better Auth as default" for when to use this vs.
+   * asking for a first-class field.
+   *
+   * Merge semantics — deep, key-by-key:
+   *
+   * - Top-level keys the SDK doesn't manage (`account`, `emailAndPassword`,
+   *   `verification`, custom plugin options, etc.) pass through verbatim.
+   * - SDK-managed top-level keys are replaced wholesale: `database`,
+   *   `secret`, `baseURL`, `socialProviders`, `rateLimit`. Adopter
+   *   values for these are dropped.
+   * - `advanced` / `user` / `databaseHooks` are MERGED key-by-key
+   *   one level deep: SDK's `advanced.backgroundTasks`,
+   *   `user.additionalFields.githubLogin`, and
+   *   `databaseHooks.user.create.after` win on leaf conflict; the
+   *   adopter's other entries under each (e.g.
+   *   `advanced.defaultCookieAttributes`, `user.additionalFields.foo`,
+   *   `databaseHooks.session.*`) survive.
+   * - `plugins` is concatenated with id-dedupe: adopter plugins
+   *   whose `id` matches an SDK plugin (`admin`, `mcp`, `email-otp`,
+   *   `magic-link`) are dropped silently — SDK wiring is canonical.
+   *   Adopter plugins with new ids (`twoFactor`, `passkey`, …) ship.
+   * - `trustedOrigins` is array-merged with the SDK's
+   *   per-provider auto-origins (Apple needs
+   *   `https://appleid.apple.com`); de-dup via Set. Adopters who
+   *   pass a function-form `trustedOrigins` get the function wrapped
+   *   so the SDK's auto-origins are tried first, then the function.
+   */
+  readonly betterAuthOptions?: Partial<BetterAuthOptions>;
 }
 
 const ac = createAccessControl(defaultStatements);
@@ -383,6 +416,84 @@ function pickSingleton<K extends AuthMethodConfig["kind"]>(
   return matches[0];
 }
 
+/**
+ * Origins each registered social provider needs in
+ * `trustedOrigins`. Adding a provider that demands an extra
+ * `trustedOrigins` entry = adding a row here. Apple is the only one
+ * in 1.6.9 that hard-requires this; if Better Auth ever drops the
+ * requirement, the entry stays harmless (Better Auth dedupes).
+ */
+const SOCIAL_PROVIDER_TRUSTED_ORIGINS: Readonly<
+  Partial<Record<SocialProviderId, ReadonlyArray<string>>>
+> = {
+  apple: ["https://appleid.apple.com"],
+};
+
+function autoTrustedOriginsFor(
+  methods: ReadonlyArray<AuthMethodConfig>,
+): string[] {
+  const origins = methods.flatMap((m) =>
+    m.kind === "social" ? SOCIAL_PROVIDER_TRUSTED_ORIGINS[m.provider] ?? [] : [],
+  );
+  return [...new Set(origins)];
+}
+
+/**
+ * Apple uses `response_mode=form_post` — Apple POSTs cross-site to
+ * our callback. The OAuth state cookie must have `sameSite: "none"`
+ * (and `secure: true`, which browsers require alongside) or the
+ * cookie won't ride the POST and Better Auth raises a state mismatch.
+ * Other providers don't need this. We only auto-set when Apple is
+ * registered AND the adopter hasn't already specified
+ * `defaultCookieAttributes.sameSite` themselves.
+ */
+function methodsRequireSameSiteNone(
+  methods: ReadonlyArray<AuthMethodConfig>,
+): boolean {
+  return methods.some((m) => m.kind === "social" && m.provider === "apple");
+}
+
+/**
+ * Plugin ids the SDK manages — adopter plugins with these ids are
+ * dropped before concat so Better Auth doesn't run the same plugin
+ * twice (it does NOT dedupe internally; verified against
+ * `better-auth@1.6.9` source). Adopter plugins with other ids
+ * (`twoFactor`, `passkey`, custom) ride through unchanged.
+ */
+const SDK_PLUGIN_IDS = new Set(["admin", "mcp", "email-otp", "magic-link"]);
+
+type TrustedOriginsOption = NonNullable<BetterAuthOptions["trustedOrigins"]>;
+
+/**
+ * Merge SDK's `trustedOrigins` auto-additions with the adopter's.
+ * Better Auth accepts `string[]` or a `(req?) => Awaitable<string[]>`
+ * predicate. Both forms supported:
+ *  - array: concat + Set dedupe.
+ *  - function: wrap so the adopter's result + the SDK's auto-origins
+ *    both ride the response.
+ */
+function mergeTrustedOrigins(
+  adopter: TrustedOriginsOption | undefined,
+  autoOrigins: ReadonlyArray<string>,
+): TrustedOriginsOption {
+  if (typeof adopter === "function") {
+    const fn = adopter;
+    return async (request?: Request): Promise<string[]> => {
+      const result = await fn(request);
+      const adopterList = (Array.isArray(result) ? result : []).filter(
+        (s): s is string => typeof s === "string",
+      );
+      return [...new Set([...adopterList, ...autoOrigins])];
+    };
+  }
+  return [
+    ...new Set([
+      ...(Array.isArray(adopter) ? adopter : []),
+      ...autoOrigins,
+    ]),
+  ];
+}
+
 function buildAuth(config: CreateAuthConfig) {
   if (config.methods.length === 0) {
     throw new Error(
@@ -411,103 +522,182 @@ function buildAuth(config: CreateAuthConfig) {
     ? { ...config.rateLimit, enabled: true as const }
     : rateLimitDefault;
 
+  // `trustedOrigins`: array-merge with the SDK's per-provider
+  // auto-origins (Apple needs `https://appleid.apple.com`). Function-
+  // form `(req) => ...` is supported by wrapping; see
+  // `mergeTrustedOrigins`.
+  const trustedOrigins = mergeTrustedOrigins(
+    config.betterAuthOptions?.trustedOrigins,
+    autoTrustedOriginsFor(config.methods),
+  );
+
+  // `plugins`: SDK plugins are canonical. Drop adopter plugins whose
+  // id matches one of ours (`admin`, `mcp`, `email-otp`, `magic-link`)
+  // because Better Auth does NOT dedupe internally — duplicate hooks
+  // would run twice. Adopter plugins with new ids (`twoFactor`,
+  // `passkey`, etc.) ride through.
+  const adopterPlugins = (config.betterAuthOptions?.plugins ?? []).filter(
+    (p) => !SDK_PLUGIN_IDS.has((p as { id?: string }).id ?? ""),
+  );
+  const sdkPlugins = [
+    admin({
+      defaultRole: "user",
+      adminRoles: [...ADMIN_ROLES],
+      ac,
+      roles: {
+        owner: ownerAc,
+        editor: editorAc,
+        contributor: contributorAc,
+        user: userAc,
+      },
+    }),
+    mcp({
+      loginPage: "/admin/sign-in",
+      oidcConfig: {
+        loginPage: "/admin/sign-in",
+        scopes: ["mcp:read", "mcp:staff"],
+        defaultScope: "openid profile email mcp:read",
+        metadata: {
+          scopes_supported: [
+            "openid",
+            "profile",
+            "email",
+            "offline_access",
+            "mcp:read",
+            "mcp:staff",
+          ],
+        },
+      },
+    }),
+    ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
+    ...(magicLinkMethod ? [buildMagicLinkPlugin(magicLinkMethod)] : []),
+  ];
+
+  // Deep-merge the three sub-trees Better Auth nests adopters into.
+  // Shallow spread would silently shadow the entire sub-tree at the
+  // SDK key, dropping adopter knobs like
+  // `advanced.defaultCookieAttributes` or
+  // `databaseHooks.session.create`. Deep merge means the SDK wins on
+  // the specific LEAF keys it manages; adopter values for siblings
+  // pass through.
+
+  // `user.additionalFields`: SDK owns `githubLogin` only.
+  const adopterUser = config.betterAuthOptions?.user ?? {};
+  const mergedUser = {
+    ...adopterUser,
+    additionalFields: {
+      ...(adopterUser.additionalFields ?? {}),
+      githubLogin: {
+        type: "string" as const,
+        required: false,
+        input: false,
+      },
+    },
+  };
+
+  // `advanced`: SDK owns `backgroundTasks`. Apple auto-injects
+  // `defaultCookieAttributes.sameSite: "none"` when adopter hasn't
+  // already set that field, because Apple's `form_post` callback
+  // is cross-site and a `lax` cookie won't ride it (Better Auth's
+  // default raises a state-mismatch).
+  const adopterAdvanced = config.betterAuthOptions?.advanced ?? {};
+  const adopterCookieAttrs = adopterAdvanced.defaultCookieAttributes ?? {};
+  const appleNeedsCrossSite = methodsRequireSameSiteNone(config.methods);
+  const cookieAttrs = appleNeedsCrossSite
+    ? {
+        // Browsers require `secure: true` whenever `sameSite: "none"`.
+        secure: true,
+        ...adopterCookieAttrs,
+        // Adopter explicit `sameSite` wins — power users who've gone
+        // through the trade-offs themselves shouldn't be overridden.
+        sameSite: adopterCookieAttrs.sameSite ?? "none",
+      }
+    : adopterCookieAttrs;
+  const mergedAdvanced = {
+    ...adopterAdvanced,
+    ...(Object.keys(cookieAttrs).length > 0
+      ? { defaultCookieAttributes: cookieAttrs }
+      : {}),
+    // Fire-and-forget hook closes the user-existence timing oracle
+    // on OTP send — see § "Auth as contract" notes in ADR-0014.
+    // SDK-managed; adopter can't override this leaf.
+    backgroundTasks: {
+      handler: (p: Promise<unknown>) => {
+        p.catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error("[better-auth backgroundTask]", err);
+        });
+      },
+    },
+  };
+
+  // `databaseHooks`: SDK owns `user.create.after` (bootstrap-owner
+  // promotion). Adopter `user.create.before`, `user.update.*`,
+  // `session.*`, `account.*` pass through.
+  const adopterHooks = config.betterAuthOptions?.databaseHooks ?? {};
+  const adopterUserHooks = adopterHooks.user ?? {};
+  const adopterUserCreate = adopterUserHooks.create ?? {};
+  const sdkUserCreateAfter = async (user: unknown): Promise<void> => {
+    if (!bootstrap) return;
+    const u = user as {
+      id: string;
+      email?: string | null;
+      githubLogin?: string | null;
+    };
+    if (!shouldPromoteToOwner(bootstrap, u)) return;
+
+    const placeholders = ADMIN_ROLES.map(() => "?").join(",");
+    const existingAdmin = await config.database
+      .prepare(`SELECT id FROM user WHERE role IN (${placeholders}) LIMIT 1`)
+      .bind(...ADMIN_ROLES)
+      .first<{ id: string }>();
+    if (existingAdmin) return;
+
+    await config.database
+      .prepare("UPDATE user SET role = ? WHERE id = ?")
+      .bind("owner", u.id)
+      .run();
+  };
+  const mergedDatabaseHooks = {
+    ...adopterHooks,
+    user: {
+      ...adopterUserHooks,
+      create: {
+        ...adopterUserCreate,
+        // SDK's hook composes with adopter's create.after if both are
+        // set: adopter's runs first, then ours (bootstrap promotion).
+        // Errors in the adopter hook propagate (Better Auth's default
+        // is to abort the create on hook failure).
+        after: adopterUserCreate.after
+          ? async (user: unknown) => {
+              const adopterAfter = adopterUserCreate.after as (
+                u: unknown,
+              ) => Promise<void> | void;
+              await adopterAfter(user);
+              await sdkUserCreateAfter(user);
+            }
+          : sdkUserCreateAfter,
+      },
+    },
+  };
+
+  // Adopter `betterAuthOptions` spread FIRST so top-level keys we
+  // don't manage (`account`, `emailAndPassword`, plugin options,
+  // etc.) pass through. SDK keys are re-asserted AFTER and win on
+  // conflict. The three deep-merged sub-trees (`user` / `advanced` /
+  // `databaseHooks`) are pre-computed above.
   return betterAuth({
+    ...(config.betterAuthOptions ?? {}),
     database: config.database,
     secret: config.secret,
     baseURL: config.baseURL,
     socialProviders,
-    user: {
-      additionalFields: {
-        githubLogin: {
-          type: "string",
-          required: false,
-          input: false,
-        },
-      },
-    },
+    user: mergedUser,
     ...(rateLimit ? { rateLimit } : {}),
-    // Fire-and-forget for any callback that opts into background.
-    // Better Auth's emailOTP plugin wraps `sendVerificationOTP` in
-    // `runInBackgroundOrAwait` — without this hook it awaits, which
-    // turns response latency into a user-existence oracle (Better
-    // Auth only calls the callback when the user exists for
-    // `email-verification` / `forget-password` types). With this
-    // hook the callback returns immediately. We don't have request-
-    // scoped `ctx.waitUntil` at this construction-time layer, so
-    // pending sends rely on the Worker isolate staying alive long
-    // enough — typical for ~100-500ms sends. A waitUntil-aware
-    // version is queued as a follow-up; until then fire-and-forget
-    // beats the timing leak.
-    advanced: {
-      backgroundTasks: {
-        handler: (p) => {
-          p.catch((err) => {
-            // eslint-disable-next-line no-console
-            console.error("[better-auth backgroundTask]", err);
-          });
-        },
-      },
-    },
-    plugins: [
-      admin({
-        defaultRole: "user",
-        adminRoles: [...ADMIN_ROLES],
-        ac,
-        roles: {
-          owner: ownerAc,
-          editor: editorAc,
-          contributor: contributorAc,
-          user: userAc,
-        },
-      }),
-      mcp({
-        loginPage: "/admin/sign-in",
-        oidcConfig: {
-          loginPage: "/admin/sign-in",
-          scopes: ["mcp:read", "mcp:staff"],
-          defaultScope: "openid profile email mcp:read",
-          metadata: {
-            scopes_supported: [
-              "openid",
-              "profile",
-              "email",
-              "offline_access",
-              "mcp:read",
-              "mcp:staff",
-            ],
-          },
-        },
-      }),
-      ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
-      ...(magicLinkMethod ? [buildMagicLinkPlugin(magicLinkMethod)] : []),
-    ],
-    databaseHooks: {
-      user: {
-        create: {
-          after: async (user) => {
-            if (!bootstrap) return;
-            const u = user as {
-              id: string;
-              email?: string | null;
-              githubLogin?: string | null;
-            };
-            if (!shouldPromoteToOwner(bootstrap, u)) return;
-
-            const placeholders = ADMIN_ROLES.map(() => "?").join(",");
-            const existingAdmin = await config.database
-              .prepare(`SELECT id FROM user WHERE role IN (${placeholders}) LIMIT 1`)
-              .bind(...ADMIN_ROLES)
-              .first<{ id: string }>();
-            if (existingAdmin) return;
-
-            await config.database
-              .prepare("UPDATE user SET role = ? WHERE id = ?")
-              .bind("owner", u.id)
-              .run();
-          },
-        },
-      },
-    },
+    trustedOrigins,
+    advanced: mergedAdvanced,
+    plugins: [...adopterPlugins, ...sdkPlugins],
+    databaseHooks: mergedDatabaseHooks,
   });
 }
 
