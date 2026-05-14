@@ -142,7 +142,7 @@ This is a minor amendment to ADR-0011 (adapter port spec): the auth ports disapp
 
 ### 7. Auth as contract, Better Auth as default
 
-**Amended 2026-05-14.** The five auth-cascade PRs (#160 → #173) shipped Better Auth-backed config + admin SPA + tests. During that work two architectural lines need to be explicit so future PRs don't drift toward mechanical pass-through:
+**Amended 2026-05-14.** The seven auth-cascade PRs (#160 / #161 / #162 / #165 / #167 / #169 / #173) shipped Better Auth-backed config + admin SPA + tests. During that work two architectural lines need to be explicit so future PRs don't drift toward mechanical pass-through:
 
 **The SDK's public auth contract is the `Auth` interface, not Better Auth.**
 
@@ -162,20 +162,21 @@ The four consumers (`mountServerEndpoints`, `mountMcp`, `bootRuntimeOnce`, `cmsC
 
 **`createAuth(config)` is the SDK-shipped, Better Auth-backed *default* implementation.** Adopters who want the curated `methods[]` shape, `bootstrapOwner` promotion, Workers-aware rate-limit, fire-and-forget `backgroundTasks.handler`, `extras` reserved-key validation, and the `Auth.methods` admin-SPA contract — pass a config to `createAuth()` and get an `Auth`.
 
-**Adopters who want a different backend implement `Auth` directly and bypass `createAuth`.** Lucia, Auth.js, a custom hand-roll — all valid. The seam already works today; only the `/api/auth/*` URL convention (which Better Auth picks for its mounted endpoints) is a second-tier contract that affects the admin SPA's hard-coded `fetch()` paths. Replacing the backend means matching that URL convention OR forking the admin SPA's `auth-views.tsx`.
+**Adopters who want a different backend implement `Auth` directly and bypass `createAuth`.** Lucia, Auth.js, a custom hand-roll — all valid. The seam already works today; the `/api/auth/*` URL convention (which Better Auth picks for its mounted endpoints) is a second-tier contract that affects the admin SPA. `auth-views.tsx` hard-codes six paths today (`/api/auth/methods`, `/api/auth/sign-in/social`, `/api/auth/email-otp/send-verification-otp`, `/api/auth/sign-in/email-otp`, `/api/auth/sign-in/magic-link`, `/api/auth/sign-out`); replacing the backend means matching the URL convention OR forking `auth-views.tsx`.
 
-**Anti-pattern to refuse in review: BetterAuth-field pass-through.**
+**Anti-pattern to refuse in review: Better Auth-field pass-through.**
 
-If a future PR's only effect is to rename a Better Auth field into our `CreateAuthConfig` and forward it verbatim, refuse it. The SDK adds load-bearing surface area only when:
+If a future PR's only effect is to rename a Better Auth field into our `CreateAuthConfig` and forward it verbatim, refuse it. **Picking a different literal default for an existing Better Auth field does NOT, by itself, justify a new field on `CreateAuthConfig` — that's the same pass-through dressed up.** The SDK adds load-bearing surface area only when the new field exists for at least one of these concrete reasons:
 
-- It encodes a Workers-aware default (e.g. `rateLimit` on when an email-shaped method registers; `advanced.backgroundTasks.handler` wired)
-- It defines a cross-adapter port (e.g. `EmailSender` in `mantle-runtime/domain/port/`)
-- It opinionates a default we'd bet on (e.g. magic-link 15min TTL / 3 attempts for mail prefetchers)
-- It adds a safety net (e.g. `extras` reserved-key validation; bootstrap-method cross-check)
-- It introduces a new abstraction (e.g. `methods[]` unifies `socialProviders` + `emailOTP` + `magicLink` plugins under one config shape)
-- It ships a DX helper that removes a Workers-hostile dep (e.g. `appleClientSecret` for the ES256 JWT via `crypto.subtle` instead of `jose`)
+- **Workers-aware behavior** that Better Auth doesn't supply (e.g. `rateLimit` flipped on by default when an email-shaped method registers — Better Auth's per-route limits gate on `process.env.NODE_ENV === "production"` which is unset on Workers; `advanced.backgroundTasks.handler` wired to fire-and-forget — closes the timing-oracle on OTP send).
+- **Cross-adapter port** the runtime needs (e.g. `EmailSender` in `mantle-runtime/domain/port/` — used by both `createAuth`'s OTP / magic-link callbacks AND future use cases like order receipts).
+- **Safety net** Better Auth doesn't provide (e.g. `extras` reserved-key validation refuses to let an adopter shadow `clientSecret` via spread order; bootstrap-method cross-check refuses `match: "github-login"` with no `github` social registered).
+- **New abstraction** that fuses multiple Better Auth surfaces (e.g. `methods[]` unifies `socialProviders` + `emailOTP` + `magicLink` plugins under one config shape with shared per-method discrimination).
+- **DX helper that removes a Workers-hostile dep** (e.g. `appleClientSecret` signs the ES256 JWT via `crypto.subtle` so adopters don't have to install `jose` for the one task Better Auth's docs assume a JWT lib).
 
-For knobs that are *just* Better Auth fields with no opinion (e.g. `account.accountLinking.trustedProviders`, `emailOTP.storeOTP`, `emailOTP.resend`, `emailOTP.disableSignUp`), the escape hatch is the answer: `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` (introduced alongside this amendment) merges adopter-supplied options into the underlying `betterAuth({...})` call.
+A different default value on its own is not on this list. Default tweaks live in adopter code or in `betterAuthOptions`.
+
+For knobs that are *just* Better Auth fields (e.g. `account.accountLinking.trustedProviders`, `emailOTP.storeOTP`, `emailOTP.resend`, `emailOTP.disableSignUp`), the escape hatch is the answer: `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` (lands in the companion PR following this amendment — see § "Implementation status") merges adopter-supplied options into the underlying `betterAuth({...})` call.
 
 This makes the implicit explicit. The SDK's auth surface is now committee-curated; the escape hatch is for everything else.
 
