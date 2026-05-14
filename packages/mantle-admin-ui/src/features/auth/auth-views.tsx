@@ -64,6 +64,10 @@ export function AccessDeniedView({
   );
 }
 
+// Mirrors `AuthMethodInfo` exported from `@aotter/mantle-cloudflare`
+// (see `createAuth.ts`). Duplicated here because the admin SPA is built
+// adapter-agnostic and can't import from the adapter package; the
+// `/api/auth/methods` endpoint is the wire contract between them.
 type AuthMethodInfo =
   | { kind: "email-otp" }
   | { kind: "magic-link" }
@@ -187,8 +191,10 @@ function MethodSection({
  * Display-name table for Better Auth's social provider ids. Brand
  * names don't translate, so this stays language-agnostic — the
  * surrounding "Continue with …" template is the only translated
- * piece. Unknown ids (a provider Better Auth adds before the SPA
- * rebuilds) render as-is.
+ * piece. Mirrors the `SocialProviderId` union in
+ * `@aotter/mantle-cloudflare`; kept here (not split into a
+ * shared constants file) because adapters and the SPA evolve
+ * independently — the only consumer is one call site below.
  */
 const SOCIAL_PROVIDER_DISPLAY_NAME: Readonly<Record<string, string>> = {
   github: "GitHub",
@@ -228,14 +234,12 @@ const SOCIAL_PROVIDER_DISPLAY_NAME: Readonly<Record<string, string>> = {
   dropbox: "Dropbox",
 };
 
-function socialDisplayName(provider: string): string {
-  return SOCIAL_PROVIDER_DISPLAY_NAME[provider] ?? provider;
-}
-
 /**
  * Generic social-provider button. Label = template
  * `auth.signIn.method.social.button` substituted with the provider's
  * display name. Brand names don't translate; only the wrapper does.
+ * Unknown ids (a provider Better Auth adds before the SPA rebuilds)
+ * render with the raw id as the substitution.
  */
 function SocialSignInSection({
   provider,
@@ -245,6 +249,7 @@ function SocialSignInSection({
   returnTo: string;
 }): React.ReactElement {
   const { language } = usePreferences();
+  const displayName = SOCIAL_PROVIDER_DISPLAY_NAME[provider] ?? provider;
   const startSocial = async (): Promise<void> => {
     const res = await fetch("/api/auth/sign-in/social", {
       method: "POST",
@@ -259,9 +264,7 @@ function SocialSignInSection({
   return (
     <div className={SECTION_PLAIN}>
       <Button onClick={() => void startSocial()} className="w-full">
-        {t(language, "auth.signIn.method.social.button", {
-          provider: socialDisplayName(provider),
-        })}
+        {t(language, "auth.signIn.method.social.button", { provider: displayName })}
       </Button>
     </div>
   );

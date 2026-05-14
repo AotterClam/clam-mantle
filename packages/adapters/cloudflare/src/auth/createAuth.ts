@@ -170,29 +170,33 @@ const userAc = ac.newRole({
 function buildSocialProviders(
   methods: ReadonlyArray<AuthMethodConfig>,
 ): BetterAuthOptions["socialProviders"] {
-  // Cast through `Record` because Better Auth's typed
-  // `socialProviders` shape names every provider key individually;
-  // assigning by computed string requires the index signature.
-  const out = {} as Record<string, Record<string, unknown>>;
+  // Better Auth's typed `socialProviders` shape names every provider
+  // key individually; assigning by computed string requires an index
+  // signature, so we build through a plain map and cast once at the
+  // return. The runtime shape matches Better Auth's expectations.
+  const out: Record<string, Record<string, unknown>> = {};
   for (const method of methods) {
     if (method.kind !== "social") continue;
-    const config: Record<string, unknown> = {
+    // GitHub-specific: stash the github login on `user.githubLogin`
+    // so `bootstrapOwner: { match: "github-login" }` keeps working.
+    // Other providers don't need an analogous shim because bootstrap
+    // matches on email for them.
+    const githubProfileMapper =
+      method.provider === "github"
+        ? {
+            mapProfileToUser: (profile: { login?: string }) => ({
+              githubLogin: profile.login,
+            }),
+          }
+        : {};
+    out[method.provider] = {
       clientId: method.clientId,
       clientSecret: method.clientSecret,
       ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
       ...(method.scope ? { scope: [...method.scope] } : {}),
       ...(method.extras ?? {}),
+      ...githubProfileMapper,
     };
-    // GitHub-specific: stash the github login on `user.githubLogin`
-    // so `bootstrapOwner: { match: "github-login" }` keeps working.
-    // Other providers don't need an analogous shim because
-    // bootstrap matches on email for them.
-    if (method.provider === "github") {
-      config.mapProfileToUser = (profile: { login?: string }) => ({
-        githubLogin: profile.login,
-      });
-    }
-    out[method.provider] = config;
   }
   return out as BetterAuthOptions["socialProviders"];
 }
