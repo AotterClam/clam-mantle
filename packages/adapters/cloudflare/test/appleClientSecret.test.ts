@@ -145,7 +145,47 @@ describe("appleClientSecret", () => {
         audience: "com.example.web",
         expiresInSeconds: 0,
       }),
-    ).rejects.toThrow(/positive/);
+    ).rejects.toThrow(/positive finite number/);
+  });
+
+  it("rejects NaN expiresInSeconds (would silently produce exp: null)", async () => {
+    const { privateKeyPem } = await generateEphemeralKeyPair();
+    await expect(
+      appleClientSecret({
+        teamId: "TEAM123456",
+        keyId: "KEY1234567",
+        privateKey: privateKeyPem,
+        audience: "com.example.web",
+        expiresInSeconds: Number.NaN,
+      }),
+    ).rejects.toThrow(/positive finite number/);
+  });
+
+  it("rejects Infinity expiresInSeconds", async () => {
+    const { privateKeyPem } = await generateEphemeralKeyPair();
+    await expect(
+      appleClientSecret({
+        teamId: "TEAM123456",
+        keyId: "KEY1234567",
+        privateKey: privateKeyPem,
+        audience: "com.example.web",
+        expiresInSeconds: Number.POSITIVE_INFINITY,
+      }),
+    ).rejects.toThrow(/positive finite number/);
+  });
+
+  it("accepts exactly Apple's 180-day max", async () => {
+    const { privateKeyPem, publicKey } = await generateEphemeralKeyPair();
+    const APPLE_MAX = 180 * 24 * 60 * 60;
+    const jwt = await appleClientSecret({
+      teamId: "TEAM123456",
+      keyId: "KEY1234567",
+      privateKey: privateKeyPem,
+      audience: "com.example.web",
+      expiresInSeconds: APPLE_MAX,
+    });
+    const { payload } = await verifyJwt(jwt, publicKey);
+    expect((payload.exp as number) - (payload.iat as number)).toBe(APPLE_MAX);
   });
 
   it("rejects an empty privateKey", async () => {

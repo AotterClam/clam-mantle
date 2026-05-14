@@ -11,9 +11,11 @@
  *     `clientId` you pass for `provider: "apple"`)
  *
  * The JWT lives at most 180 days per Apple's policy. This helper
- * defaults to 30 days; for typical Workers the JWT is regenerated at
- * isolate boot, which is well below 30 days. Long-lived Workers should
- * regenerate at deploy or via cron.
+ * defaults to 30 days; **the adopter is responsible for regenerating
+ * the JWT before it expires** (e.g. on deploy, or via a scheduled
+ * worker). A long-lived Cloudflare isolate can outlive the default,
+ * and Apple will reject signin attempts with an expired secret —
+ * don't rely on isolate restart cadence for rotation.
  *
  * Built on `crypto.subtle` (native to Workers) — no `node:crypto`, no
  * JWT deps.
@@ -74,8 +76,13 @@ export async function appleClientSecret(
   args: AppleClientSecretArgs,
 ): Promise<string> {
   const expiresIn = args.expiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS;
-  if (expiresIn <= 0) {
-    throw new Error("appleClientSecret: expiresInSeconds must be positive");
+  if (!Number.isFinite(expiresIn) || expiresIn <= 0) {
+    // `Number.isFinite` filters NaN / Infinity — without it, NaN slips
+    // through `<= 0` and lands as `exp: NaN` → JSON serialises null
+    // → Apple rejects opaquely. Catch at the boundary with a clear msg.
+    throw new Error(
+      "appleClientSecret: expiresInSeconds must be a positive finite number",
+    );
   }
   if (expiresIn > APPLE_MAX_EXPIRES_IN_SECONDS) {
     throw new Error(
