@@ -49,10 +49,12 @@ export type AuthMethodConfig =
        *  clickable URL; Better Auth verifies the token when the user
        *  lands on it. */
       readonly sender: EmailSender;
-      /** Link TTL in seconds (Better Auth default 300 = 5 min). */
+      /** Link TTL in seconds. Defaults to 900 (15 min); see
+       *  `MAGIC_LINK_DEFAULT_EXPIRES_SECONDS` for rationale. */
       readonly expiresInSeconds?: number;
-      /** Allowed verification attempts (Better Auth default 1 —
-       *  links are single-use). */
+      /** Allowed verification attempts. Defaults to 3 to survive
+       *  mail-prefetcher URL scans (Outlook Safe Links etc.); see
+       *  `MAGIC_LINK_DEFAULT_ALLOWED_ATTEMPTS`. */
       readonly allowedAttempts?: number;
       /** Fallback locale when the request carries no Accept-Language. */
       readonly fallbackLocale?: string;
@@ -62,6 +64,15 @@ export type AuthMethodConfig =
  * First-staff promotion rule. Decoupled from `methods[]` so switching
  * the bootstrap signal (e.g. `github-login` → `email`) doesn't touch
  * any method's options.
+ *
+ * Promotion fires on `user.create.after`, which Better Auth dispatches
+ * **only on first user creation**. If the operator signs in via one
+ * method (say GitHub) before the rule can match (say `match: "email"`
+ * with a non-GitHub email), the user row is created and a later
+ * sign-in via a different method on the SAME email reuses that row —
+ * `create.after` does not re-fire and the owner role is never
+ * assigned. Match key first; the linked second method inherits the
+ * role via the shared `user.id`.
  */
 export type BootstrapOwnerRule =
   | { readonly match: "github-login"; readonly value: string }
@@ -130,15 +141,24 @@ function pickLocale(req: Request | undefined, fallback: string): string {
   return first && first.length > 0 ? first : fallback;
 }
 
+// Magic-link defaults override Better Auth's tighter built-ins:
+//   - 900s (15 min) link TTL — corporate mail (Outlook + Exchange,
+//     Mimecast, Proofpoint URL Defense) often has 30-60s delivery
+//     lag and users batch-check; 300s shipped too many "expired"
+//     receipts. Industry baseline: Slack 60min, Notion / Vercel
+//     24h. We split the difference and let adopters override.
+//   - 3 allowed verification attempts — mail prefetchers (Outlook
+//     Safe Links, Mimecast URL Protect, Proofpoint URL Defense)
+//     routinely consume URLs once before the user opens the email.
+//     1 attempt is genuinely broken on those inboxes.
+const MAGIC_LINK_DEFAULT_EXPIRES_SECONDS = 900;
+const MAGIC_LINK_DEFAULT_ALLOWED_ATTEMPTS = 3;
+
 function buildMagicLinkPlugin(method: Extract<AuthMethodConfig, { kind: "magic-link" }>) {
   const fallback = method.fallbackLocale ?? "en";
   return magicLink({
-    ...(method.expiresInSeconds !== undefined
-      ? { expiresIn: method.expiresInSeconds }
-      : {}),
-    ...(method.allowedAttempts !== undefined
-      ? { allowedAttempts: method.allowedAttempts }
-      : {}),
+    expiresIn: method.expiresInSeconds ?? MAGIC_LINK_DEFAULT_EXPIRES_SECONDS,
+    allowedAttempts: method.allowedAttempts ?? MAGIC_LINK_DEFAULT_ALLOWED_ATTEMPTS,
     // Returned synchronously — same fire-and-forget contract as
     // email-otp via `advanced.backgroundTasks.handler`. The body
     // carries the click-URL; SDK doesn't ship a template, the
