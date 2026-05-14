@@ -6,6 +6,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Breaking
+
+- **`@aotterclam/clam-cms-cloudflare`**: `AuthMethodConfig` collapses the `kind: "github"` case into the new generic `kind: "social"` discriminated by `provider`. Mirrors Better Auth's own `socialProviders` block shape and unlocks ~35 upstream IDPs (`google`, `apple`, `microsoft-entra-id`, `facebook`, `discord`, `twitter`, `linkedin`, `spotify`, `twitch`, `gitlab`, `tiktok`, `reddit`, `kick`, `vk`, `naver`, `kakao`, `line`, `slack`, `atlassian`, `zoom`, `notion`, `figma`, `linear`, `vercel`, `paypal`, `huggingface`, `cognito`, `salesforce`, `polar`, `railway`, `roblox`, `paybin`, `wechat`, `dropbox`, plus `github`). Adopter migration: `{ kind: "github", clientId, clientSecret }` → `{ kind: "social", provider: "github", clientId, clientSecret }`. `bootstrapOwner: { match: "github-login" }` continues to work; the internal `mapProfileToUser` shim still populates `user.githubLogin` when `provider === "github"`. Provider-specific fields (Apple's `teamId` / `keyId` / `privateKey`, Microsoft Entra ID's `tenantId`, etc.) ride via the new `extras?: Record<string, unknown>` field merged verbatim into Better Auth's per-provider config (#166).
+- **`@aotterclam/clam-cms-cloudflare`**: `Auth.methods` now returns structured `AuthMethodInfo[]` objects instead of `AuthMethodKind[]` strings — `{ kind: "email-otp" } | { kind: "magic-link" } | { kind: "social"; provider }`. The `GET /api/auth/methods` endpoint reflects the new shape so the admin SPA can dispatch per-provider (#166).
+
 ### Added
 
 - **`@aotterclam/clam-cms-runtime`**: new optional port `EmailSender` (`domain/port/EmailSender.ts`). Transactional-email contract for features that need to send mail — passwordless sign-in, order receipts, etc. The SDK never owns email body templates; the port hands the sender a `locale` (BCP 47) so adopter-supplied senders branch on language without the runtime owning translation tables (#158).
@@ -17,6 +22,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - **`@aotterclam/clam-cms-admin-ui`**: i18n key family `auth.signIn.method.<kind>.*` for per-method labels + body text + error states. EN canonical; zh-TW and ja carry translations for the email-OTP UI; other languages fall back to EN per the documented chain (#159).
 - **`@aotterclam/clam-cms-cloudflare`**: new `AuthMethodConfig` union case `{ kind: "magic-link", sender, expiresInSeconds?, allowedAttempts?, fallbackLocale? }`. Better Auth's `magicLink` plugin wires in; `sendMagicLink` dispatches the click-URL through the configured `EmailSender` with category `auth.magic-link.sign-in`. Singleton-per-config like `email-otp`. Rate-limit default now fires when either `email-otp` OR `magic-link` is registered (#164).
 - **`@aotterclam/clam-cms-admin-ui`**: `MagicLinkSection` added to SignInView — single email field → "check your inbox" confirmation state. POSTs to `/api/auth/sign-in/magic-link` with `callbackURL: returnTo` so the email link lands on the original destination after verification. New `auth.signIn.method.magic-link.*` i18n keys; EN/zh-TW/ja translated (#164).
+- **`@aotterclam/clam-cms-admin-ui`**: generic `SocialSignInSection` replaces the GitHub-only button. Renders one button per registered social method, label templated from `auth.signIn.method.social.button` ("Continue with {provider}") with a brand display-name table (`SOCIAL_PROVIDER_DISPLAY_NAME`) so e.g. `microsoft-entra-id` → "Microsoft", `huggingface` → "Hugging Face". Brand names aren't translated; only the "Continue with" wrapper is, in EN/zh-TW/ja (#166).
 
 ### Changed
 
