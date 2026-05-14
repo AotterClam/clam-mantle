@@ -46,7 +46,7 @@ You're an agent helping a (likely non-technical) user install or extend a mantle
 
 End state: a Cloudflare Worker at `https://<your-site>.<your-account>.workers.dev` with:
 
-- `/admin` — GitHub-OAuth-gated React admin SPA
+- `/admin` — React admin SPA, role-gated after sign-in (GitHub / Google / Apple / 30+ social providers, email-OTP, magic-link — adopter picks the methods)
 - `/staff/mcp` — staff MCP endpoint, owner/editor agents connect here to edit content
 - `/mcp` — end-user/read MCP endpoint for public View tools and future member flows
 - `/<locale>/<collection>/<slug>` — per-entry HTML
@@ -63,7 +63,7 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 | `@aotter/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
 | `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
 | `@aotter/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
-| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS and owns Better Auth wiring. |
+| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS. Ships `createAuth()` — the Better Auth-backed *default* implementation of the SDK's `Auth` contract (see [ADR-0014](docs/adr/0014-auth-better-auth-and-multi-tenant-mcp.md) § "Auth as contract, Better Auth as default"); replace by passing your own `Auth` instance. |
 | `@aotter/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
 
 ## Starters

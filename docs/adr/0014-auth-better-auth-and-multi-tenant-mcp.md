@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted (new)
+Accepted (new). Amended 2026-05-14 — formalize "Better Auth as default implementation, `Auth` interface as the SDK contract" (see § "Auth as contract, Better Auth as default").
 
 ## Date
 
-2026-05-09
+2026-05-09 (amended 2026-05-14)
 
 ## Context
 
@@ -139,6 +139,65 @@ Auth is no longer an adapter port. `mantle-runtime` does NOT define an auth port
 The adapter uses Better Auth to validate sessions, MCP bearer tokens, scopes, and roles, then passes authenticated user/staff context into runtime dispatchers. Better Auth remains platform-agnostic, but it is not a runtime dependency.
 
 This is a minor amendment to ADR-0011 (adapter port spec): the auth ports disappear and auth becomes adapter-owned mount wiring. The hard invariant ("`mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved.
+
+### 7. Auth as contract, Better Auth as default
+
+**Amended 2026-05-14.** The five auth-cascade PRs (#160 → #173) shipped Better Auth-backed config + admin SPA + tests. During that work two architectural lines need to be explicit so future PRs don't drift toward mechanical pass-through:
+
+**The SDK's public auth contract is the `Auth` interface, not Better Auth.**
+
+`packages/adapters/cloudflare/src/auth/createAuth.ts` exports:
+
+```ts
+export interface Auth {
+  readonly handler: (request: Request) => Promise<Response>;
+  readonly getSession: (request: Request) => Promise<{...} | null>;
+  readonly getMcpSession: (request: Request) => Promise<{...} | null>;
+  readonly getUserRole: (userId: string) => Promise<string | null>;
+  readonly methods: ReadonlyArray<AuthMethodInfo>;
+}
+```
+
+The four consumers (`mountServerEndpoints`, `mountMcp`, `bootRuntimeOnce`, `cmsConfig`) all import only the `Auth` type — never `betterAuth`, never any plugin internals. Better Auth is imported in exactly one file (`createAuth.ts`).
+
+**`createAuth(config)` is the SDK-shipped, Better Auth-backed *default* implementation.** Adopters who want the curated `methods[]` shape, `bootstrapOwner` promotion, Workers-aware rate-limit, fire-and-forget `backgroundTasks.handler`, `extras` reserved-key validation, and the `Auth.methods` admin-SPA contract — pass a config to `createAuth()` and get an `Auth`.
+
+**Adopters who want a different backend implement `Auth` directly and bypass `createAuth`.** Lucia, Auth.js, a custom hand-roll — all valid. The seam already works today; only the `/api/auth/*` URL convention (which Better Auth picks for its mounted endpoints) is a second-tier contract that affects the admin SPA's hard-coded `fetch()` paths. Replacing the backend means matching that URL convention OR forking the admin SPA's `auth-views.tsx`.
+
+**Anti-pattern to refuse in review: BetterAuth-field pass-through.**
+
+If a future PR's only effect is to rename a Better Auth field into our `CreateAuthConfig` and forward it verbatim, refuse it. The SDK adds load-bearing surface area only when:
+
+- It encodes a Workers-aware default (e.g. `rateLimit` on when an email-shaped method registers; `advanced.backgroundTasks.handler` wired)
+- It defines a cross-adapter port (e.g. `EmailSender` in `mantle-runtime/domain/port/`)
+- It opinionates a default we'd bet on (e.g. magic-link 15min TTL / 3 attempts for mail prefetchers)
+- It adds a safety net (e.g. `extras` reserved-key validation; bootstrap-method cross-check)
+- It introduces a new abstraction (e.g. `methods[]` unifies `socialProviders` + `emailOTP` + `magicLink` plugins under one config shape)
+- It ships a DX helper that removes a Workers-hostile dep (e.g. `appleClientSecret` for the ES256 JWT via `crypto.subtle` instead of `jose`)
+
+For knobs that are *just* Better Auth fields with no opinion (e.g. `account.accountLinking.trustedProviders`, `emailOTP.storeOTP`, `emailOTP.resend`, `emailOTP.disableSignUp`), the escape hatch is the answer: `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` (introduced alongside this amendment) merges adopter-supplied options into the underlying `betterAuth({...})` call.
+
+This makes the implicit explicit. The SDK's auth surface is now committee-curated; the escape hatch is for everything else.
+
+### 8. Path to `@aotter/mantle-better-auth` separate package (deferred)
+
+When `mantle-netlify` lands, the Better Auth wiring moves to its own package. Today the seam is in place:
+
+- `Auth` interface lives in the adapter (could move to runtime or a separate package without breaking the contract — adapters consume the type, not the implementation).
+- `createAuth.ts` is the only file with `import { betterAuth }` (~290 LOC, no Cloudflare-binding-specific code outside `config.database: D1Database`).
+- `ConsoleEmailSender.ts` is dev-only and platform-agnostic (~25 LOC).
+- `appleClientSecret.ts` uses Web Crypto (`crypto.subtle`) which Workers + Node 18+ + Bun + Deno all share (~150 LOC).
+
+The future split looks like:
+
+```
+@aotter/mantle-runtime           ← ports + use cases (today)
+@aotter/mantle-better-auth       ← createAuth + EmailSender impls + appleClientSecret (new, when needed)
+@aotter/mantle-cloudflare        ← Workers adapter; depends on (or accepts) Auth-shape (today)
+@aotter/mantle-netlify           ← Netlify adapter; same shape (v0.2)
+```
+
+The pivot point — when to extract — is when the second adapter (`mantle-netlify`) needs the same wiring. Until then, in-place co-location is cheaper than a new package boundary.
 
 ## Consequences
 
