@@ -1,6 +1,6 @@
 {
   "name": "@aotterclam/clam-cms-admin-ui",
-  "version": "0.0.8-beta.4",
+  "version": "0.0.8-beta.5",
   "description": "Admin SPA for clam-cms — React 19 + Vite + Tailwind v4 + shadcn. Platform-agnostic: ships a single self-contained HTML string consumed by clam-cms-cloudflare / clam-cms-netlify mount layers.",
   "license": "Apache-2.0",
   "homepage": "https://github.com/AotterClam/clam-cms/tree/main/packages/clam-cms-admin-ui",
