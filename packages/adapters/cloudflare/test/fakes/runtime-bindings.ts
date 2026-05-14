@@ -36,6 +36,6 @@ export class StubAssetServer implements AssetServer {
 export const stubAuth: Auth = {
   handler: async () => new Response(null, { status: 404 }),
   getSession: async () => null,
-  getMcpSession: async () => null,
   getUserRole: async () => null,
+  methods: [],
 };
