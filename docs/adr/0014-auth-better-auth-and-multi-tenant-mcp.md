@@ -158,7 +158,7 @@ export interface Auth {
 }
 ```
 
-The four consumers (`mountServerEndpoints`, `mountMcp`, `bootRuntimeOnce`, `cmsConfig`) all import only the `Auth` type — never `betterAuth`, never any plugin internals. Better Auth is imported in exactly one file (`createAuth.ts`).
+The internal consumers of `Auth` (post-#193: `mountServerEndpoints`, `createMcpApiHandler`, `mountAuthorize`, `bootRuntimeOnce`, `cmsConfig`) all import only the `Auth` type — never `betterAuth`, never any plugin internals. Better Auth is imported in exactly one file (`createAuth.ts`).
 
 **`createAuth(config)` is the SDK-shipped, Better Auth-backed *default* implementation.** Adopters who want the curated `methods[]` shape, `bootstrapOwner` promotion, Workers-aware rate-limit, fire-and-forget `backgroundTasks.handler`, `extras` reserved-key validation, and the `Auth.methods` admin-SPA contract — pass a config to `createAuth()` and get an `Auth`.
 
@@ -174,11 +174,11 @@ If a future PR's only effect is to rename a Better Auth field into our `CreateAu
 - **New abstraction** that fuses multiple Better Auth surfaces (e.g. `methods[]` unifies `socialProviders` + `emailOTP` + `magicLink` plugins under one config shape with shared per-method discrimination).
 - **DX helper that removes a Workers-hostile dep** (e.g. `appleClientSecret` signs the ES256 JWT via `crypto.subtle` so adopters don't have to install `jose` for the one task Better Auth's docs assume a JWT lib).
 
-A different default value on its own is not on this list. Default tweaks live in adopter code or in `betterAuthOptions`.
+A different default value on its own is not on this list. Default tweaks live in adopter code.
 
-For knobs that are *just* Better Auth fields (e.g. `account.accountLinking.trustedProviders`, `emailOTP.storeOTP`, `emailOTP.resend`, `emailOTP.disableSignUp`), the escape hatch is the answer: `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` (lands in the companion PR following this amendment — see § "Implementation status") merges adopter-supplied options into the underlying `betterAuth({...})` call.
+> **Retracted by Amendment 2026-05-15.** This section originally pointed at a `CreateAuthConfig.betterAuthOptions?: Partial<BetterAuthOptions>` escape hatch (introduced in PR #175). The 2026-05-15 OAuth carve-out (PR #193) removed it. With the MCP OAuth surface now served by `@cloudflare/workers-oauth-provider`, the un-curated knob set Better Auth still owns (staff sign-in, social, OTP, magic-link, role) is small enough that the curated `methods[]` / `rateLimit` / `bootstrapOwner` fields cover the adopter contract. When a missing Better Auth knob is real and load-bearing, the answer is a curated first-class field — not a passthrough. See § "Amendment 2026-05-15" below.
 
-This makes the implicit explicit. The SDK's auth surface is now committee-curated; the escape hatch is for everything else.
+This makes the implicit explicit. The SDK's auth surface is committee-curated; un-curated knobs require either a justified first-class field or an architectural change to remove the dependency on that knob.
 
 ### 8. Path to `@aotterclam/clam-cms-better-auth` separate package (deferred)
 
