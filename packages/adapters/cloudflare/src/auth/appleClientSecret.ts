@@ -11,17 +11,12 @@
  *     `clientId` you pass for `provider: "apple"`)
  *
  * The JWT lives at most 180 days per Apple's policy. This helper
- * defaults to 30 days; adopters who run long-lived Workers (rare)
- * should regenerate at deploy or via cron. For typical Workers the
- * JWT is regenerated at isolate boot, which is well below 30 days.
+ * defaults to 30 days; for typical Workers the JWT is regenerated at
+ * isolate boot, which is well below 30 days. Long-lived Workers should
+ * regenerate at deploy or via cron.
  *
- * # Why not bring `jsonwebtoken`?
- *
- * `jsonwebtoken` and friends pull `node:crypto`, which is not a free
- * import on Workers (compatibility-flag-gated, larger bundle).
- * `crypto.subtle` is native to Workers and signs ECDSA-P256 directly;
- * the JWT envelope is two short base64url strings around a signature.
- * The whole helper is ~80 LOC and zero deps.
+ * Built on `crypto.subtle` (native to Workers) — no `node:crypto`, no
+ * JWT deps.
  *
  * # Adopter usage
  *
@@ -112,8 +107,7 @@ export async function appleClientSecret(
 
 const textEncoder = new TextEncoder();
 
-const PEM_HEADER_RE = /-----BEGIN [^-]+-----/;
-const PEM_FOOTER_RE = /-----END [^-]+-----/;
+const PEM_MARKERS_RE = /-----(?:BEGIN|END) [^-]+-----/g;
 
 async function importApplePrivateKey(input: string): Promise<CryptoKey> {
   const der = decodePrivateKeyToDer(input);
@@ -127,16 +121,8 @@ async function importApplePrivateKey(input: string): Promise<CryptoKey> {
 }
 
 function decodePrivateKeyToDer(input: string): Uint8Array {
-  // Strip PEM wrapper + whitespace; tolerate the bare-base64 path too.
-  let body = input.trim();
-  if (PEM_HEADER_RE.test(body)) {
-    body = body
-      .replace(PEM_HEADER_RE, "")
-      .replace(PEM_FOOTER_RE, "")
-      .replace(/\s+/g, "");
-  } else {
-    body = body.replace(/\s+/g, "");
-  }
+  // Strip PEM markers + all whitespace; tolerate the bare-base64 path too.
+  const body = input.replace(PEM_MARKERS_RE, "").replace(/\s+/g, "");
   if (body.length === 0) {
     throw new Error(
       "appleClientSecret: privateKey is empty after stripping the PEM wrapper.",
