@@ -166,7 +166,7 @@ function MethodSection({
     case "github":
       return <GitHubSignInSection returnTo={returnTo} />;
     case "email-otp":
-      return <EmailOtpSection />;
+      return <EmailOtpSection returnTo={returnTo} />;
     default:
       return <UnknownMethodSection kind={kind} />;
   }
@@ -194,7 +194,7 @@ function GitHubSignInSection({ returnTo }: { returnTo: string }): React.ReactEle
   );
 }
 
-function EmailOtpSection(): React.ReactElement {
+function EmailOtpSection({ returnTo }: { returnTo: string }): React.ReactElement {
   const { language } = usePreferences();
   const [step, setStep] = React.useState<"email" | "otp">("email");
   const [email, setEmail] = React.useState("");
@@ -248,9 +248,13 @@ function EmailOtpSection(): React.ReactElement {
         setError(t(language, "auth.signIn.method.email-otp.verifyFailed"));
         return;
       }
-      // Better Auth sets the session cookie on the response; reload
-      // to let the gate redirect to the original return URL.
-      window.location.reload();
+      // Navigate to the original return URL. The session cookie is
+      // already set on the response, so the next request to
+      // `returnTo` is authenticated and the gate routes accordingly.
+      // Plain reload() would land back on /admin/sign-in — the
+      // pathname is unchanged, the gate sees us on the sign-in page
+      // and renders SignInView again instead of routing through.
+      window.location.assign(returnTo);
     });
   };
 
