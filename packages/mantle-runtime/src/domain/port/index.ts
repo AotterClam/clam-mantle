@@ -5,7 +5,8 @@
  *
  * Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer`.
  * Optional feature ports — `MediaStorage` (public-bucket media
- * uploads). Dispatcher-internal seams — `Clock`, `IdGenerator`,
+ * uploads), `EmailSender` (transactional email — passwordless auth,
+ * receipts). Dispatcher-internal seams — `Clock`, `IdGenerator`,
  * `HandlerRegistry`, `EntryRepository`. Identity / session / OAuth
  * live outside the runtime via Better Auth (ADR-0014).
  *
@@ -46,6 +47,10 @@ export type {
   DeleteAssetArgs,
   MediaAsset,
 } from "./MediaStorage.js";
+export type {
+  EmailSender,
+  EmailSendArgs,
+} from "./EmailSender.js";
 export type {
   LifecycleHookRunner,
   RunLifecycleHookRequest,

@@ -44,6 +44,10 @@ export type {
   DeleteAssetArgs,
   MediaAsset,
 } from "./domain/port/MediaStorage.js";
+export type {
+  EmailSender,
+  EmailSendArgs,
+} from "./domain/port/EmailSender.js";
 export { extensionForMime } from "./usecase/media/mediaAllowlist.js";
 export type {
   DeferredHookDispatcher,

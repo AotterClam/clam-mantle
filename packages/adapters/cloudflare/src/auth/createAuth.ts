@@ -1,7 +1,8 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { admin, mcp } from "better-auth/plugins";
+import { admin, emailOTP, mcp } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
+import type { EmailSender } from "@aotter/mantle-runtime";
 
 export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
@@ -26,6 +27,21 @@ export type AuthMethodConfig =
        *  redirect to. The consumer is then responsible for forwarding
        *  requests at that URI to `auth.handler`. */
       readonly redirectURI?: string;
+    }
+  | {
+      readonly kind: "email-otp";
+      /** Transactional-email sender. SDK never owns body templates;
+       *  the locale is passed through so the sender can branch. */
+      readonly sender: EmailSender;
+      /** OTP length (Better Auth default 6). */
+      readonly otpLength?: number;
+      /** OTP TTL in seconds (Better Auth default 300 = 5 min). */
+      readonly expiresInSeconds?: number;
+      /** Allowed attempts before the OTP locks (Better Auth default 3). */
+      readonly allowedAttempts?: number;
+      /** Fallback locale when the request carries no Accept-Language —
+       *  typically the site's canonical locale. BCP 47. Defaults to "en". */
+      readonly fallbackLocale?: string;
     };
 
 /**
@@ -75,28 +91,58 @@ function buildSocialProviders(
 ): BetterAuthOptions["socialProviders"] {
   const out: BetterAuthOptions["socialProviders"] = {};
   for (const method of methods) {
-    switch (method.kind) {
-      case "github":
-        out.github = {
-          clientId: method.clientId,
-          clientSecret: method.clientSecret,
-          mapProfileToUser: (profile) => ({
-            githubLogin: profile.login,
-          }),
-          ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
-        };
-        break;
-      default: {
-        // Runtime guard for unknown `kind` values. The compile-time
-        // exhaustiveness check activates the moment PR-B adds a
-        // second union variant — until then there's nothing for
-        // TypeScript to narrow into `never`.
-        const kind = (method as { kind: string }).kind;
-        throw new Error(`createAuth: unhandled AuthMethodConfig.kind '${kind}'`);
-      }
+    if (method.kind === "github") {
+      out.github = {
+        clientId: method.clientId,
+        clientSecret: method.clientSecret,
+        mapProfileToUser: (profile) => ({
+          githubLogin: profile.login,
+        }),
+        ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
+      };
     }
   }
   return out;
+}
+
+/**
+ * First tag off `Accept-Language`, quality values ignored. Locale
+ * contract lives in `EmailSender.ts`.
+ */
+function pickLocale(req: Request | undefined, fallback: string): string {
+  const header = req?.headers.get("accept-language");
+  if (!header) return fallback;
+  const first = header.split(",")[0]?.split(";")[0]?.trim();
+  return first && first.length > 0 ? first : fallback;
+}
+
+function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-otp" }>) {
+  const fallback = method.fallbackLocale ?? "en";
+  return emailOTP({
+    ...(method.otpLength !== undefined ? { otpLength: method.otpLength } : {}),
+    ...(method.expiresInSeconds !== undefined
+      ? { expiresIn: method.expiresInSeconds }
+      : {}),
+    ...(method.allowedAttempts !== undefined
+      ? { allowedAttempts: method.allowedAttempts }
+      : {}),
+    // Return synchronously — the promise is fire-and-forget via the
+    // `advanced.backgroundTasks.handler` we wire in `buildAuth`. For
+    // `email-verification` / `forget-password` types Better Auth only
+    // calls this when the user exists, so awaiting would leak account
+    // existence through response latency. See Better Auth's own
+    // sendVerificationOTP docstring + reviewer finding in PR #161.
+    sendVerificationOTP: (data, ctx) => {
+      const locale = pickLocale(ctx?.request, fallback);
+      return method.sender.send({
+        to: data.email,
+        subject: `Your sign-in code: ${data.otp}`,
+        text: `Your one-time code is ${data.otp}. It expires shortly. If you didn't request this, ignore this email.`,
+        locale,
+        category: `auth.email-otp.${data.type}`,
+      });
+    },
+  });
 }
 
 /**
@@ -106,6 +152,10 @@ function buildSocialProviders(
  * `match: "github-login"` with no `github` method registered. Throws
  * at construction so vibe-coders see the mistake before the first
  * sign-in attempt.
+ *
+ * `match: "email"` is permissive — every Better Auth method that
+ * creates a user populates `email`, including GitHub (via the
+ * upstream profile). No registration constraint to enforce.
  */
 function validateBootstrap(
   rule: BootstrapOwnerRule,
@@ -120,9 +170,6 @@ function validateBootstrap(
       );
     }
   }
-  // `match: "email"` is permissive — every Better Auth method that
-  // creates a user populates `email`, including GitHub (via the
-  // upstream profile). No registration constraint to enforce.
 }
 
 function shouldPromoteToOwner(
@@ -149,6 +196,25 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const socialProviders = buildSocialProviders(config.methods);
   const bootstrap = config.bootstrapOwner;
+  const emailOtpMethods = config.methods.filter((m) => m.kind === "email-otp");
+  if (emailOtpMethods.length > 1) {
+    throw new Error(
+      "createAuth: more than one `email-otp` method registered. Combine into one.",
+    );
+  }
+  const emailOtpMethod = emailOtpMethods[0];
+
+  // Rate limit: Better Auth's per-route limits gate on
+  // `process.env.NODE_ENV === "production"`, which is unset on
+  // Cloudflare Workers — leaving the limits silently off. When email
+  // is wired (free email-send-to-any-address surface) we ALWAYS turn
+  // limits on; adopter can override window/max via `config.rateLimit`.
+  const rateLimitDefault = emailOtpMethod
+    ? { window: 60, max: 10, enabled: true as const }
+    : null;
+  const rateLimit = config.rateLimit
+    ? { ...config.rateLimit, enabled: true as const }
+    : rateLimitDefault;
 
   return betterAuth({
     database: config.database,
@@ -164,7 +230,29 @@ function buildAuth(config: CreateAuthConfig) {
         },
       },
     },
-    ...(config.rateLimit ? { rateLimit: { ...config.rateLimit, enabled: true } } : {}),
+    ...(rateLimit ? { rateLimit } : {}),
+    // Fire-and-forget for any callback that opts into background.
+    // Better Auth's emailOTP plugin wraps `sendVerificationOTP` in
+    // `runInBackgroundOrAwait` — without this hook it awaits, which
+    // turns response latency into a user-existence oracle (Better
+    // Auth only calls the callback when the user exists for
+    // `email-verification` / `forget-password` types). With this
+    // hook the callback returns immediately. We don't have request-
+    // scoped `ctx.waitUntil` at this construction-time layer, so
+    // pending sends rely on the Worker isolate staying alive long
+    // enough — typical for ~100-500ms sends. A waitUntil-aware
+    // version is queued as a follow-up; until then fire-and-forget
+    // beats the timing leak.
+    advanced: {
+      backgroundTasks: {
+        handler: (p) => {
+          p.catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error("[better-auth backgroundTask]", err);
+          });
+        },
+      },
+    },
     plugins: [
       admin({
         defaultRole: "user",
@@ -195,6 +283,7 @@ function buildAuth(config: CreateAuthConfig) {
           },
         },
       }),
+      ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
     ],
     databaseHooks: {
       user: {
