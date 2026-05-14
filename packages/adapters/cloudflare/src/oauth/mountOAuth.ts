@@ -80,12 +80,11 @@ export function mountAuthorize(app: Hono, options: MountAuthorizeOptions): void 
         metadata: {},
         scope: grantedScope,
         // Stash role on props so apiHandler can enforce staff gating
-        // via D1 lookup without re-querying. ctx.props is what the
-        // lib hands to apiHandler.fetch after token verification.
+        // via D1 lookup. ctx.props is what the lib hands to
+        // apiHandler.fetch after token verification.
         props: {
           userId: session.user.id,
           role: role ?? null,
-          scopes: grantedScope,
         },
       });
       return new Response(null, { status: 302, headers: { location: redirectTo } });
@@ -142,5 +141,4 @@ interface OauthHelpers {
 export interface OAuthApiProps {
   readonly userId: string;
   readonly role: string | null;
-  readonly scopes: readonly string[];
 }
