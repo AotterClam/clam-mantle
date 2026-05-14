@@ -64,7 +64,7 @@ export function AccessDeniedView({
   );
 }
 
-type AuthMethodKind = "github" | "email-otp";
+type AuthMethodKind = "github" | "email-otp" | "magic-link";
 
 // Shared input styling for the email-otp form. Lives at module scope
 // so we don't reallocate the string on every render and so a future
@@ -167,6 +167,8 @@ function MethodSection({
       return <GitHubSignInSection returnTo={returnTo} />;
     case "email-otp":
       return <EmailOtpSection returnTo={returnTo} />;
+    case "magic-link":
+      return <MagicLinkSection returnTo={returnTo} />;
     default:
       return <UnknownMethodSection kind={kind} />;
   }
@@ -311,6 +313,97 @@ function EmailOtpSection({ returnTo }: { returnTo: string }): React.ReactElement
           >
             {t(language, "auth.signIn.method.email-otp.back")}
           </button>
+        </form>
+      )}
+      {error ? (
+        <p className="mt-2 text-xs text-destructive">{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function MagicLinkSection({ returnTo }: { returnTo: string }): React.ReactElement {
+  const { language } = usePreferences();
+  const [email, setEmail] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // Mirrors EmailOtpSection's withBusy: identical busy / error-reset
+  // bookkeeping per submit. Kept inline (not module-scope) because the
+  // two sections have independent state setters; lifting it would
+  // require passing setBusy/setError in, which is more wiring than
+  // duplication saved.
+  const withBusy = async (run: () => Promise<void>): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      await run();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendLink = (e: React.FormEvent): void => {
+    e.preventDefault();
+    if (!email) return;
+    void withBusy(async () => {
+      const res = await fetch("/api/auth/sign-in/magic-link", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, callbackURL: returnTo }),
+      });
+      if (!res.ok) {
+        setError(t(language, "auth.signIn.method.magic-link.sendFailed"));
+        return;
+      }
+      setSent(true);
+    });
+  };
+
+  return (
+    <div className={SECTION_DIVIDED}>
+      <p className="mb-2 text-sm text-muted-foreground">
+        {t(language, "auth.signIn.method.magic-link.body")}
+      </p>
+      {sent ? (
+        <div className="space-y-2">
+          <p className="text-sm text-foreground">
+            {t(language, "auth.signIn.method.magic-link.sentTo", { email })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t(language, "auth.signIn.method.magic-link.clickHint")}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSent(false);
+              setEmail("");
+            }}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {t(language, "auth.signIn.method.magic-link.anotherEmail")}
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={sendLink} className="space-y-2">
+          <label htmlFor="signin-mlink-email" className="sr-only">
+            {t(language, "auth.signIn.method.magic-link.emailLabel")}
+          </label>
+          <input
+            id="signin-mlink-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.currentTarget.value)}
+            placeholder={t(language, "auth.signIn.method.magic-link.emailPlaceholder")}
+            required
+            autoComplete="email"
+            className={INPUT_CLASS}
+          />
+          <Button type="submit" className="w-full" disabled={busy || !email}>
+            {t(language, "auth.signIn.method.magic-link.sendButton")}
+          </Button>
         </form>
       )}
       {error ? (
