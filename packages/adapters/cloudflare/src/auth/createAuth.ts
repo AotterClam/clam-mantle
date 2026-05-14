@@ -8,36 +8,24 @@ export type AdminRole = (typeof ADMIN_ROLES)[number];
 export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
 
 /**
- * Auth method configurations. Discriminated union — adding a new
- * method (email-otp, magic-link, google, passkey, ...) becomes a new
- * union case in this file, not a new top-level key on
- * `CreateAuthConfig`. Order of registration in `methods[]` controls
- * the display order on the admin sign-in page (when admin-ui renders
- * data-driven, see issue #159).
- *
- * Per ADR-0014 we expect GitHub / Google / Apple via Better Auth's
- * `socialProviders`, plus email OTP and magic link via plugins.
- * This shape lets every method ride one slot.
+ * Auth method config (discriminated union). Adding a new method
+ * (email-otp, google, passkey, ...) becomes a new case here, not a
+ * new top-level key on `CreateAuthConfig` — per ADR-0014.
  */
-export type AuthMethodConfig =
-  | {
-      readonly kind: "github";
-      readonly clientId: string;
-      readonly clientSecret: string;
-      /** Override the OAuth callback URL Better Auth tells GitHub to
-       *  redirect to. The consumer is then responsible for forwarding
-       *  requests at that URI to `auth.handler`. */
-      readonly redirectURI?: string;
-    };
+export type AuthMethodConfig = {
+  readonly kind: "github";
+  readonly clientId: string;
+  readonly clientSecret: string;
+  /** Override the OAuth callback URL Better Auth tells GitHub to
+   *  redirect to. The consumer is then responsible for forwarding
+   *  requests at that URI to `auth.handler`. */
+  readonly redirectURI?: string;
+};
 
 /**
- * First-staff promotion rule. The `databaseHooks.user.create.after`
- * hook checks each created user against this rule; the first matching
- * user with no existing admin in the DB is promoted to `owner`.
- *
- * Decoupled from the method config — switching the bootstrap rule
- * (e.g. from `github-login` to `email`) doesn't require touching any
- * method's options.
+ * First-staff promotion rule. Decoupled from `methods[]` so switching
+ * the bootstrap signal (e.g. `github-login` → `email`) doesn't touch
+ * any method's options.
  */
 export type BootstrapOwnerRule =
   | { readonly match: "github-login"; readonly value: string }
@@ -47,17 +35,13 @@ export interface CreateAuthConfig {
   readonly database: D1Database;
   readonly baseURL: string;
   readonly secret: string;
-  /**
-   * Registered auth methods. Display order on the admin sign-in page
-   * follows this array. Boot fails fast if empty — every consumer
-   * needs at least one way for staff to sign in.
-   */
+  /** Registered auth methods. Boot fails fast if empty. */
   readonly methods: ReadonlyArray<AuthMethodConfig>;
-  /** First-user-becomes-owner rule. Optional; without it, owner role
-   *  must be assigned manually in D1. */
+  /** First-user-becomes-owner rule. Without it, the `owner` role must
+   *  be assigned manually in D1. */
   readonly bootstrapOwner?: BootstrapOwnerRule;
-  /** Better Auth's built-in rate limit. Applies to every method's
-   *  endpoints. Defaults off; production deployments should set it. */
+  /** Better Auth's built-in rate limit. Defaults off; production
+   *  deployments should set it. */
   readonly rateLimit?: { readonly window: number; readonly max: number };
 }
 
@@ -103,14 +87,12 @@ function shouldPromoteToOwner(
   rule: BootstrapOwnerRule,
   user: { readonly email?: string | null; readonly githubLogin?: string | null },
 ): boolean {
+  const target = rule.value.trim().toLowerCase();
   switch (rule.match) {
     case "github-login":
-      return (
-        !!user.githubLogin &&
-        user.githubLogin.toLowerCase() === rule.value.trim().toLowerCase()
-      );
+      return !!user.githubLogin && user.githubLogin.toLowerCase() === target;
     case "email":
-      return !!user.email && user.email.toLowerCase() === rule.value.trim().toLowerCase();
+      return !!user.email && user.email.toLowerCase() === target;
   }
 }
 
