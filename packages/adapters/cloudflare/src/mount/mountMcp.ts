@@ -4,6 +4,26 @@ import type { StaffRole, ViewManifest } from "@aotter/mantle-spec";
 import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
+/**
+ * RFC 9728 §3.1: the OAuth Protected Resource Metadata document for a
+ * resource at `<origin><path>` is served at
+ * `<origin>/.well-known/oauth-protected-resource<path>` — the resource
+ * path component goes AFTER the well-known suffix, not before.
+ *
+ * Examples (from the RFC):
+ *   /        → /.well-known/oauth-protected-resource
+ *   /mcp     → /.well-known/oauth-protected-resource/mcp
+ *   /a/b     → /.well-known/oauth-protected-resource/a/b
+ *
+ * Trailing slashes on the resource path are normalized away.
+ */
+export function protectedResourceMetadataPath(resourcePath: string): string {
+  const trimmed = resourcePath.replace(/\/+$/, "");
+  if (!trimmed || trimmed === "/") return "/.well-known/oauth-protected-resource";
+  const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return `/.well-known/oauth-protected-resource${normalized}`;
+}
+
 export function mountMcp(
   app: Hono,
   ref: CmsRuntimeRef,
@@ -17,7 +37,7 @@ export function mountMcp(
   const path = options.path ?? "/mcp";
   const surface = options.surface ?? "staff";
   const requiredScope = options.requiredScope ?? (surface === "staff" ? "mcp:staff" : "mcp:read");
-  const metadataPath = `${path}/.well-known/oauth-protected-resource`;
+  const metadataPath = protectedResourceMetadataPath(path);
   let dispatcher: McpJsonRpcDispatcher | null = null;
 
   app.get(metadataPath, (c) => {
@@ -95,7 +115,7 @@ function hasRequiredScope(scopes: readonly string[], required: "mcp:staff" | "mc
 
 function unauthorized(requestUrl: string, requiredScope: "mcp:staff" | "mcp:read"): ResponseInit {
   const url = new URL(requestUrl);
-  const metadataPath = `${url.pathname}/.well-known/oauth-protected-resource`;
+  const metadataPath = protectedResourceMetadataPath(url.pathname);
   return {
     status: 401,
     headers: {
