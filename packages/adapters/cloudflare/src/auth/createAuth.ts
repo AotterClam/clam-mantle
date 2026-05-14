@@ -315,6 +315,13 @@ function buildAuth(config: CreateAuthConfig) {
   });
 }
 
+/**
+ * Method kind exposed to clients. Mirrors `AuthMethodConfig["kind"]`
+ * but without the adapter-internal config (secrets, sender refs). The
+ * admin SPA reads this to decide which sign-in sections to render.
+ */
+export type AuthMethodKind = AuthMethodConfig["kind"];
+
 // Better Auth's full inferred type pulls plugin internals
 // (`MCPOptions`, `AdminOptions`) that aren't re-exported, so emitting
 // a .d.ts that names that type fails (TS4058). The structural facade
@@ -341,6 +348,10 @@ export interface Auth {
    *  (MCP, HTTP Triggers) need this because Better Auth's MCP access
    *  tokens carry userId + scopes but not the user's role. */
   readonly getUserRole: (userId: string) => Promise<string | null>;
+  /** Method kinds the consumer registered, in declaration order. The
+   *  admin SPA renders sign-in sections per this list. Secrets and
+   *  sender refs are intentionally excluded — UI doesn't need them. */
+  readonly methods: ReadonlyArray<AuthMethodKind>;
 }
 
 export function createAuth(config: CreateAuthConfig): Auth {
@@ -371,5 +382,6 @@ export function createAuth(config: CreateAuthConfig): Auth {
         .first<{ role: string | null }>();
       return row?.role ?? null;
     },
+    methods: config.methods.map((m) => m.kind),
   };
 }

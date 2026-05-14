@@ -66,6 +66,14 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     }),
   );
 
+  // Public read-only manifest of registered sign-in methods. The admin
+  // SPA hits this on sign-in-page mount so it can render per-method
+  // sections without baking the method list into its build. No secrets
+  // or sender refs — only the `kind` strings.
+  app.get("/api/auth/methods", () =>
+    Response.json({ methods: auth.methods }),
+  );
+
   for (const path of [
     "/.well-known/oauth-authorization-server",
     "/.well-known/oauth-protected-resource",
