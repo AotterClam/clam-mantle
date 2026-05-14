@@ -7,19 +7,48 @@ export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
 
+/**
+ * Auth method config (discriminated union). Adding a new method
+ * (email-otp, google, passkey, ...) becomes a new case here, not a
+ * new top-level key on `CreateAuthConfig` — per ADR-0014.
+ *
+ * Written as a one-member union (leading `|`) deliberately — keeps
+ * the switch in `buildSocialProviders` exhaustiveness-checked when
+ * PR-B adds a second variant; a flat object type would silently
+ * accept the new shape without firing the never-narrowing.
+ */
+export type AuthMethodConfig =
+  | {
+      readonly kind: "github";
+      readonly clientId: string;
+      readonly clientSecret: string;
+      /** Override the OAuth callback URL Better Auth tells GitHub to
+       *  redirect to. The consumer is then responsible for forwarding
+       *  requests at that URI to `auth.handler`. */
+      readonly redirectURI?: string;
+    };
+
+/**
+ * First-staff promotion rule. Decoupled from `methods[]` so switching
+ * the bootstrap signal (e.g. `github-login` → `email`) doesn't touch
+ * any method's options.
+ */
+export type BootstrapOwnerRule =
+  | { readonly match: "github-login"; readonly value: string }
+  | { readonly match: "email"; readonly value: string };
+
 export interface CreateAuthConfig {
   readonly database: D1Database;
   readonly baseURL: string;
   readonly secret: string;
-  readonly github?: {
-    readonly clientId: string;
-    readonly clientSecret: string;
-    /** Override the OAuth callback URL Better Auth tells GitHub to
-     *  redirect to. The consumer is then responsible for forwarding
-     *  requests at that URI to `auth.handler`. */
-    readonly redirectURI?: string;
-  };
-  readonly adminGithubLogin?: string;
+  /** Registered auth methods. Boot fails fast if empty. */
+  readonly methods: ReadonlyArray<AuthMethodConfig>;
+  /** First-user-becomes-owner rule. Without it, the `owner` role must
+   *  be assigned manually in D1. */
+  readonly bootstrapOwner?: BootstrapOwnerRule;
+  /** Better Auth's built-in rate limit. Defaults off; production
+   *  deployments should set it. */
+  readonly rateLimit?: { readonly window: number; readonly max: number };
 }
 
 const ac = createAccessControl(defaultStatements);
@@ -41,22 +70,85 @@ const userAc = ac.newRole({
   session: [],
 });
 
-function buildAuth(config: CreateAuthConfig) {
-  const socialProviders: BetterAuthOptions["socialProviders"] = {};
-  if (config.github) {
-    socialProviders.github = {
-      clientId: config.github.clientId,
-      clientSecret: config.github.clientSecret,
-      mapProfileToUser: (profile) => ({
-        githubLogin: profile.login,
-      }),
-      ...(config.github.redirectURI
-        ? { redirectURI: config.github.redirectURI }
-        : {}),
-    };
+function buildSocialProviders(
+  methods: ReadonlyArray<AuthMethodConfig>,
+): BetterAuthOptions["socialProviders"] {
+  const out: BetterAuthOptions["socialProviders"] = {};
+  for (const method of methods) {
+    switch (method.kind) {
+      case "github":
+        out.github = {
+          clientId: method.clientId,
+          clientSecret: method.clientSecret,
+          mapProfileToUser: (profile) => ({
+            githubLogin: profile.login,
+          }),
+          ...(method.redirectURI ? { redirectURI: method.redirectURI } : {}),
+        };
+        break;
+      default: {
+        // Runtime guard for unknown `kind` values. The compile-time
+        // exhaustiveness check activates the moment PR-B adds a
+        // second union variant — until then there's nothing for
+        // TypeScript to narrow into `never`.
+        const kind = (method as { kind: string }).kind;
+        throw new Error(`createAuth: unhandled AuthMethodConfig.kind '${kind}'`);
+      }
+    }
   }
+  return out;
+}
 
-  const adminGithubLogin = config.adminGithubLogin?.trim();
+/**
+ * Cross-check bootstrap rule against registered methods. Catches the
+ * silent-no-op case where the rule's discriminator can never match
+ * any signal a registered method actually produces — e.g.
+ * `match: "github-login"` with no `github` method registered. Throws
+ * at construction so vibe-coders see the mistake before the first
+ * sign-in attempt.
+ */
+function validateBootstrap(
+  rule: BootstrapOwnerRule,
+  methods: ReadonlyArray<AuthMethodConfig>,
+): void {
+  if (rule.match === "github-login") {
+    const hasGithub = methods.some((m) => m.kind === "github");
+    if (!hasGithub) {
+      throw new Error(
+        "createAuth: bootstrapOwner.match='github-login' but no `github` method is registered. " +
+          "Either register a github method or switch to `bootstrapOwner: { match: 'email', value: '…' }`.",
+      );
+    }
+  }
+  // `match: "email"` is permissive — every Better Auth method that
+  // creates a user populates `email`, including GitHub (via the
+  // upstream profile). No registration constraint to enforce.
+}
+
+function shouldPromoteToOwner(
+  rule: BootstrapOwnerRule,
+  user: { readonly email?: string | null; readonly githubLogin?: string | null },
+): boolean {
+  const target = rule.value.trim().toLowerCase();
+  switch (rule.match) {
+    case "github-login":
+      return !!user.githubLogin && user.githubLogin.toLowerCase() === target;
+    case "email":
+      return !!user.email && user.email.toLowerCase() === target;
+  }
+}
+
+function buildAuth(config: CreateAuthConfig) {
+  if (config.methods.length === 0) {
+    throw new Error(
+      "createAuth: methods[] is empty — register at least one AuthMethodConfig so staff can sign in.",
+    );
+  }
+  if (config.bootstrapOwner) {
+    validateBootstrap(config.bootstrapOwner, config.methods);
+  }
+  const socialProviders = buildSocialProviders(config.methods);
+  const bootstrap = config.bootstrapOwner;
 
   return betterAuth({
     database: config.database,
@@ -72,6 +164,7 @@ function buildAuth(config: CreateAuthConfig) {
         },
       },
     },
+    ...(config.rateLimit ? { rateLimit: { ...config.rateLimit, enabled: true } } : {}),
     plugins: [
       admin({
         defaultRole: "user",
@@ -107,9 +200,13 @@ function buildAuth(config: CreateAuthConfig) {
       user: {
         create: {
           after: async (user) => {
-            if (!adminGithubLogin) return;
-            const u = user as { id: string; githubLogin?: string | null };
-            if (u.githubLogin?.toLowerCase() !== adminGithubLogin.toLowerCase()) return;
+            if (!bootstrap) return;
+            const u = user as {
+              id: string;
+              email?: string | null;
+              githubLogin?: string | null;
+            };
+            if (!shouldPromoteToOwner(bootstrap, u)) return;
 
             const placeholders = ADMIN_ROLES.map(() => "?").join(",");
             const existingAdmin = await config.database
