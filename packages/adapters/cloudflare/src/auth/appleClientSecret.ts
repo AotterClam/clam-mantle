@@ -1,0 +1,165 @@
+/**
+ * Helper for the Sign In with Apple `clientSecret` field.
+ *
+ * Apple's "client secret" is **not** an OAuth client secret — it is
+ * an ES256-signed JWT the relying party generates from:
+ *
+ *   - Team ID  (Apple Developer team identifier, 10 chars)
+ *   - Key ID   (the Sign-In key id, 10 chars; visible in Apple Developer)
+ *   - Private key (the `.p8` file Apple lets you download once)
+ *   - Audience (typically the Services ID — same as the Better Auth
+ *     `clientId` you pass for `provider: "apple"`)
+ *
+ * The JWT lives at most 180 days per Apple's policy. This helper
+ * defaults to 30 days; adopters who run long-lived Workers (rare)
+ * should regenerate at deploy or via cron. For typical Workers the
+ * JWT is regenerated at isolate boot, which is well below 30 days.
+ *
+ * # Why not bring `jsonwebtoken`?
+ *
+ * `jsonwebtoken` and friends pull `node:crypto`, which is not a free
+ * import on Workers (compatibility-flag-gated, larger bundle).
+ * `crypto.subtle` is native to Workers and signs ECDSA-P256 directly;
+ * the JWT envelope is two short base64url strings around a signature.
+ * The whole helper is ~80 LOC and zero deps.
+ *
+ * # Adopter usage
+ *
+ * ```ts
+ * const appleSecret = await appleClientSecret({
+ *   teamId: env.APPLE_TEAM_ID,
+ *   keyId: env.APPLE_KEY_ID,
+ *   privateKey: env.APPLE_PRIVATE_KEY,  // contents of the .p8 file
+ *   audience: env.APPLE_SERVICES_ID,    // your Services ID
+ * });
+ * const auth = createAuth({
+ *   methods: [{
+ *     kind: "social",
+ *     provider: "apple",
+ *     clientId: env.APPLE_SERVICES_ID,
+ *     clientSecret: appleSecret,
+ *   }],
+ *   // ...
+ * });
+ * ```
+ *
+ * `env.APPLE_PRIVATE_KEY` is the multi-line PEM contents of the `.p8`
+ * file (set via `wrangler secret put APPLE_PRIVATE_KEY` — paste the
+ * whole file when prompted). The helper also accepts the bare
+ * base64-encoded DER if the PEM wrapping doesn't survive your secret
+ * pipeline.
+ */
+
+export interface AppleClientSecretArgs {
+  /** Apple Developer team identifier (10 chars). */
+  readonly teamId: string;
+  /** Sign-In key id (10 chars). */
+  readonly keyId: string;
+  /**
+   * `.p8` file contents — either PEM-wrapped
+   * (`-----BEGIN PRIVATE KEY-----\n…\n-----END PRIVATE KEY-----`)
+   * or just the base64 of the DER.
+   */
+  readonly privateKey: string;
+  /** Typically the Services ID — same string you pass for `clientId`. */
+  readonly audience: string;
+  /**
+   * JWT lifetime in seconds. Apple caps at 180 days
+   * (`180 * 24 * 60 * 60 = 15552000`); the default here is 30 days.
+   * The helper rejects values above Apple's cap.
+   */
+  readonly expiresInSeconds?: number;
+}
+
+const DEFAULT_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const APPLE_MAX_EXPIRES_IN_SECONDS = 180 * 24 * 60 * 60; // 180 days
+const APPLE_TOKEN_AUDIENCE_ISSUER = "https://appleid.apple.com";
+
+export async function appleClientSecret(
+  args: AppleClientSecretArgs,
+): Promise<string> {
+  const expiresIn = args.expiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS;
+  if (expiresIn <= 0) {
+    throw new Error("appleClientSecret: expiresInSeconds must be positive");
+  }
+  if (expiresIn > APPLE_MAX_EXPIRES_IN_SECONDS) {
+    throw new Error(
+      `appleClientSecret: expiresInSeconds ${expiresIn} exceeds Apple's 180-day max (${APPLE_MAX_EXPIRES_IN_SECONDS}).`,
+    );
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "ES256", kid: args.keyId };
+  const payload = {
+    iss: args.teamId,
+    iat: now,
+    exp: now + expiresIn,
+    aud: APPLE_TOKEN_AUDIENCE_ISSUER,
+    sub: args.audience,
+  };
+  const headerB64 = base64UrlEncode(textEncoder.encode(JSON.stringify(header)));
+  const payloadB64 = base64UrlEncode(
+    textEncoder.encode(JSON.stringify(payload)),
+  );
+  const signingInput = `${headerB64}.${payloadB64}`;
+  const key = await importApplePrivateKey(args.privateKey);
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    textEncoder.encode(signingInput),
+  );
+  return `${signingInput}.${base64UrlEncode(new Uint8Array(signature))}`;
+}
+
+const textEncoder = new TextEncoder();
+
+const PEM_HEADER_RE = /-----BEGIN [^-]+-----/;
+const PEM_FOOTER_RE = /-----END [^-]+-----/;
+
+async function importApplePrivateKey(input: string): Promise<CryptoKey> {
+  const der = decodePrivateKeyToDer(input);
+  return crypto.subtle.importKey(
+    "pkcs8",
+    der,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+}
+
+function decodePrivateKeyToDer(input: string): Uint8Array {
+  // Strip PEM wrapper + whitespace; tolerate the bare-base64 path too.
+  let body = input.trim();
+  if (PEM_HEADER_RE.test(body)) {
+    body = body
+      .replace(PEM_HEADER_RE, "")
+      .replace(PEM_FOOTER_RE, "")
+      .replace(/\s+/g, "");
+  } else {
+    body = body.replace(/\s+/g, "");
+  }
+  if (body.length === 0) {
+    throw new Error(
+      "appleClientSecret: privateKey is empty after stripping the PEM wrapper.",
+    );
+  }
+  try {
+    return base64ToBytes(body);
+  } catch {
+    throw new Error(
+      "appleClientSecret: privateKey is not valid base64 — paste the contents of your .p8 file (PEM or base64).",
+    );
+  }
+}
+
+function base64UrlEncode(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
