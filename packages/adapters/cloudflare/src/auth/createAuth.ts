@@ -1,5 +1,5 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
-import { admin, emailOTP, mcp } from "better-auth/plugins";
+import { admin, emailOTP, magicLink, mcp } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
 import type { EmailSender } from "@aotter/mantle-runtime";
@@ -41,6 +41,20 @@ export type AuthMethodConfig =
       readonly allowedAttempts?: number;
       /** Fallback locale when the request carries no Accept-Language —
        *  typically the site's canonical locale. BCP 47. Defaults to "en". */
+      readonly fallbackLocale?: string;
+    }
+  | {
+      readonly kind: "magic-link";
+      /** Transactional-email sender. The email body carries a single
+       *  clickable URL; Better Auth verifies the token when the user
+       *  lands on it. */
+      readonly sender: EmailSender;
+      /** Link TTL in seconds (Better Auth default 300 = 5 min). */
+      readonly expiresInSeconds?: number;
+      /** Allowed verification attempts (Better Auth default 1 —
+       *  links are single-use). */
+      readonly allowedAttempts?: number;
+      /** Fallback locale when the request carries no Accept-Language. */
       readonly fallbackLocale?: string;
     };
 
@@ -114,6 +128,32 @@ function pickLocale(req: Request | undefined, fallback: string): string {
   if (!header) return fallback;
   const first = header.split(",")[0]?.split(";")[0]?.trim();
   return first && first.length > 0 ? first : fallback;
+}
+
+function buildMagicLinkPlugin(method: Extract<AuthMethodConfig, { kind: "magic-link" }>) {
+  const fallback = method.fallbackLocale ?? "en";
+  return magicLink({
+    ...(method.expiresInSeconds !== undefined
+      ? { expiresIn: method.expiresInSeconds }
+      : {}),
+    ...(method.allowedAttempts !== undefined
+      ? { allowedAttempts: method.allowedAttempts }
+      : {}),
+    // Returned synchronously — same fire-and-forget contract as
+    // email-otp via `advanced.backgroundTasks.handler`. The body
+    // carries the click-URL; SDK doesn't ship a template, the
+    // sender can render plain text or richer HTML.
+    sendMagicLink: (data, ctx) => {
+      const locale = pickLocale(ctx?.request, fallback);
+      return method.sender.send({
+        to: data.email,
+        subject: "Your sign-in link",
+        text: `Click to sign in: ${data.url}\nThe link expires shortly. If you didn't request this, ignore this email.`,
+        locale,
+        category: "auth.magic-link.sign-in",
+      });
+    },
+  });
 }
 
 function buildEmailOTPPlugin(method: Extract<AuthMethodConfig, { kind: "email-otp" }>) {
@@ -204,12 +244,22 @@ function buildAuth(config: CreateAuthConfig) {
   }
   const emailOtpMethod = emailOtpMethods[0];
 
+  const magicLinkMethods = config.methods.filter((m) => m.kind === "magic-link");
+  if (magicLinkMethods.length > 1) {
+    throw new Error(
+      "createAuth: more than one `magic-link` method registered. Combine into one.",
+    );
+  }
+  const magicLinkMethod = magicLinkMethods[0];
+
   // Rate limit: Better Auth's per-route limits gate on
   // `process.env.NODE_ENV === "production"`, which is unset on
-  // Cloudflare Workers — leaving the limits silently off. When email
-  // is wired (free email-send-to-any-address surface) we ALWAYS turn
-  // limits on; adopter can override window/max via `config.rateLimit`.
-  const rateLimitDefault = emailOtpMethod
+  // Cloudflare Workers — leaving the limits silently off. When any
+  // email-shaped method is wired (free email-send-to-any-address
+  // surface) we ALWAYS turn limits on; adopter can override
+  // window/max via `config.rateLimit`.
+  const hasEmailMethod = !!(emailOtpMethod || magicLinkMethod);
+  const rateLimitDefault = hasEmailMethod
     ? { window: 60, max: 10, enabled: true as const }
     : null;
   const rateLimit = config.rateLimit
@@ -284,6 +334,7 @@ function buildAuth(config: CreateAuthConfig) {
         },
       }),
       ...(emailOtpMethod ? [buildEmailOTPPlugin(emailOtpMethod)] : []),
+      ...(magicLinkMethod ? [buildMagicLinkPlugin(magicLinkMethod)] : []),
     ],
     databaseHooks: {
       user: {
