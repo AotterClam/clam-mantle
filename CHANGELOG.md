@@ -6,6 +6,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.9-alpha] - 2026-05-15
+
 ### Breaking
 
 - **`@aotterclam/clam-cms-cloudflare`**: MCP OAuth surface carved out from Better Auth's `mcp()` plugin to `@cloudflare/workers-oauth-provider`. Better Auth keeps owning staff sign-in (D1 session, role, social/email-OTP/magic-link), but the OAuth AS surface (`/.well-known/oauth-*`, DCR, PKCE, token issue) is now served by `OAuthProvider` at the top level of the worker module. **Adopter migration**: `export default new Hono({...}).fetch` → `export default new OAuthProvider({...})`, where the Hono app becomes `defaultHandler` and each MCP endpoint becomes an entry in `apiHandlers`. New SDK exports: `createOAuthProvider`, `createMcpApiHandler`, `mountAuthorize`. Removed: `mountMcp`, `mountOAuthEndpoints`, `WorkersOAuthVerifier` (the lib does bearer verification internally before calling `apiHandler.fetch` with `ctx.props` set). See `docs/adr/0014-...md` § "Amendment 2026-05-15" for empirical context.
