@@ -143,48 +143,61 @@ The admin SPA itself lives in `@aotterclam/clam-cms-admin-ui` as a pre-built `di
 ## How adapters wire ports
 
 ```ts
-// simplified Cloudflare adapter wiring (post-ADR-0014)
-import { createCmsRef, mountServerEndpoints, mountMcp, createAuth } from "@aotterclam/clam-cms-cloudflare";
+// simplified Cloudflare adapter wiring (post-ADR-0014, amended
+// 2026-05-15 by PR #193's OAuth carve-out).
 import {
+  createAuth,
+  createCmsRef,
+  createMcpApiHandler,
+  createOAuthProvider,
+  mountAuthorize,
+  mountServerEndpoints,
   AssetsAssetServer,
   D1DatabaseDriver,
   KvCacheBinding,
 } from "@aotterclam/clam-cms-cloudflare";
 
-export default {
-  fetch(req: Request, env: Env, ctx: ExecutionContext) {
-    const auth = createAuth({
-      database: env.DB,
-      baseURL: env.PUBLIC_ORIGIN,
-      secret: env.BETTER_AUTH_SECRET,
-      methods: [
-        {
-          kind: "github",
-          clientId: env.GITHUB_CLIENT_ID,
-          clientSecret: env.GITHUB_CLIENT_SECRET,
-        },
-      ],
-      bootstrapOwner: env.ADMIN_GITHUB_LOGIN
-        ? { match: "github-login", value: env.ADMIN_GITHUB_LOGIN }
-        : undefined,
-    });
-    const cms = createCmsRef({
-      manifests,
-      handlers,
-      bindings: {
-        db: new D1DatabaseDriver(env.DB),
-        kv: new KvCacheBinding(env.KV),
-        assets: new AssetsAssetServer(env.ASSETS),
-      },
-      auth,
-    });
-    const app = new Hono();
-    app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
-    mountServerEndpoints(app, cms);
-    mountMcp(app, cms);
-    return app.fetch(req, env, ctx);
+const auth = createAuth({
+  database: env.DB,
+  baseURL: env.PUBLIC_ORIGIN,
+  secret: env.BETTER_AUTH_SECRET,
+  methods: [
+    {
+      kind: "social",
+      provider: "github",
+      clientId: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+    },
+  ],
+  bootstrapOwner: env.ADMIN_GITHUB_LOGIN
+    ? { match: "github-login", value: env.ADMIN_GITHUB_LOGIN }
+    : undefined,
+});
+const cms = createCmsRef({
+  manifests,
+  handlers,
+  bindings: {
+    db: new D1DatabaseDriver(env.DB),
+    kv: new KvCacheBinding(env.KV),
+    assets: new AssetsAssetServer(env.ASSETS),
   },
-};
+  auth,
+});
+const app = new Hono();
+app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+mountServerEndpoints(app, cms);
+mountAuthorize(app, { auth }); // /oauth/authorize consent gate
+
+// `OAuthProvider` must be the top-level worker entry — it injects
+// `env.OAUTH_PROVIDER` helpers the consent handler needs, and the
+// claude.ai MCP client requires it to discover AS metadata.
+export default createOAuthProvider({
+  defaultHandler: app,
+  apiHandlers: {
+    "/mcp/staff": createMcpApiHandler({ ref: cms, surface: "staff" }),
+    "/mcp":       createMcpApiHandler({ ref: cms, surface: "public" }),
+  },
+});
 ```
 
 The runtime gets three required adapter ports (`db`, `kv`, `assets`)
