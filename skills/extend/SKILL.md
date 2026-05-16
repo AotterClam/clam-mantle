@@ -165,7 +165,7 @@ app.get("/:locale/tools/prompt-generator", async (c) => {
 
 This is consumer-app territory, NOT an SDK feature. The SDK doesn't ship a `customRoutes.ts` declarative API or a type-safe context wrapper — the starter's `Hono` app + `runtime` access via `ref.get()` is enough.
 
-SDK mounts (`mountServerEndpoints`, `mountPublicRoutes`, `mountMcp`) register their routes early; consumer `app.get(...)` calls register on the same Hono instance. The `/:locale` param route in `mountPublicRoutes` 404s on unknown locales, so paths under `/tools/...`, `/api/foo`, `/calc`, etc. won't collide as long as your prefix isn't a declared site locale.
+SDK mounts (`mountServerEndpoints`, `mountPublicRoutes`, `mountAuthorize`) register their routes early on the Hono `defaultHandler`; consumer `app.get(...)` calls register on the same Hono instance. MCP endpoints are NOT mounted into Hono — they live as `apiHandlers` on the top-level `createOAuthProvider({...})` instance (`/mcp/staff`, `/mcp`), so they share no route table with public Hono routes and can't collide with consumer paths. The `/:locale` param route in `mountPublicRoutes` 404s on unknown locales, so paths under `/tools/...`, `/api/foo`, `/calc`, etc. won't collide as long as your prefix isn't a declared site locale.
 
 Right tool when: the user wants ONE public page that doesn't read entries or carry workflow. Wrong tool when: you find yourself reimplementing CRUD, list pagination, or auth gating — those are atom-shaped.
 

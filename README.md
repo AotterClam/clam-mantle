@@ -3,6 +3,18 @@
 [![CI](https://github.com/aotter/mantle/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/aotter/mantle/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+[![Status: Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#status)
+
+> ⚠️ **Experimental — co-built with AI**
+>
+> mantle is co-developed with AI coding agents (Claude Code) and is
+> currently in **0.0.x / pre-1.0**. Treat everything here as experimental:
+> APIs, manifests, schema shapes, and runtime behavior **can break between
+> any two commits** without notice or migration path. Do not deploy this
+> for anything you cannot afford to rebuild from scratch.
+>
+> Review the code, run your own tests, and verify generated content before
+> trusting it. Pull requests welcome; bug reports especially welcome.
 
 **Build your content model by prompting, not configuring.**
 
@@ -11,13 +23,13 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 ## Try it cold
 
 ```bash
-npx https://github.com/aotter/mantle-starters/releases/latest/download/aotter-create-mantle.tgz my-site
+npm create @aotter/mantle@alpha my-site
 cd my-site
 ```
 
 The scaffolder asks for your archetype + theme + name and produces a Cloudflare-Worker-ready project. See [`skills/install/SKILL.md`](./skills/install/SKILL.md) for the agent-guided flow.
 
-Or paste a two-URL prompt from the landing page at [the legacy MCP test deployment](https://the legacy MCP test deployment/) into Claude Code / Cursor / Codex — same install, friendlier surface.
+Or paste a two-URL prompt from the landing page at [the Mantle landing page](https://the Mantle landing page/) into Claude Code / Cursor / Codex — same install, friendlier surface.
 
 > **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 

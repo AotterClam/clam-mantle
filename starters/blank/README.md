@@ -5,7 +5,7 @@ The `blank` starter now lives in the standalone starters monorepo:
 [`aotter/mantle-starters/blank/`](https://github.com/aotter/mantle-starters/tree/main/blank)
 
 (Repo URL above is the post-rename name; if your tooling still pins
-the original `mantle-starters`, GitHub auto-redirects.)
+the original `mantle-starter-publication`, GitHub auto-redirects.)
 
 ## Why this moved
 
