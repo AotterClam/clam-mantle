@@ -194,18 +194,19 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    `pnpm validate` emits `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, no letter yet. The diagnostic clears once the Mantle subagent finishes (step 9). Anything else non-zero → surface `code` + `suggestion` verbatim.
 
-6. **Pre-provision dialogue — preview + draft together (this is a chatter zone, not a checklist).**
+6. **Pre-provision dialogue — preview + voice elicitation (this is a chatter zone, not a checklist).**
 
-   Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) seed a draft post or two together so day-one isn't empty, (c) **draw more voice material out of the user through writing concretely** rather than asking abstract "what's your register" questions.
+   Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) **draw voice material out of them by writing something concrete together** rather than asking abstract "what's your register" questions.
 
-   A shape that works (adapt freely; don't read this off like a script):
+   Read RUN_NOTES `files_written` to see which collections the archetype actually ships. The drafting medium depends on what's there:
 
-   - Briefly describe what's in the project — admin panel empty, the archetype's primary collection empty, any forms scaffolded but their gated services (Turnstile, etc.) deferred until provision. Show the user where you are.
-   - Offer to draft 1–2 sample posts/entries before deploy so day-one has something to look at and the user can react to voice. If no, skip to step 7. If yes, continue.
-   - Propose 2–4 post topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let them pick, add, or kill any. The picking/killing itself reveals priorities.
-   - Draft the chosen post(s). Show them. Let the user react — corrections, line cuts, tone pushes, register shifts, pronoun-choice complaints. Each reaction is gold for voice elicitation.
-   - For cover images: use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
-   - When the drafts feel like the user's voice, ask if they want to keep them (saved into the scaffold somewhere reasonable — `mantle/drafts/<slug>.md` is a fine place; provision/admin can pick them up later) or just discard them now that they served their voice-elicitation purpose.
+   - **Archetypes with a post-like collection** (`publication`, `community`, `membership`): offer to draft 1–2 sample posts/entries. Propose 2–4 topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let the user pick, add, kill. Drafts get saved to `mantle/drafts/<slug>.md`; admin can pick them up later.
+   - **Archetypes without posts** (`presence`, `intake`, `transaction`, `reservation`, `blank`): no `posts` collection exists — **do not fabricate one**. Instead, offer to draft one short concrete piece of copy the archetype actually needs: the home-page opening sentence, the intake form intro, the reservation page tagline. One paragraph max. Save into `mantle/drafts/home-opener.md` (or similar archetype-fitting name) only if the user wants it kept.
+   - **Roadmap archetypes**: skip this step entirely. The refuse path already routed the conversation.
+
+   For any drafting that happens, the dynamic is the same: show the user, let them react, capture the reactions. Each correction / line cut / tone push / pronoun-choice complaint is gold for voice elicitation.
+
+   For cover images (post-shaped drafts only): use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
 
    This step's length is responsive to the user. Curt user / no-deadline / "just go" → keep it to one offer and skip on a no. Engaged user → spend 5–10 minutes drafting together. The investment here pays off in the next step.
 
