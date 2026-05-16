@@ -1,6 +1,6 @@
 ---
 name: mantle install
-description: Install a mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from the landing page at https://the legacy MCP test deployment/skill/install?type=<archetype>&theme=<theme>, or when starting from an empty repo.
+description: Install a mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from the landing page at https://the Mantle landing page/skill/install?type=<archetype>&theme=<theme>, or when starting from an empty repo.
 when_to_invoke: |
   Empty repo + landing-page composed-skill prompt; or the user describes a site they want to build. The composed URL already inlined the per-archetype hint with this brief.
 applies_to: mantle@v0.1.0
@@ -174,11 +174,10 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
-2. **Run `create-mantle` non-interactively.** Distributed as a tarball attached to a `mantle-starters` GitHub release:
+2. **Run `create-mantle` non-interactively.** Installed from npm:
 
    ```bash
-   npx https://github.com/aotter/mantle-starters/releases/download/v0.0.8-alpha/aotter-create-mantle-0.0.8-alpha.1.tgz \
-     <archetype> \
+   npm create @aotter/mantle@alpha <archetype> -- \
      --project-name "<lowercase-hyphenated>" \
      --brand "<brand>" \
      --description "<one line>" \
@@ -186,6 +185,8 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
      --github-owner "<gh-login>" \
      --summary "<one-line install description>"
    ```
+
+   (`npm create @aotter/mantle` is `npm init`'s short form for `npx @aotter/create-mantle`. The `--` separator passes the flags through to the underlying CLI. Pin to an exact version with `npx @aotter/create-mantle@0.0.10-alpha.1 ...` if you need reproducibility.)
 
    The package fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
