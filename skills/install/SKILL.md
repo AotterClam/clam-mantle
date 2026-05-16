@@ -83,19 +83,11 @@ archetype is already known (the composed URL pinned it). Every value above must 
 
 ### Multi-round purpose discovery — start here, not with brand
 
-Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Instead, read the archetype hint's **Interview probes** (composed in below) and offer the first probe's options as a picker:
+Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Use the archetype hint's **Interview probes** (composed in below) as your discovery spine. Ask the first probe naturally, in the user's language, as an open question — don't fabricate multiple-choice options if the probe is written as open-ended. The picker step already happened at the landing page (`?type=` and `?theme=` in the URL); the probes here are about texture, not branching.
 
-> "A few shapes this could be — pick what fits, or tell me something else:
-> - [option A from archetype]
-> - [option B from archetype]
-> - [option C from archetype]
-> - Something else (tell me)"
+User answers → react → ask the next probe. **One probe per turn, not all four at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
 
-The archetype hint's option labels are written in EN as placeholders. **Translate them — and your framing question — into whatever language the user is writing to you in, before presenting.** Don't paste English labels at a user writing in another language; the picker should read as natural prose in their register.
-
-User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
-
-If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
+If a probe is phrased with options in the archetype hint, you may offer them as a picker — but most presence / publication / intake probes are intentionally open. Translate every probe (and your framing) into the user's language before presenting.
 
 ### Stances (the few non-archetype rules)
 
@@ -161,7 +153,7 @@ Same discovery order as the Goal table above — purpose first, brand later. The
 
 | Value | Authorized when |
 |---|---|
-| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (as pickers), not inferred |
+| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (open-question discovery), not inferred |
 | **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
 | **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
 | **description** | agent-drafted in user's language; user nodded on the exact one-liner |
