@@ -87,6 +87,13 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     }),
   );
 
+  // Better Auth handles the rest of `/api/auth/*` (sign-in, callback,
+  // session, magic-link, OTP, OAuth provider routes). Owned by the SDK
+  // so consumers don't have to wire — and can't accidentally register a
+  // catch-all BEFORE the specific routes above and silently swallow
+  // them. Hono matches in registration order; this catch-all sits last.
+  app.all("/api/auth/*", (c) => auth.handler(c.req.raw));
+
   // Well-known OAuth endpoints (RFC 8414 + RFC 9728) used to be
   // forwarded to Better Auth's mcp() plugin here. With the carve-out
   // to @cloudflare/workers-oauth-provider (PR #193), the top-level
