@@ -3,7 +3,6 @@ name: mantle install
 description: Install a mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from the landing page at https://the Mantle landing page/skill/install?type=<archetype>&theme=<theme>, or when starting from an empty repo.
 when_to_invoke: |
   Empty repo + landing-page composed-skill prompt; or the user describes a site they want to build. The composed URL already inlined the per-archetype hint with this brief.
-applies_to: mantle@v0.1.0
 ---
 
 # mantle install
@@ -49,13 +48,13 @@ Diagnostics are structured JSON with `code` + `suggestion` fields — surface bo
 Verify the environment can run the flow. Don't waste the user's time interviewing for a site we can't build:
 
 ```bash
-node --version    # need ≥ 20
+node --version    # need ≥ 22 (starter `engines.node`)
 pnpm --version    # need ≥ 9
 git --version     # any recent
 ```
 
 If any is missing or below the minimum, surface install hints once and stop until the user confirms tools are ready:
-- node ≥ 20: nvm (`nvm install 20 && nvm use 20`), Homebrew, or the official installer at nodejs.org
+- node ≥ 22: nvm (`nvm install 22 && nvm use 22`), Homebrew, or the official installer at nodejs.org
 - pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
 - git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
 
@@ -84,19 +83,11 @@ archetype is already known (the composed URL pinned it). Every value above must 
 
 ### Multi-round purpose discovery — start here, not with brand
 
-Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Instead, read the archetype hint's **Interview probes** (composed in below) and offer the first probe's options as a picker:
+Open with **what's this site for** — not the brand name. Don't ask cold ("describe your site in your own words"); that puts the user on the spot. Use the archetype hint's **Interview probes** (composed in below) as your discovery spine. Ask the first probe naturally, in the user's language, as an open question — don't fabricate multiple-choice options if the probe is written as open-ended. The picker step already happened at the landing page (`?type=` and `?theme=` in the URL); the probes here are about texture, not branching.
 
-> "A few shapes this could be — pick what fits, or tell me something else:
-> - [option A from archetype]
-> - [option B from archetype]
-> - [option C from archetype]
-> - Something else (tell me)"
+User answers → react → ask the next probe. **One probe per turn, not all four at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
 
-The archetype hint's option labels are written in EN as placeholders. **Translate them — and your framing question — into whatever language the user is writing to you in, before presenting.** Don't paste English labels at a user writing in another language; the picker should read as natural prose in their register.
-
-User picks → react → ask the next probe (also as a picker if it has options). **One probe per turn, not all five at once.** This is the multi-round shape. After 2–4 turns you have enough texture to propose brand candidates (Brand stance below) and synthesize description + summary drafts.
-
-If the archetype's probe list doesn't have options for a particular question (some probes are intentionally open — "what's the emotional weight here?"), then it's a free-form follow-up, not a picker.
+If a probe is phrased with options in the archetype hint, you may offer them as a picker — but most presence / publication / intake probes are intentionally open. Translate every probe (and your framing) into the user's language before presenting.
 
 ### Stances (the few non-archetype rules)
 
@@ -152,7 +143,7 @@ Invoking `npx create-mantle` is **not low-risk work**. The command writes the us
 
 Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
 
-**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each of the six parameters passed to `npx create-mantle` must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these six values.
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each marker (`<<...>>`) in the composed `## Run this` block (see end of this document) must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these marker values.
 
 If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
 
@@ -160,35 +151,26 @@ If you have not had a turn where the user looked at the exact value and replied 
 
 Same discovery order as the Goal table above — purpose first, brand later. The order matters because it reflects the interview shape, not arbitrary alphabetization.
 
-| Value | Authorized when |
-|---|---|
-| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (as pickers), not inferred |
-| **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
-| **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
-| **description** | agent-drafted in user's language; user nodded on the exact one-liner |
-| **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
-| **brand** | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
-| **github owner** | user explicitly stated their GitHub login (not derived from email) |
+| Value | Marker | Authorized when |
+|---|---|---|
+| **purpose / audience / emotional weight** | (feeds Mantle, not a CLI flag) | enough texture for Mantle's letter — surfaced through the archetype probes (open-question discovery), not inferred |
+| **audience scope** | (drives `<<LOCALES>>`) | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
+| **locales** | `<<LOCALES>>` | derived from audience scope; user nodded on the resulting BCP 47 list |
+| **description** | `<<DESCRIPTION>>` | agent-drafted in user's language; user nodded on the exact one-liner |
+| **summary** | `<<SUMMARY>>` | agent-drafted in user's language; user nodded on the exact one-liner |
+| **brand** | `<<BRAND>>` | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
+| **project-name** | `<<PROJECT_NAME>>` | lowercase-hyphenated slug of brand; show the slug to user in the rehearsal (step 1) and confirm; user can override if they prefer a different repo / dir name |
+| **github owner** | `<<GITHUB_OWNER>>` | user explicitly stated their GitHub login (not derived from email) |
 
 If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
-2. **Run `create-mantle` non-interactively.** Installed from npm:
+2. **Run the composed `## Run this` block.** Scroll to the `## Run this` section at the bottom of this composed document — the landing composer baked the archetype and theme literals into the command. Copy it verbatim, fill the 6 `<<...>>` markers from your authorized interview values (see Prerequisites table above), and run it.
 
-   ```bash
-   npm create @aotter/mantle@alpha <archetype> -- \
-     --project-name "<lowercase-hyphenated>" \
-     --brand "<brand>" \
-     --description "<one line>" \
-     --locales "<canonical>,<secondary>" \
-     --github-owner "<gh-login>" \
-     --summary "<one-line install description>"
-   ```
+   Do not modify the literal flags or the archetype positional. Do not invent additional flags. If a marker has no authorized value, you're still in the interview — return there.
 
-   (`npm create @aotter/mantle` is `npm init`'s short form for `npx @aotter/create-mantle`. The `--` separator passes the flags through to the underlying CLI. Pin to an exact version with `npx @aotter/create-mantle@0.0.10-alpha.1 ...` if you need reproducibility.)
-
-   The package fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
+   The CLI fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
 3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files — at minimum `manifests/`, `src/mantleConfig.ts`, `mantle/site.md` — before deciding anything else.
 
@@ -203,18 +185,19 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    `pnpm validate` emits `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, no letter yet. The diagnostic clears once the Mantle subagent finishes (step 9). Anything else non-zero → surface `code` + `suggestion` verbatim.
 
-6. **Pre-provision dialogue — preview + draft together (this is a chatter zone, not a checklist).**
+6. **Pre-provision dialogue — preview + voice elicitation (this is a chatter zone, not a checklist).**
 
-   Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) seed a draft post or two together so day-one isn't empty, (c) **draw more voice material out of the user through writing concretely** rather than asking abstract "what's your register" questions.
+   Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) **draw voice material out of them by writing something concrete together** rather than asking abstract "what's your register" questions.
 
-   A shape that works (adapt freely; don't read this off like a script):
+   Read RUN_NOTES `files_written` to see which collections the archetype actually ships. The drafting medium depends on what's there:
 
-   - Briefly describe what's in the project — admin panel empty, the archetype's primary collection empty, any forms scaffolded but their gated services (Turnstile, etc.) deferred until provision. Show the user where you are.
-   - Offer to draft 1–2 sample posts/entries before deploy so day-one has something to look at and the user can react to voice. If no, skip to step 7. If yes, continue.
-   - Propose 2–4 post topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let them pick, add, or kill any. The picking/killing itself reveals priorities.
-   - Draft the chosen post(s). Show them. Let the user react — corrections, line cuts, tone pushes, register shifts, pronoun-choice complaints. Each reaction is gold for voice elicitation.
-   - For cover images: use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
-   - When the drafts feel like the user's voice, ask if they want to keep them (saved into the scaffold somewhere reasonable — `mantle/drafts/<slug>.md` is a fine place; provision/admin can pick them up later) or just discard them now that they served their voice-elicitation purpose.
+   - **Archetypes with a post-like collection** (`publication`, `community`, `membership`): offer to draft 1–2 sample posts/entries. Propose 2–4 topics anchored in what the interview surfaced (training log, a parenting moment, a brand-voice opener, etc.). Let the user pick, add, kill. Drafts get saved to `mantle/drafts/<slug>.md`; admin can pick them up later.
+   - **Archetypes without posts** (`presence`, `intake`, `transaction`, `reservation`, `blank`): no `posts` collection exists — **do not fabricate one**. Instead, offer to draft one short concrete piece of copy the archetype actually needs: the home-page opening sentence, the intake form intro, the reservation page tagline. One paragraph max. Save into `mantle/drafts/home-opener.md` (or similar archetype-fitting name) only if the user wants it kept.
+   - **Roadmap archetypes**: skip this step entirely. The refuse path already routed the conversation.
+
+   For any drafting that happens, the dynamic is the same: show the user, let them react, capture the reactions. Each correction / line cut / tone push / pronoun-choice complaint is gold for voice elicitation.
+
+   For cover images (post-shaped drafts only): use LoremFlickr (`source.unsplash.com` was deprecated in 2023; LoremFlickr is the closest keyword-based replacement). Pick 1–3 comma-separated keywords from the draft content. URL pattern: `https://loremflickr.com/<width>/<height>/<keyword1>,<keyword2>`. **Verify each URL resolves with a GET request before embedding — expect a 302 redirect to a cached JPG (`curl -sL -o /dev/null -w "%{http_code} %{content_type}"`), and confirm final status is 200 and content-type starts with `image/`.** Don't use `HEAD` — LoremFlickr's resized-cache path responds to GET only. If verification fails, leave the cover slot empty and tell the user.
 
    This step's length is responsive to the user. Curt user / no-deadline / "just go" → keep it to one offer and skip on a no. Engaged user → spend 5–10 minutes drafting together. The investment here pays off in the next step.
 
