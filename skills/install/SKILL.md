@@ -49,13 +49,13 @@ Diagnostics are structured JSON with `code` + `suggestion` fields — surface bo
 Verify the environment can run the flow. Don't waste the user's time interviewing for a site we can't build:
 
 ```bash
-node --version    # need ≥ 20
+node --version    # need ≥ 22 (starter `engines.node`)
 pnpm --version    # need ≥ 9
 git --version     # any recent
 ```
 
 If any is missing or below the minimum, surface install hints once and stop until the user confirms tools are ready:
-- node ≥ 20: nvm (`nvm install 20 && nvm use 20`), Homebrew, or the official installer at nodejs.org
+- node ≥ 22: nvm (`nvm install 22 && nvm use 22`), Homebrew, or the official installer at nodejs.org
 - pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
 - git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
 
