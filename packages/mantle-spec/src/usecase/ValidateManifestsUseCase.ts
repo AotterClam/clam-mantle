@@ -416,7 +416,28 @@ function checkTriggerRefs(
     }
 
     if (t.spec.source.kind === "http") {
-      const key = `${t.spec.source.method} ${t.spec.source.path}`;
+      const httpPath = t.spec.source.path;
+      const isValidPrefix = httpPath.startsWith("/api/");
+      if (!isValidPrefix) {
+        out.push(
+          validateDiagnostic({
+            code: "TRIGGER_PATH_INVALID",
+            severity: "error",
+            path: manifestPath("Trigger", t.metadata.name, "/spec/source/path", filePaths),
+            value: httpPath,
+            expected: "path starting with '/api/'",
+            message:
+              `Trigger '${t.metadata.name}' has path '${httpPath}' — http Trigger ` +
+              `paths MUST start with '/api/' so adapters can route public ` +
+              `pages and Procedure endpoints without ambiguity.`,
+          }),
+        );
+      }
+      // Only track valid paths for collision detection — emitting both
+      // TRIGGER_PATH_INVALID and TRIGGER_PATH_COLLISION for the same
+      // bad path produces noisy diagnostics that misdescribe the root
+      // cause (collision is secondary; the path is the real error).
+      const key = `${t.spec.source.method} ${httpPath}`;
       const prior = httpRoutes.get(key);
       if (prior) {
         out.push(
@@ -429,7 +450,7 @@ function checkTriggerRefs(
             message: `Trigger '${t.metadata.name}' shares route ${key} with Trigger '${prior}'.`,
           }),
         );
-      } else {
+      } else if (isValidPrefix) {
         httpRoutes.set(key, t.metadata.name);
       }
     }
