@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EmailSender } from "@aotterclam/clam-cms-runtime";
+import type { EmailSender } from "@aotterclam/clam-mantle-runtime";
 import {
   buildSocialProviders,
   createAuth,

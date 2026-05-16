@@ -1,12 +1,12 @@
 ---
-name: clam-cms provision
-description: Deploy an installed clam-cms consumer project to the user's Cloudflare Worker and return the public URL plus Staff / User MCP URLs. Use after the install skill has produced a standalone project and the user wants the service online.
+name: clam-mantle provision
+description: Deploy an installed clam-mantle consumer project to the user's Cloudflare Worker and return the public URL plus Staff / User MCP URLs. Use after the install skill has produced a standalone project and the user wants the service online.
 when_to_invoke: |
   Project exists, `pnpm validate` + `pnpm typecheck` pass, user wants to deploy.
-applies_to: clam-cms@v0.1.0
+applies_to: clam-mantle@v0.1.0
 ---
 
-# Provision a clam-cms project
+# Provision a clam-mantle project
 
 You're taking an installed consumer project from local files to a user-owned Cloudflare Worker.
 

@@ -1,6 +1,6 @@
-# `@aotterclam/clam-cms-netlify` — STUB
+# `@aotterclam/clam-mantle-netlify` — STUB
 
-Netlify Functions adapter for clam-cms. **Coming v0.2.**
+Netlify Functions adapter for clam-mantle. **Coming v0.2.**
 
 This package is intentionally empty in v0.1.0.
 
@@ -8,13 +8,13 @@ This package is intentionally empty in v0.1.0.
 
 It exists as an **engineering forcing function**.
 
-The required adapter ports defined in `@aotterclam/clam-cms-runtime`
+The required adapter ports defined in `@aotterclam/clam-mantle-runtime`
 (`DatabaseDriver`, `KvCache`, `AssetServer`) only stay
 adapter-agnostic if there's pressure to implement them in more than
 one place. Auth is supplied by an adapter-owned Better Auth instance;
 optional feature ports, such as media hosting, must stay optional
 until a starter explicitly enables that feature. With only
-`clam-cms-cloudflare` shipping, `clam-cms-runtime` would slowly grow
+`clam-mantle-cloudflare` shipping, `clam-mantle-runtime` would slowly grow
 Cloudflare-specific imports in PR review (`D1Database` here,
 `KVNamespace` there) — death by a thousand papercuts. After a year,
 "adapter-agnostic" is a comment, not a constraint.
@@ -26,7 +26,7 @@ This README declares the public commitment to a second adapter. PR reviewers can
 - Netlify Functions handler (replaces Cloudflare Workers' Hono adapter)
 - `DatabaseDriver` → Postgres-via-Neon impl, OR Netlify Blob storage if first-party support exists
 - `KvCache` → Netlify Blobs (or Redis bridge)
-- `AssetServer` → Netlify static publish dir (consumes `clam-cms-admin-ui` dist same as Cloudflare)
+- `AssetServer` → Netlify static publish dir (consumes `clam-mantle-admin-ui` dist same as Cloudflare)
 - Better Auth factory → Netlify-compatible database adapter, GitHub/social providers, and MCP OAuth/DCR
 
 The adapter implementation entry point is [`docs/adapter-guide.md`](../../docs/adapter-guide.md). The port contract is documented in [`docs/adr/0011-adapter-port-spec.md`](../../docs/adr/0011-adapter-port-spec.md).
@@ -37,4 +37,4 @@ Open an issue. Implementation work for the second adapter is a discrete chunk; o
 
 ## Until v0.2
 
-Use [`@aotterclam/clam-cms-cloudflare`](../cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).
+Use [`@aotterclam/clam-mantle-cloudflare`](../cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).

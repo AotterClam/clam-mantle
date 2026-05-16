@@ -169,7 +169,7 @@ configuration.
   via grammar-revise.
 - **`now` semantics on D1 vs PG diverge.** D1 has no
   column-level `DEFAULT now()`; SDK stamps. PG (v0.2+ via
-  Hyperdrive — see `clam-cms-cloudflare` README) has native defaults. Authors writing
+  Hyperdrive — see `clam-mantle-cloudflare` README) has native defaults. Authors writing
   `x-clam-bind: now` on a future PG-targeted deployment may
   expect column-level enforcement; v0.1.0 ships SDK-stamped
   only.
@@ -219,7 +219,7 @@ attributes.
 
 ## Implementation status
 
-Closed-enum types live in `packages/clam-cms-spec/` and the
+Closed-enum types live in `packages/clam-mantle-spec/` and the
 parser rejects unknown values with the structured diagnostic
 shape. Verify in code review that new manifest grammar
 additions do not quietly widen these enums; widening is a

@@ -1,6 +1,6 @@
 # Release process
 
-clam-cms is in `0.0.x-alpha` until the v0.1.0 release gate closes. The process below documents the branch, tag, GitHub release, and npm publish discipline for prereleases and stable releases.
+clam-mantle is in `0.0.x-alpha` until the v0.1.0 release gate closes. The process below documents the branch, tag, GitHub release, and npm publish discipline for prereleases and stable releases.
 
 ## Branch model
 
@@ -102,10 +102,10 @@ the selected npm version.
 
 For `0.0.x-alpha`, publish SDK packages only:
 
-1. `@aotterclam/clam-cms-spec`
-2. `@aotterclam/clam-cms-admin-ui`
-3. `@aotterclam/clam-cms-runtime`
-4. `@aotterclam/clam-cms-cloudflare`
+1. `@aotterclam/clam-mantle-spec`
+2. `@aotterclam/clam-mantle-admin-ui`
+3. `@aotterclam/clam-mantle-runtime`
+4. `@aotterclam/clam-mantle-cloudflare`
 
 Do **not** publish starter packages during alpha unless a separate PR
 explicitly prepares their package allowlists and verifies the tarballs.
@@ -113,20 +113,20 @@ Current starter install flow downloads starter source tarballs from
 GitHub/template refs, extracts them without preserving the template
 repo remote, and uses npm as the runtime dependency source.
 
-Do **not** publish `@aotterclam/clam-cms-netlify` while it is a stub.
+Do **not** publish `@aotterclam/clam-mantle-netlify` while it is a stub.
 
-`@aotterclam/create-clam-cms` lives in `AotterClam/clam-cms-starters`,
+`@aotterclam/create-clam-mantle` lives in `AotterClam/clam-mantle-starters`,
 not here. The scaffolder couples to starter content (sources.json,
 merge layout, placeholder macros) and has zero coupling to SDK runtime,
 so it ships from the starters repo. Releases on this SDK repo no longer
-attach a create-clam-cms tarball — that asset is on the starters repo's
+attach a create-clam-mantle tarball — that asset is on the starters repo's
 matching release tag.
 
 **The scaffolder is intentionally not published to npm.** Consumers
 invoke it via the GitHub release tarball URL directly:
 
 ```bash
-npx https://github.com/AotterClam/clam-cms-starters/releases/download/<tag>/aotterclam-create-clam-cms-<tag>.tgz \
+npx https://github.com/AotterClam/clam-mantle-starters/releases/download/<tag>/aotterclam-create-clam-mantle-<tag>.tgz \
   <archetype> \
   --project-name "..." \
   --brand "..." \
@@ -162,9 +162,9 @@ Create package tarballs and inspect them before publishing:
 
 ```bash
 mkdir -p /private/tmp/clam-pack-check
-pnpm -C packages/clam-cms-spec pack --pack-destination /private/tmp/clam-pack-check
-pnpm -C packages/clam-cms-admin-ui pack --pack-destination /private/tmp/clam-pack-check
-pnpm -C packages/clam-cms-runtime pack --pack-destination /private/tmp/clam-pack-check
+pnpm -C packages/clam-mantle-spec pack --pack-destination /private/tmp/clam-pack-check
+pnpm -C packages/clam-mantle-admin-ui pack --pack-destination /private/tmp/clam-pack-check
+pnpm -C packages/clam-mantle-runtime pack --pack-destination /private/tmp/clam-pack-check
 pnpm -C packages/adapters/cloudflare pack --pack-destination /private/tmp/clam-pack-check
 ```
 
@@ -191,10 +191,10 @@ Publish in dependency order:
 After publishing, verify:
 
 ```bash
-npm view @aotterclam/clam-cms-spec version dist-tags --json
-npm view @aotterclam/clam-cms-admin-ui version dist-tags --json
-npm view @aotterclam/clam-cms-runtime version dist-tags dependencies --json
-npm view @aotterclam/clam-cms-cloudflare version dist-tags dependencies --json
+npm view @aotterclam/clam-mantle-spec version dist-tags --json
+npm view @aotterclam/clam-mantle-admin-ui version dist-tags --json
+npm view @aotterclam/clam-mantle-runtime version dist-tags dependencies --json
+npm view @aotterclam/clam-mantle-cloudflare version dist-tags dependencies --json
 ```
 
 ### Rollback / yanking policy
@@ -208,7 +208,7 @@ is broken:
 Example:
 
 ```bash
-npm deprecate @aotterclam/clam-cms-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
+npm deprecate @aotterclam/clam-mantle-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
 ```
 
 Only unpublish when the tarball contains secrets, private files, or a

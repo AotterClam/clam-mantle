@@ -43,7 +43,7 @@ function checkRuntimeCloudflareFree() {
     "Fetcher",
     "ExecutionContext",
   ];
-  const files = listFiles(join(ROOT, "packages/clam-cms-runtime/src"), (p) =>
+  const files = listFiles(join(ROOT, "packages/clam-mantle-runtime/src"), (p) =>
     p.endsWith(".ts"),
   );
   for (const file of files) {
@@ -66,18 +66,18 @@ function checkRuntimeCloudflareFree() {
 function checkPackageDirection() {
   const rules = [
     {
-      dir: "packages/clam-cms-spec/src",
+      dir: "packages/clam-mantle-spec/src",
       forbidden: [
-        "@aotterclam/clam-cms-runtime",
-        "@aotterclam/clam-cms-cloudflare",
+        "@aotterclam/clam-mantle-runtime",
+        "@aotterclam/clam-mantle-cloudflare",
       ],
       message: "spec must not import runtime/cloudflare packages",
     },
     {
-      dir: "packages/clam-cms-runtime/src",
+      dir: "packages/clam-mantle-runtime/src",
       forbidden: [
-        "@aotterclam/clam-cms-cloudflare",
-        "@aotterclam/clam-cms-netlify",
+        "@aotterclam/clam-mantle-cloudflare",
+        "@aotterclam/clam-mantle-netlify",
       ],
       message: "runtime must not import adapter packages",
     },
