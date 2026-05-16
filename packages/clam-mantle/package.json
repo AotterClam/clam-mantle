@@ -1,0 +1,58 @@
+{
+  "name": "@aotterclam/clam-mantle",
+  "version": "0.0.10-alpha",
+  "description": "Umbrella entry for @aotterclam/clam-mantle. Adopters install this one package and import from subpaths: /spec, /runtime, /cloudflare, /admin-ui. Sub-packages remain individually installable on npm for tooling / alt-adapter authors. The Netlify adapter ships as a private workspace stub in v0.1 — its subpath will be added when the impl lands in v0.2.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/AotterClam/clam-mantle/tree/main/packages/clam-mantle",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AotterClam/clam-mantle.git",
+    "directory": "packages/clam-mantle"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "exports": {
+    "./spec": {
+      "types": "./dist/spec.d.ts",
+      "import": "./dist/spec.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    },
+    "./cloudflare": {
+      "types": "./dist/cloudflare.d.ts",
+      "import": "./dist/cloudflare.js"
+    },
+    "./admin-ui": {
+      "types": "./dist/admin-ui.d.ts",
+      "import": "./dist/admin-ui.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@aotterclam/clam-mantle-admin-ui": "workspace:*",
+    "@aotterclam/clam-mantle-cloudflare": "workspace:*",
+    "@aotterclam/clam-mantle-runtime": "workspace:*",
+    "@aotterclam/clam-mantle-spec": "workspace:*"
+  },
+  "scripts": {
+    "prebuild": "rm -rf dist .tsbuildinfo",
+    "build": "tsc -b tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
