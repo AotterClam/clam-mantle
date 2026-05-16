@@ -74,7 +74,7 @@ function trigger(name: string, procedureName: string): TriggerManifest {
     kind: "Trigger",
     metadata: { name },
     spec: {
-      source: { kind: "http", method: "POST", path: `/${name}` },
+      source: { kind: "http", method: "POST", path: `/api/${name}` },
       target: { procedure: procedureName },
     },
   };
@@ -91,6 +91,60 @@ describe("check()", () => {
     const result = check({ manifests });
     expect(result.errorCount).toBe(0);
     expect(result.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  });
+
+  it("emits TRIGGER_PATH_INVALID when an http Trigger path does not start with /api/", () => {
+    const t: TriggerManifest = {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "restockProductHttp" },
+      spec: {
+        source: { kind: "http", method: "POST", path: "/staff/api/restock" },
+        target: { procedure: "restockProduct" },
+      },
+    };
+    const manifests: Manifest[] = [
+      schema("posts"),
+      procedure("restockProduct"),
+      t,
+    ];
+    const result = check({ manifests });
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toContain("TRIGGER_PATH_INVALID");
+    expect(result.errorCount).toBeGreaterThan(0);
+  });
+
+  it("does NOT emit a spurious TRIGGER_PATH_COLLISION when two triggers share an invalid path", () => {
+    const tA: TriggerManifest = {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "badA" },
+      spec: {
+        source: { kind: "http", method: "POST", path: "/bad/path" },
+        target: { procedure: "restockProduct" },
+      },
+    };
+    const tB: TriggerManifest = {
+      apiVersion,
+      kind: "Trigger",
+      metadata: { name: "badB" },
+      spec: {
+        source: { kind: "http", method: "POST", path: "/bad/path" },
+        target: { procedure: "restockProduct" },
+      },
+    };
+    const manifests: Manifest[] = [
+      schema("posts"),
+      procedure("restockProduct"),
+      tA,
+      tB,
+    ];
+    const result = check({ manifests });
+    const codes = result.diagnostics.map((d) => d.code);
+    // Both triggers should report TRIGGER_PATH_INVALID — collision is
+    // secondary to the bad prefix and would misdescribe the root cause.
+    expect(codes.filter((c) => c === "TRIGGER_PATH_INVALID")).toHaveLength(2);
+    expect(codes).not.toContain("TRIGGER_PATH_COLLISION");
   });
 
   it("emits TRIGGER_TARGET_PROCEDURE_UNKNOWN when a Trigger targets an undeclared Procedure", () => {
