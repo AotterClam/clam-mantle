@@ -1,0 +1,73 @@
+import { stdout, stderr } from "node:process";
+import { EmitOpenapiUseCase } from "../../usecase/EmitOpenapiUseCase.js";
+import { loadManifestsFromRoot } from "./loadManifests.js";
+
+export interface EmitOpenapiArgs {
+  readonly manifests: string;
+  readonly title: string;
+  readonly version: string;
+}
+
+export type ParseResult = { kind: "args"; args: EmitOpenapiArgs } | { kind: "help" };
+
+export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
+  let manifests = "./manifests";
+  let title = "clam-mantle";
+  let version = "0.1.0";
+  for (let i = 0; i < rawArgs.length; i++) {
+    const a = rawArgs[i];
+    if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
+    else if (a === "--title") title = rawArgs[++i] ?? title;
+    else if (a === "--version") version = rawArgs[++i] ?? version;
+    else if (a === "--help" || a === "-h") return { kind: "help" };
+    else if (a !== undefined) {
+      throw new Error(`Unknown argument: ${a}`);
+    }
+  }
+  return { kind: "args", args: { manifests, title, version } };
+}
+
+function printHelp(): void {
+  stdout.write(`clam-mantle emit-openapi — emit OpenAPI 3.1 from manifests
+
+Usage: clam-mantle emit-openapi [options] > openapi.json
+
+Options:
+  --manifests <dir>   Manifest root (default: ./manifests)
+  --title <str>       OpenAPI info.title (default: clam-mantle)
+  --version <str>     OpenAPI info.version (default: 0.1.0)
+  -h, --help          This help
+
+Output: OpenAPI 3.1 JSON on stdout.
+
+Covers HTTP Triggers (POST/PUT/PATCH/DELETE) and View REST routes
+(GET /api/views/<name>). MCP is out of scope.
+`);
+}
+
+export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
+  let parsed: ParseResult;
+  try {
+    parsed = parseArgs(rawArgs);
+  } catch (err) {
+    stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    return 2;
+  }
+  if (parsed.kind === "help") {
+    printHelp();
+    return 0;
+  }
+  const args = parsed.args;
+  const { manifests, parseErrors } = await loadManifestsFromRoot(args.manifests);
+  if (parseErrors.some((d) => d.severity === "error")) {
+    stderr.write(`Manifest parse errors — run \`clam-mantle validate\` to inspect.\n`);
+    return 1;
+  }
+  const { document } = EmitOpenapiUseCase.run({
+    manifests,
+    title: args.title,
+    version: args.version,
+  });
+  stdout.write(JSON.stringify(document, null, 2) + "\n");
+  return 0;
+}

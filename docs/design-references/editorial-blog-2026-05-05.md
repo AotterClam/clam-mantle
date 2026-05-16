@@ -90,7 +90,7 @@ Footer:
 - One-pixel top rule.
 - Mono text at `0.75rem`.
 - Left side shows `site.brand` and `site.description`.
-- Right side links to `clam-cms`.
+- Right side links to `clam-mantle`.
 
 ## Templates
 

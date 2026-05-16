@@ -1,10 +1,10 @@
 # Adapter implementation guide
 
-This guide is the fresh-developer entry point for implementing a new clam-cms platform adapter.
+This guide is the fresh-developer entry point for implementing a new clam-mantle platform adapter.
 
-Read this with [ADR-0011](adr/0011-adapter-port-spec.md). The source of truth for TypeScript shapes is `packages/clam-cms-runtime/src/domain/port/`.
+Read this with [ADR-0011](adr/0011-adapter-port-spec.md). The source of truth for TypeScript shapes is `packages/clam-mantle-runtime/src/domain/port/`.
 
-Adapter packages live under `packages/adapters/<platform>/` using a plural `adapters` bucket. The npm package names stay unchanged, for example `@aotterclam/clam-cms-cloudflare`. Keep adapters in this monorepo until the runtime/spec API is stable enough that coordinated releases across separate repositories would not create version skew for starters.
+Adapter packages live under `packages/adapters/<platform>/` using a plural `adapters` bucket. The npm package names stay unchanged, for example `@aotterclam/clam-mantle-cloudflare`. Keep adapters in this monorepo until the runtime/spec API is stable enough that coordinated releases across separate repositories would not create version skew for starters.
 
 ## Required runtime ports
 
@@ -12,9 +12,9 @@ A first-run adapter must implement exactly these three runtime ports:
 
 | Contract | Source | Cloudflare example |
 |---|---|---|
-| `DatabaseDriver` plus `PreparedStatement` and `MigrationRunner` | `packages/clam-cms-runtime/src/domain/port/DatabaseDriver.ts` | `packages/adapters/cloudflare/src/bindings/D1DatabaseDriver.ts` |
-| `KvCache` | `packages/clam-cms-runtime/src/domain/port/KvCache.ts` | `packages/adapters/cloudflare/src/bindings/KvCacheBinding.ts` |
-| `AssetServer` | `packages/clam-cms-runtime/src/domain/port/AssetServer.ts` | `packages/adapters/cloudflare/src/bindings/AssetsAssetServer.ts` |
+| `DatabaseDriver` plus `PreparedStatement` and `MigrationRunner` | `packages/clam-mantle-runtime/src/domain/port/DatabaseDriver.ts` | `packages/adapters/cloudflare/src/bindings/D1DatabaseDriver.ts` |
+| `KvCache` | `packages/clam-mantle-runtime/src/domain/port/KvCache.ts` | `packages/adapters/cloudflare/src/bindings/KvCacheBinding.ts` |
+| `AssetServer` | `packages/clam-mantle-runtime/src/domain/port/AssetServer.ts` | `packages/adapters/cloudflare/src/bindings/AssetsAssetServer.ts` |
 
 The runtime must not import platform types such as `D1Database`, `KVNamespace`, Cloudflare `Fetcher`, Netlify request objects, Postgres pools, or adapter SDK types. Those live in adapter packages.
 
@@ -24,8 +24,8 @@ Optional ports are enabled only when a feature needs them:
 
 | Contract | Source | Required when |
 |---|---|---|
-| `MediaStorage` | `packages/clam-cms-runtime/src/domain/port/MediaStorage.ts` | The adapter exposes admin/MCP media upload flows. |
-| `DeferredHookDispatcher` | `packages/clam-cms-runtime/src/domain/port/DeferredHookDispatcher.ts` | The adapter wants durable queue delivery for `after_*` lifecycle hooks. |
+| `MediaStorage` | `packages/clam-mantle-runtime/src/domain/port/MediaStorage.ts` | The adapter exposes admin/MCP media upload flows. |
+| `DeferredHookDispatcher` | `packages/clam-mantle-runtime/src/domain/port/DeferredHookDispatcher.ts` | The adapter wants durable queue delivery for `after_*` lifecycle hooks. |
 
 Test seams such as `Clock` and `IdGenerator` are injectable through `createCmsRuntime`, but normal adapters do not need custom implementations.
 
@@ -34,7 +34,7 @@ Test seams such as `Clock` and `IdGenerator` are injectable through `createCmsRu
 Adapters compose the runtime through `createCmsRuntime`:
 
 ```ts
-import { createCmsRuntime } from "@aotterclam/clam-cms-runtime";
+import { createCmsRuntime } from "@aotterclam/clam-mantle-runtime";
 
 const runtime = createCmsRuntime({
   manifests,
@@ -64,7 +64,7 @@ The runtime is a library, not an HTTP server. A new adapter must mount equivalen
 | Auth endpoints | Own sign-in/session/OAuth metadata routes through the adapter's Better Auth integration. | `packages/adapters/cloudflare/src/auth/createAuth.ts`, `mountServerEndpoints.ts` |
 | MCP endpoints | Mount `/mcp/staff` and `/mcp` via `createOAuthProvider({ apiHandlers })`; the OAuth lib verifies bearer tokens against its KV grant store, then calls the matching apiHandler with `ctx.props` set. The adapter enforces the staff D1 role inside the apiHandler, then dispatches JSON-RPC. | `packages/adapters/cloudflare/src/mount/mountMcp.ts`, `oauth/oauthSingleton.ts`, `oauth/mountOAuth.ts` |
 
-Auth is not a runtime port. Per [ADR-0014](adr/0014-auth-better-auth-and-multi-tenant-mcp.md), the adapter owns Better Auth wiring and passes authenticated user/staff context into runtime dispatchers. Procedure handlers receive that data through `HandlerContext` in `packages/clam-cms-runtime/src/domain/model/HandlerContext.ts`.
+Auth is not a runtime port. Per [ADR-0014](adr/0014-auth-better-auth-and-multi-tenant-mcp.md), the adapter owns Better Auth wiring and passes authenticated user/staff context into runtime dispatchers. Procedure handlers receive that data through `HandlerContext` in `packages/clam-mantle-runtime/src/domain/model/HandlerContext.ts`.
 
 Minimum HTTP behavior for a full adapter:
 
@@ -86,7 +86,7 @@ Minimum auth/MCP behavior:
 
 ## Static assets
 
-`AssetServer` is required because every adapter must have a strategy for serving the prebuilt admin UI from `@aotterclam/clam-cms-admin-ui`. The adapter may serve those files from platform assets, a static publish directory, object storage plus CDN, or a filesystem bundle. Return `null` from `AssetServer.fetch()` when a specific asset is not found so the adapter can fall back to the admin SPA catchall.
+`AssetServer` is required because every adapter must have a strategy for serving the prebuilt admin UI from `@aotterclam/clam-mantle-admin-ui`. The adapter may serve those files from platform assets, a static publish directory, object storage plus CDN, or a filesystem bundle. Return `null` from `AssetServer.fetch()` when a specific asset is not found so the adapter can fall back to the admin SPA catchall.
 
 ## Implementation checklist
 

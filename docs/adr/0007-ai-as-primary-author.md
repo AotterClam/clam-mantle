@@ -12,7 +12,7 @@
 
 ## Context
 
-This ADR is the local statement of an Aotter-wide thesis. clam-cms is
+This ADR is the local statement of an Aotter-wide thesis. clam-mantle is
 one half of **CLAM** (**C**onfig **L**anguage for **A**pps &
 **M**odeling) — the other half is the OLAP / data-warehouse work in
 [`aotter-clam`](https://github.com/aotter/aotter-clam). Both share a
@@ -28,11 +28,11 @@ catching mistakes before they become production failures. Non-coders
 benefit from agent leverage *safely* because the load-bearing logic
 isn't in their hands.
 
-This ADR documents what that thesis means concretely for clam-cms's
+This ADR documents what that thesis means concretely for clam-mantle's
 authoring contract.
 
 The primary author/integrator of consumer apps that depend on
-`@aotterclam/clam-cms-*` is expected to be Claude Code (or a peer LLM
+`@aotterclam/clam-mantle-*` is expected to be Claude Code (or a peer LLM
 agent) running inside the consumer project. Human contributors review
 and steer, but the moment-to-moment work — wiring a manifest, writing
 a Procedure handler, registering it at boot, bisecting a failure — is
@@ -80,14 +80,14 @@ The SDK provides **three explicit feedback loops**, ordered by
 "leftward shift" — catch the failure as early in the author's
 workflow as physically possible:
 
-#### Loop 1 — Static validation (`clam-cms validate`)
+#### Loop 1 — Static validation (`clam-mantle validate`)
 
 Pure manifest + handler-source check. No D1, no runtime, no
 network. Runs in the AI's terminal in milliseconds. Reads YAML files
 and handler registration source files; emits structured diagnostics;
 exits non-zero on any error.
 
-The CLI ships in the `@aotterclam/clam-cms-spec` package — it's the
+The CLI ships in the `@aotterclam/clam-mantle-spec` package — it's the
 spec authority for what a v0.1 manifest must look like.
 
 What it catches:
@@ -121,7 +121,7 @@ or Views directly without going through HTTP.
 Target API sketch:
 
 ```ts
-import { createTestDispatcher } from "@aotterclam/clam-cms-runtime/testing";
+import { createTestDispatcher } from "@aotterclam/clam-mantle-runtime/testing";
 import { manifests } from "../manifests"; // loaded by build hook
 import { handlers } from "../handlers";   // map of ref → fn
 
@@ -216,12 +216,12 @@ discipline.
 (Folded in from POC ADR-0013, which was a separate ADR in the POC tree
 and is consolidated here in v0.1.0.)
 
-Two AI agents read and write to a `@aotterclam/clam-cms-*` deployment:
+Two AI agents read and write to a `@aotterclam/clam-mantle-*` deployment:
 
 1. **The coder agent** — Claude Code (cc) running inside the
    consumer's repo. Edits manifests, handlers, scaffold files,
-   `wrangler.toml`. Runs CLI commands (`clam-cms validate`,
-   `clam-cms emit-openapi`). Reads skill files. Has shell, filesystem, git,
+   `wrangler.toml`. Runs CLI commands (`clam-mantle validate`,
+   `clam-mantle emit-openapi`). Reads skill files. Has shell, filesystem, git,
    and network access in the consumer's dev environment.
 
 2. **The operator agent** — a content-editing client (Claude Desktop,
@@ -240,7 +240,7 @@ it's a property of the environments. cc can run an arbitrary command
 in the consumer's repo; an MCP-only client cannot.
 
 Without an explicit principle, every feature decision can be expressed
-on either surface. "Should `clam-cms validate` also be an MCP tool?"
+on either surface. "Should `clam-mantle validate` also be an MCP tool?"
 "Should `update_draft` also be a CLI command?" Answered ad-hoc, the
 two surfaces drift toward feature parity, which destroys the role
 boundary, which destroys the security and DX properties the boundary
@@ -276,13 +276,13 @@ SDK TS API instead of needing a matching MCP tool).
 
 Concrete artifacts today:
 - `skills/<name>/SKILL.md` files in the
-  [`AotterClam/clam-cms`](https://github.com/AotterClam/clam-cms)
+  [`AotterClam/clam-mantle`](https://github.com/AotterClam/clam-mantle)
   repo, discoverable by URL. Distribution as a Claude plugin is
   **optional** (a v0.1.x convenience), not required — the canonical
   location is the in-repo path, and any agent that can fetch a URL
   can consume them.
-- `clam-cms validate` CLI (shipped in `@aotterclam/clam-cms-spec`)
-- `clam-cms emit-openapi` CLI (likewise)
+- `clam-mantle validate` CLI (shipped in `@aotterclam/clam-mantle-spec`)
+- `clam-mantle emit-openapi` CLI (likewise)
 - Public testing harness (planned; current coverage is SDK tests +
   starter integration smokes)
 
@@ -303,7 +303,7 @@ Concrete artifacts today:
 
 A small third category exists: APIs that only the **runtime itself**
 consumes (the dispatcher, the boot validator, the diagnostic types).
-These are exported from `@aotterclam/clam-cms-spec` for the coder to
+These are exported from `@aotterclam/clam-mantle-spec` for the coder to
 import inside their handler code, but are not CLI commands and not
 MCP tools — they're library types.
 
@@ -318,7 +318,7 @@ MCP tools — they're library types.
 - **CLI commands that mutate runtime state.** The CLI is for the
   pre-deploy authoring loop. Once deployed, runtime state changes via
   MCP (operator) or via direct SDK calls inside handler code
-  (developer). No `clam-cms publish-entry <id>` is planned — that
+  (developer). No `clam-mantle publish-entry <id>` is planned — that
   would mix the two surfaces.
 
 ## Consequences
@@ -353,7 +353,7 @@ MCP tools — they're library types.
 
 ### Costs
 
-- v0.1 ships more than just a runtime: also the `clam-cms validate`
+- v0.1 ships more than just a runtime: also the `clam-mantle validate`
   CLI, a public testing module, and a boot validator. Roughly +30%
   of the v0.1 dispatcher work.
 - Test harness needs an in-memory D1 substitute (most plausible:

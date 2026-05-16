@@ -10,15 +10,15 @@ import {
   type ContentState,
   type Diagnostic,
   type SchemaManifest,
-} from "@aotterclam/clam-cms-spec";
+} from "@aotterclam/clam-mantle-spec";
 import {
   ViewParamCoercionError,
   coerceViewParams,
   matchPath,
   type CmsRuntime,
   type HandlerContext,
-} from "@aotterclam/clam-cms-runtime";
-import { indexHtml } from "@aotterclam/clam-cms-admin-ui";
+} from "@aotterclam/clam-mantle-runtime";
+import { indexHtml } from "@aotterclam/clam-mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
 import { AOTTER_CLAM_FAVICON_SVG } from "../assets/aotterClamFavicon.js";

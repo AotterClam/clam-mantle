@@ -6,7 +6,7 @@ Do not report vulnerabilities in public issues or discussions.
 
 Preferred path: open a private GitHub Security Advisory:
 
-https://github.com/AotterClam/clam-cms/security/advisories/new
+https://github.com/AotterClam/clam-mantle/security/advisories/new
 
 Fallback contact: `phsu@aotter.net`.
 

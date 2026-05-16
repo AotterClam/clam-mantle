@@ -87,7 +87,7 @@ produces them is their choice.
 
 ### Adapter scope for v0.1.0
 
-The Cloudflare adapter (`@aotterclam/clam-cms-cloudflare`) is the
+The Cloudflare adapter (`@aotterclam/clam-mantle-cloudflare`) is the
 only shipping adapter in v0.1.0, so the Text-import-via-`[[rules]]`
 pattern is the canonical path. When other adapters (Netlify, etc.)
 ship, they will need their own equivalent text-import mechanism, but
@@ -127,7 +127,7 @@ through the sequence.
 - Consumers can compose all four atoms in their own project per the
   ADR-0001 promise. The 4-atom model is a property of the SDK, not
   of the starters.
-- The static-validation feedback loop (`clam-cms validate`) reads
+- The static-validation feedback loop (`clam-mantle validate`) reads
   from a `manifests/` directory in the consumer's project; the
   validate path is uniformly applicable to consumer-authored
   manifests across all four feedback loops.
@@ -208,9 +208,9 @@ provide a hook for the SDK to read consumer files — that's the
 consumer's bundler's job, which is exactly what Text-imported YAML
 is for.
 
-**(C) Separate `@aotterclam/clam-cms-manifests-<consumer>` package** —
+**(C) Separate `@aotterclam/clam-mantle-manifests-<consumer>` package** —
 each consumer ships their manifests as an npm package; the SDK
-imports from `clam-cms-manifests-blog` etc. Rejected: 1:N package
+imports from `clam-mantle-manifests-blog` etc. Rejected: 1:N package
 overhead for what should be a directory of YAML files. Tooling pain
 (versioning, publishing) for a layer that is fundamentally
 consumer-internal. Useful if a community emerges around shared
@@ -257,7 +257,7 @@ Accepted for v0.1.0. The implementation slice:
 - `CmsConfig` carries `manifests?: readonly string[]`.
 - The mount factory builds the registry from the consumer-supplied
   YAML; no SDK fallback.
-- The `@aotterclam/clam-cms-cloudflare` package ships zero embedded
+- The `@aotterclam/clam-mantle-cloudflare` package ships zero embedded
   manifests.
 - The starter at `starters/blog/` is self-contained: `manifests/`,
   `src/yaml.d.ts`, `wrangler.toml` `[[rules]]` block, and
@@ -267,4 +267,4 @@ Accepted for v0.1.0. The implementation slice:
   (e.g. `consumer-manifest:[2]#/spec/...`) so deploy logs point at
   the right file.
 
-Tracking: AotterClam/clam-cms.
+Tracking: AotterClam/clam-mantle.

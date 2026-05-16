@@ -1,6 +1,6 @@
-# Contributing to clam-cms
+# Contributing to clam-mantle
 
-clam-cms is built for AI agents to be primary authors of consumer projects. Human maintainers still own review and release decisions, but the contributor workflow must be clear enough that a fresh AI agent can file a good issue or open a good PR by reading only this repo.
+clam-mantle is built for AI agents to be primary authors of consumer projects. Human maintainers still own review and release decisions, but the contributor workflow must be clear enough that a fresh AI agent can file a good issue or open a good PR by reading only this repo.
 
 Start here before changing code or docs. For deeper engineering rules, read [`CLAUDE.md`](CLAUDE.md) and the ADR index in [`docs/adr/README.md`](docs/adr/README.md).
 
@@ -107,7 +107,7 @@ Use `.github/pull_request_template.md`. Link issues with `Closes #NN` only when 
 
 Read the relevant ADRs before touching architecture. The most common gates are:
 
-- Runtime must stay adapter-agnostic. `@aotterclam/clam-cms-runtime` must not import Cloudflare-specific types.
+- Runtime must stay adapter-agnostic. `@aotterclam/clam-mantle-runtime` must not import Cloudflare-specific types.
 - Manifest grammar is locked at v0.1. New grammar keys or closed-enum entries need grammar-revise work before implementation.
 - New top-level `domain/`, `usecase/`, or `infrastructure/` folders need an ADR-lite paragraph in the PR body.
 - Trust-boundary changes, auth changes, MCP surface changes, persistence boundaries, and public HTTP semantics need `needs-adr` unless an existing ADR clearly covers the decision.

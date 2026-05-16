@@ -1,4 +1,4 @@
-import type { AssetServer } from "@aotterclam/clam-cms-runtime";
+import type { AssetServer } from "@aotterclam/clam-mantle-runtime";
 
 /**
  * `AssetServer` impl wrapping Cloudflare's `ASSETS` binding (a

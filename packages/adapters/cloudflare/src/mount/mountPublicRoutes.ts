@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import type { ContentState, SiteConfig } from "@aotterclam/clam-cms-spec";
+import type { ContentState, SiteConfig } from "@aotterclam/clam-mantle-spec";
 import {
   entryHtmlKeyFromParts,
   entryMarkdownKeyFromParts,
@@ -12,7 +12,7 @@ import {
   toUrlLocale,
   type CmsRuntime,
   type KvCache,
-} from "@aotterclam/clam-cms-runtime";
+} from "@aotterclam/clam-mantle-runtime";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
 /**
@@ -300,7 +300,7 @@ function mountCollection(
     // there's no `/{locale}` route to serve. Surface as a console
     // warning at boot rather than silently misconfiguring.
     console.warn(
-      `[clam-cms] collectionRoute "${route.collection}" declares homeSlug="${route.homeSlug}" ` +
+      `[clam-mantle] collectionRoute "${route.collection}" declares homeSlug="${route.homeSlug}" ` +
         `but no homeRenderer was passed to mountPublicRoutes — /{locale} will 404.`,
     );
   }

@@ -21,7 +21,7 @@ export function detectConsentLocale(acceptLanguage: string | null): "zh-TW" | "e
 
 const STRINGS = {
   en: {
-    title: "Authorize · clam-cms",
+    title: "Authorize · clam-mantle",
     eyebrow: "Authorize MCP access",
     heading: (client: string) => `Allow ${client} to access your CMS?`,
     redirectLabel: "Will redirect to",
@@ -32,7 +32,7 @@ const STRINGS = {
     invalidBody: "Missing or malformed consent payload. Return to your MCP client and try again.",
   },
   "zh-TW": {
-    title: "授權 · clam-cms",
+    title: "授權 · clam-mantle",
     eyebrow: "授權 MCP 存取",
     heading: (client: string) => `允許 ${client} 存取您的 CMS？`,
     redirectLabel: "將重新導向至",

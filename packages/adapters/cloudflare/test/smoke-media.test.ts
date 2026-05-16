@@ -5,11 +5,11 @@ import type {
   CreateUploadArgs,
   Manifest,
   MediaStorage,
-} from "@aotterclam/clam-cms-runtime";
+} from "@aotterclam/clam-mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import type { Auth } from "../src/auth/createAuth.js";
-import { InMemoryDatabase } from "../../../clam-cms-runtime/test/fakes/database.js";
+import { InMemoryDatabase } from "../../../clam-mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,

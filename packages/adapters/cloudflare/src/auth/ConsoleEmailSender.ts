@@ -1,4 +1,4 @@
-import type { EmailSender, EmailSendArgs } from "@aotterclam/clam-cms-runtime";
+import type { EmailSender, EmailSendArgs } from "@aotterclam/clam-mantle-runtime";
 
 /**
  * Dev convenience: writes the email to `console.log` instead of

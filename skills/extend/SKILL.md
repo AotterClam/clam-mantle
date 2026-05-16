@@ -1,12 +1,12 @@
 ---
-name: clam-cms extend
-description: Add new functionality to an existing clam-cms project — a new Schema, View, Procedure, or Trigger; or wire a feature like a contact form, newsletter signup, comment thread, or filtered list page. Use when the user already has a clam-cms project and wants to grow it.
+name: clam-mantle extend
+description: Add new functionality to an existing clam-mantle project — a new Schema, View, Procedure, or Trigger; or wire a feature like a contact form, newsletter signup, comment thread, or filtered list page. Use when the user already has a clam-mantle project and wants to grow it.
 when_to_invoke: |
   Working dir contains `manifests/`, `package.json` includes `@aotterclam/*`. The user describes a new content type, a public REST query, a write endpoint, or a side-effect on entry mutation.
-applies_to: clam-cms@v0.1.0
+applies_to: clam-mantle@v0.1.0
 ---
 
-# Extend a clam-cms project
+# Extend a clam-mantle project
 
 The 4-atom manifest model:
 
@@ -15,7 +15,7 @@ The 4-atom manifest model:
 - **Procedure** — the typed callable
 - **Trigger** — the event binding (HTTP / lifecycle / cron)
 
-Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts, or read the full grammar reference at <https://raw.githubusercontent.com/AotterClam/clam-cms/develop/docs/design-atoms.md>.
+Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts, or read the full grammar reference at <https://raw.githubusercontent.com/AotterClam/clam-mantle/develop/docs/design-atoms.md>.
 
 ## Match the user's request to atoms
 
@@ -195,7 +195,7 @@ If you change any module-init resolved chrome — `src/theme.default/components/
 
 Local dev fix: `pnpm fixture` rebakes everything from seed data.
 
-Production fix: iterate every published entry and call `runtime.requestPublish.execute({ id })`. A `clam-cms republish-all` CLI is on the v0.1.x roadmap; until then, a one-shot script that pulls `runtime.listEntries` for every collection and re-publishes each row is the right pattern.
+Production fix: iterate every published entry and call `runtime.requestPublish.execute({ id })`. A `clam-mantle republish-all` CLI is on the v0.1.x roadmap; until then, a one-shot script that pulls `runtime.listEntries` for every collection and re-publishes each row is the right pattern.
 
 ## Don't
 

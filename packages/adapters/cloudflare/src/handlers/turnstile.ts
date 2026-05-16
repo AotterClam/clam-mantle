@@ -1,8 +1,8 @@
 import {
   InvokeFailure,
   type HandlerContext,
-} from "@aotterclam/clam-cms-runtime";
-import { runtimeDiagnostic } from "@aotterclam/clam-cms-spec";
+} from "@aotterclam/clam-mantle-runtime";
+import { runtimeDiagnostic } from "@aotterclam/clam-mantle-spec";
 
 const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 

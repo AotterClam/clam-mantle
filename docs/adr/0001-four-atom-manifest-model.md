@@ -211,10 +211,10 @@ See § Authoring shape below for the full retirement rationale.
 
 Names + PG-1:1 framing are documented in this ADR and the
 manifest grammar reference. Manifest TS types live in
-`packages/clam-cms-spec/`. Starter manifests under
+`packages/clam-mantle-spec/`. Starter manifests under
 `starters/` declare instances of each. Runtime dispatcher /
 View executor / Procedure dispatcher are tracked under the
-v0.1.0 ship list in [AotterClam/clam-cms](https://github.com/AotterClam/clam-cms).
+v0.1.0 ship list in [AotterClam/clam-mantle](https://github.com/AotterClam/clam-mantle).
 
 ---
 
@@ -651,7 +651,7 @@ block as a manifest.
   A Schema referenced by 4 features can live in any of those
   4 files (or its own). Without grep / IDE go-to-def, finding
   the Schema definition requires knowing where the author
-  put it. Mitigation: Loop 1 (`clam-cms validate`) emits the
+  put it. Mitigation: Loop 1 (`clam-mantle validate`) emits the
   filesystem path in `VIEW_FROM_UNKNOWN_SCHEMA` diagnostics;
   IDE-shaped tooling (LSP — DRAFT) closes the rest.
 
