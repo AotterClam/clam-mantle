@@ -23,13 +23,13 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 ## Try it cold
 
 ```bash
-npx https://github.com/AotterClam/clam-mantle-starters/releases/latest/download/aotterclam-create-clam-mantle.tgz my-site
+npm create @aotterclam/clam-mantle@alpha my-site
 cd my-site
 ```
 
 The scaffolder asks for your archetype + theme + name and produces a Cloudflare-Worker-ready project. See [`skills/install/SKILL.md`](./skills/install/SKILL.md) for the agent-guided flow.
 
-Or paste a two-URL prompt from the landing page at [cms.aotterclam.ai](https://cms.aotterclam.ai/) into Claude Code / Cursor / Codex — same install, friendlier surface.
+Or paste a two-URL prompt from the landing page at [mantle.aotterclam.ai](https://mantle.aotterclam.ai/) into Claude Code / Cursor / Codex — same install, friendlier surface.
 
 > **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/AotterClam/clam-mantle/issues/1).
 

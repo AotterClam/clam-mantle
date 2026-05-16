@@ -100,12 +100,17 @@ the selected npm version.
 
 ### Packages published in alpha
 
-For `0.0.x-alpha`, publish SDK packages only:
+For `0.0.x-alpha`, publish SDK packages in dependency order:
 
 1. `@aotterclam/clam-mantle-spec`
 2. `@aotterclam/clam-mantle-admin-ui`
 3. `@aotterclam/clam-mantle-runtime`
 4. `@aotterclam/clam-mantle-cloudflare`
+5. `@aotterclam/clam-mantle` (umbrella — depends on all four above; publish last so its exact-pinned `dependencies` resolve)
+
+The umbrella is the adopter-facing entry: a single dep, subpath imports
+`@aotterclam/clam-mantle/{spec,runtime,cloudflare,admin-ui}`. Sub-packages
+stay individually installable for tooling / alt-adapter authors.
 
 Do **not** publish starter packages during alpha unless a separate PR
 explicitly prepares their package allowlists and verifies the tarballs.
@@ -119,15 +124,14 @@ Do **not** publish `@aotterclam/clam-mantle-netlify` while it is a stub.
 not here. The scaffolder couples to starter content (sources.json,
 merge layout, placeholder macros) and has zero coupling to SDK runtime,
 so it ships from the starters repo. Releases on this SDK repo no longer
-attach a create-clam-mantle tarball — that asset is on the starters repo's
-matching release tag.
+attach a create-clam-mantle tarball — that asset is published to npm
+from the starters repo's matching release tag.
 
-**The scaffolder is intentionally not published to npm.** Consumers
-invoke it via the GitHub release tarball URL directly:
+Adopters install via the `npm create` shortcut (npm 7+ resolves
+`@aotterclam/clam-mantle` to `@aotterclam/create-clam-mantle`):
 
 ```bash
-npx https://github.com/AotterClam/clam-mantle-starters/releases/download/<tag>/aotterclam-create-clam-mantle-<tag>.tgz \
-  <archetype> \
+npm create @aotterclam/clam-mantle@alpha <archetype> -- \
   --project-name "..." \
   --brand "..." \
   --description "..." \
@@ -136,19 +140,11 @@ npx https://github.com/AotterClam/clam-mantle-starters/releases/download/<tag>/a
   --summary "..."
 ```
 
-`skills/install/SKILL.md` carries the canonical invocation. Reasons
-for staying off npm:
+Equivalent direct invocations: `npx @aotterclam/create-clam-mantle@alpha
+<archetype> ...` or pinning to an exact version
+`npx @aotterclam/create-clam-mantle@0.0.10-alpha.1 ...`.
 
-- The scaffolder fetches `sources.json` at runtime from the starters
-  repo's `main` branch, so its behavior is already pinned to a
-  starters ref. An npm version would add a second layer of pinning
-  without value.
-- Consumers run it exactly once per project (scaffold-then-discard).
-  npm cache hygiene doesn't help for one-shot runs.
-- Skipping npm avoids a class of supply-chain risk: a malicious npm
-  publish of the scaffolder name would intercept every install.
-  GitHub release tarballs are signed by repo authority and tied to
-  the matching release tag.
+`skills/install/SKILL.md` carries the canonical invocation.
 
 ### Pre-publish checks
 
@@ -158,14 +154,21 @@ Run the full gate before publishing:
 pnpm run check
 ```
 
-Create package tarballs and inspect them before publishing:
+Run `pnpm build` from the workspace root first so `dist/` exists for
+every package — `pnpm publish` does NOT run the build lifecycle scripts
+by default, and a tarball published without `dist/` is a wasted version
+slot (npm forbids republishing the same version, and `npm unpublish`
+needs an OTP not always to hand). Then pack + inspect:
 
 ```bash
-mkdir -p /private/tmp/clam-pack-check
-pnpm -C packages/clam-mantle-spec pack --pack-destination /private/tmp/clam-pack-check
-pnpm -C packages/clam-mantle-admin-ui pack --pack-destination /private/tmp/clam-pack-check
-pnpm -C packages/clam-mantle-runtime pack --pack-destination /private/tmp/clam-pack-check
-pnpm -C packages/adapters/cloudflare pack --pack-destination /private/tmp/clam-pack-check
+pnpm run check                          # boundary + build + typecheck + test
+mkdir -p /tmp/clam-pack
+pnpm -C packages/clam-mantle-spec       pack --pack-destination /tmp/clam-pack
+pnpm -C packages/clam-mantle-admin-ui   pack --pack-destination /tmp/clam-pack
+pnpm -C packages/clam-mantle-runtime    pack --pack-destination /tmp/clam-pack
+pnpm -C packages/adapters/cloudflare    pack --pack-destination /tmp/clam-pack
+pnpm -C packages/clam-mantle            pack --pack-destination /tmp/clam-pack
+tar tzf /tmp/clam-pack/aotterclam-clam-mantle-<ver>.tgz | head    # spot-check
 ```
 
 Confirm each tarball contains only intended `dist`, `README.md`,
@@ -178,24 +181,40 @@ workspace-only artifacts.
 Publish prerelease packages with the `alpha` dist-tag:
 
 ```bash
-npm publish --access public --tag alpha <tarball>
+pnpm publish --filter @aotterclam/clam-mantle-spec       --no-git-checks --access public
+pnpm publish --filter @aotterclam/clam-mantle-admin-ui   --no-git-checks --access public
+pnpm publish --filter @aotterclam/clam-mantle-runtime    --no-git-checks --access public
+pnpm publish --filter @aotterclam/clam-mantle-cloudflare --no-git-checks --access public
+pnpm publish --filter @aotterclam/clam-mantle            --no-git-checks --access public
 ```
 
-Publish in dependency order:
+`pnpm publish` resolves `workspace:*` deps to the actual published
+version in the umbrella's `dependencies` field at pack time, so the
+umbrella's `dependencies` lock to the exact `0.0.X-alpha` of each
+sub-package once the publish completes.
 
-1. spec
-2. admin-ui
-3. runtime
-4. cloudflare
+`pnpm publish` uses `publishConfig.tag` (set to `alpha` on every
+package) but `npm` also assigns the `latest` dist-tag by default. Per
+the pre-v0.1 `latest` policy above, that's the correct behavior; no
+action needed. Add the `alpha` tag explicitly only if it's missing:
+
+```bash
+npm dist-tag add @aotterclam/clam-mantle@<ver> alpha
+```
 
 After publishing, verify:
 
 ```bash
-npm view @aotterclam/clam-mantle-spec version dist-tags --json
-npm view @aotterclam/clam-mantle-admin-ui version dist-tags --json
-npm view @aotterclam/clam-mantle-runtime version dist-tags dependencies --json
-npm view @aotterclam/clam-mantle-cloudflare version dist-tags dependencies --json
+for p in @aotterclam/clam-mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
+  npm view "$p" version dist-tags --json
+done
 ```
+
+Note: `npm view` against a freshly-published name can 404 for 5–15 min
+while the Fastly read-side cache propagates. The write side (and
+`pnpm publish`'s "cannot publish over the previously published
+versions" sanity check) is the authoritative confirmation that the
+publish landed.
 
 ### Rollback / yanking policy
 
