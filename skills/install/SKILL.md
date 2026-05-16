@@ -166,7 +166,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
-2. **Run the composed `## Run this` block.** Scroll to the `## Run this` section at the bottom of this composed document — the landing composer baked the archetype and theme literals into the command. Copy it verbatim, fill the 7 `<<...>>` markers from your authorized interview values (see Prerequisites table above), and run it.
+2. **Run the composed `## Run this` block.** Scroll to the `## Run this` section at the bottom of this composed document — the landing composer baked the archetype and theme literals into the command. Copy it verbatim, fill the 6 `<<...>>` markers from your authorized interview values (see Prerequisites table above), and run it.
 
    Do not modify the literal flags or the archetype positional. Do not invent additional flags. If a marker has no authorized value, you're still in the interview — return there.
 
