@@ -125,7 +125,7 @@ they are debugging a failed provision.
 
 - `skills/install/SKILL.md` and `skills/provision/SKILL.md` encode the
   current agent workflow.
-- `aotter/mantle-starters` and `starters/blank` both
+- `aotter/mantle-starter-publication` and `starters/blank` both
   ship `setup:site`.
 - The publication starter ships `provision:up`; `seed:initial` remains
   a test/contributor utility, not part of real-user provisioning.

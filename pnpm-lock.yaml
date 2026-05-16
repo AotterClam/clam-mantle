@@ -50,6 +50,28 @@ importers:
 
   packages/adapters/netlify: {}
 
+  packages/mantle:
+    dependencies:
+      '@aotter/mantle-admin-ui':
+        specifier: workspace:*
+        version: link:../mantle-admin-ui
+      '@aotter/mantle-cloudflare':
+        specifier: workspace:*
+        version: link:../adapters/cloudflare
+      '@aotter/mantle-runtime':
+        specifier: workspace:*
+        version: link:../mantle-runtime
+      '@aotter/mantle-spec':
+        specifier: workspace:*
+        version: link:../mantle-spec
+    devDependencies:
+      '@types/node':
+        specifier: ^22
+        version: 22.19.19
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+
   packages/mantle-admin-ui:
     dependencies:
       '@radix-ui/react-collapsible':
@@ -127,7 +149,7 @@ importers:
         version: 14.1.4
       zod:
         specifier: ^4.4.2
-        version: 4.4.2
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -146,7 +168,7 @@ importers:
         version: 2.8.4
       zod:
         specifier: ^4.4.2
-        version: 4.4.2
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -1995,10 +2017,6 @@ packages:
     resolution: {integrity: sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==}
     engines: {node: '>=12'}
 
-  postcss@8.5.13:
-    resolution: {integrity: sha512-qif0+jGGZoLWdHey3UFHHWP0H7Gbmsk8T5VEqyYFbWqPr1XqvLGBbk/sl8V5exGmcYJklJOhOQq1pV9IcsiFag==}
-    engines: {node: ^10 || ^12 || >=14}
-
   postcss@8.5.14:
     resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -2358,9 +2376,6 @@ packages:
 
   youch@4.1.0-beta.10:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
-
-  zod@4.4.2:
-    resolution: {integrity: sha512-IynmDyxsEsb9RKzO3J9+4SxXnl2FTFSzNBaKKaMV6tsSk0rw9gYw9gs+JFCq/qk2LCZ78KDwyj+Z289TijSkUw==}
 
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
@@ -3814,12 +3829,6 @@ snapshots:
 
   picomatch@4.0.4: {}
 
-  postcss@8.5.13:
-    dependencies:
-      nanoid: 3.3.12
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
   postcss@8.5.14:
     dependencies:
       nanoid: 3.3.12
@@ -4044,7 +4053,7 @@ snapshots:
       esbuild: 0.27.7
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.13
+      postcss: 8.5.14
       rollup: 4.60.3
       tinyglobby: 0.2.16
     optionalDependencies:
@@ -4145,7 +4154,5 @@ snapshots:
       '@speed-highlight/core': 1.2.15
       cookie: 1.1.1
       youch-core: 0.3.3
-
-  zod@4.4.2: {}
 
   zod@4.4.3: {}
