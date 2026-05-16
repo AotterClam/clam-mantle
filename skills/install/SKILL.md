@@ -143,7 +143,7 @@ Invoking `npx create-clam-mantle` is **not low-risk work**. The command writes t
 
 Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
 
-**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each of the six parameters passed to `npx create-clam-mantle` must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these six values.
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each marker (`<<...>>`) in the composed `## Run this` block (see end of this document) must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these marker values.
 
 If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
 
@@ -151,35 +151,26 @@ If you have not had a turn where the user looked at the exact value and replied 
 
 Same discovery order as the Goal table above — purpose first, brand later. The order matters because it reflects the interview shape, not arbitrary alphabetization.
 
-| Value | Authorized when |
-|---|---|
-| **purpose / audience / emotional weight** | enough texture for Mantle's letter — surfaced through the archetype probes (open-question discovery), not inferred |
-| **audience scope** | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
-| **locales** | derived from audience scope; user nodded on the resulting BCP 47 list |
-| **description** | agent-drafted in user's language; user nodded on the exact one-liner |
-| **summary** | agent-drafted in user's language; user nodded on the exact one-liner |
-| **brand** | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
-| **github owner** | user explicitly stated their GitHub login (not derived from email) |
+| Value | Marker | Authorized when |
+|---|---|---|
+| **purpose / audience / emotional weight** | (feeds Mantle, not a CLI flag) | enough texture for Mantle's letter — surfaced through the archetype probes (open-question discovery), not inferred |
+| **audience scope** | (drives `<<LOCALES>>`) | user explicitly stated: domestic (which country / region) OR international (which language[s]) |
+| **locales** | `<<LOCALES>>` | derived from audience scope; user nodded on the resulting BCP 47 list |
+| **description** | `<<DESCRIPTION>>` | agent-drafted in user's language; user nodded on the exact one-liner |
+| **summary** | `<<SUMMARY>>` | agent-drafted in user's language; user nodded on the exact one-liner |
+| **brand** | `<<BRAND>>` | you proposed 2–3 candidates (Brand stance, after purpose + audience texture is in); user picked one or supplied their own |
+| **project-name** | `<<PROJECT_NAME>>` | lowercase-hyphenated slug of brand; show the slug to user in the rehearsal (step 1) and confirm; user can override if they prefer a different repo / dir name |
+| **github owner** | `<<GITHUB_OWNER>>` | user explicitly stated their GitHub login (not derived from email) |
 
 If any value is unauthorized — including auto-derivation that "looks reasonable" — the work is still in the interview. Return there. Step 1 below IS the rehearsal back to the user in their language; it is not the moment you collect authorization for unfilled values.
 
 1. **Confirm the synthesized draft.** User accepts or corrects.
 
-2. **Run `create-clam-mantle` non-interactively.** Installed from npm:
+2. **Run the composed `## Run this` block.** Scroll to the `## Run this` section at the bottom of this composed document — the landing composer baked the archetype and theme literals into the command. Copy it verbatim, fill the 7 `<<...>>` markers from your authorized interview values (see Prerequisites table above), and run it.
 
-   ```bash
-   npm create @aotterclam/clam-mantle@alpha <archetype> -- \
-     --project-name "<lowercase-hyphenated>" \
-     --brand "<brand>" \
-     --description "<one line>" \
-     --locales "<canonical>,<secondary>" \
-     --github-owner "<gh-login>" \
-     --summary "<one-line install description>"
-   ```
+   Do not modify the literal flags or the archetype positional. Do not invent additional flags. If a marker has no authorized value, you're still in the interview — return there.
 
-   (`npm create @aotterclam/clam-mantle` is `npm init`'s short form for `npx @aotterclam/create-clam-mantle`. The `--` separator passes the flags through to the underlying CLI. Pin to an exact version with `npx @aotterclam/create-clam-mantle@0.0.10-alpha.1 ...` if you need reproducibility.)
-
-   The package fetches `sources.json` at runtime from `clam-mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
+   The CLI fetches `sources.json` at runtime from `clam-mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
 3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files — at minimum `manifests/`, `src/clamConfig.ts`, `mantle/site.md` — before deciding anything else.
 
