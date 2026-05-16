@@ -1,6 +1,6 @@
-# @aotterclam/clam-mantle-cloudflare
+# @aotterclam/mantle-cloudflare
 
-Cloudflare Workers adapter for clam-mantle.
+Cloudflare Workers adapter for mantle.
 
 This package mounts the runtime on Hono, implements the runtime ports against
 Cloudflare D1 / KV / Workers assets, and owns Better Auth wiring for GitHub

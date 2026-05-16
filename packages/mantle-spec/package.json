@@ -1,0 +1,48 @@
+{
+  "name": "@aotterclam/mantle-spec",
+  "version": "0.0.11-alpha.3",
+  "description": "Spec engine for mantle: types + manifest YAML parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env / adapter deps.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/AotterClam/mantle/tree/main/packages/mantle-spec",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AotterClam/mantle.git",
+    "directory": "packages/mantle-spec"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "mantle": "./dist/infrastructure/cli/ClamMantleCli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "prebuild": "rm -rf dist .tsbuildinfo",
+    "build": "tsc -b tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "yaml": "^2.6.0",
+    "zod": "^4.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.5"
+  }
+}

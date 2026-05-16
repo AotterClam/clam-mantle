@@ -1,12 +1,12 @@
 {
-  "name": "@aotterclam/clam-mantle-cloudflare",
-  "version": "0.0.10-alpha",
-  "description": "Cloudflare Workers adapter for clam-mantle. Hono-based mountServerEndpoints / createMcpApiHandler / mountAuthorize / mountPublicRoutes. Better Auth for staff sign-in; @cloudflare/workers-oauth-provider for the MCP OAuth AS surface.",
+  "name": "@aotterclam/mantle-cloudflare",
+  "version": "0.0.11-alpha.3",
+  "description": "Cloudflare Workers adapter for mantle. Hono-based mountServerEndpoints / createMcpApiHandler / mountAuthorize / mountPublicRoutes. Better Auth for staff sign-in; @cloudflare/workers-oauth-provider for the MCP OAuth AS surface.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/clam-mantle/tree/main/packages/adapters/cloudflare",
+  "homepage": "https://github.com/AotterClam/mantle/tree/main/packages/adapters/cloudflare",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/clam-mantle.git",
+    "url": "git+https://github.com/AotterClam/mantle.git",
     "directory": "packages/adapters/cloudflare"
   },
   "type": "module",
@@ -34,9 +34,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aotterclam/clam-mantle-admin-ui": "workspace:*",
-    "@aotterclam/clam-mantle-runtime": "workspace:*",
-    "@aotterclam/clam-mantle-spec": "workspace:*",
+    "@aotterclam/mantle-admin-ui": "workspace:*",
+    "@aotterclam/mantle-runtime": "workspace:*",
+    "@aotterclam/mantle-spec": "workspace:*",
     "@cloudflare/workers-oauth-provider": "^0.6.0",
     "aws4fetch": "^1.0.20",
     "better-auth": "^1.6.11",

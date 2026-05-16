@@ -6,7 +6,7 @@
 
 ## Context
 
-clam-mantle ships two read-side surfaces and one write-side surface:
+mantle ships two read-side surfaces and one write-side surface:
 
 - **Templates** (rendered HTML / Markdown / `llms.txt`) — composed by the consumer's `TemplateRegistry` from runtime APIs. The starter blog uses these for `/{locale}/posts/{slug}` etc.
 - **MCP tools** — agent-facing CRUD over the entry chokepoint. Every Schema gets `create_draft_<n>` / `update_draft_<n>` per-collection authoring tools plus generic tools (`list_entries`, `get_entry`, `request_publish`, `unpublish_entry`, `archive_entry`).

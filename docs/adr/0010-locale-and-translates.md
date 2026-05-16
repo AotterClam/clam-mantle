@@ -134,7 +134,7 @@ lets the manifest, the CmsConfig, and the D1 row drift apart safely
 
 - There is no top-level `entries.locale` column. Locale lives inside
   the `data` JSON.
-- The runtime locale gate (in `clam-mantle-runtime`'s content-ops
+- The runtime locale gate (in `mantle-runtime`'s content-ops
   `helpers.ts`) is the **authoritative per-request check**. On every
   read and write the gate validates:
   - `localized: true` Schema → `data.locale` MUST be present, MUST
@@ -423,17 +423,17 @@ When configuring a new consumer:
 
 Accepted for v0.1.0. The POC shipped the grammar, runtime gate, and
 `siteDefaults` seed; the v0.1.0 rebuild ports the same shapes into
-the new package layout (`@aotterclam/clam-mantle-spec` for the manifest
-grammar, `@aotterclam/clam-mantle-runtime` for the gate, the CF adapter
+the new package layout (`@aotterclam/mantle-spec` for the manifest
+grammar, `@aotterclam/mantle-runtime` for the gate, the CF adapter
 for `createCmsRuntime().bootInit()` + `DatabaseSiteConfigRepository.seed`):
 
-- Grammar in `packages/clam-mantle-spec/src/domain/model/ManifestGrammar.ts`
+- Grammar in `packages/mantle-spec/src/domain/model/ManifestGrammar.ts`
   + the manifest parser.
 - Cross-Schema validation in the validate + boot phases.
 - D1 schema: no `entries.locale` column; `data.locale` is the
   authoritative storage; partial unique index per localized Schema.
 - `site_config` key/value table with the `locales` key.
-- Runtime locale gate in `packages/clam-mantle-runtime/src/domain/service/ContentLocaleGate.ts`.
+- Runtime locale gate in `packages/mantle-runtime/src/domain/service/ContentLocaleGate.ts`.
 - `CmsConfig.siteDefaults` consumed by runtime `bootInit()`, with
   `assertSiteDefaultsCanonical` + `DatabaseSiteConfigRepository.seed`
   (async, idempotent).

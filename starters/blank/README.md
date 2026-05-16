@@ -2,14 +2,14 @@
 
 The `blank` starter now lives in the standalone starters monorepo:
 
-[`AotterClam/clam-mantle-starters/blank/`](https://github.com/AotterClam/clam-mantle-starters/tree/main/blank)
+[`AotterClam/mantle-starters/blank/`](https://github.com/AotterClam/mantle-starters/tree/main/blank)
 
 (Repo URL above is the post-rename name; if your tooling still pins
-the original `clam-mantle-starter-publication`, GitHub auto-redirects.)
+the original `mantle-starter-publication`, GitHub auto-redirects.)
 
 ## Why this moved
 
-Real-user installs go through `@aotterclam/create-clam-mantle`, which
+Real-user installs go through `@aotterclam/create-mantle`, which
 fetches a tagged tarball of the starters monorepo and merges
 `_common/` + `<archetype>/` into the user's empty directory. Keeping
 `starters/blank` inside this SDK monorepo created two problems:
@@ -27,4 +27,4 @@ before it ships.
 ## See also
 
 - [`packages/adapters/netlify/README.md`](../../packages/adapters/netlify/README.md) — same stub pattern, different reason.
-- [`AotterClam/clam-mantle#97`](https://github.com/AotterClam/clam-mantle/issues/97) — Epic that moved the starters out.
+- [`AotterClam/mantle#97`](https://github.com/AotterClam/mantle/issues/97) — Epic that moved the starters out.

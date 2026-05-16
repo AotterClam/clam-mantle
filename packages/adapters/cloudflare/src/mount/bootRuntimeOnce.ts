@@ -1,8 +1,8 @@
 import {
   createCmsRuntime,
   type CmsRuntime,
-} from "@aotterclam/clam-mantle-runtime";
-import type { Manifest } from "@aotterclam/clam-mantle-spec";
+} from "@aotterclam/mantle-runtime";
+import type { Manifest } from "@aotterclam/mantle-spec";
 import type { Auth } from "../auth/createAuth.js";
 import type { CmsConfig } from "./cmsConfig.js";
 

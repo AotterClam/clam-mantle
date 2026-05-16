@@ -5,7 +5,7 @@ import type {
   MigrationRunner,
   PreparedStatement,
   RunResult,
-} from "@aotterclam/clam-mantle-runtime";
+} from "@aotterclam/mantle-runtime";
 
 /**
  * `DatabaseDriver` impl wrapping Cloudflare's `D1Database` binding.

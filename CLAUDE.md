@@ -1,6 +1,6 @@
 # CLAUDE.md — orientation for AI contributors
 
-This is `@aotterclam/clam-mantle-*`: MCP-native headless CMS for Cloudflare Workers, built around a 4-atom YAML manifest model. **v0.1.0 is in development**; until v0.1.0 tags, the runtime is stubbed in places and ships in incremental commits per the plan in [#1](https://github.com/AotterClam/clam-mantle/issues/1).
+This is `@aotterclam/mantle-*`: MCP-native headless CMS for Cloudflare Workers, built around a 4-atom YAML manifest model. **v0.1.0 is in development**; until v0.1.0 tags, the runtime is stubbed in places and ships in incremental commits per the plan in [#1](https://github.com/AotterClam/mantle/issues/1).
 
 ## CLAM thesis (read first)
 
@@ -34,28 +34,28 @@ This is the lens for every architectural decision in this codebase.
 | `CONTRIBUTING.md` | Workflow contract for AI + human contributors. Branch prefixes, commit shape, PR template, architecture gates. Entry point for anyone (or any agent) about to file an issue or open a PR. |
 | `CHANGELOG.md` | Versioned change log. Each release tag gets an entry here before the release PR merges. |
 | `skills/<name>/SKILL.md` | AI-agent-readable briefs for install / provision / extend / customize-design flows. Discoverable by URL — no Claude plugin install required. |
-| `packages/clam-mantle-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
-| `packages/clam-mantle-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
-| `packages/clam-mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
+| `packages/mantle-spec/` | Spec engine. ESM, `sideEffects: false`, zero env / adapter deps. |
+| `packages/mantle-runtime/` | Runtime engine. Defines the required adapter ports plus optional feature ports. Adapter-agnostic — see "MUST NOT" rule below. |
+| `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| [`AotterClam/clam-mantle-starters`](https://github.com/AotterClam/clam-mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, `blank/`, etc. Also hosts `packages/create-clam-mantle` — the npx scaffolder that fetches the starters tarball, merges `_common/` + `<archetype>/`, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. **The scaffolder is intentionally not on npm**; consumers run it via `npx https://github.com/AotterClam/clam-mantle-starters/releases/download/<tag>/aotterclam-create-clam-mantle-<tag>.tgz` per `skills/install/SKILL.md`. Premium / per-customer starters live in the private sibling [`AotterClam/clam-mantle-starters-premium`](https://github.com/AotterClam/clam-mantle-starters-premium). |
-| `starters/blank/` | **README stub.** Migrated to `clam-mantle-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
+| [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, `blank/`, etc. Also hosts `packages/create-mantle` — the npx scaffolder that fetches the starters tarball, merges `_common/` + `<archetype>/`, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. **The scaffolder is intentionally not on npm**; consumers run it via `npx https://github.com/AotterClam/mantle-starters/releases/download/<tag>/aotterclam-create-mantle-<tag>.tgz` per `skills/install/SKILL.md`. Premium / per-customer starters live in the private sibling [`AotterClam/mantle-starters-premium`](https://github.com/AotterClam/mantle-starters-premium). |
+| `starters/blank/` | **README stub.** Migrated to `mantle-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
 | `starters/_archive/` | Frozen snapshots of retired starters. Not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
-- **`@aotterclam/clam-mantle-runtime` MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-specific type.** It defines port interfaces; concrete adapters bind them. Violating this collapses the rebuild's reason for existing — the Netlify stub is the public reminder.
+- **`@aotterclam/mantle-runtime` MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-specific type.** It defines port interfaces; concrete adapters bind them. Violating this collapses the rebuild's reason for existing — the Netlify stub is the public reminder.
 - **Manifest grammar is locked at v0.1.** DRAFT keys (see [ADR-0001 §"Future grammar discipline"](docs/adr/0001-four-atom-manifest-model.md)) are documented but **must not** be implemented in code, types, or starter manifests until promoted.
 - **Atom name stability**: Schema / View / Procedure / Trigger. No renames.
 - **Closed enums for `x-clam-bind` and `ctx.*` predicates** — see (incoming) ADR-0002. New entries go through grammar-revise, not ad-hoc.
 - **Cloudflare-only for v0.1.0.** The Netlify package is a README. PG-via-Hyperdrive, Bun, Deno — all v0.2+.
-- **`@aotterclam/clam-mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
-- **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `clam-mantle-spec/src/domain/service/JsonSchemaToZod.ts`.
+- **`@aotterclam/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
+- **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/domain/service/JsonSchemaToZod.ts`.
 
 ### Clean-architecture layout (mirrors `aotter-clam/clam/core`)
 
-Both `clam-mantle-spec` and `clam-mantle-runtime` follow the Aotter clean-architecture convention:
+Both `mantle-spec` and `mantle-runtime` follow the Aotter clean-architecture convention:
 
 ```
 kernel ← domain (model + port + service) ← usecase ← infrastructure
@@ -86,7 +86,7 @@ kernel ← domain (model + port + service) ← usecase ← infrastructure
 
 - One barrel `index.ts` per folder.
 - Adding a new top-level folder under `domain/` / `usecase/` / `infrastructure/` requires an ADR-lite paragraph in the PR description.
-- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `clam-mantle-runtime/src/domain/port/`. Auth is owned by adapters via Better Auth mount wiring (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `DeferredHookDispatcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `clam-mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`packages/adapters/cloudflare`, future `packages/adapters/netlify`).
+- Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer` — live in `mantle-runtime/src/domain/port/`. Auth is owned by adapters via Better Auth mount wiring (ADR-0014), not by runtime ports. Optional feature ports such as `MediaStorage` / `DeferredHookDispatcher` also live in `domain/port/` but must not become mandatory first-run bindings. Concrete impls live in `mantle-runtime/src/infrastructure/persistence/` (those backed by `DatabaseDriver`) or in adapter packages (`packages/adapters/cloudflare`, future `packages/adapters/netlify`).
 
 ### Spec/runtime type boundary (separate from layer rules)
 
@@ -122,7 +122,7 @@ Several v0.1.x features ship as **interface defined, impl stubbed** in v0.1.0:
 - Sitemap auto-emit — starter ships a hand-rolled `<SitemapStub />`
 - Editorial lifecycle — schema accepts `lifecycle: editorial` but boot validator rejects with a clear "v0.1.x" message; starters use `simple` only
 - Image variants / OG card generation — not present; lands after R2 impl
-- `clam-mantle-netlify` package — README only
+- `mantle-netlify` package — README only
 
 The "stub" pattern lets consumers compile against the real interface. Replacing the stub with a real impl in v0.1.x doesn't break consumer code.
 
@@ -135,7 +135,7 @@ Two grammar items that were originally committed as v0.1.x are in v0.1.0:
 
 ## Failure modes to avoid (encoded in the ADRs)
 
-- **Adapter coupling creep.** A PR adds a "small convenience" import of `D1Database` in `clam-mantle-runtime`. Reject. The whole point of the 5-port boundary is that runtime stays portable.
+- **Adapter coupling creep.** A PR adds a "small convenience" import of `D1Database` in `mantle-runtime`. Reject. The whole point of the 5-port boundary is that runtime stays portable.
 - **Grammar speculation.** Marking new keys DRAFT until a real use case applies pressure. Locked grammar is more valuable than complete grammar.
 - **Doctrine bloat.** Two ways to do the same thing because "doctrine resolves it." Pick one. POC accumulated several of these (Procedure.expose: shortcut, scaffold/ subdir, virtual:cms-config); the rebuild starts clean.
 - **ADR proliferation.** ADRs are for genuinely path-dependent decisions where the *why* would be lost in code ("we picked X over Y, X is irreversible"). File-format specs, taxonomies, and skill behavior contracts live elsewhere — reference docs, inline `> why:` comments, or PR descriptions. If a change ships and the ADR is mostly redescribing the diff, the ADR isn't load-bearing — delete it. (See Epic #116 for the cleanup that retired ADR-0015 and slimmed ADR-0016.)
@@ -145,6 +145,6 @@ Two grammar items that were originally committed as v0.1.x are in v0.1.0:
 v0.1.0 ships in 10 commits (see #1's "Initial commit sequence"). Each commit is independently reviewable, typechecks, tests pass. No commit lands without a manual stop-and-review.
 
 After v0.1.0 tags:
-- `aotter/clam-mantle` (the POC) gets deleted by the user (no redirect — these repos are independent)
+- `aotter/mantle` (the POC) gets deleted by the user (no redirect — these repos are independent)
 - `npm publish` / GitHub Packages decision finalised
 - Public-launch banner on the README

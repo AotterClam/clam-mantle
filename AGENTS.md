@@ -2,8 +2,8 @@
 
 This SDK repo's agent entry point is **[CLAUDE.md](./CLAUDE.md)** — read that first.
 
-Consumer projects scaffolded via `create-clam-mantle` get a different, mantle-aware `AGENTS.md` templated
-from [`_common/AGENTS.md.template`](https://github.com/AotterClam/clam-mantle-starters/blob/main/_common/AGENTS.md.template)
+Consumer projects scaffolded via `create-mantle` get a different, mantle-aware `AGENTS.md` templated
+from [`_common/AGENTS.md.template`](https://github.com/AotterClam/mantle-starters/blob/main/_common/AGENTS.md.template)
 on the starters repo (per [ADR-0016](./docs/adr/0016-agents-md-and-macros.md)). This file at the SDK
 repo root only points you at the right place.
 

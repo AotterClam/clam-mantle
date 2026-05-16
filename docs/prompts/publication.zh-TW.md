@@ -1,1 +1,1 @@
-用 https://raw.githubusercontent.com/AotterClam/clam-mantle/{template_ref}/skills/install/SKILL.md 跟 https://raw.githubusercontent.com/AotterClam/clam-mantle/{template_ref}/skills/install/archetypes/publication.md 架設：Publication 網站。
+用 https://raw.githubusercontent.com/AotterClam/mantle/{template_ref}/skills/install/SKILL.md 跟 https://raw.githubusercontent.com/AotterClam/mantle/{template_ref}/skills/install/archetypes/publication.md 架設：Publication 網站。

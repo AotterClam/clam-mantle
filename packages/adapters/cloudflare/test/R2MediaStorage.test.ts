@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AwsClient } from "aws4fetch";
-import type { IdGenerator } from "@aotterclam/clam-mantle-runtime";
+import type { IdGenerator } from "@aotterclam/mantle-runtime";
 import { R2MediaStorage } from "../src/bindings/R2MediaStorage.js";
 
 /**

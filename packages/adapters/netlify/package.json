@@ -1,12 +1,12 @@
 {
-  "name": "@aotterclam/clam-mantle-netlify",
-  "version": "0.0.10-alpha",
-  "description": "STUB. Netlify Functions adapter for clam-mantle — coming v0.2. The package exists to enforce that clam-mantle-runtime stays adapter-agnostic. See README and ADR-0011.",
+  "name": "@aotterclam/mantle-netlify",
+  "version": "0.0.11-alpha",
+  "description": "STUB. Netlify Functions adapter for mantle — coming v0.2. The package exists to enforce that mantle-runtime stays adapter-agnostic. See README and ADR-0011.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/clam-mantle/tree/main/packages/adapters/netlify",
+  "homepage": "https://github.com/AotterClam/mantle/tree/main/packages/adapters/netlify",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/clam-mantle.git",
+    "url": "git+https://github.com/AotterClam/mantle.git",
     "directory": "packages/adapters/netlify"
   },
   "type": "module",

@@ -3,7 +3,7 @@ import type {
   KvCache,
   KvListResult,
   KvPutOptions,
-} from "@aotterclam/clam-mantle-runtime";
+} from "@aotterclam/mantle-runtime";
 import type { Auth } from "../../src/auth/createAuth.js";
 
 export class InMemoryKv implements KvCache {

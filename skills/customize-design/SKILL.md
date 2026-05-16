@@ -1,12 +1,12 @@
 ---
-name: clam-mantle customize-design
-description: Layer custom design over a clam-mantle publication starter project using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer+PageShell slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
+name: mantle customize-design
+description: Layer custom design over a mantle publication starter project using the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer+PageShell slots / whole-template fork). Use when the user wants to rebrand, restyle, or swap UI pieces without forking the whole starter.
 when_to_invoke: |
   User says: "change the colors", "use my own font", "I want a different header", "make this look like X", "this is too plain / too editorial", "translate the labels", "swap the logo". Applies to the `publication` archetype; the `blank` archetype has no UI to customize.
-applies_to: clam-mantle@v0.1.0 + publication archetype
+applies_to: mantle@v0.1.0 + publication archetype
 ---
 
-# Customize the design of a clam-mantle publication site
+# Customize the design of a mantle publication site
 
 You are layering a consumer theme over a project built from the `publication` starter. The baseline lives at `src/theme.default/` (read-only by convention). Consumer overrides live at `src/theme/`. Always escalate from L1 → L4 and stop at the lowest layer that solves the user's stated need.
 

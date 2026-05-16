@@ -134,11 +134,11 @@ The token can carry `role` via `customAccessTokenClaims` for caller convenience,
 
 ### 6. Single auth surface, no port indirection
 
-Auth is no longer an adapter port. `clam-mantle-runtime` does NOT define an auth port and `createCmsRuntime()` does not accept auth. Adapter packages (`clam-mantle-cloudflare`, future `clam-mantle-netlify`) construct the Better Auth instance with the right database adapter for their platform and keep it in the adapter-owned HTTP/MCP mount layer.
+Auth is no longer an adapter port. `mantle-runtime` does NOT define an auth port and `createCmsRuntime()` does not accept auth. Adapter packages (`mantle-cloudflare`, future `mantle-netlify`) construct the Better Auth instance with the right database adapter for their platform and keep it in the adapter-owned HTTP/MCP mount layer.
 
 The adapter uses Better Auth to validate sessions, MCP bearer tokens, scopes, and roles, then passes authenticated user/staff context into runtime dispatchers. Better Auth remains platform-agnostic, but it is not a runtime dependency.
 
-This is a minor amendment to ADR-0011 (adapter port spec): the auth ports disappear and auth becomes adapter-owned mount wiring. The hard invariant ("`clam-mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved.
+This is a minor amendment to ADR-0011 (adapter port spec): the auth ports disappear and auth becomes adapter-owned mount wiring. The hard invariant ("`mantle-runtime` MUST NOT import `D1Database` / `KVNamespace`") is preserved.
 
 ### 7. Auth as contract, Better Auth as default
 
@@ -169,7 +169,7 @@ The internal consumers of `Auth` (post-#193: `mountServerEndpoints`, `createMcpA
 If a future PR's only effect is to rename a Better Auth field into our `CreateAuthConfig` and forward it verbatim, refuse it. **Picking a different literal default for an existing Better Auth field does NOT, by itself, justify a new field on `CreateAuthConfig` — that's the same pass-through dressed up.** The SDK adds load-bearing surface area only when the new field exists for at least one of these concrete reasons:
 
 - **Workers-aware behavior** that Better Auth doesn't supply (e.g. `rateLimit` flipped on by default when an email-shaped method registers — Better Auth's per-route limits gate on `process.env.NODE_ENV === "production"` which is unset on Workers; `advanced.backgroundTasks.handler` wired to fire-and-forget — closes the timing-oracle on OTP send).
-- **Cross-adapter port** the runtime needs (e.g. `EmailSender` in `clam-mantle-runtime/domain/port/` — used by both `createAuth`'s OTP / magic-link callbacks AND future use cases like order receipts).
+- **Cross-adapter port** the runtime needs (e.g. `EmailSender` in `mantle-runtime/domain/port/` — used by both `createAuth`'s OTP / magic-link callbacks AND future use cases like order receipts).
 - **Safety net** Better Auth doesn't provide (e.g. `extras` reserved-key validation refuses to let an adopter shadow `clientSecret` via spread order; bootstrap-method cross-check refuses `match: "github-login"` with no `github` social registered).
 - **New abstraction** that fuses multiple Better Auth surfaces (e.g. `methods[]` unifies `socialProviders` + `emailOTP` + `magicLink` plugins under one config shape with shared per-method discrimination).
 - **DX helper that removes a Workers-hostile dep** (e.g. `appleClientSecret` signs the ES256 JWT via `crypto.subtle` so adopters don't have to install `jose` for the one task Better Auth's docs assume a JWT lib).
@@ -180,9 +180,9 @@ A different default value on its own is not on this list. Default tweaks live in
 
 This makes the implicit explicit. The SDK's auth surface is committee-curated; un-curated knobs require either a justified first-class field or an architectural change to remove the dependency on that knob.
 
-### 8. Path to `@aotterclam/clam-mantle-better-auth` separate package (deferred)
+### 8. Path to `@aotterclam/mantle-better-auth` separate package (deferred)
 
-When `clam-mantle-netlify` lands, the Better Auth wiring moves to its own package. Today the seam is in place:
+When `mantle-netlify` lands, the Better Auth wiring moves to its own package. Today the seam is in place:
 
 - `Auth` interface lives in the adapter (could move to runtime or a separate package without breaking the contract — adapters consume the type, not the implementation).
 - `createAuth.ts` is the only file with `import { betterAuth }` (~290 LOC, no Cloudflare-binding-specific code outside `config.database: D1Database`).
@@ -192,13 +192,13 @@ When `clam-mantle-netlify` lands, the Better Auth wiring moves to its own packag
 The future split looks like:
 
 ```
-@aotterclam/clam-mantle-runtime           ← ports + use cases (today)
-@aotterclam/clam-mantle-better-auth       ← createAuth + EmailSender impls + appleClientSecret (new, when needed)
-@aotterclam/clam-mantle-cloudflare        ← Workers adapter; depends on (or accepts) Auth-shape (today)
-@aotterclam/clam-mantle-netlify           ← Netlify adapter; same shape (v0.2)
+@aotterclam/mantle-runtime           ← ports + use cases (today)
+@aotterclam/mantle-better-auth       ← createAuth + EmailSender impls + appleClientSecret (new, when needed)
+@aotterclam/mantle-cloudflare        ← Workers adapter; depends on (or accepts) Auth-shape (today)
+@aotterclam/mantle-netlify           ← Netlify adapter; same shape (v0.2)
 ```
 
-The pivot point — when to extract — is when the second adapter (`clam-mantle-netlify`) needs the same wiring. Until then, in-place co-location is cheaper than a new package boundary.
+The pivot point — when to extract — is when the second adapter (`mantle-netlify`) needs the same wiring. Until then, in-place co-location is cheaper than a new package boundary.
 
 ## Consequences
 
@@ -210,11 +210,11 @@ The pivot point — when to extract — is when the second adapter (`clam-mantle
 - `packages/adapters/cloudflare/src/bindings/D1StaffRepository.ts`
 - `packages/adapters/cloudflare/src/bindings/WorkersOAuthVerifier.ts`
 - `packages/adapters/cloudflare/src/bindings/StubOAuthVerifier.ts`
-- `clam-mantle-runtime/src/domain/port/UserRepository.ts`
-- `clam-mantle-runtime/src/domain/port/SessionRepository.ts`
-- `clam-mantle-runtime/src/domain/port/StaffRepository.ts`
-- `clam-mantle-runtime/src/domain/port/OAuthVerifier.ts`
-- `clam-mantle-runtime/src/runtime.ts` `users` / `sessions` / `staff` / `oauth` ports
+- `mantle-runtime/src/domain/port/UserRepository.ts`
+- `mantle-runtime/src/domain/port/SessionRepository.ts`
+- `mantle-runtime/src/domain/port/StaffRepository.ts`
+- `mantle-runtime/src/domain/port/OAuthVerifier.ts`
+- `mantle-runtime/src/runtime.ts` `users` / `sessions` / `staff` / `oauth` ports
 - `mountServerEndpoints.ts` `/admin/auth/github` + callback (Better Auth handles), session cookie read/write code, `ensureBootstrapOwner` inline logic (moves to hook), OAuth consent UI handlers (`/oauth/authorize` GET/POST), OAuth provider passthrough (`/oauth/token`, `/oauth/register`, `.well-known/*`)
 - D1 tables: `users`, `social_logins`, `sessions`, `github_tokens`, `staff`
 - `OAUTH_KV` binding (no longer required in `wrangler.toml`)
@@ -321,7 +321,7 @@ Phase 0 (spike, 0.5–1d) — pending:
 
 Phase 1 (migration, ~2d) — pending Phase 0:
 
-- Better Auth integration (publication starter + clam-mantle-cloudflare adapter)
+- Better Auth integration (publication starter + mantle-cloudflare adapter)
 - Schema cut-over (canonical migrations rewrite, drop legacy auth tables, add Better Auth tables)
 - Drop `oauth/` directory, all auth ports, `WorkersOAuthVerifier`, `StubOAuthVerifier`
 - Drop `@cloudflare/workers-oauth-provider` dep + `OAUTH_KV` binding
@@ -414,5 +414,5 @@ The original ADR-0014 §"Auth as contract, Better Auth as default" framing stays
 ### Future work
 
 - A `@cloudflare/vitest-pool-workers`-based integration test covering the full OAuth flow (DCR → consent → token → MCP RPC). Node-vitest can't load `@cloudflare/workers-oauth-provider` because it imports from `cloudflare:workers`.
-- Starters (`AotterClam/clam-mantle-starters`) migration to the same top-level OAuthProvider shape. All 8 archetypes currently use the pre-carve-out `mountMcp` API and need updating before the next starter tag.
+- Starters (`AotterClam/mantle-starters`) migration to the same top-level OAuthProvider shape. All 8 archetypes currently use the pre-carve-out `mountMcp` API and need updating before the next starter tag.
 - Track whether Anthropic relaxes (1) the `/mcp` resource-path-prefix requirement and (2) the no-colon-in-scope requirement. Both are de-facto MCP client behaviors, not RFC requirements; if upstream relaxes them, the SDK can re-introduce `mcp:read` / `mcp:staff` scopes for finer-grained delegation.

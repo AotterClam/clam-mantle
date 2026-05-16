@@ -6,7 +6,7 @@ Accepted (slimmed 2026-05-12 per Epic #116; original 2026-05-12).
 
 ## Decision
 
-Every agent-authored clam-mantle project carries two files at fixed paths. They serve different audiences, change at different rates, and are filled by `create-clam-mantle` from `_common/*.template` files.
+Every agent-authored mantle project carries two files at fixed paths. They serve different audiences, change at different rates, and are filled by `create-mantle` from `_common/*.template` files.
 
 | File | Audience | Size budget | Format |
 |---|---|---|---|
@@ -20,7 +20,7 @@ Every agent-authored clam-mantle project carries two files at fixed paths. They 
 
 ## Placeholder macros
 
-`create-clam-mantle` substitutes these across `_common/*.template` files in a single pass:
+`create-mantle` substitutes these across `_common/*.template` files in a single pass:
 
 | Macro | Source | Example |
 |---|---|---|
@@ -34,7 +34,7 @@ Every agent-authored clam-mantle project carries two files at fixed paths. They 
 | `{{INSTALL_TIMESTAMP}}` | ISO 8601 of install run | `2026-05-12T14:03:00Z` |
 | `{{INSTALL_SUMMARY}}` | CLI flag | `bootstrapped publication site for Lab Cafe in zh-TW/en` |
 
-New macros must be added here, to `_common/*.template`, and to the substitution pass in `create-clam-mantle`.
+New macros must be added here, to `_common/*.template`, and to the substitution pass in `create-mantle`.
 
 ## Update rules
 
@@ -44,12 +44,12 @@ New macros must be added here, to `_common/*.template`, and to the substitution 
 
 ## Cross-tool compatibility
 
-`AGENTS.md` lives at repo root because that is where the AGENTS.md ecosystem (`agents.md`) looks. `mantle/` is a clam-mantle-owned subdirectory; the naming is deliberately specific so a generic AGENTS.md reader does not interpret it as its own state.
+`AGENTS.md` lives at repo root because that is where the AGENTS.md ecosystem (`agents.md`) looks. `mantle/` is a mantle-owned subdirectory; the naming is deliberately specific so a generic AGENTS.md reader does not interpret it as its own state.
 
 ## Implementation
 
-- Templates: `clam-mantle-starters/_common/AGENTS.md.template` and `clam-mantle-starters/_common/mantle/site.md.template`.
-- Substitution: `packages/create-clam-mantle/src/placeholder.ts`.
+- Templates: `mantle-starters/_common/AGENTS.md.template` and `mantle-starters/_common/mantle/site.md.template`.
+- Substitution: `packages/create-mantle/src/placeholder.ts`.
 - Install handoff: `skills/install/SKILL.md` describes the post-substitution prose-fill (HTML comments → prose drawn from interview).
 - Provision update: `skills/provision/SKILL.md` describes the `site_url:` + `revisions:` write after deploy.
 - Theme overlay merge (Epic #116): `themes/<theme-key>/` overlay applies after the archetype starter and may touch `src/theme/` — never these two files.

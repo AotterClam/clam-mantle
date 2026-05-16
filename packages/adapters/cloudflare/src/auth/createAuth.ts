@@ -2,7 +2,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { admin, emailOTP, magicLink } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
-import type { EmailSender } from "@aotterclam/clam-mantle-runtime";
+import type { EmailSender } from "@aotterclam/mantle-runtime";
 
 export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];

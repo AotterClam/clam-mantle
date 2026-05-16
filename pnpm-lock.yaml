@@ -10,15 +10,15 @@ importers:
 
   packages/adapters/cloudflare:
     dependencies:
-      '@aotterclam/clam-mantle-admin-ui':
+      '@aotterclam/mantle-admin-ui':
         specifier: workspace:*
-        version: link:../../clam-mantle-admin-ui
-      '@aotterclam/clam-mantle-runtime':
+        version: link:../../mantle-admin-ui
+      '@aotterclam/mantle-runtime':
         specifier: workspace:*
-        version: link:../../clam-mantle-runtime
-      '@aotterclam/clam-mantle-spec':
+        version: link:../../mantle-runtime
+      '@aotterclam/mantle-spec':
         specifier: workspace:*
-        version: link:../../clam-mantle-spec
+        version: link:../../mantle-spec
       '@cloudflare/workers-oauth-provider':
         specifier: ^0.6.0
         version: 0.6.0
@@ -50,20 +50,20 @@ importers:
 
   packages/adapters/netlify: {}
 
-  packages/clam-mantle:
+  packages/mantle:
     dependencies:
-      '@aotterclam/clam-mantle-admin-ui':
+      '@aotterclam/mantle-admin-ui':
         specifier: workspace:*
-        version: link:../clam-mantle-admin-ui
-      '@aotterclam/clam-mantle-cloudflare':
+        version: link:../mantle-admin-ui
+      '@aotterclam/mantle-cloudflare':
         specifier: workspace:*
         version: link:../adapters/cloudflare
-      '@aotterclam/clam-mantle-runtime':
+      '@aotterclam/mantle-runtime':
         specifier: workspace:*
-        version: link:../clam-mantle-runtime
-      '@aotterclam/clam-mantle-spec':
+        version: link:../mantle-runtime
+      '@aotterclam/mantle-spec':
         specifier: workspace:*
-        version: link:../clam-mantle-spec
+        version: link:../mantle-spec
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -72,7 +72,7 @@ importers:
         specifier: ^5.6.3
         version: 5.9.3
 
-  packages/clam-mantle-admin-ui:
+  packages/mantle-admin-ui:
     dependencies:
       '@radix-ui/react-collapsible':
         specifier: ^1.1.12
@@ -139,11 +139,11 @@ importers:
         specifier: ^2.0.3
         version: 2.3.3(rollup@4.60.3)(vite@7.3.2(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  packages/clam-mantle-runtime:
+  packages/mantle-runtime:
     dependencies:
-      '@aotterclam/clam-mantle-spec':
+      '@aotterclam/mantle-spec':
         specifier: workspace:*
-        version: link:../clam-mantle-spec
+        version: link:../mantle-spec
       marked:
         specifier: ^14.1.3
         version: 14.1.4
@@ -161,7 +161,7 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@22.19.19)(vite@8.0.10(@types/node@22.19.19)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4))
 
-  packages/clam-mantle-spec:
+  packages/mantle-spec:
     dependencies:
       yaml:
         specifier: ^2.6.0

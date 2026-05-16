@@ -14,7 +14,7 @@ body:
     id: proposal
     attributes:
       label: Proposed behavior
-      description: What should clam-mantle do?
+      description: What should mantle do?
     validations:
       required: true
   - type: dropdown

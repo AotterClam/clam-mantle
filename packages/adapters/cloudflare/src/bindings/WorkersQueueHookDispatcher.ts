@@ -2,7 +2,7 @@ import type {
   CmsRuntime,
   DeferredHookDispatcher,
   DeferredHookEnvelope,
-} from "@aotterclam/clam-mantle-runtime";
+} from "@aotterclam/mantle-runtime";
 
 /**
  * `DeferredHookDispatcher` impl backed by a Cloudflare Workers Queue

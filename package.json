@@ -1,13 +1,13 @@
 {
-  "name": "clam-mantle-monorepo",
+  "name": "mantle-monorepo",
   "private": true,
   "version": "0.0.10-alpha",
   "description": "MCP-native headless CMS for Cloudflare Workers.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/clam-mantle",
+  "homepage": "https://github.com/AotterClam/mantle",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/clam-mantle.git"
+    "url": "git+https://github.com/AotterClam/mantle.git"
   },
   "type": "module",
   "engines": {
@@ -15,9 +15,9 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "build": "pnpm -r --filter '@aotterclam/clam-mantle*' build",
-    "typecheck": "pnpm -r --filter '@aotterclam/clam-mantle*' typecheck",
-    "test": "pnpm -r --filter '@aotterclam/clam-mantle*' test",
+    "build": "pnpm -r --filter '@aotterclam/mantle*' build",
+    "typecheck": "pnpm -r --filter '@aotterclam/mantle*' typecheck",
+    "test": "pnpm -r --filter '@aotterclam/mantle*' test",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check": "pnpm run check:boundaries && pnpm build && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test"
   },

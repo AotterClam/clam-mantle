@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import type { Manifest } from "@aotterclam/clam-mantle-spec";
-import { TemplateRegistry } from "@aotterclam/clam-mantle-runtime";
+import type { Manifest } from "@aotterclam/mantle-spec";
+import { TemplateRegistry } from "@aotterclam/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
-import { InMemoryDatabase } from "../../../clam-mantle-runtime/test/fakes/database.js";
+import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
   StubAssetServer,

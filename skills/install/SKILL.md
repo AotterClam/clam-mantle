@@ -1,17 +1,17 @@
 ---
-name: clam-mantle install
-description: Install a clam-mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-clam-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from the landing page at https://mantle.aotterclam.ai/skill/install?type=<archetype>&theme=<theme>, or when starting from an empty repo.
+name: mantle install
+description: Install a mantle consumer project. This Skill is interview-driven — it elicits the user's purpose, audience, timing, and identity, scaffolds the project via create-mantle, then delegates the Mantle welcome letter to a background subagent. Use when the user pasted a composed-skill URL from the landing page at https://mantle.aotterclam.ai/skill/install?type=<archetype>&theme=<theme>, or when starting from an empty repo.
 when_to_invoke: |
   Empty repo + landing-page composed-skill prompt; or the user describes a site they want to build. The composed URL already inlined the per-archetype hint with this brief.
 ---
 
-# clam-mantle install
+# mantle install
 
-You're installing a clam-mantle site for the user. The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
+You're installing a mantle site for the user. The composed URL inlined this brief plus the per-archetype hint — archetype-specific register cues are in the same document.
 
 ## Ground truth
 
-`@aotterclam/clam-mantle-*` exposes **exactly four declarative atoms** scoped to `cms.clam.ai/v1`, mapping 1-to-1 to Postgres primitives:
+`@aotterclam/mantle-*` exposes **exactly four declarative atoms** scoped to `cms.clam.ai/v1`, mapping 1-to-1 to Postgres primitives:
 
 | Atom | Postgres analog | External surface |
 |---|---|---|
@@ -20,9 +20,9 @@ You're installing a clam-mantle site for the user. The composed URL inlined this
 | **Procedure** | `CREATE FUNCTION` | none directly; needs a Trigger to bind it |
 | **Trigger** | `CREATE TRIGGER` + cron + REST route + LISTEN/NOTIFY | binding atom — turns Procedures into HTTP / lifecycle / MCP surfaces |
 
-Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/AotterClam/clam-mantle/develop/docs/design-atoms.md>.
+Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/AotterClam/mantle/develop/docs/design-atoms.md>.
 
-After `create-clam-mantle` runs, the scaffold's ground truth lives in:
+After `create-mantle` runs, the scaffold's ground truth lives in:
 
 | Path | Contents |
 |---|---|
@@ -58,7 +58,7 @@ If any is missing or below the minimum, surface install hints once and stop unti
 - pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
 - git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
 
-Also confirm the current working directory is empty (or contains only files the user already accepted as part of the install). `create-clam-mantle` writes into this directory directly; collisions with pre-existing files are surprising and rarely what the user wanted.
+Also confirm the current working directory is empty (or contains only files the user already accepted as part of the install). `create-mantle` writes into this directory directly; collisions with pre-existing files are surprising and rarely what the user wanted.
 
 Don't proceed to the interview until preflight passes.
 
@@ -121,7 +121,7 @@ Show both drafts when you synthesize; user confirms or corrects.
 
 ### Synthesize and confirm
 
-Before running `create-clam-mantle`, rehearse the install back to the user in their language. Translate technical tokens to something a non-engineer reads naturally — BCP 47 codes become the language's natural name in the user's language, config keys like `github_owner` become their everyday phrasing, archetype codenames become the site type's everyday meaning rather than the codeword.
+Before running `create-mantle`, rehearse the install back to the user in their language. Translate technical tokens to something a non-engineer reads naturally — BCP 47 codes become the language's natural name in the user's language, config keys like `github_owner` become their everyday phrasing, archetype codenames become the site type's everyday meaning rather than the codeword.
 
 Surface `description` and `summary` as separate one-line drafts for the user to nod or tweak, since they land in different places (SEO meta vs. revisions log).
 
@@ -131,9 +131,9 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
 ## When to act
 
-### Why `npx create-clam-mantle` is a destructive action under Auto Mode
+### Why `npx create-mantle` is a destructive action under Auto Mode
 
-Invoking `npx create-clam-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/clamConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
+Invoking `npx create-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/clamConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
 
 - every page's SEO `<meta description>`
 - locale routing for the entire site (canonical + redirects)
@@ -170,7 +170,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    Do not modify the literal flags or the archetype positional. Do not invent additional flags. If a marker has no authorized value, you're still in the interview — return there.
 
-   The CLI fetches `sources.json` at runtime from `clam-mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
+   The CLI fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
 3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files — at minimum `manifests/`, `src/clamConfig.ts`, `mantle/site.md` — before deciding anything else.
 
@@ -216,7 +216,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
    pnpm -s mantle:prompt > /tmp/mantle-letter-prompt.md
    ```
 
-   `-s` suppresses pnpm's banner so the file is just the prompt body. The script reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `clam-mantle-starters`, substitutes `<<MANTLE_*>>` placeholders in the scaffolded `mantle-subagent-prompt.md`, prints to stdout. Fails fast if any of the three sections still hold template placeholders.
+   `-s` suppresses pnpm's banner so the file is just the prompt body. The script reads `mantle/site.md` (frontmatter + your `## site` / `## voice` / `## history` sections), fetches the archetype hint from `mantle-starters`, substitutes `<<MANTLE_*>>` placeholders in the scaffolded `mantle-subagent-prompt.md`, prints to stdout. Fails fast if any of the three sections still hold template placeholders.
 
 9. **Dispatch the Mantle subagent (in background)** with `/tmp/mantle-letter-prompt.md` as its only prompt body. Use a `general-purpose` subagent with `run_in_background: true`.
 
@@ -230,11 +230,11 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
 11. **Commit.** If step 4 produced an adjustment, that's its own commit. Then the main commit: `mantle: notes from install interview`.
 
-12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/AotterClam/clam-mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
+12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/AotterClam/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
 
 ## Adjustment window — between scaffold and provision
 
-A permitted modification turn after `create-clam-mantle` returns and before the Mantle subagent fires. Small concrete edits to match what the user said.
+A permitted modification turn after `create-mantle` returns and before the Mantle subagent fires. Small concrete edits to match what the user said.
 
 ### In scope
 
@@ -242,7 +242,7 @@ A permitted modification turn after `create-clam-mantle` returns and before the 
 |---|---|
 | Delete a manifest the user explicitly said they don't need | Honesty over inertia |
 | Add a single field to an existing Schema, from a concrete interview signal | Small, validated, recoverable |
-| Edit `src/clamConfig.ts` site defaults beyond what `create-clam-mantle` set | Site-shape, fits Mantle's surface |
+| Edit `src/clamConfig.ts` site defaults beyond what `create-mantle` set | Site-shape, fits Mantle's surface |
 | Tweak `src/theme/` tokens if the user gave a strong visual register | Prefer deferring to the customize-design Skill unless explicit |
 
 ### Out of scope

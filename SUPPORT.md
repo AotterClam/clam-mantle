@@ -3,14 +3,14 @@
 ## How to get help
 
 1. **Skim docs first** — [README](./README.md), [CONTRIBUTING.md](./CONTRIBUTING.md), and the ADRs at [`docs/adr/`](./docs/adr/).
-2. **General questions** — file under [Discussions](https://github.com/AotterClam/clam-mantle/discussions) (Q&A, Ideas, Show and tell).
-3. **Bug or feature request** — file an [issue](https://github.com/AotterClam/clam-mantle/issues/new/choose).
+2. **General questions** — file under [Discussions](https://github.com/AotterClam/mantle/discussions) (Q&A, Ideas, Show and tell).
+3. **Bug or feature request** — file an [issue](https://github.com/AotterClam/mantle/issues/new/choose).
 4. **Security** — do **not** open a public issue. See [SECURITY.md](./SECURITY.md).
 
 ## Help wanted on the starters monorepo?
 
-Starter scaffolds + the `create-clam-mantle` scaffolder live in
-[`AotterClam/clam-mantle-starters`](https://github.com/AotterClam/clam-mantle-starters). File issues there for
+Starter scaffolds + the `create-mantle` scaffolder live in
+[`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters). File issues there for
 archetype bugs, scaffolder fixes, and theme work.
 
 ## What we don't offer

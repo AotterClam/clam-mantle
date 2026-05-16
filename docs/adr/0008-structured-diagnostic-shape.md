@@ -43,7 +43,7 @@ diagnostic before it can route a fix. Structure is cheaper.
 
 All four feedback loops emit diagnostics in the following shape.
 The canonical type, the diagnostic-code constants, and the phase
-helpers all live in `@aotterclam/clam-mantle-spec`; every other
+helpers all live in `@aotterclam/mantle-spec`; every other
 package (runtime, cloudflare adapter, admin UI, CLI) imports from
 there.
 
@@ -219,7 +219,7 @@ admin SPA and CF Workers could share a CSP-safe path with no
 from day 1 — manifest authoring stays JSON Schema, but the
 runtime validator a manifest author's request body hits is a
 zod schema, produced by the JSON-Schema → zod converter in
-`@aotterclam/clam-mantle-spec` (see [`docs/design-atoms.md`](../design-atoms.md) § "Manifest validation — JSON Schema in, zod at runtime").
+`@aotterclam/mantle-spec` (see [`docs/design-atoms.md`](../design-atoms.md) § "Manifest validation — JSON Schema in, zod at runtime").
 
 Concretely, the translation now consumes `ZodError.issues`:
 
@@ -259,8 +259,8 @@ Diagnostic candidate (alternative (d) below) applies to zod —
   consistent with the contract layers; consumers' app frontends
   and AI authors see the same structure.
 - Single source of truth. The interface, code constants, and
-  formatter all live in `@aotterclam/clam-mantle-spec`; the runtime
-  package and adapters import them. A future `clam-mantle-netlify`
+  formatter all live in `@aotterclam/mantle-spec`; the runtime
+  package and adapters import them. A future `mantle-netlify`
   inherits the shape for free.
 
 ### Costs
@@ -323,7 +323,7 @@ objects feed *into* the Diagnostic translator described under
 
 - New error codes: choose a suffix that names the failure
   family, not the specific assertion. UPPER_SNAKE, no prefix.
-  Add the constant to `@aotterclam/clam-mantle-spec`'s diagnostic
+  Add the constant to `@aotterclam/mantle-spec`'s diagnostic
   code module; do not redeclare per-package.
 - When the same root cause can be caught by multiple loops,
   reuse the code; let `phase` distinguish.
@@ -331,7 +331,7 @@ objects feed *into* the Diagnostic translator described under
   a single helper (`makeDiagnostic` + phase-helpers
   `validateDiagnostic` / `testDiagnostic` / `bootDiagnostic` /
   `runtimeDiagnostic`), all exported from
-  `@aotterclam/clam-mantle-spec`, not authored at each error site.
+  `@aotterclam/mantle-spec`, not authored at each error site.
 - Documentation: every code in the catalog gets one row in the
   v0.1.0 authoring-contract doc (when ported) under
   § Error catalog with `code`, applicable phases,
@@ -341,13 +341,13 @@ objects feed *into* the Diagnostic translator described under
 
 **v0.1.0 rebuild — porting in progress.** The shape is locked
 by this ADR; the canonical declarations land in
-`@aotterclam/clam-mantle-spec/src/diagnostic.ts` (interface +
+`@aotterclam/mantle-spec/src/diagnostic.ts` (interface +
 `DIAGNOSTIC_CODES` constants + `makeDiagnostic` formatter +
 `validateDiagnostic` / `testDiagnostic` / `bootDiagnostic` /
-`runtimeDiagnostic` phase helpers). `@aotterclam/clam-mantle-runtime`
+`runtimeDiagnostic` phase helpers). `@aotterclam/mantle-runtime`
 imports them for the dispatcher and the boot validator;
-`@aotterclam/clam-mantle-cloudflare` imports them for HTTP error
+`@aotterclam/mantle-cloudflare` imports them for HTTP error
 responses; the admin UI imports them so the in-browser editor
 surfaces the same structured errors the CLI does. The
-`AotterClam/clam-mantle` v0.1.0 milestone tracks the per-package
+`AotterClam/mantle` v0.1.0 milestone tracks the per-package
 landings.

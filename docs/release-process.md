@@ -1,6 +1,6 @@
 # Release process
 
-clam-mantle is in `0.0.x-alpha` until the v0.1.0 release gate closes. The process below documents the branch, tag, GitHub release, and npm publish discipline for prereleases and stable releases.
+mantle is in `0.0.x-alpha` until the v0.1.0 release gate closes. The process below documents the branch, tag, GitHub release, and npm publish discipline for prereleases and stable releases.
 
 ## Branch model
 
@@ -102,14 +102,14 @@ the selected npm version.
 
 For `0.0.x-alpha`, publish SDK packages in dependency order:
 
-1. `@aotterclam/clam-mantle-spec`
-2. `@aotterclam/clam-mantle-admin-ui`
-3. `@aotterclam/clam-mantle-runtime`
-4. `@aotterclam/clam-mantle-cloudflare`
-5. `@aotterclam/clam-mantle` (umbrella — depends on all four above; publish last so its exact-pinned `dependencies` resolve)
+1. `@aotterclam/mantle-spec`
+2. `@aotterclam/mantle-admin-ui`
+3. `@aotterclam/mantle-runtime`
+4. `@aotterclam/mantle-cloudflare`
+5. `@aotterclam/mantle` (umbrella — depends on all four above; publish last so its exact-pinned `dependencies` resolve)
 
 The umbrella is the adopter-facing entry: a single dep, subpath imports
-`@aotterclam/clam-mantle/{spec,runtime,cloudflare,admin-ui}`. Sub-packages
+`@aotterclam/mantle/{spec,runtime,cloudflare,admin-ui}`. Sub-packages
 stay individually installable for tooling / alt-adapter authors.
 
 Do **not** publish starter packages during alpha unless a separate PR
@@ -118,20 +118,20 @@ Current starter install flow downloads starter source tarballs from
 GitHub/template refs, extracts them without preserving the template
 repo remote, and uses npm as the runtime dependency source.
 
-Do **not** publish `@aotterclam/clam-mantle-netlify` while it is a stub.
+Do **not** publish `@aotterclam/mantle-netlify` while it is a stub.
 
-`@aotterclam/create-clam-mantle` lives in `AotterClam/clam-mantle-starters`,
+`@aotterclam/create-mantle` lives in `AotterClam/mantle-starters`,
 not here. The scaffolder couples to starter content (sources.json,
 merge layout, placeholder macros) and has zero coupling to SDK runtime,
 so it ships from the starters repo. Releases on this SDK repo no longer
-attach a create-clam-mantle tarball — that asset is published to npm
+attach a create-mantle tarball — that asset is published to npm
 from the starters repo's matching release tag.
 
 Adopters install via the `npm create` shortcut (npm 7+ resolves
-`@aotterclam/clam-mantle` to `@aotterclam/create-clam-mantle`):
+`@aotterclam/mantle` to `@aotterclam/create-mantle`):
 
 ```bash
-npm create @aotterclam/clam-mantle@alpha <archetype> -- \
+npm create @aotterclam/mantle@alpha <archetype> -- \
   --project-name "..." \
   --brand "..." \
   --description "..." \
@@ -140,9 +140,9 @@ npm create @aotterclam/clam-mantle@alpha <archetype> -- \
   --summary "..."
 ```
 
-Equivalent direct invocations: `npx @aotterclam/create-clam-mantle@alpha
+Equivalent direct invocations: `npx @aotterclam/create-mantle@alpha
 <archetype> ...` or pinning to an exact version
-`npx @aotterclam/create-clam-mantle@0.0.10-alpha.1 ...`.
+`npx @aotterclam/create-mantle@0.0.10-alpha.1 ...`.
 
 `skills/install/SKILL.md` carries the canonical invocation.
 
@@ -163,12 +163,12 @@ needs an OTP not always to hand). Then pack + inspect:
 ```bash
 pnpm run check                          # boundary + build + typecheck + test
 mkdir -p /tmp/clam-pack
-pnpm -C packages/clam-mantle-spec       pack --pack-destination /tmp/clam-pack
-pnpm -C packages/clam-mantle-admin-ui   pack --pack-destination /tmp/clam-pack
-pnpm -C packages/clam-mantle-runtime    pack --pack-destination /tmp/clam-pack
+pnpm -C packages/mantle-spec       pack --pack-destination /tmp/clam-pack
+pnpm -C packages/mantle-admin-ui   pack --pack-destination /tmp/clam-pack
+pnpm -C packages/mantle-runtime    pack --pack-destination /tmp/clam-pack
 pnpm -C packages/adapters/cloudflare    pack --pack-destination /tmp/clam-pack
-pnpm -C packages/clam-mantle            pack --pack-destination /tmp/clam-pack
-tar tzf /tmp/clam-pack/aotterclam-clam-mantle-<ver>.tgz | head    # spot-check
+pnpm -C packages/mantle            pack --pack-destination /tmp/clam-pack
+tar tzf /tmp/clam-pack/aotterclam-mantle-<ver>.tgz | head    # spot-check
 ```
 
 Confirm each tarball contains only intended `dist`, `README.md`,
@@ -181,11 +181,11 @@ workspace-only artifacts.
 Publish prerelease packages with the `alpha` dist-tag:
 
 ```bash
-pnpm publish --filter @aotterclam/clam-mantle-spec       --no-git-checks --access public
-pnpm publish --filter @aotterclam/clam-mantle-admin-ui   --no-git-checks --access public
-pnpm publish --filter @aotterclam/clam-mantle-runtime    --no-git-checks --access public
-pnpm publish --filter @aotterclam/clam-mantle-cloudflare --no-git-checks --access public
-pnpm publish --filter @aotterclam/clam-mantle            --no-git-checks --access public
+pnpm publish --filter @aotterclam/mantle-spec       --no-git-checks --access public
+pnpm publish --filter @aotterclam/mantle-admin-ui   --no-git-checks --access public
+pnpm publish --filter @aotterclam/mantle-runtime    --no-git-checks --access public
+pnpm publish --filter @aotterclam/mantle-cloudflare --no-git-checks --access public
+pnpm publish --filter @aotterclam/mantle            --no-git-checks --access public
 ```
 
 `pnpm publish` resolves `workspace:*` deps to the actual published
@@ -199,13 +199,13 @@ the pre-v0.1 `latest` policy above, that's the correct behavior; no
 action needed. Add the `alpha` tag explicitly only if it's missing:
 
 ```bash
-npm dist-tag add @aotterclam/clam-mantle@<ver> alpha
+npm dist-tag add @aotterclam/mantle@<ver> alpha
 ```
 
 After publishing, verify:
 
 ```bash
-for p in @aotterclam/clam-mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
+for p in @aotterclam/mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
   npm view "$p" version dist-tags --json
 done
 ```
@@ -227,7 +227,7 @@ is broken:
 Example:
 
 ```bash
-npm deprecate @aotterclam/clam-mantle-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
+npm deprecate @aotterclam/mantle-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
 ```
 
 Only unpublish when the tarball contains secrets, private files, or a
