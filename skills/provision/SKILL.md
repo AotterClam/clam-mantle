@@ -35,6 +35,8 @@ Provision does **not** seed content. First real content is created after owner s
 
 6. **One OAuth App per site.** It powers both browser sign-in and MCP OAuth/DCR consent.
 
+7. **`BETTER_AUTH_SECRET` is auto-generated and load-bearing.** `provision:up` mints a fresh 32-byte secret on every run and pipes it in as a worker secret — the user never sees the value, and `wrangler secret list` shows names only, not values. The secret signs session cookies + JWTs, and (if the JWT plugin is enabled) encrypts JWK private keys at rest. Consequences worth saying out loud during handoff: re-running `provision:up` on the same worker, deleting and recreating the worker, or migrating to a new account all mint a fresh secret — every existing session is invalidated and any stored JWK row stops decrypting. There is no in-flow recovery path; if the user wants graceful rotation later, surface `BETTER_AUTH_SECRETS` (comma-separated, plural — old values kept for verification) as the path.
+
 ## CLI surface
 
 ```bash
