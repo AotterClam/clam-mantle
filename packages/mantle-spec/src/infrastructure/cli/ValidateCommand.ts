@@ -24,20 +24,28 @@ import { loadManifestsFromRoot } from "./loadManifests.js";
  *   --format json   → JSON array on stdout (default when piped)
  *   --format text   → pretty-print on stdout (default when TTY)
  *
+ * Phase (which gates are active — see Phase doc below):
+ *   --phase preview  → grammar checks only; deploy-only gates skipped (default)
+ *   --phase deploy   → all checks including the Mantle welcome letter
+ *
  * Per the clean-architecture rules this is a thin adapter: it loads
  * files, constructs the request DTO, calls the use case, formats the
  * response. No business logic.
  */
+export type Phase = "preview" | "deploy";
+
 export interface CliArgs {
   readonly manifests: string;
   readonly source: string | null;
   readonly format: "json" | "text";
+  readonly phase: Phase;
 }
 
 export function parseArgs(rawArgs: ReadonlyArray<string>): CliArgs {
   let manifests = "./manifests";
   let source: string | null = "./src";
   let format: "json" | "text" | null = null;
+  let phase: Phase = "preview";
 
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
@@ -52,6 +60,12 @@ export function parseArgs(rawArgs: ReadonlyArray<string>): CliArgs {
       format = v;
     } else if (a === "--json") {
       format = "json";
+    } else if (a === "--phase") {
+      const v = rawArgs[++i];
+      if (v !== "preview" && v !== "deploy") {
+        throw new Error(`--phase must be 'preview' or 'deploy'; got ${JSON.stringify(v)}`);
+      }
+      phase = v;
     } else if (a === "--help" || a === "-h") {
       printHelp();
       exit(0);
@@ -64,7 +78,7 @@ export function parseArgs(rawArgs: ReadonlyArray<string>): CliArgs {
     format = stdout.isTTY ? "text" : "json";
   }
 
-  return { manifests, source, format };
+  return { manifests, source, format, phase };
 }
 
 function printHelp(): void {
@@ -77,6 +91,13 @@ Options:
   --source <dir>      Handler source root for register-handler grep
                       (default: ./src)
   --no-source         Skip the handler-source grep entirely
+  --phase <phase>     'preview' (default) or 'deploy'.
+                        preview: grammar + cross-Schema checks only.
+                                 Suitable right after \`create-mantle\`
+                                 and during local \`pnpm dev\`.
+                        deploy:  adds the Mantle welcome letter gate
+                                 + any other pre-deploy-only checks.
+                                 Run this before \`wrangler deploy\`.
   --format <fmt>      'json' or 'text' (default: auto by isTTY)
   --json              Alias for --format json
   -h, --help          This help
@@ -86,6 +107,26 @@ Exit codes:
   1  one or more errors
   2  CLI invocation problem
 `);
+}
+
+/**
+ * Which diagnostic codes are gated to which phase. Codes not listed
+ * here fire in every phase. The list is small on purpose — most
+ * grammar checks belong in every phase; only the lifecycle-stage gates
+ * (Mantle letter, future production secret checks) live here.
+ *
+ * "deploy" entries mean: the diagnostic is emitted only when phase
+ * === "deploy". In preview the check still runs (cheap) but the
+ * diagnostic is dropped before counting + printing.
+ */
+const PHASE_GATED_CODES: Readonly<Record<string, Phase>> = {
+  MANTLE_LETTER_NOT_WRITTEN: "deploy",
+};
+
+function isVisibleInPhase(code: string, phase: Phase): boolean {
+  const gate = PHASE_GATED_CODES[code];
+  if (gate === undefined) return true;
+  return gate === phase;
 }
 
 export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
@@ -145,22 +186,33 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
   // See § Mantle letter check below for why this lives here.
   const mantleDiagnostics = await runMantleLetterCheck();
 
-  const diagnostics = [...parseErrors, ...result.diagnostics, ...cliWarnings, ...mantleDiagnostics];
-  const errorCount =
-    result.errorCount +
-    parseErrors.filter((d) => d.severity === "error").length +
-    mantleDiagnostics.filter((d) => d.severity === "error").length;
-  const warningCount =
-    result.warningCount +
-    cliWarnings.length +
-    parseErrors.filter((d) => d.severity === "warning").length +
-    mantleDiagnostics.filter((d) => d.severity === "warning").length;
+  const rawDiagnostics = [...parseErrors, ...result.diagnostics, ...cliWarnings, ...mantleDiagnostics];
+
+  // Apply phase gating — diagnostics for codes only valid in another
+  // phase are dropped before counting. Preview hides
+  // `MANTLE_LETTER_NOT_WRITTEN` so a fresh-scaffold `pnpm validate`
+  // exits 0; deploy keeps it.
+  const diagnostics = rawDiagnostics.filter((d) => isVisibleInPhase(d.code, args.phase));
+  const suppressedCount = rawDiagnostics.length - diagnostics.length;
+
+  let errorCount = 0;
+  let warningCount = 0;
+  for (const d of diagnostics) {
+    if (d.severity === "error") errorCount++;
+    else warningCount++;
+  }
 
   // 4. Emit.
   if (args.format === "json") {
-    stdout.write(JSON.stringify({ diagnostics, errorCount, warningCount }, null, 2) + "\n");
+    stdout.write(
+      JSON.stringify(
+        { phase: args.phase, diagnostics, errorCount, warningCount, suppressedCount },
+        null,
+        2,
+      ) + "\n",
+    );
   } else {
-    emitText(diagnostics, errorCount, warningCount, manifestsRoot);
+    emitText(diagnostics, errorCount, warningCount, manifestsRoot, args.phase, suppressedCount);
   }
 
   return errorCount > 0 ? 1 : 0;
@@ -255,9 +307,16 @@ function emitText(
   errorCount: number,
   warningCount: number,
   root: string,
+  phase: Phase,
+  suppressedCount: number,
 ): void {
   if (diagnostics.length === 0) {
-    stdout.write(`OK  no issues (root: ${relative(cwd(), root) || root})\n`);
+    stdout.write(`OK  no issues (root: ${relative(cwd(), root) || root}, phase: ${phase})\n`);
+    if (phase === "preview" && suppressedCount > 0) {
+      stdout.write(
+        `ℹ ${suppressedCount} deploy-only gate(s) skipped — re-run with \`--phase deploy\` before shipping.\n`,
+      );
+    }
     return;
   }
   for (const d of diagnostics) {
@@ -270,7 +329,12 @@ function emitText(
     if (d.message) stdout.write(`         ${d.message}\n`);
     stdout.write("\n");
   }
-  stdout.write(`${errorCount} error(s), ${warningCount} warning(s).\n`);
+  stdout.write(`${errorCount} error(s), ${warningCount} warning(s) (phase: ${phase}).\n`);
+  if (phase === "preview" && suppressedCount > 0) {
+    stdout.write(
+      `ℹ ${suppressedCount} deploy-only gate(s) skipped — re-run with \`--phase deploy\` before shipping.\n`,
+    );
+  }
 }
 
 function formatValue(v: unknown): string {

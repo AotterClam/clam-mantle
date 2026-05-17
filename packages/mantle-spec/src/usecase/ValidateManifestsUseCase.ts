@@ -497,8 +497,20 @@ function checkHandlerRefsInSource(
     if (p.spec.handler.kind !== "ref") continue;
     const ref = p.spec.handler.ref;
     const escaped = ref.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`["'\`]${escaped}["'\`]`);
-    if (!re.test(source)) {
+    // Two registration patterns we accept as evidence:
+    //   1. Quoted string literal: `registerHandler('captchaCheck', ...)`
+    //      or `handlers: { 'captchaCheck': ... }`
+    //   2. Unquoted object-property-key shorthand:
+    //      `{ captchaCheck: someFn, slackNotify: otherFn }` —
+    //      the idiomatic JS form the publication / intake / presence
+    //      starters use in `src/handlers/index.ts`'s buildHandlers().
+    //
+    // Both are evidence that the handler is wired; boot's catalog
+    // check is the source of truth either way, so a false negative
+    // here would just delay the same diagnostic until boot.
+    const quoted = new RegExp(`["'\`]${escaped}["'\`]`);
+    const propertyKey = new RegExp(`(?:^|[\\s{,;])${escaped}\\s*:`, "m");
+    if (!quoted.test(source) && !propertyKey.test(source)) {
       out.push(
         validateDiagnostic({
           code: "HANDLER_NOT_REGISTERED",
@@ -510,7 +522,7 @@ function checkHandlerRefsInSource(
             filePaths,
           ),
           value: ref,
-          expected: `string literal '${ref}' to appear in handler source (e.g. registerHandler('${ref}', ...) or handlers: { '${ref}': ... })`,
+          expected: `'${ref}' to appear in handler source as a quoted string (e.g. registerHandler('${ref}', ...)) or an unquoted object-property key (e.g. { ${ref}: someFn })`,
           message: `Procedure '${p.metadata.name}' handler.ref '${ref}' was not found in any handler source file. The boot-time validator will hard-fail if it isn't registered at runtime.`,
         }),
       );
