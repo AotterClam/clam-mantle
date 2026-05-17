@@ -209,6 +209,17 @@ describe("parseWireDiagnostic", () => {
     expect(parseWireDiagnostic('"a string"')).toBeNull();
     expect(parseWireDiagnostic("true")).toBeNull();
   });
+
+  it("returns null when code is not in DIAGNOSTIC_CODES", () => {
+    // Wire-level safety: a misbehaving peer cannot smuggle an unknown
+    // code through the closed catalog by sending a JSON body with all
+    // other fields shaped correctly.
+    expect(
+      parseWireDiagnostic(
+        '{"code":"MADE_UP_CODE","message":"m","path":"/","phase":"runtime","severity":"error"}',
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("readJsonPointer", () => {

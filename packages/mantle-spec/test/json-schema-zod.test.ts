@@ -179,6 +179,32 @@ describe("jsonSchemaToZod — boolean / null / unknown", () => {
   });
 });
 
+describe("jsonSchemaToZod — nullable", () => {
+  it("nullable: true on a string accepts null and the string type", () => {
+    const zs = jsonSchemaToZod({ type: "string", nullable: true });
+    expect(zs.safeParse("x").success).toBe(true);
+    expect(zs.safeParse(null).success).toBe(true);
+    expect(zs.safeParse(1).success).toBe(false);
+  });
+
+  it("nullable: false (or unset) on a string rejects null", () => {
+    const zs = jsonSchemaToZod({ type: "string" });
+    expect(zs.safeParse(null).success).toBe(false);
+  });
+
+  it("nullable: true on an object accepts null and the object shape", () => {
+    const zs = jsonSchemaToZod({
+      type: "object",
+      properties: { a: { type: "string" } },
+      required: ["a"],
+      nullable: true,
+    });
+    expect(zs.safeParse({ a: "x" }).success).toBe(true);
+    expect(zs.safeParse(null).success).toBe(true);
+    expect(zs.safeParse({}).success).toBe(false);
+  });
+});
+
 describe("jsonSchemaToZod — type union", () => {
   it("`type: ['string', 'null']` accepts either", () => {
     const zs = jsonSchemaToZod({ type: ["string", "null"] });

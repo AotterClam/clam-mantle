@@ -50,7 +50,7 @@ function jsonPath(fieldPath: string): string {
  * collisions.
  */
 export function buildDdl(manifest: SchemaManifest): DdlStatements {
-  const collection = manifest.metadata.name;
+  const collection = safeIdent(manifest.metadata.name, "collection");
   const indexes = manifest.spec.uniqueIndexes ?? [];
   const addColumns: string[] = [];
   const createIndexes: string[] = [];
