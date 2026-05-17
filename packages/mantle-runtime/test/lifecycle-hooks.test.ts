@@ -147,8 +147,8 @@ describe("LifecycleHookingEntryRepository — before_create", () => {
       }),
     ).rejects.toBeInstanceOf(DiagnosticError);
     // Ensure no row was written.
-    const rows = await h.store.list({ collection: "posts" });
-    expect(rows).toHaveLength(0);
+    const result = await h.store.list({ collection: "posts" });
+    expect(result.rows).toHaveLength(0);
   });
 
   it("does NOT abort when errorPolicy is overridden to 'continue' on a before_* hook", async () => {
