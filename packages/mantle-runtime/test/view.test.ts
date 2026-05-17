@@ -170,6 +170,70 @@ describe("ExecuteViewUseCase", () => {
     expect(result.result.hasMore).toBe(false);
   });
 
+  it("rejects an auth-gated View when ctx is missing (UNAUTHENTICATED)", async () => {
+    const db = new InMemoryDatabase();
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: ["ctx.user"] } },
+      }),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostic.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("denies an auth-gated View when the predicate fails (AUTH_DENIED)", async () => {
+    const db = new InMemoryDatabase();
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+      }),
+      ctx: {
+        user: { id: "u1" },
+        staff: null,
+        env: {},
+        request: new Request("https://example.com/"),
+        waitUntil: () => {},
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostic.code).toBe("AUTH_DENIED");
+  });
+
+  it("allows an auth-gated View when the staff role matches", async () => {
+    const db = new InMemoryDatabase();
+    db.entries.set("p1", {
+      id: "p1",
+      collection: "posts",
+      status: "published",
+      version: 1,
+      data: JSON.stringify({ title: "Hi" }),
+      author_id: null,
+      created_at: 1,
+      updated_at: 2,
+    });
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+      }),
+      ctx: {
+        user: { id: "u1" },
+        staff: { id: "u1", role: "owner" },
+        env: {},
+        request: new Request("https://example.com/"),
+        waitUntil: () => {},
+      },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("hasMore=true when result fills the requested page exactly", async () => {
     const db = new InMemoryDatabase();
     for (let i = 1; i <= 4; i++) {
