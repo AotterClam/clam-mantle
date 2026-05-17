@@ -268,7 +268,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     contentPublishEffects,
     siteConfig,
   );
-  const unpublish = new UnpublishUseCase(entries, clock, contentPublishEffects);
+  const unpublish = new UnpublishUseCase(entries, schemasByName, clock, contentPublishEffects);
   const archive = new ArchiveUseCase(entries, schemasByName, clock, contentPublishEffects);
   const deleteEntry = new DeleteEntryUseCase(entries);
   const executeView = new ExecuteViewUseCase(args.db);

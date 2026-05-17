@@ -121,27 +121,42 @@ export class DatabaseEntryRepository implements EntryRepository {
   }
 
   async transitionStatus(args: TransitionStatusArgs): Promise<EntryRow> {
-    const guarded = args.expectedStatus !== undefined;
-    const sql =
-      `UPDATE entries SET status = ?, version = version + 1, updated_at = ?
-       WHERE id = ?${guarded ? " AND status = ?" : ""}
-       RETURNING id, collection, status, version, data, author_id, created_at, updated_at`;
-    const stmt = guarded
-      ? this.db.prepare(sql).bind(args.to, args.now, args.id, args.expectedStatus)
-      : this.db.prepare(sql).bind(args.to, args.now, args.id);
-    const row = await stmt.first<EntryDbRow>();
-    if (!row) {
-      const after = await this.db
-        .prepare(`SELECT status FROM entries WHERE id = ?`)
-        .bind(args.id)
-        .first<{ status: string }>();
-      throw new EntryStatusConflict(
-        args.id,
-        args.expectedStatus ?? args.to,
-        (after?.status as ContentState | undefined) ?? args.to,
-      );
+    const { expectedStatus, expectedVersion } = args;
+    const guards: string[] = [];
+    const binds: unknown[] = [args.to, args.now, args.id];
+    if (expectedStatus !== undefined) {
+      guards.push(" AND status = ?");
+      binds.push(expectedStatus);
     }
-    return rowFromDb(row);
+    if (expectedVersion !== undefined) {
+      guards.push(" AND version = ?");
+      binds.push(expectedVersion);
+    }
+    const row = await this.db
+      .prepare(
+        `UPDATE entries SET status = ?, version = version + 1, updated_at = ?
+         WHERE id = ?${guards.join("")}
+         RETURNING id, collection, status, version, data, author_id, created_at, updated_at`,
+      )
+      .bind(...binds)
+      .first<EntryDbRow>();
+    if (row) return rowFromDb(row);
+    // Disambiguate version- vs. status-conflict from a single SELECT —
+    // splitting into two SELECTs leaves a TOCTOU window where a third
+    // concurrent writer between the two reads can flip which guard
+    // appears to have failed.
+    const after = await this.db
+      .prepare(`SELECT version, status FROM entries WHERE id = ?`)
+      .bind(args.id)
+      .first<{ version: number; status: string }>();
+    if (expectedVersion !== undefined && after && after.version !== expectedVersion) {
+      throw new EntryVersionConflict(args.id, expectedVersion, after.version);
+    }
+    throw new EntryStatusConflict(
+      args.id,
+      expectedStatus ?? args.to,
+      (after?.status as ContentState | undefined) ?? args.to,
+    );
   }
 
   async list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {

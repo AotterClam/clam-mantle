@@ -86,6 +86,10 @@ export class RequestPublishUseCase {
         collection: existing.collection,
         to: "published",
         expectedStatus: existing.status,
+        // Validation above ran against this version; a concurrent
+        // UpdateDraft between then and the flip must fail rather than
+        // publish stale-but-passed data.
+        expectedVersion: existing.version,
         now: this.clock.now(),
         hookContext: request.ctx,
         originalInput: request.originalInput,

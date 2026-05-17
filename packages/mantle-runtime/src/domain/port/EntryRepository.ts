@@ -96,6 +96,11 @@ export interface TransitionStatusArgs extends MutationHookFields {
   readonly collection: string;
   readonly to: ContentState;
   readonly expectedStatus?: ContentState;
+  /** OCC guard. Impls must add `AND version = ?` and throw
+   *  `EntryVersionConflict` on miss, so a concurrent UpdateDraft
+   *  between caller-side validation and the flip cannot publish
+   *  stale data. */
+  readonly expectedVersion?: number;
   readonly now: number;
 }
 
