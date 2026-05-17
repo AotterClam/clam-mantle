@@ -185,6 +185,16 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    `pnpm validate` emits `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, no letter yet. The diagnostic clears once the Mantle subagent finishes (step 9). Anything else non-zero → surface `code` + `suggestion` verbatim.
 
+   **Then set up `.dev.vars` so `pnpm dev` works.** Starters that ship `.dev.vars.example` (publication / transaction / intake / presence) require a real `BETTER_AUTH_SECRET` before `pnpm dev` — the worker returns `auth_not_configured` on every request until it's filled. Copy the file, generate a value, and write it in:
+
+   ```bash
+   [ -f .dev.vars.example ] && cp .dev.vars.example .dev.vars
+   # Generate, then paste the output into the BETTER_AUTH_SECRET= line of .dev.vars
+   openssl rand -hex 32
+   ```
+
+   This secret is **local only** — `.dev.vars` is gitignored and never reaches Cloudflare. Production's secret is minted separately by `provision:up` (see the provision Skill). Tell the user this distinction explicitly so they don't try to reuse the local value or expect it to follow them to prod.
+
 6. **Pre-provision dialogue — preview + voice elicitation (this is a chatter zone, not a checklist).**
 
    Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) **draw voice material out of them by writing something concrete together** rather than asking abstract "what's your register" questions.
