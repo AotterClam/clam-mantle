@@ -31,6 +31,21 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Approve first — develop branch protection requires 1 approving
+      # review (same shape as main). Dependabot can't self-approve, so
+      # without this the auto-merge queue stays BLOCKED forever. Repo
+      # Settings → Actions → "Allow GitHub Actions to create and approve
+      # PRs" must be on (flipped 2026-05-17 at org level).
+      - name: Auto-approve patch + minor + digest
+        if: |
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+          steps.meta.outputs.update-type == 'version-update:semver-digest'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr review --approve "$PR_URL"
+
       - name: Auto-merge patch + minor + digest
         if: |
           steps.meta.outputs.update-type == 'version-update:semver-patch' ||
@@ -39,4 +54,6 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge --auto --squash "$PR_URL"
+        # `--merge` (not --squash) — match this repo's merge history
+        # (develop integration commits, not squash).
+        run: gh pr merge --auto --merge "$PR_URL"
