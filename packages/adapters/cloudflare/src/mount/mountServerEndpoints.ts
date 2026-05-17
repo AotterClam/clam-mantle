@@ -14,6 +14,7 @@ import {
 import {
   ViewParamCoercionError,
   coerceViewParams,
+  evaluateAuthAll,
   matchPath,
   type CmsRuntime,
   type HandlerContext,
@@ -352,9 +353,41 @@ async function handleViewRequest(
     return jsonError({ status: 500, code: "INTERNAL_ERROR", message: `View '${viewName}' missing post-boot.` });
   }
 
-  const url = new URL(req.url);
   const viewPath = `GET /api/views/${viewName}`;
 
+  // Resolve caller identity FIRST and evaluate `requires.auth.all`
+  // BEFORE param coercion. Two reasons:
+  //   (1) a param-coercion 400 against an auth-gated View would leak
+  //       the View's parameter contract to an unauthorized caller —
+  //       this matters for both anonymous probes AND authenticated
+  //       users without the required role.
+  //   (2) the UNAUTHENTICATED branch in ExecuteViewUseCase only fires
+  //       when ctx is undefined, so passing a guest ctx for no-session
+  //       would collapse 401 and 403 into the same AUTH_DENIED.
+  const ctx = await buildViewCtx(req, auth, waitUntil);
+  if (view.spec.requires?.auth) {
+    if (!ctx) {
+      return jsonResponse(401, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "UNAUTHENTICATED",
+          severity: "error",
+          path: viewPath,
+          expected: "authenticated session",
+          message: `View '${viewName}' requires authentication.`,
+        }),
+      });
+    }
+    const denial = evaluateAuthAll(view.spec.requires, ctx, viewPath, "runtime");
+    if (denial) {
+      return jsonResponse(HTTP_STATUS_BY_CODE[denial.code] ?? 403, {
+        ok: false,
+        diagnostic: denial,
+      });
+    }
+  }
+
+  const url = new URL(req.url);
   const page = parsePositiveInt(url.searchParams.get(PAGE_PARAM));
   const show = parsePositiveInt(url.searchParams.get(SHOW_PARAM));
 
@@ -377,13 +410,6 @@ async function handleViewRequest(
     throw err;
   }
 
-  // Build caller ctx from the Better Auth cookie session so that
-  // `ExecuteViewUseCase` can evaluate `requires.auth.all`. Anonymous
-  // callers get a guest ctx (user/staff null) — the use case rejects
-  // with UNAUTHENTICATED when requires.auth is present and ctx lacks
-  // identity; it skips the check when requires.auth is absent.
-  const ctx = await buildViewCtx(req, auth, waitUntil);
-
   const result = await runtime.executeView.execute({
     view,
     pathPrefix: viewPath,
@@ -398,14 +424,21 @@ async function handleViewRequest(
   return jsonResponse(status, { ok: false, diagnostic: result.diagnostic });
 }
 
+/**
+ * Resolve caller identity for a View request from the Better Auth
+ * cookie session. Returns `undefined` when there is no session at all
+ * so callers can distinguish 401 (no session) from 403 (session but
+ * wrong role) — `ExecuteViewUseCase` produces `UNAUTHENTICATED` for
+ * `ctx: undefined` and `AUTH_DENIED` for a ctx whose predicates fail.
+ */
 async function buildViewCtx(
   req: Request,
   auth: Auth,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
-): Promise<HandlerContext> {
-  const wu = waitUntil ? { waitUntil } : {};
+): Promise<HandlerContext | undefined> {
   const session = await auth.getSession(req);
-  if (!session) return { user: null, staff: null, env: {}, ...wu };
+  if (!session) return undefined;
+  const wu = waitUntil ? { waitUntil } : {};
   const role = await auth.getUserRole(session.user.id);
   const staff = role && ADMIN_ROLE_SET.has(role)
     ? { id: session.user.id, role: role as AdminRole }
