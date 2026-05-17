@@ -92,23 +92,25 @@ class D1Migrations implements MigrationRunner {
         `CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`,
       )
       .run();
-    // One-time rename: pre-rename deployments wrote tracking rows to
-    // `_mantle_migrations`. Copy any not-yet-canonical rows over (no-op
-    // on collisions) and drop the legacy table. Idempotent after the
-    // first successful boot.
+    // One-time copy from pre-rename `_mantle_migrations`: idempotent
+    // via `INSERT OR IGNORE` + `IF EXISTS`, so re-running on every
+    // boot is harmless after the rows have landed. We deliberately
+    // DON'T drop the legacy table — codex CX1 showed that any
+    // copy-then-drop ordering races between concurrent boots
+    // (Worker B's INSERT runs after Worker A's DROP succeeds and
+    // crashes with `no such table`). Leaving the legacy table
+    // around costs a few KB; eliminating it isn't worth the race
+    // class. A standalone op (`mantle migrate drop-legacy`) can
+    // remove it later under operator control if desired.
     const legacy = await this.db
       .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='_mantle_migrations'`)
       .first<{ name: string }>();
     if (legacy) {
-      // `IF EXISTS` on the drop guards against a concurrent cold-boot
-      // race where Worker A's batch already dropped the table by the
-      // time Worker B reaches this step.
-      await this.db.batch([
-        this.db.prepare(
+      await this.db
+        .prepare(
           `INSERT OR IGNORE INTO _migrations (id, applied_at) SELECT id, applied_at FROM _mantle_migrations`,
-        ),
-        this.db.prepare(`DROP TABLE IF EXISTS _mantle_migrations`),
-      ]);
+        )
+        .run();
     }
     const applied = await this.db
       .prepare(`SELECT id FROM _migrations`)
