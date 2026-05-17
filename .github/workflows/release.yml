@@ -1,0 +1,153 @@
+# Release fanout — Step 1 of #191.
+#
+# Triggered by pushing a `v*` tag. Does:
+#
+#   1. Build + test (gate — bad tag never publishes)
+#   2. Write the tag's version into every public package.json
+#   3. `pnpm -r publish` with npm dist-tag inferred from the prerelease
+#      suffix (see § "npm tag inference" below)
+#   4. Create a GitHub release with auto-generated notes
+#   5. Dispatch `aotter/mantle-starters` with the new SDK version
+#      so its `bump-from-sdk.yml` workflow opens a downstream bump PR
+#
+# Steps 2-3 of the fanout (starters bump → tag → landing bump → deploy)
+# live in the downstream repos' workflows; see the issue body for the
+# whole chain.
+#
+# ── Operator setup (one-time, repo secrets) ───────────────────────────
+#
+#   NPM_TOKEN              — npm automation token with publish access to
+#                            `@aotter/*`. Repo Settings → Secrets →
+#                            Actions → New repository secret.
+#
+#   RELEASE_FANOUT_TOKEN   — fine-grained PAT (or GitHub App installation
+#                            token) with `contents: write` +
+#                            `pull-requests: write` on `mantle-starters`.
+#                            Used for the `repository_dispatch` API call.
+#                            GITHUB_TOKEN can't dispatch across repos, so
+#                            this is required.
+#
+# Without these secrets, the workflow fails fast at the publish / dispatch
+# step — the publish gate already gates on tests, so a missing token can't
+# leak a partial release.
+#
+# ── npm tag inference ────────────────────────────────────────────────
+#
+#   v1.2.3            → latest
+#   v0.0.11-alpha.4   → alpha
+#   v0.0.11-beta.1    → beta
+#   v0.0.11-rc.1      → rc
+#
+# The mapping is in the "Extract version + infer npm tag" step. Without
+# it, every prerelease would land on `latest` and break adopters running
+# `npm install @aotter/mantle` without a tag.
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Only one release run at a time per tag — if two tag pushes race
+# somehow, the later one queues until the first finishes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # create GitHub release
+  id-token: write   # npm provenance (when we opt in later)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (release gate)
+        run: pnpm build
+
+      - name: Test (release gate)
+        run: pnpm test
+
+      - name: Extract version + infer npm tag
+        id: ver
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          case "$VERSION" in
+            *-alpha*) NPM_TAG=alpha ;;
+            *-beta*)  NPM_TAG=beta ;;
+            *-rc*)    NPM_TAG=rc ;;
+            *)        NPM_TAG=latest ;;
+          esac
+          echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag $TAG → version $VERSION → npm dist-tag $NPM_TAG"
+
+      - name: Bump every workspace package.json to ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          # pnpm -r exec runs in each workspace package. `npm version`
+          # with --no-git-tag-version writes to package.json only.
+          # `--allow-same-version` is a no-op safety net if the tag
+          # accidentally matches the current package.json version.
+          pnpm -r --filter './packages/**' exec npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          # `workspace:*` deps in published packages get rewritten to
+          # the actual version by pnpm publish, so the umbrella
+          # @aotter/mantle pkg's subpath deps line up automatically.
+          pnpm -r --filter './packages/**' publish \
+            --tag "${{ steps.ver.outputs.npm_tag }}" \
+            --no-git-checks \
+            --access public
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Mark prereleases so GitHub UI / consumers can filter.
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.ver.outputs.npm_tag }}" != "latest" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "${{ github.ref_name }}" \
+            --generate-notes \
+            --title "${{ github.ref_name }}" \
+            $PRERELEASE_FLAG
+
+      - name: Dispatch starters bump-from-sdk
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_FANOUT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::RELEASE_FANOUT_TOKEN not set — starters bump skipped. SDK is published; set the secret and re-dispatch via the Actions UI to continue the fanout."
+            exit 0
+          fi
+          gh api repos/aotter/mantle-starters/dispatches \
+            -f event_type=sdk-published \
+            -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
+            -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"
+          echo "Dispatched mantle-starters bump-from-sdk for ${{ steps.ver.outputs.version }}"
