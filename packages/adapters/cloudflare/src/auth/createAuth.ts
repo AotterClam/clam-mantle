@@ -515,16 +515,15 @@ function buildAuth(config: CreateAuthConfig) {
     };
     if (!shouldPromoteToOwner(bootstrap, u)) return;
 
+    // Atomic check-then-promote: `WHERE NOT EXISTS (...admin already)`
+    // closes the race window where two concurrent first signups both
+    // pass the SELECT-then-UPDATE pattern and both become owner.
     const placeholders = ADMIN_ROLES.map(() => "?").join(",");
-    const existingAdmin = await config.database
-      .prepare(`SELECT id FROM user WHERE role IN (${placeholders}) LIMIT 1`)
-      .bind(...ADMIN_ROLES)
-      .first<{ id: string }>();
-    if (existingAdmin) return;
-
     await config.database
-      .prepare("UPDATE user SET role = ? WHERE id = ?")
-      .bind("owner", u.id)
+      .prepare(
+        `UPDATE user SET role = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM user WHERE role IN (${placeholders}))`,
+      )
+      .bind("owner", u.id, ...ADMIN_ROLES)
       .run();
   };
   const databaseHooks = {

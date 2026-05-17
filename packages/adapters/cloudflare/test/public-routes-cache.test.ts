@@ -5,11 +5,24 @@ import { TemplateRegistry } from "@aotterclam/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
+import type { Auth } from "../src/auth/createAuth.js";
 import {
   InMemoryKv,
   StubAssetServer,
   stubAuth,
 } from "./fakes/runtime-bindings.js";
+
+function staffAuth(role: "owner" | "editor" | "contributor" = "owner"): Auth {
+  return {
+    handler: async () => new Response(null, { status: 404 }),
+    getSession: async () => ({
+      session: { id: "s1", userId: "u1", expiresAt: new Date(Date.now() + 60_000) },
+      user: { id: "u1", email: "x@y.z", name: "Staff", role, githubLogin: "staff" },
+    }),
+    getUserRole: async () => role,
+    methods: [],
+  };
+}
 
 function manifests(): Manifest[] {
   return [
@@ -36,7 +49,7 @@ function manifests(): Manifest[] {
   ];
 }
 
-function harness(locales: readonly string[] = ["en"]) {
+function harness(locales: readonly string[] = ["en"], opts: { auth?: Auth } = {}) {
   const db = new InMemoryDatabase();
   const kv = new InMemoryKv();
   const templates = new TemplateRegistry();
@@ -56,7 +69,7 @@ function harness(locales: readonly string[] = ["en"]) {
       kv,
       assets: new StubAssetServer(),
     },
-    auth: stubAuth,
+    auth: opts.auth ?? stubAuth,
   });
   const app = new Hono();
   mountPublicRoutes(app, ref, {
@@ -153,5 +166,55 @@ describe("mountPublicRoutes read-through cache", () => {
     const res = await h.app.request("/en/posts/ghost");
     expect(res.status).toBe(404);
     await expect(h.kv.get("entry:html:en/posts/ghost")).resolves.toBeNull();
+  });
+
+  it("preview returns 401 without a session", async () => {
+    const h = harness();
+    seedPublishedPost(h.db);
+    const res = await h.app.request("/en/posts/hello?preview=1");
+    expect(res.status).toBe(401);
+  });
+
+  it("preview returns 403 for a non-staff session", async () => {
+    // stubAuth has getUserRole → null; staffAuth("contributor") still
+    // qualifies as admin, so build a custom auth that returns no role.
+    const customerAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Customer", role: null, githubLogin: null },
+      }),
+      getUserRole: async () => null,
+      methods: [],
+    };
+    const h = harness(["en"], { auth: customerAuth });
+    seedPublishedPost(h.db);
+    const res = await h.app.request("/en/posts/hello?preview=1");
+    expect(res.status).toBe(403);
+  });
+
+  it("preview returns 200 for a staff session", async () => {
+    const h = harness(["en"], { auth: staffAuth("editor") });
+    seedPublishedPost(h.db);
+    const res = await h.app.request("/en/posts/hello?preview=1");
+    expect(res.status).toBe(200);
+  });
+
+  it("preview returns 403 when getUserRole returns a non-admin role string", async () => {
+    // Defends against future extension where getUserRole might return
+    // a custom role (e.g. "viewer") not in ADMIN_ROLE_SET.
+    const oddRoleAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Viewer", role: null, githubLogin: null },
+      }),
+      getUserRole: async () => "viewer",
+      methods: [],
+    };
+    const h = harness(["en"], { auth: oddRoleAuth });
+    seedPublishedPost(h.db);
+    const res = await h.app.request("/en/posts/hello?preview=1");
+    expect(res.status).toBe(403);
   });
 });

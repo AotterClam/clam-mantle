@@ -14,6 +14,7 @@ import {
   type KvCache,
 } from "@aotterclam/mantle-runtime";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
+import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 
 /**
  * `mountPublicRoutes` — mounts the SDK-managed public surface on the
@@ -262,6 +263,8 @@ function mountCollection(
     if (override) return override.render(ctx);
 
     if (c.req.query("preview") === "1") {
+      const denied = await assertStaffSession(ref, c.req.raw);
+      if (denied) return denied;
       const html = await runtime.previewEntry.execute({
         collection: route.collection,
         slug,
@@ -304,6 +307,25 @@ function mountCollection(
         `but no homeRenderer was passed to mountPublicRoutes — /{locale} will 404.`,
     );
   }
+}
+
+/**
+ * Gate `?preview=1` behind a staff session so anonymous visitors can't
+ * enumerate draft slugs. Returns the denial `Response` on failure (401
+ * for no session, 403 for non-staff), or `null` when the caller may
+ * proceed.
+ */
+async function assertStaffSession(
+  ref: CmsRuntimeRef,
+  req: Request,
+): Promise<Response | null> {
+  const session = await ref.auth.getSession(req);
+  if (!session) return new Response("unauthorized", { status: 401 });
+  const role = await ref.auth.getUserRole(session.user.id);
+  if (!role || !ADMIN_ROLE_SET.has(role)) {
+    return new Response("forbidden", { status: 403 });
+  }
+  return null;
 }
 
 async function readKvText(
