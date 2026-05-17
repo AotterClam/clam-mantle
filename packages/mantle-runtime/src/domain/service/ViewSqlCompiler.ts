@@ -57,13 +57,15 @@ const DEFAULT_PROJECTION = Object.entries(RESERVED_COLUMN)
   .join(", ");
 
 export function compileView(view: ViewManifest, options: CompileViewOptions = {}): CompiledView {
-  const sqlParams: unknown[] = [];
+  const sqlParams: unknown[] = [view.spec.from];
   const selectExpr = buildSelect(view.spec.fields);
   const whereParts: string[] = ["collection = ?"];
-  sqlParams.push(view.spec.from);
   if (view.spec.filter) {
-    const filterSql = compileFilter(view.spec.filter, sqlParams, options.params ?? {});
-    if (filterSql !== null) whereParts.push(`(${filterSql})`);
+    const compiled = compileFilter(view.spec.filter, options.params ?? {});
+    if (compiled !== null) {
+      whereParts.push(`(${compiled.sql})`);
+      sqlParams.push(...compiled.params);
+    }
   }
   const where = `WHERE ${whereParts.join(" AND ")}`;
   const orderBy = buildOrderBy(view.spec.orderBy);
@@ -93,43 +95,48 @@ function fieldRefExpr(field: string): string {
   return `json_extract(data, '$.${escapeJsonKey(field)}')`;
 }
 
+interface CompiledFragment {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
 /**
- * Returns `null` when the node should evaluate to TRUE (no constraint).
- * That happens when an `eq` references a param via `{ $param: <name> }`
- * and the resolved value is `undefined`. v0.1.0 parser enforces
- * required-only param refs, so this drop path is dead code today; it
- * lives here so v0.1.x "optional param ref" promotion is purely a
- * parser change. AND/OR fold over their children: any null child
- * drops; an AND/OR whose children all drop returns null itself.
+ * Returns `null` when the node has no constraint to emit: an `eq`
+ * whose `{ $param }` ref is unresolved, or an AND/OR whose children
+ * all dropped. v0.1.0 parser enforces required-only param refs so
+ * the drop path is dead today; kept so v0.1.x "optional param ref"
+ * promotion is a parser-only change.
+ *
+ * Each node returns its own `{ sql, params }` (vs. pushing into a
+ * shared array) so a dropped sub-tree can never leave orphan params
+ * bound to the parent's `?` placeholders.
  */
 function compileFilter(
   node: FilterAst,
-  sqlParams: unknown[],
   paramValues: Record<string, unknown>,
-): string | null {
+): CompiledFragment | null {
   if ("eq" in node) {
     const value = node.eq.value;
+    let bound: unknown;
     if (isParamRef(value)) {
       const resolved = paramValues[value.$param];
       if (resolved === undefined) return null;
-      sqlParams.push(resolved);
+      bound = resolved;
     } else {
-      sqlParams.push(value);
+      bound = value;
     }
-    return `${fieldRefExpr(node.eq.field)} = ?`;
+    return { sql: `${fieldRefExpr(node.eq.field)} = ?`, params: [bound] };
   }
-  if ("and" in node) {
-    const parts = node.and
-      .map((c) => compileFilter(c, sqlParams, paramValues))
-      .filter((p): p is string => p !== null);
-    if (parts.length === 0) return null;
-    return parts.map((p) => `(${p})`).join(" AND ");
-  }
-  const parts = node.or
-    .map((c) => compileFilter(c, sqlParams, paramValues))
-    .filter((p): p is string => p !== null);
-  if (parts.length === 0) return null;
-  return parts.map((p) => `(${p})`).join(" OR ");
+  const op = "and" in node ? "AND" : "OR";
+  const children = "and" in node ? node.and : node.or;
+  const compiled = children
+    .map((c) => compileFilter(c, paramValues))
+    .filter((c): c is CompiledFragment => c !== null);
+  if (compiled.length === 0) return null;
+  return {
+    sql: compiled.map((c) => `(${c.sql})`).join(` ${op} `),
+    params: compiled.flatMap((c) => c.params),
+  };
 }
 
 function buildOrderBy(
@@ -143,34 +150,39 @@ function buildOrderBy(
   return ` ORDER BY ${parts.join(", ")}`;
 }
 
+// Schema/View validators gate field names; this allowlist is
+// defense-in-depth at the SQL-emission boundary. Escaping single
+// quotes inside a JSON path string isn't reliable — SQLite parses
+// `$.it''s` as terminating at the second `'`. Reject instead.
+//
+// Dotted names (`foo.bar`) are intentionally accepted as multi-segment
+// JSON paths (`$.foo.bar`); the resulting alias `"foo.bar"` is a
+// quoted SQLite identifier and the caller reads it back via the same
+// row key. `PublishedEntries.SAFE_FIELD_RE` uses a stricter no-dot
+// regex because its callers pass single-segment fields only — keep
+// the two divergent on purpose.
+const SAFE_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
+
+function assertSafeFieldName(name: string, callsite: string): void {
+  if (SAFE_FIELD_NAME.test(name)) return;
+  throw new DiagnosticError(
+    runtimeDiagnostic({
+      code: "INTERNAL_ERROR",
+      severity: "error",
+      path: `compileView/${callsite}`,
+      value: name,
+      expected: `field name matching ${SAFE_FIELD_NAME.source} (Schema validator gate)`,
+      message: `field name '${name}' contains characters outside the allowlist; Schema validation should have caught this.`,
+    }),
+  );
+}
+
 function escapeJsonKey(key: string): string {
-  if (key.includes("\\")) {
-    throw new DiagnosticError(
-      runtimeDiagnostic({
-        code: "INTERNAL_ERROR",
-        severity: "error",
-        path: "compileView/escapeJsonKey",
-        value: key,
-        expected: "field name without backslashes (Schema validator gate)",
-        message: `field name '${key}' contains a backslash; Schema validation should have caught this.`,
-      }),
-    );
-  }
-  return key.replace(/'/g, "''");
+  assertSafeFieldName(key, "escapeJsonKey");
+  return key;
 }
 
 function quoteIdent(name: string): string {
-  if (name.includes('"')) {
-    throw new DiagnosticError(
-      runtimeDiagnostic({
-        code: "INTERNAL_ERROR",
-        severity: "error",
-        path: "compileView/quoteIdent",
-        value: name,
-        expected: "field name without double-quotes (Schema validator gate)",
-        message: `field name '${name}' contains a double-quote; Schema validation should have caught this.`,
-      }),
-    );
-  }
+  assertSafeFieldName(name, "quoteIdent");
   return `"${name}"`;
 }

@@ -22,4 +22,22 @@ describe("matchPath", () => {
   it("decodes URL-encoded param values", () => {
     expect(matchPath("/api/posts/{id}", "/api/posts/a%20b")).toEqual({ id: "a b" });
   });
+
+  it("normalizes trailing slash on either side", () => {
+    expect(matchPath("/api/posts", "/api/posts/")).toEqual({});
+    expect(matchPath("/api/posts/", "/api/posts")).toEqual({});
+    expect(matchPath("/api/posts/{id}", "/api/posts/abc/")).toEqual({ id: "abc" });
+  });
+
+  it("preserves root '/' (not stripped to empty)", () => {
+    expect(matchPath("/", "/")).toEqual({});
+  });
+
+  it("returns null on malformed percent-encoding instead of throwing", () => {
+    expect(matchPath("/api/posts/{id}", "/api/posts/%GG")).toBeNull();
+  });
+
+  it("decodes literal segments so `/by%2Dtag` matches trigger `/by-tag`", () => {
+    expect(matchPath("/api/by-tag", "/api/by%2Dtag")).toEqual({});
+  });
 });
