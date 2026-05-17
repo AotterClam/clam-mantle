@@ -62,7 +62,7 @@ function buildHarness(schemas = [postsSchema()]): Harness {
     createDraft: new CreateDraftUseCase(store, schemasByName, clock, idgen),
     updateDraft: new UpdateDraftUseCase(store, schemasByName, clock),
     requestPublish: new RequestPublishUseCase(store, schemasByName, clock, effects),
-    unpublish: new UnpublishUseCase(store, clock, effects),
+    unpublish: new UnpublishUseCase(store, schemasByName, clock, effects),
     archive: new ArchiveUseCase(store, schemasByName, clock, effects),
     deleteEntry: new DeleteEntryUseCase(store),
   };
@@ -119,7 +119,7 @@ describe("McpJsonRpcDispatcher", () => {
         createDraft: new CreateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }, { next: () => "x" }),
         updateDraft: new UpdateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
         requestPublish: new RequestPublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
-        unpublish: new UnpublishUseCase(h.store, { now: () => 0 }),
+        unpublish: new UnpublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
         archive: new ArchiveUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
         deleteEntry: new DeleteEntryUseCase(h.store),
       },

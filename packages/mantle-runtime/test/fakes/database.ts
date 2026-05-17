@@ -145,6 +145,16 @@ class InMemoryStatement implements PreparedStatement {
       return { rows: r ? [{ version: r.version }] : [], changes: 0 };
     }
 
+    // SELECT version, status FROM entries WHERE id = ? — used by
+    // transitionStatus disambiguation (one SELECT covers both checks).
+    if (sql.startsWith("SELECT version, status FROM entries WHERE id = ?")) {
+      const r = this.db.entries.get(p[0] as string);
+      return {
+        rows: r ? [{ version: r.version, status: r.status }] : [],
+        changes: 0,
+      };
+    }
+
     // UPDATE entries SET data = ?, version = ?, updated_at = ? WHERE id = ? AND version = ? RETURNING …
     if (sql.startsWith("UPDATE entries SET data = ?, version = ?, updated_at = ? WHERE id = ? AND version = ? RETURNING")) {
       const [data, version, updated_at, id, expected] = p as [string, number, number, string, number];
