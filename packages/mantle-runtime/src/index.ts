@@ -97,7 +97,7 @@ export {
   llmsTxtKey,
 } from "./domain/service/PublishKeys.js";
 export { serializeEntryAsMarkdown } from "./domain/service/MarkdownSerializer.js";
-export { readEntryBySlug } from "./domain/service/PublishedEntries.js";
+export { readEntryBySlug } from "./domain/service/io/PublishedEntries.js";
 export {
   inferLocaleFromPath,
   isKnownLocale,

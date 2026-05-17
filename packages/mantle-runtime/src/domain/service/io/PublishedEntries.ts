@@ -1,5 +1,5 @@
 import { type ContentState, type Entry } from "@aotter/mantle-spec";
-import type { DatabaseDriver } from "../port/DatabaseDriver.js";
+import type { DatabaseDriver } from "../../port/DatabaseDriver.js";
 
 /**
  * Cross-collection scan of `status='published'` entries. Pure read,

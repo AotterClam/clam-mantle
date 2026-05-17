@@ -1,5 +1,5 @@
 import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
-import type { DatabaseDriver } from "../port/DatabaseDriver.js";
+import type { DatabaseDriver } from "../../port/DatabaseDriver.js";
 import {
   readEntriesByDataFieldIn,
   readEntryByDataField,

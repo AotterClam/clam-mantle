@@ -1,6 +1,6 @@
 import type { Entry } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
-import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
+import { readPublishedEntries } from "../../domain/service/io/PublishedEntries.js";
 import { entryPublicPath } from "../../domain/service/PublishKeys.js";
 import { serializeSitemap } from "../../domain/service/SitemapSerializer.js";
 import type { ComposeSitemapRequest } from "../dto/render/ComposeSitemapRequest.js";

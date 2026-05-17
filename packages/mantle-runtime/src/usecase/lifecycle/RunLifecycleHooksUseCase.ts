@@ -10,14 +10,22 @@ import type {
   RunLifecycleHookRequest,
 } from "../../domain/port/LifecycleHookRunner.js";
 import type { TriggerIndex } from "../../domain/service/TriggerIndex.js";
-import { InvokeProcedureUseCase } from "../procedure/InvokeProcedureUseCase.js";
+import type {
+  InvokeProcedureRequest,
+  InvokeProcedureResponse,
+} from "../dto/procedure/index.js";
 
 /**
  * `RunLifecycleHooksUseCase` — implements the `LifecycleHookRunner`
  * port. Resolves matching Triggers via `TriggerIndex`, dispatches each
- * to its target Procedure through `InvokeProcedureUseCase` (so input
+ * to its target Procedure through the injected invoker (so input
  * validation, auth, output validation all reuse the shared pipeline),
  * and applies per-Trigger `errorPolicy`.
+ *
+ * The invoker is taken as a function rather than a concrete class so
+ * this use case does NOT import from a sibling under `usecase/` —
+ * `usecase → usecase` coupling would bypass the port boundary.
+ * Assembly root passes `(req) => invokeProcedure.execute(req)`.
  *
  * Defaults from the parser-locked grammar (POC ADR-0014):
  *   - before_*: errorPolicy default `abort` — handler failure throws
@@ -31,11 +39,15 @@ import { InvokeProcedureUseCase } from "../procedure/InvokeProcedureUseCase.js";
  * `Trigger.errorPolicy: 'abort'` on after_* is parser-rejected, so the
  * use case never has to reconcile that combination.
  */
+export type InvokeProcedureFn = (
+  request: InvokeProcedureRequest,
+) => Promise<InvokeProcedureResponse>;
+
 export class RunLifecycleHooksUseCase implements LifecycleHookRunner {
   constructor(
     private readonly triggers: TriggerIndex,
     private readonly proceduresByName: ReadonlyMap<string, ProcedureManifest>,
-    private readonly invoke: InvokeProcedureUseCase,
+    private readonly invoke: InvokeProcedureFn,
   ) {}
 
   async run(request: RunLifecycleHookRequest): Promise<void> {
@@ -81,9 +93,9 @@ export class RunLifecycleHooksUseCase implements LifecycleHookRunner {
     const policy = declared ?? (isBefore ? "abort" : "continue");
 
     const input = request.originalInput ?? request.entry?.data ?? {};
-    let result: Awaited<ReturnType<InvokeProcedureUseCase["execute"]>>;
+    let result: InvokeProcedureResponse;
     try {
-      result = await this.invoke.execute({
+      result = await this.invoke({
         procedure,
         input,
         ctx: ctxWithEvent,
