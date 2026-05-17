@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { injectPreviewBanner } from "../src/domain/service/PreviewBanner.js";
+import {
+  defaultPreviewBanner,
+  injectPreviewBanner,
+} from "../src/domain/service/PreviewBanner.js";
 
 describe("injectPreviewBanner", () => {
   it("inserts the banner immediately after <body>", () => {
@@ -16,5 +19,26 @@ describe("injectPreviewBanner", () => {
   it("returns input unchanged when no body tag exists", () => {
     const html = injectPreviewBanner("<div>fragment</div>", "<div>P</div>");
     expect(html).toBe("<div>fragment</div>");
+  });
+});
+
+describe("defaultPreviewBanner", () => {
+  it("interpolates status and slug into the default markup", () => {
+    expect(defaultPreviewBanner("draft", "my-post")).toBe(
+      `<div class="preview-banner">Preview · draft · my-post</div>`,
+    );
+  });
+
+  it("escapes HTML in the slug — no reflected XSS via preview", () => {
+    const html = defaultPreviewBanner("draft", `<script>alert(1)</script>`);
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("escapes ampersand, quotes, and apostrophe", () => {
+    const html = defaultPreviewBanner("draft", `"a'b&c"`);
+    expect(html).toContain("&quot;");
+    expect(html).toContain("&#39;");
+    expect(html).toContain("&amp;");
   });
 });

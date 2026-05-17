@@ -5,7 +5,10 @@ import type { PublicPathResolver } from "../../domain/service/PublicPathResolver
 import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
 import { joinParentIfTranslation } from "../../domain/service/JoinedEntryReader.js";
 import { renderEntryHtml } from "../../domain/service/HtmlRenderer.js";
-import { injectPreviewBanner } from "../../domain/service/PreviewBanner.js";
+import {
+  defaultPreviewBanner,
+  injectPreviewBanner,
+} from "../../domain/service/PreviewBanner.js";
 import type { PreviewEntryRequest } from "../dto/render/PreviewEntryRequest.js";
 import {
   composeSeoIfPathed,
@@ -65,9 +68,7 @@ export class PreviewEntryUseCase {
       seo,
     });
     if (html === null) return null;
-    const banner =
-      request.banner ??
-      `<div class="preview-banner">Preview · ${entry.status} · ${request.slug}</div>`;
+    const banner = request.banner ?? defaultPreviewBanner(entry.status, request.slug);
     return injectPreviewBanner(html, banner);
   }
 }

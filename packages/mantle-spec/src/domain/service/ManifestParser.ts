@@ -334,6 +334,9 @@ function validateViewSpec(m: ViewManifest, idx: number): ViewManifest {
   if (typeof s["from"] !== "string" || (s["from"] as string).length === 0) {
     throw new ManifestParseError("View.spec.from is required (non-empty string)", idx, "/spec/from");
   }
+  if ("requires" in s && s["requires"] != null) {
+    validateRequires(s["requires"], idx, "View");
+  }
   let paramSchema: JsonSchema | undefined;
   if ("params" in s && s["params"] != null) {
     paramSchema = validateViewParams(s["params"], idx);
@@ -513,7 +516,7 @@ function validateProcedureSpec(m: ProcedureManifest, idx: number): ProcedureMani
   }
   validateHandlerBinding(handler, idx);
   if ("requires" in s && s["requires"] != null) {
-    validateRequires(s["requires"], idx);
+    validateRequires(s["requires"], idx, "Procedure");
   }
   for (const draft of ["errors", "retry", "idempotency"] as const) {
     if (draft in s) {
@@ -578,15 +581,17 @@ function validateHandlerBinding(h: Record<string, unknown>, idx: number): void {
   }
 }
 
-function validateRequires(req: unknown, idx: number): void {
+function validateRequires(req: unknown, idx: number, atom: "Procedure" | "View"): void {
   if (typeof req !== "object" || req === null) {
-    throw new ManifestParseError("Procedure.spec.requires must be an object", idx);
+    throw new ManifestParseError(`${atom}.spec.requires must be an object`, idx);
   }
   const r = req as Record<string, unknown>;
+  // window / quota are Procedure-only DRAFT keys; reject early on both
+  // atoms so a misplaced key surfaces with a clear diagnostic.
   for (const draft of ["window", "quota"] as const) {
     if (draft in r) {
       throw new ManifestParseError(
-        `Procedure.spec.requires.${draft} is DRAFT (see ADR-0001 § "What's DRAFT" / Procedure); not supported in v0.1`,
+        `${atom}.spec.requires.${draft} is DRAFT (see ADR-0001 § "What's DRAFT" / Procedure); not supported in v0.1`,
         idx,
         undefined,
         "DRAFT_KEY_USED",
@@ -596,12 +601,12 @@ function validateRequires(req: unknown, idx: number): void {
   if (!("auth" in r) || r["auth"] == null) return;
   const auth = r["auth"];
   if (typeof auth !== "object" || auth === null) {
-    throw new ManifestParseError("Procedure.spec.requires.auth must be an object", idx);
+    throw new ManifestParseError(`${atom}.spec.requires.auth must be an object`, idx);
   }
   const a = auth as Record<string, unknown>;
   if ("any" in a) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth.any is DRAFT; v0.1 supports only `all`",
+      `${atom}.spec.requires.auth.any is DRAFT; v0.1 supports only \`all\``,
       idx,
       undefined,
       "DRAFT_KEY_USED",
@@ -609,19 +614,19 @@ function validateRequires(req: unknown, idx: number): void {
   }
   if (!("all" in a)) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth must declare `all` (v0.1)",
+      `${atom}.spec.requires.auth must declare \`all\` (v0.1)`,
       idx,
     );
   }
   const all = a["all"];
   if (!Array.isArray(all) || all.length === 0) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth.all must be a non-empty array",
+      `${atom}.spec.requires.auth.all must be a non-empty array`,
       idx,
     );
   }
   for (let i = 0; i < all.length; i++) {
-    validateAuthPredicate(all[i], idx, `Procedure.spec.requires.auth.all[${i}]`);
+    validateAuthPredicate(all[i], idx, `${atom}.spec.requires.auth.all[${i}]`);
   }
 }
 
