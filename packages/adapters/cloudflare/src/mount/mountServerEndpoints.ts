@@ -216,23 +216,27 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       caption?: unknown;
       purpose?: unknown;
     };
-    if (typeof body.filename !== "string" || typeof body.mimeType !== "string") {
+    if (
+      typeof body.filename !== "string" ||
+      typeof body.mimeType !== "string" ||
+      typeof body.byteSize !== "number"
+    ) {
       return jsonResponse(400, {
         ok: false,
         diagnostic: runtimeDiagnostic({
           code: "INPUT_VALIDATION_FAILED",
           severity: "error",
           path: `POST ${MEDIA_UPLOADS_PATH}`,
-          expected: "{ filename: string, mimeType: string, byteSize?: number }",
+          expected: "{ filename: string, mimeType: string, byteSize: number }",
         }),
       });
     }
-    const { filename, mimeType } = body;
+    const { filename, mimeType, byteSize } = body;
     return runUseCase(`POST ${MEDIA_UPLOADS_PATH}`, () =>
       media.createUpload.execute({
         filename,
         mimeType,
-        byteSize: typeof body.byteSize === "number" ? body.byteSize : undefined,
+        byteSize,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
         purpose: typeof body.purpose === "string" ? body.purpose : undefined,

@@ -135,7 +135,7 @@ describe("smoke: /admin/api/media/uploads", () => {
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.png", mimeType: "image/png" }),
+      body: JSON.stringify({ filename: "x.png", mimeType: "image/png", byteSize: 100 }),
     });
     expect(res.status).toBe(501);
     const body = (await res.json()) as { diagnostic: { code: string } };
@@ -147,7 +147,7 @@ describe("smoke: /admin/api/media/uploads", () => {
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.png", mimeType: "image/png" }),
+      body: JSON.stringify({ filename: "x.png", mimeType: "image/png", byteSize: 100 }),
     });
     expect(res.status).toBe(401);
   });
@@ -182,12 +182,25 @@ describe("smoke: /admin/api/media/uploads", () => {
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.exe", mimeType: "application/octet-stream" }),
+      body: JSON.stringify({ filename: "x.exe", mimeType: "application/octet-stream", byteSize: 100 }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
     expect(body.ok).toBe(false);
     expect(body.diagnostic.code).toBe("MEDIA_MIME_REJECTED");
+  });
+
+  it("rejects request missing byteSize with INPUT_VALIDATION_FAILED (mandatory ceiling check)", async () => {
+    const h = harness({ withMedia: true, auth: staffAuth() });
+    const res = await h.app.request("/admin/api/media/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ filename: "x.png", mimeType: "image/png" }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
+    expect(body.ok).toBe(false);
+    expect(body.diagnostic.code).toBe("INPUT_VALIDATION_FAILED");
   });
 
   it("commit returns MEDIA_UPLOAD_EXPIRED when the uploadId has no KV record", async () => {

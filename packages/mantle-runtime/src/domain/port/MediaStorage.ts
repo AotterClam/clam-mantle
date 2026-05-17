@@ -42,7 +42,10 @@ export interface MediaStorage {
 export interface CreateUploadArgs {
   readonly filename: string;
   readonly mimeType: string;
-  readonly byteSize?: number;
+  /** Already checked against `maxBytes` by the use case. Adapters may
+   *  forward it as a `Content-Length` constraint when the backend
+   *  supports it. */
+  readonly byteSize: number;
   readonly maxBytes: number;
   readonly purpose?: string;
   readonly now: number;
@@ -61,10 +64,22 @@ export interface CreateUploadResult {
   readonly publicUrl?: string;
 }
 
+/**
+ * Adapter contract: before returning `MediaAsset`, verify the stored
+ * object's actual content-type against `expectedMimeType` and actual
+ * byte size against `maxBytes`. The use case only validates caller-
+ * declared MIME, not the bytes that landed in storage — without
+ * adapter-side verification, a caller can declare `image/png` and PUT
+ * a PDF. Mismatch → throw `DiagnosticError(MEDIA_MIME_REJECTED)` or
+ * `MEDIA_SIZE_EXCEEDED`. (Use whichever metadata primitive the
+ * backend exposes: R2 / S3 `head()`, filesystem `stat()`.)
+ */
 export interface CommitUploadArgs {
   readonly uploadId: string;
   readonly storageKey: string;
+  /** Adapter must verify stored object's actual content-type matches. */
   readonly expectedMimeType: string;
+  /** Adapter must verify stored object's actual byte size ≤ this. */
   readonly maxBytes: number;
   readonly alt?: string;
   readonly caption?: string;

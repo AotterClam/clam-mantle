@@ -48,12 +48,12 @@ export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
       properties: {
         filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
         mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
-        byteSize: { type: "number", description: "Optional. When provided, enforced in the signed PUT and at commit." },
+        byteSize: { type: "number", description: "Required. Caller-supplied byte size — enforced against the per-runtime byte ceiling before a presigned URL is minted." },
         alt: { type: "string" },
         caption: { type: "string" },
         purpose: { type: "string", description: "Optional purpose tag (e.g. 'post-cover')." },
       },
-      required: ["filename", "mimeType"],
+      required: ["filename", "mimeType", "byteSize"],
     },
   },
   {
