@@ -191,6 +191,22 @@ describe("check()", () => {
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).toContain("TRANSLATES_PARENT_UNKNOWN");
   });
+
+  it("reports every duplicate past the first, not just the 2nd (#210 PR12 H1)", () => {
+    // Regression: checkDuplicates used `c === 2`, so triplicates
+    // silently dropped the 3rd copy. Now `c >= 2` so every copy past
+    // the first surfaces its own diagnostic.
+    const manifests: Manifest[] = [
+      schema("posts"),
+      schema("posts"),
+      schema("posts"),
+      schema("posts"),
+      procedure("createPost"),
+    ];
+    const result = check({ manifests });
+    const dups = result.diagnostics.filter((d) => d.code === "DUPLICATE_NAME");
+    expect(dups).toHaveLength(3); // copies 2, 3, 4
+  });
 });
 
 describe("parseManifests() (envelope-shape errors return diagnostics)", () => {

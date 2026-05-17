@@ -1,4 +1,5 @@
 import {
+  canTransition,
   DiagnosticError,
   runtimeDiagnostic,
   type SchemaManifest,
@@ -10,7 +11,7 @@ import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { IdGenerator } from "../../domain/port/IdGenerator.js";
 import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 import { projectAndStamp } from "../../domain/service/BuiltinProjector.js";
-import { assertEntryWritable } from "../content/EntryWriteGuards.js";
+import { assertEntryWritable } from "../../domain/service/io/EntryWriteGuard.js";
 import type { InvokeBuiltinRequest } from "../dto/procedure/index.js";
 
 /**
@@ -195,11 +196,38 @@ export class InvokeBuiltinUseCase {
     now: number,
   ): Promise<EntryRow> {
     const id = requireField(input, "id", "string");
-    const expectedVersion = requireField(input, "expectedVersion", "number");
+    const existing = await this.entries.get(id);
+    if (!existing) {
+      throw new DiagnosticError(
+        runtimeDiagnostic({
+          code: "NOT_FOUND",
+          severity: "error",
+          path: `builtin:archive/${schema.metadata.name}/${id}`,
+          value: id,
+          expected: "id of an existing entry",
+          message: `Entry not found: ${id}.`,
+        }),
+      );
+    }
+    // Mirror ArchiveUseCase: state-machine guard + OCC pinned to the
+    // version we just read so guard and chokepoint check the same
+    // snapshot.
+    if (!canTransition(schema, existing.status, "archived")) {
+      throw new DiagnosticError(
+        runtimeDiagnostic({
+          code: "CONFLICT",
+          severity: "error",
+          path: `builtin:archive/${schema.metadata.name}/${id}`,
+          value: existing.status,
+          expected: "row in a state that allows transition to 'archived'",
+          message: `Illegal transition from '${existing.status}' to 'archived'.`,
+        }),
+      );
+    }
     return this.entries.archive({
       id,
       collection: schema.metadata.name,
-      expectedVersion,
+      expectedVersion: existing.version,
       now,
       hookContext: ctx,
       originalInput: input,

@@ -74,9 +74,14 @@ export function buildDdl(manifest: SchemaManifest): DdlStatements {
       return cn;
     });
     const ixName = `uq_${collection}__${fields.map((f) => f.replace(/\./g, "_")).join("__")}`;
+    // Partial index must require EVERY column be non-NULL; guarding
+    // only cols[0] meant rows with mixed-NULL composites silently
+    // collided as duplicates of (col0, NULL) — uniqueness weaker than
+    // declared.
+    const notNullClause = cols.map((c) => `${c} IS NOT NULL`).join(" AND ");
     createIndexes.push(
       `CREATE UNIQUE INDEX IF NOT EXISTS ${ixName} ON entries(${cols.join(", ")})` +
-        ` WHERE ${cols[0]} IS NOT NULL`,
+        ` WHERE ${notNullClause}`,
     );
     indexNames.push(ixName);
   }

@@ -31,6 +31,9 @@ export type {
   ArchiveEntryArgs,
   TransitionStatusArgs,
   ListEntriesArgs,
+  ListEntriesResult,
+  FindEntryByDataFieldArgs,
+  FindEntryByDataFieldsArgs,
   MutationHookFields,
 } from "./EntryRepository.js";
 export type { SiteConfigRepository } from "./SiteConfigRepository.js";

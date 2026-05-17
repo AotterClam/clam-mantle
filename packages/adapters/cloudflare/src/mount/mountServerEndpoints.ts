@@ -52,7 +52,8 @@ export function mountServerEndpoints(
     const viewName = v.metadata.name;
     app.get(`/api/views/${viewName}`, async (c) => {
       const runtime = await ref.get();
-      return handleViewRequest(c.req.raw, runtime, viewName);
+      const waitUntil = readWaitUntil(c);
+      return handleViewRequest(c.req.raw, runtime, viewName, ref.auth, waitUntil);
     });
   }
   mountAdminBetterAuth(app, ref, ref.auth);
@@ -343,6 +344,8 @@ async function handleViewRequest(
   req: Request,
   runtime: CmsRuntime,
   viewName: string,
+  auth: Auth,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<Response> {
   const view = runtime.viewsByName.get(viewName);
   if (!view) {
@@ -374,10 +377,18 @@ async function handleViewRequest(
     throw err;
   }
 
+  // Build caller ctx from the Better Auth cookie session so that
+  // `ExecuteViewUseCase` can evaluate `requires.auth.all`. Anonymous
+  // callers get a guest ctx (user/staff null) — the use case rejects
+  // with UNAUTHENTICATED when requires.auth is present and ctx lacks
+  // identity; it skips the check when requires.auth is absent.
+  const ctx = await buildViewCtx(req, auth, waitUntil);
+
   const result = await runtime.executeView.execute({
     view,
     pathPrefix: viewPath,
     options: { params, page, show },
+    ctx,
   });
 
   if (result.ok) {
@@ -385,6 +396,21 @@ async function handleViewRequest(
   }
   const status = HTTP_STATUS_BY_CODE[result.diagnostic.code] ?? 500;
   return jsonResponse(status, { ok: false, diagnostic: result.diagnostic });
+}
+
+async function buildViewCtx(
+  req: Request,
+  auth: Auth,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
+): Promise<HandlerContext> {
+  const wu = waitUntil ? { waitUntil } : {};
+  const session = await auth.getSession(req);
+  if (!session) return { user: null, staff: null, env: {}, ...wu };
+  const role = await auth.getUserRole(session.user.id);
+  const staff = role && ADMIN_ROLE_SET.has(role)
+    ? { id: session.user.id, role: role as AdminRole }
+    : null;
+  return { user: { id: session.user.id }, staff, env: {}, ...wu };
 }
 
 function parsePositiveInt(raw: string | null): number | undefined {

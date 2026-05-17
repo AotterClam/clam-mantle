@@ -28,7 +28,11 @@ export class CommitMediaUploadUseCase {
       throw new DiagnosticError(mediaUploadExpiredDiagnostic(opPath, request.uploadId));
     }
     const record = JSON.parse(raw) as PendingUploadRecord;
-    const maxBytes = this.opts.maxBytes ?? DEFAULT_MAX_BYTES;
+    const adapterCap = this.opts.maxBytes ?? DEFAULT_MAX_BYTES;
+    // Per-upload ceiling: tighter of (caller-declared at create) vs
+    // (adapter-wide cap). Defends against an adapter that accepted a
+    // larger PUT than the use case minted the URL for.
+    const maxBytes = Math.min(adapterCap, record.expectedSize);
 
     const asset = await this.storage.commitUpload({
       uploadId: request.uploadId,
