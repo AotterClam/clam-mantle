@@ -15,18 +15,40 @@ export function matchPath(
   triggerPath: string,
   requestPath: string,
 ): Record<string, string> | null {
-  const tParts = triggerPath.split("/");
-  const rParts = requestPath.split("/");
+  // `/api/posts` and `/api/posts/` are the same resource; without
+  // normalization the trailing-slash side gains an empty segment and
+  // segment-count alone defeats the match.
+  const tParts = stripTrailingSlash(triggerPath).split("/");
+  const rParts = stripTrailingSlash(requestPath).split("/");
   if (tParts.length !== rParts.length) return null;
   const params: Record<string, string> = {};
   for (let i = 0; i < tParts.length; i++) {
     const t = tParts[i]!;
     const r = rParts[i]!;
+    // decodeURIComponent throws URIError on malformed encoding
+    // (e.g. `%GG`); surface as a routing miss, not a 500.
+    const decoded = safeDecode(r);
+    if (decoded === null) return null;
     if (t.startsWith("{") && t.endsWith("}")) {
-      params[t.slice(1, -1)] = decodeURIComponent(r);
-    } else if (t !== r) {
+      params[t.slice(1, -1)] = decoded;
+    } else if (t !== decoded) {
+      // Decode literals too so `/api/by%2Dtag` matches trigger
+      // `/api/by-tag` (percent-encoded equivalent of the same byte).
       return null;
     }
   }
   return params;
+}
+
+function safeDecode(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
+// Preserve root "/" — only strip when length > 1.
+function stripTrailingSlash(p: string): string {
+  return p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
 }
