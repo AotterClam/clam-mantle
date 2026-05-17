@@ -44,7 +44,12 @@ export function createMcpApiHandler(
   options: CreateMcpApiHandlerOptions,
 ): ExportedHandler<Record<string, unknown>> {
   const { ref, surface } = options;
-  let dispatcher: McpJsonRpcDispatcher | null = null;
+  // Key the cached dispatcher to the runtime identity. Without this,
+  // if `ref.get()` rejects + resets and the next call returns a new
+  // runtime instance, the cached dispatcher would silently keep
+  // pointing at the pre-reset use-cases. A WeakMap also lets the GC
+  // reclaim the dispatcher if the runtime is replaced.
+  const dispatcherCache = new WeakMap<object, McpJsonRpcDispatcher>();
 
   return {
     async fetch(request, _env, ctx) {
@@ -55,30 +60,34 @@ export function createMcpApiHandler(
         return forbidden();
       }
       const runtime = await ref.get();
-      dispatcher ??= new McpJsonRpcDispatcher(
-        {
-          listEntries: runtime.listEntries,
-          getEntry: runtime.getEntry,
-          createDraft: runtime.createDraft,
-          updateDraft: runtime.updateDraft,
-          requestPublish: runtime.requestPublish,
-          unpublish: runtime.unpublish,
-          archive: runtime.archive,
-          deleteEntry: runtime.deleteEntry,
-          executeView: runtime.executeView,
-          media: runtime.media
-            ? {
-                createUpload: runtime.media.createUpload,
-                commitUpload: runtime.media.commitUpload,
-              }
-            : undefined,
-        },
-        [...runtime.schemasByName.values()],
-        {
-          surface,
-          views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
-        },
-      );
+      let dispatcher = dispatcherCache.get(runtime);
+      if (!dispatcher) {
+        dispatcher = new McpJsonRpcDispatcher(
+          {
+            listEntries: runtime.listEntries,
+            getEntry: runtime.getEntry,
+            createDraft: runtime.createDraft,
+            updateDraft: runtime.updateDraft,
+            requestPublish: runtime.requestPublish,
+            unpublish: runtime.unpublish,
+            archive: runtime.archive,
+            deleteEntry: runtime.deleteEntry,
+            executeView: runtime.executeView,
+            media: runtime.media
+              ? {
+                  createUpload: runtime.media.createUpload,
+                  commitUpload: runtime.media.commitUpload,
+                }
+              : undefined,
+          },
+          [...runtime.schemasByName.values()],
+          {
+            surface,
+            views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
+          },
+        );
+        dispatcherCache.set(runtime, dispatcher);
+      }
       return dispatcher.dispatch(request, {
         userId: props.userId,
         staff: role && ADMIN_ROLE_SET.has(role)

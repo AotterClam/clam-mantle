@@ -12,13 +12,32 @@
  * mean?" suggestions in `TRIGGER_TARGET_PROCEDURE_UNKNOWN`,
  * `VIEW_FROM_UNKNOWN_SCHEMA`, etc.
  */
+/** Per-manifest source location surfaced by the CLI loader. */
+export interface ManifestSourceLocation {
+  readonly file: string;
+  readonly docIndex: number;
+}
+
+/**
+ * Multi-occurrence file-paths map: each `kind/name` key holds an
+ * ordered list of source locations (length > 1 when the same name
+ * appears in multiple YAML docs/files, which is itself a
+ * DUPLICATE_NAME error but the locations need to remain individually
+ * addressable so duplicate diagnostics point at the right copies).
+ */
+export type ManifestFilePaths = ReadonlyMap<string, readonly ManifestSourceLocation[]>;
+
 export function manifestPath(
   kind: string,
   name: string,
   jsonPointer: string,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
+  /** 1-based occurrence index when the name has multiple file
+   *  locations (duplicate manifests). Defaults to 1 (first copy). */
+  occurrence: number = 1,
 ): string {
-  const fp = filePaths?.get(`${kind}/${name}`);
+  const locations = filePaths?.get(`${kind}/${name}`);
+  const fp = locations?.[Math.max(0, occurrence - 1)] ?? locations?.[0];
   if (fp) return `${fp.file}#/${fp.docIndex}${jsonPointer}`;
   return `manifest:${kind}/${name}#${jsonPointer}`;
 }

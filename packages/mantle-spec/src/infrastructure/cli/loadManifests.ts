@@ -20,14 +20,22 @@ import {
 export interface LoadManifestsResult {
   readonly manifests: Manifest[];
   readonly parseErrors: Diagnostic[];
-  readonly filePaths: Map<string, { file: string; docIndex: number }>;
+  /** `kind/name` → ordered list of source locations. Length > 1 when
+   *  the same name appears in multiple YAML docs / files (itself a
+   *  DUPLICATE_NAME error, but the individual file paths need to
+   *  remain addressable so duplicate diagnostics point at the right
+   *  copies — see ManifestPathDiagnoser `occurrence` param). */
+  readonly filePaths: Map<string, { file: string; docIndex: number }[]>;
+  /** Absolute path the loader resolved `rootArg` to; surfaced so
+   *  callers don't re-resolve and risk drift. */
+  readonly root: string;
 }
 
 export async function loadManifestsFromRoot(rootArg: string): Promise<LoadManifestsResult> {
   const root = resolve(cwd(), rootArg);
   const manifests: Manifest[] = [];
   const parseErrors: Diagnostic[] = [];
-  const filePaths = new Map<string, { file: string; docIndex: number }>();
+  const filePaths = new Map<string, { file: string; docIndex: number }[]>();
 
   let entries: string[];
   try {
@@ -42,7 +50,7 @@ export async function loadManifestsFromRoot(rootArg: string): Promise<LoadManife
         message: `Could not read manifest root ${root}: ${err instanceof Error ? err.message : String(err)}`,
       }),
     );
-    return { manifests, parseErrors, filePaths };
+    return { manifests, parseErrors, filePaths, root };
   }
 
   for (const file of entries) {
@@ -65,7 +73,10 @@ export async function loadManifestsFromRoot(rootArg: string): Promise<LoadManife
       parseErrors.push(...parsed.diagnostics);
       parsed.manifests.forEach((m, i) => {
         manifests.push(m);
-        filePaths.set(`${m.kind}/${m.metadata.name}`, { file, docIndex: i });
+        const key = `${m.kind}/${m.metadata.name}`;
+        const list = filePaths.get(key);
+        if (list) list.push({ file, docIndex: i });
+        else filePaths.set(key, [{ file, docIndex: i }]);
       });
     } catch (err) {
       const idx = err instanceof ManifestParseError ? err.docIndex : undefined;
@@ -87,7 +98,7 @@ export async function loadManifestsFromRoot(rootArg: string): Promise<LoadManife
     }
   }
 
-  return { manifests, parseErrors, filePaths };
+  return { manifests, parseErrors, filePaths, root };
 }
 
 async function collectYamlFiles(root: string): Promise<string[]> {
