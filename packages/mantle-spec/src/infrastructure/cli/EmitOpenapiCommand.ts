@@ -6,6 +6,7 @@ export interface EmitOpenapiArgs {
   readonly manifests: string;
   readonly title: string;
   readonly version: string;
+  readonly sessionCookieName?: string;
 }
 
 export type ParseResult = { kind: "args"; args: EmitOpenapiArgs } | { kind: "help" };
@@ -14,17 +15,19 @@ export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
   let manifests = "./manifests";
   let title = "mantle";
   let version = "0.1.0";
+  let sessionCookieName: string | undefined;
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
     if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
     else if (a === "--title") title = rawArgs[++i] ?? title;
     else if (a === "--version") version = rawArgs[++i] ?? version;
+    else if (a === "--session-cookie-name") sessionCookieName = rawArgs[++i];
     else if (a === "--help" || a === "-h") return { kind: "help" };
     else if (a !== undefined) {
       throw new Error(`Unknown argument: ${a}`);
     }
   }
-  return { kind: "args", args: { manifests, title, version } };
+  return { kind: "args", args: { manifests, title, version, sessionCookieName } };
 }
 
 function printHelp(): void {
@@ -33,10 +36,17 @@ function printHelp(): void {
 Usage: mantle emit-openapi [options] > openapi.json
 
 Options:
-  --manifests <dir>   Manifest root (default: ./manifests)
-  --title <str>       OpenAPI info.title (default: mantle)
-  --version <str>     OpenAPI info.version (default: 0.1.0)
-  -h, --help          This help
+  --manifests <dir>            Manifest root (default: ./manifests)
+  --title <str>                OpenAPI info.title (default: mantle)
+  --version <str>              OpenAPI info.version (default: 0.1.0)
+  --session-cookie-name <str>  Better Auth session-cookie name used
+                               in the cookieAuth security scheme for
+                               auth-gated Views. Default
+                               '__Secure-better-auth.session_token'
+                               (production, HTTPS); pass
+                               'better-auth.session_token' for local
+                               non-secure deploys.
+  -h, --help                   This help
 
 Output: OpenAPI 3.1 JSON on stdout.
 
@@ -67,6 +77,7 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
     manifests,
     title: args.title,
     version: args.version,
+    sessionCookieName: args.sessionCookieName,
   });
   stdout.write(JSON.stringify(document, null, 2) + "\n");
   return 0;

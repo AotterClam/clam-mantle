@@ -116,6 +116,88 @@ describe("EmitOpenapiUseCase", () => {
     expect(names).toEqual(["page", "show", "locale"]);
     expect(params.find((p) => p.name === "locale")?.required).toBe(true);
   });
+
+  it("auth-gated View emits security[bearer] + 401/403 responses (#210 PR16 / codex CX4)", () => {
+    const gated = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: posts }
+spec:
+  title: Posts
+  schema: { type: object, properties: { slug: { type: string } } }
+---
+apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: privatePosts }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [ctx.user]
+`);
+    expect(gated.diagnostics).toEqual([]);
+    const { document } = EmitOpenapiUseCase.run({
+      manifests: gated.manifests,
+      title: "Test",
+      version: "0.1.0",
+    });
+    const paths = document["paths"] as Record<string, Record<string, Record<string, unknown>>>;
+    const op = paths["/api/views/privatePosts"]!.get!;
+    // Views use cookie auth (Better Auth session), not bearer —
+    // bearer is for Procedure MCP/HTTP-Trigger surface.
+    expect(op["security"]).toEqual([{ cookieAuth: [] }]);
+    const responses = op["responses"] as Record<string, unknown>;
+    expect(responses["401"]).toBeDefined();
+    expect(responses["403"]).toBeDefined();
+    // Verify the cookieAuth scheme is registered in components with
+    // the secure production cookie name by default.
+    const schemes = (document["components"] as { securitySchemes: Record<string, unknown> }).securitySchemes;
+    expect(schemes["cookieAuth"]).toEqual({
+      type: "apiKey",
+      in: "cookie",
+      name: "__Secure-better-auth.session_token",
+    });
+  });
+
+  it("cookieAuth name can be overridden via sessionCookieName (local/non-secure deploys)", () => {
+    const gated = parseManifests(`apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: posts }
+spec:
+  title: Posts
+  schema: { type: object, properties: { slug: { type: string } } }
+---
+apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: localPrivate }
+spec:
+  from: posts
+  requires: { auth: { all: [ctx.user] } }
+`);
+    const { document } = EmitOpenapiUseCase.run({
+      manifests: gated.manifests,
+      title: "Test",
+      version: "0.1.0",
+      sessionCookieName: "better-auth.session_token",
+    });
+    const schemes = (document["components"] as { securitySchemes: Record<string, unknown> }).securitySchemes;
+    expect((schemes["cookieAuth"] as Record<string, unknown>)["name"]).toBe(
+      "better-auth.session_token",
+    );
+  });
+
+  it("public View emits no security + no 401/403 (no auth declared)", () => {
+    const { document } = EmitOpenapiUseCase.run({
+      manifests: fixture(),
+      title: "Test",
+      version: "0.1.0",
+    });
+    const paths = document["paths"] as Record<string, Record<string, Record<string, unknown>>>;
+    const op = paths["/api/views/posts-by-locale"]!.get!;
+    expect(op["security"]).toBeUndefined();
+    const responses = op["responses"] as Record<string, unknown>;
+    expect(responses["401"]).toBeUndefined();
+    expect(responses["403"]).toBeUndefined();
+  });
 });
 
 describe("EmitTypesUseCase", () => {
