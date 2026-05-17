@@ -347,6 +347,49 @@ spec:
     const result = parseManifests(yaml);
     expect(result.diagnostics.map((d) => d.code)).toContain("DRAFT_KEY_USED");
   });
+
+  it("rejects View.requires.auth.all with a non-STAFF_ROLES role (parser-level)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: vStaff }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+});
+
+describe("parseManifests() — YAML alias-bomb regression (#210 H4)", () => {
+  it("surfaces an INVALID_MANIFEST_ENVELOPE diagnostic on exponentially-expanding aliases", () => {
+    // Deep nested aliases: each level multiplies the expansion 10x.
+    // `maxAliasCount: 100` in ManifestParser triggers the yaml lib's
+    // bail — the parser now catches that throw and converts it to a
+    // structured diagnostic instead of propagating as an uncaught
+    // ReferenceError.
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: bombed }
+spec:
+  title: Bombed
+  schema:
+    type: object
+    properties:
+      a: &a {x: 1}
+      l1: &l1 [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]
+      l2: &l2 [*l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1]
+      l3: &l3 [*l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2]
+      l4: &l4 [*l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3]
+      l5: [*l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4]
+`;
+    const result = parseManifests(yaml);
+    expect(result.manifests).toHaveLength(0);
+    expect(result.diagnostics.map((d) => d.code)).toContain("INVALID_MANIFEST_ENVELOPE");
+    expect(result.diagnostics[0]?.message).toMatch(/alias/i);
+  });
 });
 
 describe("parseManifests() — View.params + filter param-ref grammar (v0.1.0)", () => {

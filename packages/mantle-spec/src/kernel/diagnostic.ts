@@ -14,19 +14,17 @@
 export type Phase = "validate" | "test" | "boot" | "runtime";
 
 /**
- * The full catalog of diagnostic codes the SDK emits across all
- * phases. Per ADR-0008, spec **defines** the catalog (this union);
- * runtime / cli / adapters **emit** them. Codes in the cross-phase
- * and runtime-only sections below are not raised by spec source —
- * they live here because the catalog is the public contract, not the
- * union of what spec happens to throw today. Adding a new code is a
- * grammar-revise event (ADR-0001 § Future grammar discipline).
- */
-/**
- * Closed catalog of diagnostic codes. Single source of truth: the
- * runtime array drives `DiagnosticCode` (type) and `isDiagnosticCode`
- * (guard), so adding a code is one edit and `parseWireDiagnostic`
- * stays in sync automatically.
+ * Closed catalog of diagnostic codes the SDK emits across all phases.
+ * Per ADR-0008, spec **defines** the catalog; runtime / cli / adapters
+ * **emit** them. Codes in the cross-phase and runtime-only sections
+ * below are not raised by spec source — they live here because the
+ * catalog is the public contract, not the union of what spec happens
+ * to throw today. Adding a new code is a grammar-revise event
+ * (ADR-0001 § Future grammar discipline).
+ *
+ * Single source of truth: the const array drives `DiagnosticCode`
+ * (type) and `isDiagnosticCode` (guard), so adding a code is one
+ * edit and `parseWireDiagnostic` stays in sync automatically.
  */
 export const DIAGNOSTIC_CODES = [
   // Validate-only.
