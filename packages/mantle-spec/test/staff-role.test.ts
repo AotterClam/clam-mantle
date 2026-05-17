@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   STAFF_ROLES,
   isStaffRole,
-  meetsRole,
 } from "../src/domain/model/ManifestGrammar.js";
+import { meetsRole } from "../src/domain/service/StaffRoleHierarchy.js";
 
 describe("STAFF_ROLES closed enum", () => {
   it("locks the v0.1 role vocabulary", () => {

@@ -14,7 +14,7 @@ import {
   notFoundDiagnostic,
   withConflictDiagnostic,
 } from "./diagnostics.js";
-import { assertEntryWritable } from "./EntryWriteGuards.js";
+import { assertEntryWritable } from "../../domain/service/io/EntryWriteGuard.js";
 
 /**
  * `UpdateDraftUseCase` — update a draft's data. Only entries in

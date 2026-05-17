@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotterclam/mantle-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
+import type { Auth } from "../src/auth/createAuth.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
@@ -181,5 +182,77 @@ describe("GET /api/views/<name>", () => {
     const h = harness();
     const res = await h.app.request("/api/views/doesNotExist");
     expect(res.status).toBe(404);
+  });
+
+  it("auth-gated View on HTTP route plumbs ctx — passes when staff session is present (#210 PR12 C1)", async () => {
+    // The route must build a HandlerContext from the Better Auth
+    // cookie session and forward it as ExecuteViewRequest.ctx, else
+    // every auth-gated View returns UNAUTHENTICATED for every caller.
+    // We validate the plumbing here by registering an auth-gated View
+    // and a staff session; the view should resolve.
+    const ownerAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Staff", role: "owner", githubLogin: null },
+      }),
+      getUserRole: async () => "owner",
+      methods: [],
+    };
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.clam.ai/v1",
+        kind: "View",
+        metadata: { name: "staffOnly" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    db.entries.set("p1", row("p1", { slug: "hi", locale: "en" }));
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: ownerAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffOnly");
+    expect(res.status).toBe(200);
+  });
+
+  it("auth-gated View on HTTP route rejects with UNAUTHENTICATED when no session", async () => {
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.clam.ai/v1",
+        kind: "View",
+        metadata: { name: "staffOnly2" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: stubAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffOnly2");
+    const body = await res.json() as { ok: boolean; diagnostic?: { code: string } };
+    expect(body.ok).toBe(false);
+    // No staff session + requires set → predicate fails → AUTH_DENIED
+    // (anonymous ctx with user: null causes the predicate to fail
+    // before the missing-ctx branch fires).
+    expect(["UNAUTHENTICATED", "AUTH_DENIED"]).toContain(body.diagnostic?.code);
   });
 });

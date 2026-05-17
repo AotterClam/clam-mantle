@@ -24,12 +24,29 @@ describe("buildDdl", () => {
   });
 
   it("rejects an unsafe collection name (SQL injection guard)", () => {
-    // Regression: collection was interpolated verbatim into the CASE
-    // WHEN literal at SchemaDdlEmitter.ts:69 without going through
-    // safeIdent. The buildDdl entry point now validates the manifest
-    // name itself so the string-literal interpolation is safe.
     expect(() => buildDdl(baseManifest("foo'; DROP TABLE entries; --"))).toThrow(
       /unsafe collection identifier/,
+    );
+  });
+
+  it("composite unique index guards every column as NOT NULL (not just the first)", () => {
+    // Regression: prior `WHERE cols[0] IS NOT NULL` let rows with
+    // mixed-NULL composites silently collide as (col0, NULL).
+    const manifest: SchemaManifest = {
+      apiVersion: "cms.clam.ai/v1",
+      kind: "Schema",
+      metadata: { name: "translations" },
+      spec: {
+        schema: {
+          type: "object",
+          properties: { locale: { type: "string" }, slug: { type: "string" } },
+        },
+        uniqueIndexes: [["locale", "slug"]],
+      },
+    };
+    const ddl = buildDdl(manifest);
+    expect(ddl.createIndexes[0]).toMatch(
+      /WHERE translations__locale IS NOT NULL AND translations__slug IS NOT NULL/,
     );
   });
 });

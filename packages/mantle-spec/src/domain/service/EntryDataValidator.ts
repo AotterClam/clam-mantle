@@ -78,6 +78,9 @@ export class EntryDataValidator {
   }
 }
 
-/** Backwards-compatible alias for the v0.1.0 import name. Will be
- *  dropped once consumers migrate to `EntryDataValidator`. */
+/**
+ * @deprecated Use {@link EntryDataValidator} directly. Kept as an
+ *  alias for v0.1.0 import-name backwards-compat; will be removed in
+ *  v0.2.
+ */
 export { EntryDataValidator as SchemaValidator };

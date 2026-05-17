@@ -177,6 +177,10 @@ export class McpJsonRpcDispatcher {
       if (!viewSegment) return UNKNOWN_TOOL;
       const view = this.viewBySegment.get(viewSegment);
       if (!view || !this.useCases.executeView) return UNKNOWN_TOOL;
+      // Build ctx from the bearer-derived McpAuthContext so the
+      // executeView use case can evaluate `requires.auth.all`. Without
+      // this, every auth-gated public-surface View returned
+      // UNAUTHENTICATED for every caller including authenticated staff.
       const result = await this.useCases.executeView.execute({
         view,
         options: {
@@ -185,6 +189,13 @@ export class McpJsonRpcDispatcher {
           show: typeof args["show"] === "number" ? args["show"] : undefined,
         },
         pathPrefix: `MCP ${name}`,
+        ctx: {
+          user: { id: auth.userId },
+          staff: auth.staff
+            ? { id: auth.staff.userId, role: auth.staff.role }
+            : null,
+          env: {},
+        },
       });
       return result;
     }
@@ -220,6 +231,11 @@ export class McpJsonRpcDispatcher {
         const expected = args["expected_version"];
         if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
         return this.useCases.archive.execute({ id, expectedVersion: expected });
+      }
+      case "delete_entry": {
+        const id = args["id"];
+        if (typeof id !== "string") return MISSING_ARG;
+        return this.useCases.deleteEntry.execute({ id });
       }
       case "create_media_upload": {
         if (!this.useCases.media) return UNKNOWN_TOOL;

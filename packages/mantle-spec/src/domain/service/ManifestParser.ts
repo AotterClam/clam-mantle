@@ -89,6 +89,7 @@ const V01_HANDLER_KINDS: ReadonlySet<string> = new Set(["ref", "builtin"]);
 const V01_BUILTIN_OPS: ReadonlySet<BuiltinOp> = new Set(BUILTIN_OPS);
 const V01_LIFECYCLE_HOOKS: ReadonlySet<LifecycleHook> = new Set(LIFECYCLE_HOOKS);
 const V01_HOOK_ERROR_POLICIES: ReadonlySet<string> = new Set(["abort", "continue"]);
+const DRAFT_FILTER_OPS: ReadonlySet<string> = new Set(["contains", "not", "in", "like"]);
 const V01_LIFECYCLE_MODES: ReadonlySet<string> = new Set(["simple", "editorial"]);
 
 /** Result of `parseManifests`. */
@@ -459,8 +460,7 @@ function validateFilterAst(
     }
     return;
   }
-  const draftOps = new Set(["contains", "not", "in", "like"]);
-  if (draftOps.has(op)) {
+  if (DRAFT_FILTER_OPS.has(op)) {
     throw new ManifestParseError(
       `${path} operator '${op}' is DRAFT (see ADR-0001 § "What's DRAFT" / View); not supported in v0.1`,
       idx,
@@ -656,10 +656,10 @@ function validateAuthPredicate(p: unknown, idx: number, path: string): asserts p
           idx,
         );
       }
-      const unknown = (roles as readonly string[]).find((r) => !isStaffRole(r));
-      if (unknown !== undefined) {
+      const badRole = (roles as readonly string[]).find((r) => !isStaffRole(r));
+      if (badRole !== undefined) {
         throw new ManifestParseError(
-          `${path}: 'ctx.staff' role '${unknown}' is not in STAFF_ROLES (${[...STAFF_ROLES].join(", ")})`,
+          `${path}: 'ctx.staff' role '${badRole}' is not in STAFF_ROLES (${[...STAFF_ROLES].join(", ")})`,
           idx,
           undefined,
           "AUTH_PREDICATE_NOT_IN_ENUM",
