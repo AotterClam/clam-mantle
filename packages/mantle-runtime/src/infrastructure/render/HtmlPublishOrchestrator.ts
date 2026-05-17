@@ -34,9 +34,22 @@ import {
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import {
   composeSeoIfPathed,
-  type ComposeLlmsTxtUseCase,
-  type ComposeEntrySeoMetaUseCase,
-} from "../../usecase/render/index.js";
+  type SeoComposer,
+} from "../../domain/service/EntrySeoSupport.js";
+
+/**
+ * Structural contract of the llms.txt composer the orchestrator
+ * accepts. Kept here (vs. importing the concrete use-case class) so
+ * infrastructure doesn't cross the `infrastructure→usecase` boundary
+ * — the runtime assembly root wires in `ComposeLlmsTxtUseCase`,
+ * which satisfies this shape.
+ */
+export interface LlmsTxtComposer {
+  execute(args: {
+    readonly site: SiteConfig;
+    readonly locale: string | null;
+  }): Promise<string>;
+}
 
 /**
  * `HtmlPublishOrchestrator` — the publish pipeline. Renders + writes
@@ -57,8 +70,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     private readonly db: DatabaseDriver,
     private readonly kv: KvCache,
     private readonly paths: PublicPathResolver | null,
-    private readonly composeSeo: ComposeEntrySeoMetaUseCase,
-    private readonly composeLlmsTxt: ComposeLlmsTxtUseCase,
+    private readonly composeSeo: SeoComposer,
+    private readonly composeLlmsTxt: LlmsTxtComposer,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
   ) {}
 

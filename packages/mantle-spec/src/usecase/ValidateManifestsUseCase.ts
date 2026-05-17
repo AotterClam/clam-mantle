@@ -13,7 +13,11 @@ import {
 } from "../domain/model/ManifestGrammar.js";
 import { partitionManifests } from "../domain/service/ManifestParser.js";
 import { checkLocaleAndTranslates } from "../domain/service/CrossSchemaChecker.js";
-import { bestMatch, manifestPath } from "../domain/service/ManifestPathDiagnoser.js";
+import {
+  bestMatch,
+  manifestPath,
+  type ManifestFilePaths,
+} from "../domain/service/ManifestPathDiagnoser.js";
 import type { ValidateManifestsRequest } from "./dto/ValidateManifestsRequest.js";
 import type { ValidateManifestsResponse } from "./dto/ValidateManifestsResponse.js";
 
@@ -95,35 +99,41 @@ function byName<M extends { metadata: { name: string } }>(arr: ReadonlyArray<M>)
 function checkDuplicates<M extends { kind: string; metadata: { name: string } }>(
   kind: string,
   arr: ReadonlyArray<M>,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
-  const seen = new Map<string, number>();
+  // Two-pass: count duplicates, then emit one diagnostic per
+  // occurrence (including the first). `manifestPath`'s `occurrence`
+  // arg pulls the correct file location per copy so each diagnostic
+  // points at its own source position — not at whichever copy the
+  // loader saw last.
+  const counts = new Map<string, number>();
+  for (const m of arr) {
+    counts.set(m.metadata.name, (counts.get(m.metadata.name) ?? 0) + 1);
+  }
+  const seenIndex = new Map<string, number>();
   const out: Diagnostic[] = [];
   for (const m of arr) {
-    const c = (seen.get(m.metadata.name) ?? 0) + 1;
-    seen.set(m.metadata.name, c);
-    if (c >= 2) {
-      // Was `=== 2`, which silently dropped the 3rd+ duplicate. Every
-      // copy past the first deserves its own diagnostic so the author
-      // sees each offending position rather than just one.
-      out.push(
-        validateDiagnostic({
-          code: "DUPLICATE_NAME",
-          severity: "error",
-          path: manifestPath(kind, m.metadata.name, "/metadata/name", filePaths),
-          value: m.metadata.name,
-          expected: `metadata.name unique within kind ${kind}`,
-          message: `${kind} manifest with duplicate metadata.name '${m.metadata.name}' (copy ${c}).`,
-        }),
-      );
-    }
+    const total = counts.get(m.metadata.name) ?? 0;
+    if (total < 2) continue;
+    const ordinal = (seenIndex.get(m.metadata.name) ?? 0) + 1;
+    seenIndex.set(m.metadata.name, ordinal);
+    out.push(
+      validateDiagnostic({
+        code: "DUPLICATE_NAME",
+        severity: "error",
+        path: manifestPath(kind, m.metadata.name, "/metadata/name", filePaths, ordinal),
+        value: m.metadata.name,
+        expected: `metadata.name unique within kind ${kind}`,
+        message: `${kind} manifest '${m.metadata.name}' is duplicated (occurrence ${ordinal} of ${total}).`,
+      }),
+    );
   }
   return out;
 }
 
 function checkSchemaInternals(
   s: SchemaManifest,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
   const schema = s.spec.schema as { properties?: Record<string, unknown> };
@@ -185,7 +195,7 @@ function checkSchemaInternals(
 function checkViewRefs(
   v: ViewManifest,
   schemasByName: ReadonlyMap<string, SchemaManifest>,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
   const fromName = v.spec.from;
@@ -275,7 +285,7 @@ function checkFilterFields(
   viewName: string,
   schemaName: string,
   jsonPointer: string,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   if ("eq" in node) {
     if (!validFields.has(node.eq.field)) {
@@ -307,7 +317,7 @@ function checkFilterFields(
 function checkBuiltinHandler(
   p: ProcedureManifest,
   schemasByName: ReadonlyMap<string, SchemaManifest>,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   const h = p.spec.handler;
   if (h.kind !== "builtin") return [];
@@ -349,7 +359,7 @@ function checkBuiltinHandler(
 
 function checkProcedureAuth(
   p: ProcedureManifest,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
   const all = p.spec.requires?.auth?.all;
@@ -395,7 +405,7 @@ function isValidPredicate(p: unknown): p is AuthPredicate {
 function checkTriggerRefs(
   triggers: ReadonlyArray<TriggerManifest>,
   proceduresByName: ReadonlyMap<string, ProcedureManifest>,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
   schemasByName?: ReadonlyMap<string, SchemaManifest>,
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
@@ -480,7 +490,7 @@ function checkTriggerRefs(
 function checkHandlerRefsInSource(
   procedures: ReadonlyArray<ProcedureManifest>,
   source: string,
-  filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>,
+  filePaths?: ManifestFilePaths,
 ): Diagnostic[] {
   const out: Diagnostic[] = [];
   for (const p of procedures) {
@@ -510,8 +520,9 @@ function checkHandlerRefsInSource(
 }
 
 /**
- * Backwards-compatible function alias for the v0.1.0 import name.
- * Will be dropped once consumers migrate to `ValidateManifestsUseCase`.
+ * @deprecated Use {@link ValidateManifestsUseCase.run} instead.
+ *  Backwards-compat alias for the v0.1.0 import name; will be removed
+ *  in v0.2.
  */
 export function check(request: ValidateManifestsRequest): ValidateManifestsResponse {
   return ValidateManifestsUseCase.run(request);

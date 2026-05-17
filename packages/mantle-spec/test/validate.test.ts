@@ -192,10 +192,13 @@ describe("check()", () => {
     expect(codes).toContain("TRANSLATES_PARENT_UNKNOWN");
   });
 
-  it("reports every duplicate past the first, not just the 2nd (#210 PR12 H1)", () => {
-    // Regression: checkDuplicates used `c === 2`, so triplicates
-    // silently dropped the 3rd copy. Now `c >= 2` so every copy past
-    // the first surfaces its own diagnostic.
+  it("reports every duplicate including the original (#210 PR12 H1 + PR17 first-copy fix)", () => {
+    // Regression history:
+    //  - original: `c === 2` (silent on 3rd+ copy)
+    //  - PR12: `c >= 2` (flags 2nd, 3rd, 4th — but author still
+    //    can't locate the canonical first copy)
+    //  - PR17: two-pass — flag every occurrence including the first,
+    //    so the author sees every offending position.
     const manifests: Manifest[] = [
       schema("posts"),
       schema("posts"),
@@ -205,7 +208,10 @@ describe("check()", () => {
     ];
     const result = check({ manifests });
     const dups = result.diagnostics.filter((d) => d.code === "DUPLICATE_NAME");
-    expect(dups).toHaveLength(3); // copies 2, 3, 4
+    expect(dups).toHaveLength(4); // every copy including the original
+    // First-occurrence diagnostic mentions ordinal 1, last mentions 4/4.
+    expect(dups[0]?.message).toMatch(/occurrence 1 of 4/);
+    expect(dups[3]?.message).toMatch(/occurrence 4 of 4/);
   });
 });
 
