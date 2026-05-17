@@ -89,11 +89,29 @@ class D1Migrations implements MigrationRunner {
   async runAll(migrations: ReadonlyArray<Migration>): Promise<void> {
     await this.db
       .prepare(
-        `CREATE TABLE IF NOT EXISTS _mantle_migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`,
+        `CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`,
       )
       .run();
+    // One-time rename: pre-rename deployments wrote tracking rows to
+    // `_mantle_migrations`. Copy any not-yet-canonical rows over (no-op
+    // on collisions) and drop the legacy table. Idempotent after the
+    // first successful boot.
+    const legacy = await this.db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='_mantle_migrations'`)
+      .first<{ name: string }>();
+    if (legacy) {
+      // `IF EXISTS` on the drop guards against a concurrent cold-boot
+      // race where Worker A's batch already dropped the table by the
+      // time Worker B reaches this step.
+      await this.db.batch([
+        this.db.prepare(
+          `INSERT OR IGNORE INTO _migrations (id, applied_at) SELECT id, applied_at FROM _mantle_migrations`,
+        ),
+        this.db.prepare(`DROP TABLE IF EXISTS _mantle_migrations`),
+      ]);
+    }
     const applied = await this.db
-      .prepare(`SELECT id FROM _mantle_migrations`)
+      .prepare(`SELECT id FROM _migrations`)
       .all<{ id: string }>();
     const seen = new Set((applied.results ?? []).map((r) => r.id));
     for (const m of migrations) {
@@ -102,7 +120,7 @@ class D1Migrations implements MigrationRunner {
       const ops: D1PreparedStatement[] = statements.map((s) => this.db.prepare(s));
       ops.push(
         this.db
-          .prepare(`INSERT INTO _mantle_migrations (id, applied_at) VALUES (?, ?)`)
+          .prepare(`INSERT INTO _migrations (id, applied_at) VALUES (?, ?)`)
           .bind(m.id, Date.now()),
       );
       await this.db.batch(ops);

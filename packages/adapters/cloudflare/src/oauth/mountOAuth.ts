@@ -67,6 +67,23 @@ export function mountAuthorize(app: Hono, options: MountAuthorizeOptions): void 
       } catch {
         return new Response("invalid oauth_request json", { status: 400 });
       }
+      // The form-field oauth_request is caller-editable — a malicious
+      // submit could swap redirectUri / scope post-consent. Re-validate
+      // clientId + redirectUri against the registered client record;
+      // refuse if either drifted. Fail closed when no registered URIs
+      // exist — a misconfigured client with no allowlist must not get
+      // a free pass.
+      const registered = await helpers.lookupClient(reqInfo.clientId);
+      if (!registered) {
+        return new Response("unknown client", { status: 400 });
+      }
+      if (
+        !Array.isArray(registered.redirectUris) ||
+        registered.redirectUris.length === 0 ||
+        !registered.redirectUris.includes(reqInfo.redirectUri)
+      ) {
+        return new Response("redirect_uri mismatch", { status: 400 });
+      }
 
       const role = await auth.getUserRole(session.user.id);
       // If claude.ai forgets to request a scope, default to ["mcp"]
@@ -126,7 +143,10 @@ interface AuthRequest {
 
 interface OauthHelpers {
   parseAuthRequest(req: Request): Promise<AuthRequest>;
-  lookupClient(clientId: string): Promise<{ clientName?: string } | null>;
+  lookupClient(clientId: string): Promise<{
+    clientName?: string;
+    redirectUris?: readonly string[];
+  } | null>;
   completeAuthorization(opts: {
     request: AuthRequest;
     userId: string;
