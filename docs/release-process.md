@@ -70,6 +70,10 @@ Stable releases use no prerelease suffix.
 
 ## Normal release playbook
 
+The release pipeline is automated end-to-end (#191). Pushing a `v*` tag
+fans out: npm publish → starters bump → starters tag → landing bump →
+landing deploy. The human steps are:
+
 1. Confirm the release scope and blocking issues.
 2. Ensure every merged PR has a changelog-worthy note when it affects users, package behavior, public docs, or release mechanics.
 3. Run the full local gate from `develop`:
@@ -88,8 +92,99 @@ Stable releases use no prerelease suffix.
    git push origin v0.1.0
    ```
 
-8. Create GitHub release notes from `CHANGELOG.md`.
-9. Publish packages using the channel rules below.
+8. The release fanout takes over (see § Release fanout below). Watch
+   the Actions tab for the chain; intervene only if a gate fails.
+
+## Release fanout
+
+`mantle/.github/workflows/release.yml` triggers on `v*` tag push.
+The full chain:
+
+```
+mantle: git push tag v0.0.11-alpha.4
+      │
+      ▼
+release.yml: pnpm install → build → test (gate) → bump package.json
+             to tag version → pnpm -r publish (with --tag inferred
+             from prerelease suffix) → GitHub release → repository_dispatch
+             to mantle-starters
+                   │
+                   ▼
+mantle-starters/bump-from-sdk.yml: bump @aotterclam/mantle* deps
+             + own version + sources.json.version → pnpm install →
+             validate × 5 starters (gate) → typecheck × 5 (gate) →
+             PR onto main → auto-approve + auto-merge
+                   │
+                   ▼ (after PR merges to main)
+mantle-starters/tag-and-dispatch-landing.yml: tag the merge commit
+             vX.Y.Z → repository_dispatch to mantle-landing
+                   │
+                   ▼
+mantle-landing/bump-from-starters.yml: bump @aotterclam/mantle* dep
+             + own version (so STARTER_VERSION const updates) →
+             pnpm install → typecheck (gate) → wrangler dry build (gate) →
+             PR onto main → auto-approve + auto-merge
+                   │
+                   ▼ (after PR merges to main)
+mantle-landing/deploy.yml (existing): wrangler deploy → production
+```
+
+Every workflow is gated. A failed gate stops the chain at the failing
+PR (left open for human triage). Nothing downstream fires until the
+upstream PR is fixed + merged.
+
+### Operator setup (one-time)
+
+Repo secrets:
+
+| Repo | Secret | Purpose |
+|---|---|---|
+| `AotterClam/mantle` | `NPM_TOKEN` | npm publish access to `@aotterclam/*` |
+| `AotterClam/mantle` | `RELEASE_FANOUT_TOKEN` | cross-repo dispatch to `mantle-starters` |
+| `AotterClam/mantle-starters` | `RELEASE_FANOUT_TOKEN` | open release PR + cross-repo dispatch to `mantle-landing` |
+| `AotterClam/mantle-landing` | `RELEASE_FANOUT_TOKEN` | open release PR (deploy is `deploy.yml`'s job) |
+
+`RELEASE_FANOUT_TOKEN` is the same fine-grained PAT across all three
+repos — easier to manage than three separate tokens. Required
+permissions: `contents: write`, `pull-requests: write`, `actions: write`
+on the three repos. Token expiration policy is whatever you want;
+rotate when expired.
+
+Long-term recommendation: replace the PAT with a GitHub App
+(`mantle-release-bot`) installed on the three repos and use
+`actions/create-github-app-token` to mint short-lived install
+tokens per workflow run. PAT path works for now.
+
+### Manual fallback
+
+If `RELEASE_FANOUT_TOKEN` is missing or a workflow fails partway:
+
+- npm publish still happens (it doesn't need the fanout token; only
+  `NPM_TOKEN`)
+- Each downstream workflow has a `workflow_dispatch` trigger so the
+  operator can re-fire it manually from the Actions UI with the
+  version as input.
+
+Order of manual re-fires: `mantle-starters/bump-from-sdk.yml` →
+(wait for merge) → `mantle-starters/tag-and-dispatch-landing.yml`
+(fires automatically on merge) → `mantle-landing/bump-from-starters.yml`
+fires automatically via the cross-repo dispatch.
+
+### Channel-specific behavior
+
+`release.yml` infers the npm dist-tag from the version suffix:
+
+| Tag pushed | npm dist-tag | GitHub release marked |
+|---|---|---|
+| `v1.2.3` | `latest` | normal release |
+| `v0.0.11-alpha.4` | `alpha` | prerelease |
+| `v0.1.0-beta.1` | `beta` | prerelease |
+| `v0.1.0-rc.1` | `rc` | prerelease |
+
+Without the inference, every prerelease would land on `latest` and
+break adopters running `npm install @aotterclam/mantle` without an
+explicit tag. The mapping is in the "Extract version + infer npm tag"
+step of `release.yml`.
 
 ## npm publish
 
