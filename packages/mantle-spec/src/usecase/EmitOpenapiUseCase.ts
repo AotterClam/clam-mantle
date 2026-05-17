@@ -14,6 +14,8 @@ import type { EmitOpenapiResponse } from "./dto/EmitOpenapiResponse.js";
  *
  * Pure: no I/O. CLI adapter handles file load + stdout.
  */
+const DEFAULT_SESSION_COOKIE_NAME = "__Secure-better-auth.session_token";
+
 export class EmitOpenapiUseCase {
   execute(request: EmitOpenapiRequest): EmitOpenapiResponse {
     const { views, procedures, triggers } = partitionManifests(request.manifests);
@@ -53,7 +55,23 @@ export class EmitOpenapiUseCase {
               },
             },
           },
-          securitySchemes: { bearer: { type: "http", scheme: "bearer" } },
+          securitySchemes: {
+            // Bearer for Procedure invocation paths (HTTP Triggers
+            // sit on the MCP-adjacent surface that the OAuth provider
+            // validates bearer tokens for).
+            bearer: { type: "http", scheme: "bearer" },
+            // Cookie for View REST paths — the Cloudflare adapter's
+            // `/api/views/*` resolves identity via `auth.getSession`
+            // (Better Auth cookie). Default to the secure production
+            // cookie name (Better Auth adds `__Secure-` prefix when
+            // baseURL is HTTPS); callers on a non-secure deployment
+            // pass `sessionCookieName: "better-auth.session_token"`.
+            cookieAuth: {
+              type: "apiKey",
+              in: "cookie",
+              name: request.sessionCookieName ?? DEFAULT_SESSION_COOKIE_NAME,
+            },
+          },
         },
       },
     };
@@ -109,44 +127,62 @@ function viewOperation(v: ViewManifest): Record<string, unknown> {
       params.push({ name, in: "query", required: required.has(name), schema });
     }
   }
-  return {
-    operationId: `view_${v.metadata.name.replace(/[^a-z0-9]+/gi, "_")}`,
-    summary: `View ${v.metadata.name}`,
-    parameters: params,
-    responses: {
-      "200": {
-        description: "View result",
-        content: {
-          "application/json": {
-            schema: {
-              type: "object",
-              required: ["ok", "data"],
-              properties: {
-                ok: { const: true },
-                data: {
-                  type: "object",
-                  required: ["rows", "page", "show", "hasMore"],
-                  properties: {
-                    rows: {
-                      type: "array",
-                      items: { type: "object", additionalProperties: true },
-                    },
-                    page: { type: "integer" },
-                    show: { type: "integer" },
-                    hasMore: { type: "boolean" },
+  const responses: Record<string, unknown> = {
+    "200": {
+      description: "View result",
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            required: ["ok", "data"],
+            properties: {
+              ok: { const: true },
+              data: {
+                type: "object",
+                required: ["rows", "page", "show", "hasMore"],
+                properties: {
+                  rows: {
+                    type: "array",
+                    items: { type: "object", additionalProperties: true },
                   },
+                  page: { type: "integer" },
+                  show: { type: "integer" },
+                  hasMore: { type: "boolean" },
                 },
               },
             },
           },
         },
       },
-      "400": {
-        description: "Invalid query parameter",
-        content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
-      },
+    },
+    "400": {
+      description: "Invalid query parameter",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
     },
   };
+  const op: Record<string, unknown> = {
+    operationId: `view_${v.metadata.name.replace(/[^a-z0-9]+/gi, "_")}`,
+    summary: `View ${v.metadata.name}`,
+    parameters: params,
+    responses,
+  };
+  // When `requires.auth.all` is set, emit cookie-session security +
+  // 401/403 responses. Views ride the `/api/views/*` REST surface
+  // which the Cloudflare adapter gates via Better Auth session cookie
+  // (NOT bearer — bearer is for Procedure HTTP Triggers which sit on
+  // the OAuth-validated MCP surface).
+  if (v.spec.requires?.auth?.all && v.spec.requires.auth.all.length > 0) {
+    op["security"] = [{ cookieAuth: [] }];
+    responses["401"] = {
+      description: "Authentication required",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+    };
+    responses["403"] = {
+      description: "Auth predicate not satisfied",
+      content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } },
+    };
+  }
+  return op;
 }
 
 function diagnosticSchema(): Record<string, unknown> {
