@@ -8,8 +8,10 @@ import {
   API_VERSION,
   BUILTIN_OPS,
   LIFECYCLE_HOOKS,
+  STAFF_ROLES,
   VIEW_PARAMS_RESERVED,
   isParamRef,
+  isStaffRole,
   type AuthPredicate,
   type BuiltinOp,
   type FilterAst,
@@ -166,7 +168,11 @@ function parseOneStream(
       );
       continue;
     }
-    const value = doc.toJS({ maxAliasCount: -1 });
+    // `maxAliasCount: 100` matches the yaml library's recommended safe
+    // default; the prior `-1` (unlimited) leaves the parser open to YAML
+    // bombs (`a: &a [{a: *a, ...}]`) that can exhaust memory before any
+    // grammar validator runs.
+    const value = doc.toJS({ maxAliasCount: 100 });
     if (value == null) continue;
     try {
       manifests.push(validateEnvelope(value, docIndex));
@@ -631,6 +637,15 @@ function validateAuthPredicate(p: unknown, idx: number, path: string): asserts p
           idx,
         );
       }
+      const unknown = (roles as readonly string[]).find((r) => !isStaffRole(r));
+      if (unknown !== undefined) {
+        throw new ManifestParseError(
+          `${path}: 'ctx.staff' role '${unknown}' is not in STAFF_ROLES (${[...STAFF_ROLES].join(", ")})`,
+          idx,
+          undefined,
+          "AUTH_PREDICATE_NOT_IN_ENUM",
+        );
+      }
       return;
     }
   }
@@ -706,9 +721,9 @@ function validateLifecycleSource(source: Record<string, unknown>, idx: number): 
         "/spec/source/errorPolicy",
       );
     }
-    if (ep === "abort" && (on as ReadonlyArray<string>).every((h) => typeof h === "string" && h.startsWith("after_"))) {
+    if (ep === "abort" && (on as ReadonlyArray<string>).some((h) => typeof h === "string" && h.startsWith("after_"))) {
       throw new ManifestParseError(
-        "Trigger.spec.source.errorPolicy: 'abort' is invalid on after_* hooks — after_* runs after the response is sent, so abort cannot reach the caller. Move the hook to before_*, or use 'continue'.",
+        "Trigger.spec.source.errorPolicy: 'abort' is invalid when any after_* hook is in `on` — after_* runs after the response is sent, so abort cannot reach the caller. Move after_* hooks to a separate trigger, or use 'continue'.",
         idx,
         "/spec/source/errorPolicy",
       );

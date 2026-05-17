@@ -283,6 +283,26 @@ spec:
     const messages = result.diagnostics.map((d) => d.message).join("\n");
     expect(messages).toMatch(/abort.*after_/);
   });
+
+  it("rejects errorPolicy: 'abort' when an after_* hook is mixed with before_* hooks", () => {
+    // Regression: the prior guard used `.every(after_*)`, so a mixed
+    // list of before + after with abort silently passed even though
+    // after_* cannot abort.
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: postsMixed }
+spec:
+  source:
+    kind: lifecycle
+    schema: posts
+    on: [before_create, after_create]
+    errorPolicy: abort
+  target: { procedure: doStuff }
+`;
+    const result = parseManifests(yaml);
+    const messages = result.diagnostics.map((d) => d.message).join("\n");
+    expect(messages).toMatch(/abort.*after_/);
+  });
 });
 
 describe("parseManifests() — View.params + filter param-ref grammar (v0.1.0)", () => {
@@ -451,5 +471,39 @@ spec:
     expect(() =>
       parseManifestsOrThrow("not even yaml: : :", { context: "starters/publication" }),
     ).toThrow(/Manifest parse failed in starters\/publication/);
+  });
+});
+
+describe("parseManifests() — ctx.staff role-enum enforcement", () => {
+  it("rejects ctx.staff with a role that is not in STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: secret }
+spec:
+  input: { type: object }
+  output: { type: object }
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+  handler: { kind: ref, ref: secretFn }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+
+  it("accepts ctx.staff with all roles in STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: editor }
+spec:
+  input: { type: object }
+  output: { type: object }
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["owner", "editor"] }]
+  handler: { kind: ref, ref: editorFn }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
   });
 });
