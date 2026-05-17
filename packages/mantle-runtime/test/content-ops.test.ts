@@ -11,8 +11,10 @@ import {
   UpdateDraftUseCase,
 } from "../src/usecase/content/index.js";
 import type { Clock } from "../src/domain/port/Clock.js";
+import type { EntryRepository } from "../src/domain/port/EntryRepository.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import type { SiteConfigRepository } from "../src/domain/port/SiteConfigRepository.js";
+import { EntryVersionConflict } from "../src/domain/model/EntryRow.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
@@ -67,7 +69,7 @@ function harness(opts: {
     getEntry: new GetEntryUseCase(store),
     listEntries: new ListEntriesUseCase(store, schemas),
     requestPublish: new RequestPublishUseCase(store, schemas, clock, undefined, opts.siteConfig),
-    unpublish: new UnpublishUseCase(store, clock),
+    unpublish: new UnpublishUseCase(store, schemas, clock),
     archive: new ArchiveUseCase(store, schemas, clock),
     deleteEntry: new DeleteEntryUseCase(store),
   };
@@ -475,6 +477,75 @@ describe("RequestPublishUseCase (simple lifecycle)", () => {
     );
   });
 
+  it("OCC: transitionStatus rejects publish flip when expectedVersion is stale (repo contract)", async () => {
+    const h = harness();
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "v1" },
+      authorId: null,
+    });
+    expect(created.version).toBe(1);
+    await h.updateDraft.execute({
+      id: created.id,
+      expectedVersion: 1,
+      data: { title: "v2-unvalidated" },
+    });
+    await expect(
+      h.store.transitionStatus({
+        id: created.id,
+        collection: "posts",
+        to: "published",
+        expectedStatus: "draft",
+        expectedVersion: 1,
+        now: 1,
+      }),
+    ).rejects.toBeInstanceOf(EntryVersionConflict);
+  });
+
+  it("OCC: RequestPublishUseCase propagates the version guard end-to-end", async () => {
+    // Race-simulating wrapper: bumps the row's version between
+    // entries.get() and entries.transitionStatus() so the snapshot
+    // RequestPublish read becomes stale by the time the flip runs.
+    // Without H7 (passing expectedVersion through), this test would
+    // publish stale-but-passed data; with H7 it must surface a
+    // conflict diagnostic.
+    const h = harness();
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "v1" },
+      authorId: null,
+    });
+    const inner = h.store;
+    const racing: EntryRepository = {
+      ...inner,
+      create: inner.create.bind(inner),
+      update: inner.update.bind(inner),
+      delete: inner.delete.bind(inner),
+      archive: inner.archive.bind(inner),
+      list: inner.list.bind(inner),
+      findByDataField: inner.findByDataField.bind(inner),
+      findByDataFields: inner.findByDataFields.bind(inner),
+      transitionStatus: inner.transitionStatus.bind(inner),
+      get: async (id) => {
+        const row = await inner.get(id);
+        if (row && row.id === created.id) {
+          await inner.update({
+            id,
+            collection: row.collection,
+            expectedVersion: row.version,
+            data: { title: "raced-edit" },
+            now: 1,
+          });
+        }
+        return row;
+      },
+    };
+    const racingPublish = new RequestPublishUseCase(racing, h.schemas, h.clock);
+    await expect(racingPublish.execute({ id: created.id })).rejects.toBeInstanceOf(
+      DiagnosticError,
+    );
+  });
+
   it("LIFECYCLE_NOT_IN_V010 if Schema is editorial", async () => {
     const editorialSchema: SchemaManifest = {
       ...postsSchema(),
@@ -617,6 +688,19 @@ describe("UnpublishUseCase", () => {
     await expect(h.unpublish.execute({ id: created.id })).rejects.toBeInstanceOf(
       DiagnosticError,
     );
+  });
+
+  it("flips archived back to draft (via canTransition, not hand-coded string list)", async () => {
+    const h = harness();
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+    });
+    const archived = await h.archive.execute({ id: created.id, expectedVersion: 1 });
+    const reverted = await h.unpublish.execute({ id: created.id });
+    expect(archived.status).toBe("archived");
+    expect(reverted.status).toBe("draft");
   });
 });
 

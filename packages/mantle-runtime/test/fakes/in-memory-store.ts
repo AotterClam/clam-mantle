@@ -92,6 +92,9 @@ export class InMemoryEntryRepository implements EntryRepository {
   async transitionStatus(args: TransitionStatusArgs): Promise<EntryRow> {
     const row = this.rows.get(args.id);
     if (!row) throw new EntryStatusConflict(args.id, args.expectedStatus ?? args.to, args.to);
+    if (args.expectedVersion !== undefined && row.version !== args.expectedVersion) {
+      throw new EntryVersionConflict(args.id, args.expectedVersion, row.version);
+    }
     if (args.expectedStatus !== undefined && row.status !== args.expectedStatus) {
       throw new EntryStatusConflict(args.id, args.expectedStatus, row.status);
     }
