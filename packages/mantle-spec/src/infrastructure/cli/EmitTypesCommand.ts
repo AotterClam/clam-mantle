@@ -11,7 +11,7 @@ export type ParseResult = { kind: "args"; args: EmitTypesArgs } | { kind: "help"
 
 export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
   let manifests = "./manifests";
-  let namespace = "ClamMantle";
+  let namespace = "Mantle";
   for (let i = 0; i < rawArgs.length; i++) {
     const a = rawArgs[i];
     if (a === "--manifests") manifests = rawArgs[++i] ?? manifests;
@@ -27,11 +27,11 @@ export function parseArgs(rawArgs: ReadonlyArray<string>): ParseResult {
 function printHelp(): void {
   stdout.write(`mantle emit-types — emit TypeScript .d.ts from manifests
 
-Usage: mantle emit-types [options] > clam-types.d.ts
+Usage: mantle emit-types [options] > mantle-types.d.ts
 
 Options:
   --manifests <dir>   Manifest root (default: ./manifests)
-  --namespace <name>  Top-level namespace (default: ClamMantle)
+  --namespace <name>  Top-level namespace (default: Mantle)
   -h, --help          This help
 
 Output: TypeScript declarations on stdout. One namespace contains:
