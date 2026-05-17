@@ -1,0 +1,42 @@
+# Auto-merge dependabot PRs after CI passes — but only for patch /
+# minor / digest update types. Major bumps stay manual because the
+# breaking-change surface is too wide to merge unattended.
+#
+# Sequencing: dependabot opens its PR against `develop` (see
+# `.github/dependabot.yml`); CI runs via `ci.yml`; once CI is green
+# `gh pr merge --auto` queues the merge.
+#
+# Lockfile note: unlike mantle-starters, this repo's dependabot setup
+# *does* regenerate `pnpm-lock.yaml` correctly (single root workspace
+# vs starters' per-dir lockfiles), so no separate lockfile-fixup
+# workflow is needed here.
+
+name: dependabot-automerge
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge patch + minor + digest
+        if: |
+          steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+          steps.meta.outputs.update-type == 'version-update:semver-minor' ||
+          steps.meta.outputs.update-type == 'version-update:semver-digest'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"
