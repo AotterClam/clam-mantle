@@ -203,6 +203,24 @@ describe("jsonSchemaToZod — nullable", () => {
     expect(zs.safeParse(null).success).toBe(true);
     expect(zs.safeParse({}).success).toBe(false);
   });
+
+  it("nullable: true on a number accepts null and the number type", () => {
+    const zs = jsonSchemaToZod({ type: "number", nullable: true });
+    expect(zs.safeParse(1).success).toBe(true);
+    expect(zs.safeParse(null).success).toBe(true);
+    expect(zs.safeParse("1").success).toBe(false);
+  });
+
+  it("nullable: true on an array accepts null and the array shape", () => {
+    const zs = jsonSchemaToZod({
+      type: "array",
+      items: { type: "string" },
+      nullable: true,
+    });
+    expect(zs.safeParse(["a"]).success).toBe(true);
+    expect(zs.safeParse(null).success).toBe(true);
+    expect(zs.safeParse([1]).success).toBe(false);
+  });
 });
 
 describe("jsonSchemaToZod — type union", () => {

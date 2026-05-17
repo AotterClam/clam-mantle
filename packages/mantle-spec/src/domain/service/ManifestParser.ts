@@ -171,8 +171,22 @@ function parseOneStream(
     // `maxAliasCount: 100` matches the yaml library's recommended safe
     // default; the prior `-1` (unlimited) leaves the parser open to YAML
     // bombs (`a: &a [{a: *a, ...}]`) that can exhaust memory before any
-    // grammar validator runs.
-    const value = doc.toJS({ maxAliasCount: 100 });
+    // grammar validator runs. The lib throws a ReferenceError when the
+    // cap trips — surface as a structured diagnostic, not an uncaught.
+    let value: unknown;
+    try {
+      value = doc.toJS({ maxAliasCount: 100 });
+    } catch (e) {
+      diagnostics.push(
+        validateDiagnostic({
+          code: "INVALID_MANIFEST_ENVELOPE",
+          severity: "error",
+          path: pointerFor(docIndex, "/"),
+          message: `[doc ${docIndex}] YAML alias-expansion limit exceeded: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+      );
+      continue;
+    }
     if (value == null) continue;
     try {
       manifests.push(validateEnvelope(value, docIndex));
