@@ -38,7 +38,10 @@ Live introspection (run from project root):
 pnpm introspect       # current manifest dump (atoms inventory)
 pnpm emit-openapi     # generated HTTP surface
 pnpm emit-types       # generated TS types
-pnpm validate         # grammar + cross-ref check; structured JSON diagnostics
+pnpm validate         # grammar + cross-ref check (preview phase by default).
+                      # For the pre-deploy gate (re-enables MANTLE_LETTER_NOT_WRITTEN
+                      # and any future production-only checks), use
+                      # `pnpm validate --phase deploy` or `pnpm validate:deploy`.
 ```
 
 Diagnostics are structured JSON with `code` + `suggestion` fields — surface both verbatim, don't paraphrase.
@@ -183,7 +186,9 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
    pnpm typecheck
    ```
 
-   `pnpm validate` emits `MANTLE_LETTER_NOT_WRITTEN` at this point — expected, no letter yet. The diagnostic clears once the Mantle subagent finishes (step 9). Anything else non-zero → surface `code` + `suggestion` verbatim.
+   `pnpm validate` runs in the **preview phase** by default — grammar + cross-Schema checks only. `MANTLE_LETTER_NOT_WRITTEN` is silenced here on purpose (it's a deploy-only gate), so this step is expected to exit 0 on a fresh scaffold. Anything non-zero → surface `code` + `suggestion` verbatim.
+
+   The deploy-phase variant (`pnpm validate --phase deploy`, or `pnpm validate:deploy` if the starter ships that script) re-enables `MANTLE_LETTER_NOT_WRITTEN`; provision runs that before `wrangler deploy`. Until step 9 fills the welcome letter cards, deploy-phase will fail — that's the intended sequencing.
 
    **Then set up `.dev.vars` so `pnpm dev` works.** Starters that ship `.dev.vars.example` (publication / transaction / intake / presence) require a real `BETTER_AUTH_SECRET` before `pnpm dev` — the worker returns `auth_not_configured` on every request until it's filled. Copy the file, generate a value, and write it in:
 
@@ -236,7 +241,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from the interview matches.
 
-10. **When the Mantle subagent returns**, run `pnpm validate` again — `MANTLE_LETTER_NOT_WRITTEN` clears. If it still fires, card1 / card4 / card5 weren't all filled; check the subagent's reply for what went wrong, fix or re-dispatch.
+10. **When the Mantle subagent returns**, run `pnpm validate --phase deploy` (or `pnpm validate:deploy` if the starter ships that script) — `MANTLE_LETTER_NOT_WRITTEN` should now clear, since the cards are filled. If it still fires, card1 / card4 / card5 weren't all written; check the subagent's reply for what went wrong, fix or re-dispatch. This is also the readiness gate before handing off to provision.
 
 11. **Commit.** If step 4 produced an adjustment, that's its own commit. Then the main commit: `mantle: notes from install interview`.
 
