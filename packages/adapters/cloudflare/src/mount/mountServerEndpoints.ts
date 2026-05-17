@@ -183,11 +183,15 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       });
     }
     const runtime = await ref.get();
-    const rows = await runtime.listEntries.execute({
+    const rawLimit = c.req.query("limit");
+    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : NaN;
+    const result = await runtime.listEntries.execute({
       collection,
       status: c.req.query("status") as ContentState | undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      cursor: c.req.query("cursor") ?? undefined,
     });
-    const items = rows.map((row) => ({
+    const items = result.rows.map((row) => ({
       id: row.id,
       collection: row.collection,
       locale: row.locale ?? null,
@@ -196,7 +200,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       title: row.data.title,
       updated_at: row.updatedAt,
     }));
-    return jsonResponse(200, { items, next_cursor: null });
+    return jsonResponse(200, { items, next_cursor: result.nextCursor ?? null });
   });
 
   // Three-step direct-upload flow: POST /uploads (capability) → caller

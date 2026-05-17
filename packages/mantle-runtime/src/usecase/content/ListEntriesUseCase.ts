@@ -5,7 +5,10 @@ import {
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import { clampLimit } from "../../domain/service/Pagination.js";
-import type { ListEntriesRequest } from "../dto/content/index.js";
+import type {
+  ListEntriesRequest,
+  ListEntriesResponse,
+} from "../dto/content/index.js";
 import { schemaUnknownDiagnostic } from "./diagnostics.js";
 
 /**
@@ -14,7 +17,7 @@ import { schemaUnknownDiagnostic } from "./diagnostics.js";
  *
  * Caller-supplied `limit` is clamped at this layer (the trust
  * boundary between MCP / admin transports and the chokepoint
- * `EntryRepository`).
+ * `EntryRepository`). Cursor is round-tripped opaquely.
  */
 export class ListEntriesUseCase {
   constructor(
@@ -22,17 +25,21 @@ export class ListEntriesUseCase {
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
   ) {}
 
-  async execute(request: ListEntriesRequest): Promise<readonly EntryRow[]> {
+  async execute(request: ListEntriesRequest): Promise<ListEntriesResponse<EntryRow>> {
     const opPath = `usecase/ListEntries/${request.collection}`;
     if (!this.schemas.has(request.collection)) {
       throw new DiagnosticError(
         schemaUnknownDiagnostic(opPath, request.collection, [...this.schemas.keys()]),
       );
     }
+    // `ListEntriesResult` is structurally identical to
+    // `ListEntriesResponse<EntryRow>` — pass it through rather than
+    // re-spreading field-by-field.
     return this.entries.list({
       collection: request.collection,
       status: request.status,
       limit: clampLimit(request.limit),
+      cursor: request.cursor,
     });
   }
 }

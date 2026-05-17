@@ -47,6 +47,14 @@ export interface ListEntriesRequest {
   readonly collection: string;
   readonly status?: ContentState;
   readonly limit?: number;
+  /** Opaque cursor from a prior `ListEntriesResponse.nextCursor`. */
+  readonly cursor?: string;
+}
+
+export interface ListEntriesResponse<R> {
+  readonly rows: readonly R[];
+  /** Present when there may be more rows; pass back as `cursor`. */
+  readonly nextCursor?: string;
 }
 
 export interface RequestPublishRequest extends ContentMutationFields {

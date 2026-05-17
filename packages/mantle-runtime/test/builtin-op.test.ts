@@ -353,6 +353,7 @@ describe("InvokeBuiltinUseCase — lifecycle hook integration", () => {
       ctx: { user: null, staff: null, env: {} },
     });
     expect(result.ok).toBe(false);
-    expect(await h.store.list({ collection: "posts" })).toHaveLength(0);
+    const list = await h.store.list({ collection: "posts" });
+    expect(list.rows).toHaveLength(0);
   });
 });

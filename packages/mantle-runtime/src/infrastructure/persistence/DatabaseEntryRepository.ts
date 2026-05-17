@@ -7,10 +7,12 @@ import type {
   FindEntryByDataFieldArgs,
   FindEntryByDataFieldsArgs,
   ListEntriesArgs,
+  ListEntriesResult,
   TransitionStatusArgs,
   UpdateEntryArgs,
 } from "../../domain/port/EntryRepository.js";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import { clampLimit } from "../../domain/service/Pagination.js";
 import {
   EntryStatusConflict,
   EntryVersionConflict,
@@ -159,25 +161,37 @@ export class DatabaseEntryRepository implements EntryRepository {
     );
   }
 
-  async list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {
-    const limit = args.limit ?? 100;
+  async list(args: ListEntriesArgs): Promise<ListEntriesResult> {
+    // Use the shared clamp so direct repo callers (tests, future
+    // adapters that bypass the use case) get the same default page
+    // size as ListEntriesUseCase — not a silently different 100.
+    const limit = clampLimit(args.limit);
+    const offset = decodeCursor(args.cursor);
+    // Fetch limit+1 to detect a next page without a second query —
+    // the extra row never reaches the caller.
+    const probe = limit + 1;
     const stmt = args.status
       ? this.db
           .prepare(
             `SELECT id, collection, status, version, data, author_id, created_at, updated_at
              FROM entries WHERE collection = ? AND status = ?
-             ORDER BY updated_at DESC LIMIT ?`,
+             ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`,
           )
-          .bind(args.collection, args.status, limit)
+          .bind(args.collection, args.status, probe, offset)
       : this.db
           .prepare(
             `SELECT id, collection, status, version, data, author_id, created_at, updated_at
              FROM entries WHERE collection = ?
-             ORDER BY updated_at DESC LIMIT ?`,
+             ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`,
           )
-          .bind(args.collection, limit);
+          .bind(args.collection, probe, offset);
     const rows = await stmt.all<EntryDbRow>();
-    return rows.map(rowFromDb);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      rows: page.map(rowFromDb),
+      nextCursor: hasMore ? encodeCursor(offset + limit) : undefined,
+    };
   }
 
   async findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {
@@ -272,4 +286,19 @@ function rowFromDb(row: EntryDbRow): EntryRow {
 
 function jsonPathForTopLevelField(field: string): string {
   return `$."${field.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * `list()` cursor: offset-based, prefixed so a future row-value cursor
+ * (`(updatedAt,id)` tuple) can coexist by switching on the prefix.
+ * Callers treat it as opaque.
+ */
+const CURSOR_PREFIX = "o:";
+function encodeCursor(offset: number): string {
+  return `${CURSOR_PREFIX}${offset}`;
+}
+function decodeCursor(cursor: string | undefined): number {
+  if (!cursor || !cursor.startsWith(CURSOR_PREFIX)) return 0;
+  const n = Number(cursor.slice(CURSOR_PREFIX.length));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
 }

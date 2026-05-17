@@ -76,13 +76,14 @@ export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
 export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
   {
     name: "list_entries",
-    description: "List entries in a collection. Optional filter by status.",
+    description: "List entries in a collection. Optional filter by status. Result is { rows, nextCursor? }: when `nextCursor` is present, pass it back as `cursor` to fetch the next page. Absent `nextCursor` means this is the last page.",
     inputSchema: {
       type: "object",
       properties: {
         collection: { type: "string" },
         status: { type: "string", enum: ["draft", "published", "archived"] },
         limit: { type: "number" },
+        cursor: { type: "string", description: "Opaque continuation token from a previous list_entries response." },
       },
       required: ["collection"],
     },

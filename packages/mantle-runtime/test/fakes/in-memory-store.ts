@@ -13,9 +13,16 @@ import type {
   FindEntryByDataFieldArgs,
   FindEntryByDataFieldsArgs,
   ListEntriesArgs,
+  ListEntriesResult,
   TransitionStatusArgs,
   UpdateEntryArgs,
 } from "../../src/domain/port/EntryRepository.js";
+
+function decodeOffsetCursor(cursor: string | undefined): number {
+  if (!cursor || !cursor.startsWith("o:")) return 0;
+  const n = Number(cursor.slice(2));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
 
 /**
  * In-memory `EntryRepository` for content-op + state-machine tests.
@@ -108,16 +115,23 @@ export class InMemoryEntryRepository implements EntryRepository {
     return next;
   }
 
-  async list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {
+  async list(args: ListEntriesArgs): Promise<ListEntriesResult> {
     const limit = args.limit ?? 100;
+    const offset = decodeOffsetCursor(args.cursor);
     const filtered: EntryRow[] = [];
     for (const row of this.rows.values()) {
       if (row.collection !== args.collection) continue;
       if (args.status && row.status !== args.status) continue;
       filtered.push(row);
     }
-    filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-    return filtered.slice(0, limit);
+    // Match real DB ordering: updated_at DESC, id DESC.
+    filtered.sort((a, b) => b.updatedAt - a.updatedAt || (b.id > a.id ? 1 : b.id < a.id ? -1 : 0));
+    const page = filtered.slice(offset, offset + limit);
+    const hasMore = offset + limit < filtered.length;
+    return {
+      rows: page,
+      nextCursor: hasMore ? `o:${offset + limit}` : undefined,
+    };
   }
 
   async findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {

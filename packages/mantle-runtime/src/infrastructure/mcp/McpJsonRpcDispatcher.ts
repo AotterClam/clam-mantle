@@ -197,6 +197,7 @@ export class McpJsonRpcDispatcher {
           collection,
           status: args["status"] as ContentState | undefined,
           limit: typeof args["limit"] === "number" ? args["limit"] : undefined,
+          cursor: typeof args["cursor"] === "string" ? args["cursor"] : undefined,
         });
       }
       case "get_entry": {

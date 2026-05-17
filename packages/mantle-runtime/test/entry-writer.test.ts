@@ -195,9 +195,9 @@ describe("DatabaseEntryRepository against in-memory DatabaseDriver", () => {
       now: 3,
     });
     const all = await repo.list({ collection: "posts" });
-    expect(all.map((r) => r.id)).toEqual(["p3", "p2", "p1"]);
+    expect(all.rows.map((r) => r.id)).toEqual(["p3", "p2", "p1"]);
     const published = await repo.list({ collection: "posts", status: "published" });
-    expect(published.map((r) => r.id)).toEqual(["p3", "p1"]);
+    expect(published.rows.map((r) => r.id)).toEqual(["p3", "p1"]);
   });
 
   it("findByDataField finds a matching row with optional status filter", async () => {

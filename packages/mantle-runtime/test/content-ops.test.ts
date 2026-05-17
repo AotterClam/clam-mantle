@@ -762,9 +762,36 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     await h.createDraft.execute({ collection: "posts", data: { title: "b" }, authorId: null });
     await h.requestPublish.execute({ id: a.id });
     const drafts = await h.listEntries.execute({ collection: "posts", status: "draft" });
-    expect(drafts).toHaveLength(1);
+    expect(drafts.rows).toHaveLength(1);
     const published = await h.listEntries.execute({ collection: "posts", status: "published" });
-    expect(published).toHaveLength(1);
+    expect(published.rows).toHaveLength(1);
+  });
+
+  it("ListEntriesUseCase returns nextCursor when there are more rows", async () => {
+    const h = harness();
+    for (let i = 1; i <= 5; i++) {
+      await h.createDraft.execute({ collection: "posts", data: { title: `t${i}` }, authorId: null });
+    }
+    const first = await h.listEntries.execute({ collection: "posts", limit: 2 });
+    expect(first.rows).toHaveLength(2);
+    expect(first.nextCursor).toBeDefined();
+    const second = await h.listEntries.execute({
+      collection: "posts",
+      limit: 2,
+      cursor: first.nextCursor,
+    });
+    expect(second.rows).toHaveLength(2);
+    expect(second.nextCursor).toBeDefined();
+    const third = await h.listEntries.execute({
+      collection: "posts",
+      limit: 2,
+      cursor: second.nextCursor,
+    });
+    expect(third.rows).toHaveLength(1);
+    expect(third.nextCursor).toBeUndefined();
+    // Pages should not overlap.
+    const allIds = [...first.rows, ...second.rows, ...third.rows].map((r) => r.id);
+    expect(new Set(allIds).size).toBe(5);
   });
 
   it("ListEntriesUseCase clamps caller-supplied limit to MAX_LIMIT (500)", async () => {
