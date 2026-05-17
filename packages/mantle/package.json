@@ -11,11 +11,17 @@
   },
   "type": "module",
   "sideEffects": false,
+  "main": "./dist/spec.js",
+  "types": "./dist/spec.d.ts",
   "publishConfig": {
     "access": "public",
     "tag": "alpha"
   },
   "exports": {
+    ".": {
+      "types": "./dist/spec.d.ts",
+      "import": "./dist/spec.js"
+    },
     "./spec": {
       "types": "./dist/spec.d.ts",
       "import": "./dist/spec.js"
@@ -53,6 +59,6 @@
     "typescript": "^5.6.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
