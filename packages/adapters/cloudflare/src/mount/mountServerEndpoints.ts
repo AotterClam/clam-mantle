@@ -21,7 +21,7 @@ import {
 import { indexHtml } from "@aotterclam/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
-import { AOTTER_CLAM_FAVICON_SVG } from "../assets/aotterClamFavicon.js";
+import { AOTTER_FAVICON_SVG } from "../assets/aotterFavicon.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
 
@@ -65,7 +65,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     });
 
   app.get("/favicon.svg", () =>
-    new Response(AOTTER_CLAM_FAVICON_SVG, {
+    new Response(AOTTER_FAVICON_SVG, {
       headers: {
         "content-type": "image/svg+xml; charset=utf-8",
         "cache-control": "public, max-age=86400",
