@@ -36,7 +36,7 @@ describe("compileView", () => {
         filter: { eq: { field: "locale", value: "en-US" } },
       }),
     );
-    expect(c.sql).toContain(`json_extract(data, '$.locale') = ?`);
+    expect(c.sql).toContain(`json_extract(data, '$."locale"') = ?`);
   });
 
   it("compiles `and` of multiple eqs", () => {
@@ -81,7 +81,7 @@ describe("compileView", () => {
       { params: { locale: "zh-TW" } },
     );
     expect(c.params).toEqual(["posts", "zh-TW"]);
-    expect(c.sql).toContain(`json_extract(data, '$.locale') = ?`);
+    expect(c.sql).toContain(`json_extract(data, '$."locale"') = ?`);
   });
 
   it("drops a filter eq whose param-ref resolves to undefined (forward-compat for v0.1.x optional)", () => {
@@ -131,15 +131,47 @@ describe("compileView", () => {
     expect(placeholders).toBe(3);
   });
 
-  it("rejects field names with characters outside the SAFE_FIELD_NAME allowlist", () => {
-    expect(() =>
-      compileView(
-        view({
-          from: "posts",
-          filter: { eq: { field: "foo'; DROP TABLE entries; --", value: "x" } },
-        }),
-      ),
-    ).toThrow(/contains characters outside the allowlist/);
+  it("accepts hyphenated field names via quoted JSON paths (#210 PR14 / codex CX3)", () => {
+    // Schema property keys are arbitrary JSON strings per RFC 8259;
+    // the prior identifier-only allowlist rejected legitimate
+    // manifests at query time. Now we always quote the path + alias.
+    const c = compileView(
+      view({
+        from: "posts",
+        fields: ["hero-image"],
+        filter: { eq: { field: "hero-image", value: "x" } },
+      }),
+    );
+    expect(c.sql).toContain(`json_extract(data, '$."hero-image"')`);
+    expect(c.sql).toMatch(/AS "hero-image"/);
+    expect(c.params).toEqual(["posts", "x"]);
+  });
+
+  it("safely escapes single quotes in field names without rejecting them", () => {
+    // Outer SQL literal uses `'...'` so inner `'` doubles to `''`;
+    // the field still resolves to the original key at JSON path time.
+    const c = compileView(
+      view({
+        from: "posts",
+        filter: { eq: { field: `foo'bar`, value: "x" } },
+      }),
+    );
+    expect(c.sql).toContain(`json_extract(data, '$."foo''bar"')`);
+    expect(c.params).toEqual(["posts", "x"]);
+  });
+
+  it("rejects field names containing `\"`, `\\`, or NUL (SQLite JSON path can't resolve them)", () => {
+    // SQLite JSON1 path syntax `$."key"` has no documented escape for
+    // an inner `"` or `\`. Codex CX3 follow-up: previously this PR
+    // tried to escape via doubling but SQLite returns NULL for such
+    // paths. Reject instead — Schema authors don't write these.
+    for (const bad of [`foo"bar`, `foo\\bar`, "foo\0bar"]) {
+      expect(() =>
+        compileView(
+          view({ from: "posts", filter: { eq: { field: bad, value: "x" } } }),
+        ),
+      ).toThrow(/unrepresentable character|NUL|"|\\/);
+    }
   });
 
   it("emits no WHERE filter when every filter clause drops", () => {
