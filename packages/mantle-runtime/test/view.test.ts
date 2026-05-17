@@ -101,6 +101,47 @@ describe("compileView", () => {
     expect(c.sql).not.toContain("locale");
   });
 
+  it("partial-drop in nested AND keeps params bound 1:1 with `?` placeholders", () => {
+    // Regression: compileFilter now returns {sql, params} per node so
+    // dropped sub-trees can never push orphan params into the parent.
+    const c = compileView(
+      view({
+        from: "posts",
+        params: {
+          type: "object",
+          properties: { tag: { type: "string" } },
+          required: ["tag"],
+        },
+        filter: {
+          and: [
+            { eq: { field: "status", value: "published" } },
+            {
+              and: [
+                { eq: { field: "locale", value: "en-US" } },
+                { eq: { field: "tag", value: { $param: "tag" } } },
+              ],
+            },
+          ],
+        },
+      }),
+      { params: {} },
+    );
+    expect(c.params).toEqual(["posts", "published", "en-US"]);
+    const placeholders = (c.sql.match(/\?/g) ?? []).length;
+    expect(placeholders).toBe(3);
+  });
+
+  it("rejects field names with characters outside the SAFE_FIELD_NAME allowlist", () => {
+    expect(() =>
+      compileView(
+        view({
+          from: "posts",
+          filter: { eq: { field: "foo'; DROP TABLE entries; --", value: "x" } },
+        }),
+      ),
+    ).toThrow(/contains characters outside the allowlist/);
+  });
+
   it("emits no WHERE filter when every filter clause drops", () => {
     const c = compileView(
       view({
