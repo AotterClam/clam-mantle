@@ -29,8 +29,8 @@ importers:
         specifier: ^1.6.11
         version: 1.6.11(@cloudflare/workers-types@4.20260511.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@types/node@22.19.19)(vite@8.0.10(@types/node@22.19.19)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.4)))
       hono:
-        specifier: ^4.6.20
-        version: 4.12.18
+        specifier: ^4.12.19
+        version: 4.12.19
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260508.1
@@ -1851,8 +1851,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  hono@4.12.18:
-    resolution: {integrity: sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ==}
+  hono@4.12.19:
+    resolution: {integrity: sha512-xa3eYXYXx68XTT4hZ7dRzsXBhaq85ToSrlUJNoR0gwz/1Ap/CNwX47wfvV7pc/xWhjKVVkLT7zBJy8chhNguqQ==}
     engines: {node: '>=16.9.0'}
 
   is-number@7.0.0:
@@ -3711,7 +3711,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  hono@4.12.18: {}
+  hono@4.12.19: {}
 
   is-number@7.0.0: {}
 
