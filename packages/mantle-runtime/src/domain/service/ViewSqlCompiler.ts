@@ -86,13 +86,13 @@ function fieldExpr(field: string): string {
   if (reserved) {
     return reserved === field ? reserved : `${reserved} AS ${field}`;
   }
-  return `json_extract(data, '$.${escapeJsonKey(field)}') AS ${quoteIdent(field)}`;
+  return `json_extract(data, ${quotedJsonPath(field)}) AS ${quoteIdent(field)}`;
 }
 
 function fieldRefExpr(field: string): string {
   const reserved = RESERVED_COLUMN[field];
   if (reserved) return reserved;
-  return `json_extract(data, '$.${escapeJsonKey(field)}')`;
+  return `json_extract(data, ${quotedJsonPath(field)})`;
 }
 
 interface CompiledFragment {
@@ -150,39 +150,51 @@ function buildOrderBy(
   return ` ORDER BY ${parts.join(", ")}`;
 }
 
-// Schema/View validators gate field names; this allowlist is
-// defense-in-depth at the SQL-emission boundary. Escaping single
-// quotes inside a JSON path string isn't reliable — SQLite parses
-// `$.it''s` as terminating at the second `'`. Reject instead.
-//
-// Dotted names (`foo.bar`) are intentionally accepted as multi-segment
-// JSON paths (`$.foo.bar`); the resulting alias `"foo.bar"` is a
-// quoted SQLite identifier and the caller reads it back via the same
-// row key. `PublishedEntries.SAFE_FIELD_RE` uses a stricter no-dot
-// regex because its callers pass single-segment fields only — keep
-// the two divergent on purpose.
-const SAFE_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*$/;
+// Schema JSON property keys can be arbitrary strings per RFC 8259,
+// but SQLite's JSON1 path syntax (`$."key"`) has no documented way
+// to escape an inner `"` or `\` inside a quoted key — doubled-quote
+// escaping is the SQLite identifier convention, NOT a JSON-path
+// convention. So we always quote the path/alias (admitting hyphens,
+// spaces, etc.) but refuse `"`, `\`, and `\0` in field names —
+// those break either the JSON-path resolution or the SQL string
+// literal. Real Schema authors don't use those characters in keys;
+// rejecting them keeps the path always-resolvable.
 
-function assertSafeFieldName(name: string, callsite: string): void {
-  if (SAFE_FIELD_NAME.test(name)) return;
+const FORBIDDEN_FIELD_CHARS = /["\\\0]/;
+
+function assertFieldNameSafe(name: string, callsite: string): void {
+  if (!FORBIDDEN_FIELD_CHARS.test(name)) return;
   throw new DiagnosticError(
     runtimeDiagnostic({
       code: "INTERNAL_ERROR",
       severity: "error",
       path: `compileView/${callsite}`,
       value: name,
-      expected: `field name matching ${SAFE_FIELD_NAME.source} (Schema validator gate)`,
-      message: `field name '${name}' contains characters outside the allowlist; Schema validation should have caught this.`,
+      expected: 'field name without `"`, `\\`, or NUL',
+      message: `field name '${name}' contains an unrepresentable character (\", \\, or NUL); Schema validation should have caught this.`,
     }),
   );
 }
 
-function escapeJsonKey(key: string): string {
-  assertSafeFieldName(key, "escapeJsonKey");
-  return key;
+/**
+ * Emit `'$."<field>"'` — a SQL string literal containing a SQLite
+ * JSON path. Doubles single quotes for the surrounding SQL literal
+ * (SQLite literal escape). Field name itself is guaranteed free of
+ * `"` / `\` / NUL by `assertFieldNameSafe`, so the inner double-
+ * quoted key needs no further escape.
+ */
+function quotedJsonPath(field: string): string {
+  assertFieldNameSafe(field, "quotedJsonPath");
+  // Only `'` needs escaping for the surrounding SQL literal; field
+  // is guaranteed free of `"` / `\` / NUL.
+  return `'$."${field.replace(/'/g, "''")}"'`;
 }
 
+/**
+ * SQLite quoted-identifier alias (`"hero-image"`). Used as the result
+ * column name so callers read the field back under its declared key.
+ */
 function quoteIdent(name: string): string {
-  assertSafeFieldName(name, "quoteIdent");
+  assertFieldNameSafe(name, "quoteIdent");
   return `"${name}"`;
 }
