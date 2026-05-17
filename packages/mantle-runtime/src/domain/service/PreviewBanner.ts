@@ -17,3 +17,23 @@ const BODY_OPEN = /<body([^>]*)>/;
 export function injectPreviewBanner(html: string, banner: string): string {
   return html.replace(BODY_OPEN, `<body$1>${banner}`);
 }
+
+/**
+ * Build the SDK's default preview banner markup. Both `status` and
+ * `slug` are HTML-escaped — `status` is a closed enum so escaping is
+ * defense-in-depth, but `slug` is caller-supplied and a slug
+ * containing `<script>` would otherwise inject script into the
+ * preview surface.
+ */
+export function defaultPreviewBanner(status: string, slug: string): string {
+  return `<div class="preview-banner">Preview · ${escapeHtml(status)} · ${escapeHtml(slug)}</div>`;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

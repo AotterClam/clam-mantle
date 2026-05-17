@@ -305,6 +305,50 @@ spec:
   });
 });
 
+describe("parseManifests() — View.requires.auth", () => {
+  it("accepts a View with requires.auth.all = [ctx.user]", () => {
+    const yaml = `apiVersion: cms.clam.ai/v1
+kind: View
+metadata: { name: privatePosts }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [ctx.user]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("rejects View.requires.auth.all with a role outside STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.clam.ai/v1
+kind: View
+metadata: { name: secretView }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+
+  it("rejects View.requires.auth.any (DRAFT)", () => {
+    const yaml = `apiVersion: cms.clam.ai/v1
+kind: View
+metadata: { name: vAny }
+spec:
+  from: posts
+  requires:
+    auth:
+      any: [ctx.user]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("DRAFT_KEY_USED");
+  });
+});
+
 describe("parseManifests() — View.params + filter param-ref grammar (v0.1.0)", () => {
   const acceptYaml = (yaml: string) => {
     const r = parseManifests(yaml);

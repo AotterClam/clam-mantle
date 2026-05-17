@@ -1,8 +1,10 @@
 import {
+  makeDiagnostic,
   runtimeDiagnostic,
   type Diagnostic,
 } from "@aotterclam/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import { evaluateAuthAll } from "../../domain/service/AuthPredicateEvaluator.js";
 import { compileView } from "../../domain/service/ViewSqlCompiler.js";
 import type { ExecuteViewRequest } from "../dto/view/ExecuteViewRequest.js";
 
@@ -34,6 +36,27 @@ export class ExecuteViewUseCase {
     request: ExecuteViewRequest,
   ): Promise<ExecuteViewResponse<R>> {
     const viewPath = request.pathPrefix ?? `manifest:View/${request.view.metadata.name}`;
+
+    // Auth — closed predicate vocabulary same as Procedure. When the
+    // View has no `requires.auth.all`, evaluateAuthAll returns null.
+    const requires = request.view.spec.requires;
+    if (requires?.auth?.all && requires.auth.all.length > 0) {
+      if (!request.ctx) {
+        return {
+          ok: false,
+          diagnostic: makeDiagnostic({
+            code: "UNAUTHENTICATED",
+            phase: "runtime",
+            severity: "error",
+            path: `${viewPath}#/requires/auth`,
+            expected: "caller identity (ctx) supplied by the adapter for an auth-gated View",
+          }),
+        };
+      }
+      const denial = evaluateAuthAll(requires, request.ctx, viewPath, "runtime");
+      if (denial) return { ok: false, diagnostic: denial };
+    }
+
     let compiled;
     try {
       compiled = compileView(request.view, request.options);

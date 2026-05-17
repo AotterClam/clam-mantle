@@ -4,13 +4,12 @@ import {
   jsonSchemaToZod,
   makeDiagnostic,
   readJsonPointer,
-  type AuthPredicate,
   type Diagnostic,
   type Phase,
   type ProcedureManifest,
 } from "@aotterclam/mantle-spec";
 import type { ZodType } from "zod";
-import type { HandlerContext } from "../../domain/model/HandlerContext.js";
+import { evaluateAuthAll } from "../../domain/service/AuthPredicateEvaluator.js";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
 import type {
   InvokeProcedureRequest,
@@ -74,7 +73,7 @@ export class InvokeProcedureUseCase {
     const procPath = request.pathPrefix ?? `manifest:Procedure/${procedure.metadata.name}`;
 
     // 1. Auth.
-    const denial = evaluateAuthAll(procedure, ctx, procPath, phase);
+    const denial = evaluateAuthAll(procedure.spec.requires, ctx, procPath, phase);
     if (denial) return { ok: false, diagnostic: denial };
 
     // 2. Input validation.
@@ -210,42 +209,4 @@ export class InvokeProcedureUseCase {
     }
     return v;
   }
-}
-
-function evaluateAuthAll(
-  procedure: ProcedureManifest,
-  ctx: HandlerContext,
-  procPath: string,
-  phase: Phase,
-): Diagnostic | null {
-  const all = procedure.spec.requires?.auth?.all;
-  if (!all || all.length === 0) return null;
-  for (let i = 0; i < all.length; i++) {
-    const pred = all[i]!;
-    if (!evaluatePredicate(pred, ctx)) {
-      return makeDiagnostic({
-        code: "AUTH_DENIED",
-        phase,
-        severity: "error",
-        path: `${procPath}#/requires/auth/all/${i}`,
-        expected: describePredicate(pred),
-        message: `Authorization predicate not satisfied: ${describePredicate(pred)}.`,
-      });
-    }
-  }
-  return null;
-}
-
-function evaluatePredicate(pred: AuthPredicate, ctx: HandlerContext): boolean {
-  if (pred === "ctx.user") return ctx.user !== null;
-  if (typeof pred === "object" && pred !== null && "ctx.staff" in pred) {
-    if (!ctx.staff) return false;
-    return pred["ctx.staff"].includes(ctx.staff.role);
-  }
-  return false;
-}
-
-function describePredicate(pred: AuthPredicate): string {
-  if (pred === "ctx.user") return "caller is signed in (ctx.user)";
-  return `caller is staff with role in [${pred["ctx.staff"].join(", ")}]`;
 }

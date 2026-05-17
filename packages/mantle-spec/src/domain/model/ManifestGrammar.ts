@@ -166,6 +166,14 @@ export type ViewManifest = ManifestEnvelope<"View", ViewManifestSpec>;
 export interface ViewManifestSpec {
   /** Source Schema name (bare; no namespace). */
   readonly from: string;
+  /** Auth gate. Identical shape to `ProcedureManifestSpec.requires.auth`.
+   *  When absent the View is public — `ExecuteViewUseCase` skips the
+   *  predicate check. When present, ALL predicates must hold; the
+   *  runtime enforces with `evaluateAuthAll`. Closed predicate
+   *  vocabulary: `ctx.user`, `{ ctx.staff: [<role>, ...] }`. */
+  readonly requires?: {
+    readonly auth?: { readonly all: readonly AuthPredicate[] };
+  };
   /** Filter AST. v0.1 grammar: eq | and | or. `eq.value` may be a literal
    *  or a `{ $param: <name> }` sentinel referencing `spec.params`. */
   readonly filter?: FilterAst;
