@@ -10,15 +10,44 @@ describe("manifestPath", () => {
 
   it("uses file path + docIndex when supplied", () => {
     const fp = new Map([
-      ["Schema/posts", { file: "/abs/manifests/posts.yaml", docIndex: 0 }],
+      ["Schema/posts", [{ file: "/abs/manifests/posts.yaml", docIndex: 0 }]],
     ]);
     expect(manifestPath("Schema", "posts", "/spec/title", fp)).toBe(
       "/abs/manifests/posts.yaml#/0/spec/title",
     );
   });
 
+  it("uses the Nth occurrence's location when `occurrence` arg is supplied (duplicate manifests)", () => {
+    // PR17 codex-follow-up: with multi-occurrence file paths, each
+    // duplicate diagnostic must point at its own source position
+    // rather than always at the loader's last-write-wins entry.
+    const fp = new Map([
+      [
+        "Schema/posts",
+        [
+          { file: "/abs/a.yaml", docIndex: 0 },
+          { file: "/abs/b.yaml", docIndex: 0 },
+          { file: "/abs/c.yaml", docIndex: 0 },
+        ],
+      ],
+    ]);
+    expect(manifestPath("Schema", "posts", "/metadata/name", fp, 1)).toBe(
+      "/abs/a.yaml#/0/metadata/name",
+    );
+    expect(manifestPath("Schema", "posts", "/metadata/name", fp, 2)).toBe(
+      "/abs/b.yaml#/0/metadata/name",
+    );
+    expect(manifestPath("Schema", "posts", "/metadata/name", fp, 3)).toBe(
+      "/abs/c.yaml#/0/metadata/name",
+    );
+    // Out-of-range occurrence falls back to first.
+    expect(manifestPath("Schema", "posts", "/metadata/name", fp, 99)).toBe(
+      "/abs/a.yaml#/0/metadata/name",
+    );
+  });
+
   it("falls back to synthetic when filePaths lacks the key", () => {
-    const fp = new Map<string, { file: string; docIndex: number }>();
+    const fp = new Map<string, { file: string; docIndex: number }[]>();
     expect(manifestPath("View", "recent", "/spec/from", fp)).toBe(
       "manifest:View/recent#/spec/from",
     );

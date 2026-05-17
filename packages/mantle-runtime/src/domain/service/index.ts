@@ -24,3 +24,4 @@ export * from "./TriggerIndex.js";
 export * from "./BuiltinProjector.js";
 export * from "./McpToolNaming.js";
 export * from "./AuthPredicateEvaluator.js";
+export * from "./EntrySeoSupport.js";

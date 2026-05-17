@@ -13,7 +13,7 @@ import type { PreviewEntryRequest } from "../dto/render/PreviewEntryRequest.js";
 import {
   composeSeoIfPathed,
   type SeoComposer,
-} from "./EntrySeoSupport.js";
+} from "../../domain/service/EntrySeoSupport.js";
 
 /** Default fallback: prefer drafts, fall back to published, then
  *  archived. Authors typically open `?preview=1` to see WIP. */

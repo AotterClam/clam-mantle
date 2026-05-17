@@ -9,7 +9,7 @@ import type { RenderEntryLiveRequest } from "../dto/render/RenderEntryLiveReques
 import {
   composeSeoIfPathed,
   type SeoComposer,
-} from "./EntrySeoSupport.js";
+} from "../../domain/service/EntrySeoSupport.js";
 
 /**
  * Render a single entry from current DB state. Used by adapter live-
