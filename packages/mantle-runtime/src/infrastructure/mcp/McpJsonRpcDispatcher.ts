@@ -224,11 +224,18 @@ export class McpJsonRpcDispatcher {
         if (!this.useCases.media) return UNKNOWN_TOOL;
         const filename = args["filename"];
         const mimeType = args["mimeType"];
-        if (typeof filename !== "string" || typeof mimeType !== "string") return MISSING_ARG;
+        const byteSize = args["byteSize"];
+        if (
+          typeof filename !== "string" ||
+          typeof mimeType !== "string" ||
+          typeof byteSize !== "number"
+        ) {
+          return MISSING_ARG;
+        }
         return this.useCases.media.createUpload.execute({
           filename,
           mimeType,
-          byteSize: typeof args["byteSize"] === "number" ? args["byteSize"] : undefined,
+          byteSize,
           alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
           caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
           purpose: typeof args["purpose"] === "string" ? args["purpose"] : undefined,

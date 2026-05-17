@@ -41,7 +41,9 @@ export class CreateMediaUploadUseCase {
     if (!isAllowedMime(request.mimeType, this.opts.allowSvg)) {
       throw new DiagnosticError(mediaMimeRejectedDiagnostic(opPath, request.mimeType));
     }
-    if (request.byteSize !== undefined && request.byteSize > maxBytes) {
+    // Enforce the ceiling before minting a presigned URL — see
+    // CreateMediaUploadRequest.byteSize for the WHY.
+    if (request.byteSize > maxBytes) {
       throw new DiagnosticError(
         mediaSizeExceededDiagnostic(opPath, request.byteSize, maxBytes),
       );

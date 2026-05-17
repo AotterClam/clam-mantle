@@ -53,7 +53,7 @@ describe("CreateMediaUploadUseCase", () => {
     const kv = new InMemoryKv();
     const useCase = new CreateMediaUploadUseCase(storage, kv, fakeClock);
     await expect(
-      useCase.execute({ filename: "x.exe", mimeType: "application/octet-stream" }),
+      useCase.execute({ filename: "x.exe", mimeType: "application/octet-stream", byteSize: 100 }),
     ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_MIME_REJECTED" } });
   });
 
@@ -62,7 +62,7 @@ describe("CreateMediaUploadUseCase", () => {
     const kv = new InMemoryKv();
     const useCase = new CreateMediaUploadUseCase(storage, kv, fakeClock);
     await expect(
-      useCase.execute({ filename: "x.svg", mimeType: "image/svg+xml" }),
+      useCase.execute({ filename: "x.svg", mimeType: "image/svg+xml", byteSize: 100 }),
     ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_SVG_REJECTED" } });
   });
 
@@ -70,7 +70,7 @@ describe("CreateMediaUploadUseCase", () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();
     const useCase = new CreateMediaUploadUseCase(storage, kv, fakeClock, { allowSvg: true });
-    const result = await useCase.execute({ filename: "x.svg", mimeType: "image/svg+xml" });
+    const result = await useCase.execute({ filename: "x.svg", mimeType: "image/svg+xml", byteSize: 100 });
     expect(result.uploadId).toBe("fake-upload-id");
   });
 
@@ -121,7 +121,7 @@ describe("CommitMediaUploadUseCase", () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();
     const create = new CreateMediaUploadUseCase(storage, kv, fakeClock);
-    const created = await create.execute({ filename: "x.png", mimeType: "image/png" });
+    const created = await create.execute({ filename: "x.png", mimeType: "image/png", byteSize: 100 });
     const commit = new CommitMediaUploadUseCase(storage, kv, fakeClock);
     const asset = await commit.execute({
       uploadId: created.uploadId,
