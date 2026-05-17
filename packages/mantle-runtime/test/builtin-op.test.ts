@@ -99,7 +99,9 @@ function harness(opts: {
     idgen,
   );
   const invoke = new InvokeProcedureUseCase(registry, invokeBuiltin);
-  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, invoke);
+  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, (req) =>
+    invoke.execute(req),
+  );
   entries = new LifecycleHookingEntryRepository(store, triggerIndex, hookRunner);
 
   return { store, invoke, schemas };

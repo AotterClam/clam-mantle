@@ -1,11 +1,14 @@
 /**
  * `domain/service/` — pure stateless algorithms operating on the
  * domain model + spec types. No env, no I/O.
+ *
+ * `PublishedEntries` + `JoinedEntryReader` take a `DatabaseDriver`
+ * and perform real reads; they live in `./io/` and are imported
+ * directly by their consumers — NOT re-exported here, so the barrel's
+ * purity claim above holds.
  */
 export * from "./PublishKeys.js";
 export * from "./MarkdownSerializer.js";
-export * from "./PublishedEntries.js";
-export * from "./JoinedEntryReader.js";
 export * from "./SitemapSerializer.js";
 export * from "./HtmlRenderer.js";
 export * from "./PreviewBanner.js";
