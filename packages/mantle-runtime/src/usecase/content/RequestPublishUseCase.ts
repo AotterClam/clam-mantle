@@ -20,7 +20,7 @@ import {
   notFoundDiagnostic,
   withConflictDiagnostic,
 } from "./diagnostics.js";
-import { assertEntryWritable } from "./EntryWriteGuards.js";
+import { assertEntryWritable } from "../../domain/service/io/EntryWriteGuard.js";
 
 /**
  * `RequestPublishUseCase` — publish or queue-for-approval, depending

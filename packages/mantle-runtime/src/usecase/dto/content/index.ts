@@ -67,7 +67,11 @@ export interface UnpublishRequest extends ContentMutationFields {
 
 export interface ArchiveRequest extends ContentMutationFields {
   readonly id: string;
-  readonly expectedVersion: number;
+  /** @deprecated Ignored. `ArchiveUseCase` pins OCC to the version it
+   *  reads internally so the transition guard and the chokepoint
+   *  check see the same snapshot. Field kept optional for backwards
+   *  compat; remove in v0.2. */
+  readonly expectedVersion?: number;
 }
 
 export interface DeleteEntryRequest extends ContentMutationFields {

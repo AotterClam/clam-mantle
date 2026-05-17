@@ -730,6 +730,30 @@ describe("ArchiveUseCase", () => {
     });
     expect(archived.status).toBe("archived");
   });
+
+  it("ignores caller-supplied stale expectedVersion (OCC pinned to internal read; #210 PR12 H3)", async () => {
+    // PR12: ArchiveUseCase now pins OCC to existing.version (the row
+    // it just read), not request.expectedVersion. A caller supplying
+    // a stale version still succeeds as long as no concurrent write
+    // raced — because the guard and chokepoint check the same snapshot.
+    const h = harness();
+    const created = await h.createDraft.execute({
+      collection: "posts",
+      data: { title: "x" },
+      authorId: null,
+    });
+    expect(created.version).toBe(1);
+    // Bump the version via update so caller's view of version=1 is stale.
+    await h.updateDraft.execute({
+      id: created.id,
+      expectedVersion: 1,
+      data: { title: "y" },
+    });
+    // request.expectedVersion is now ignored — archive picks up the
+    // real version internally and succeeds.
+    const archived = await h.archive.execute({ id: created.id, expectedVersion: 1 });
+    expect(archived.status).toBe("archived");
+  });
 });
 
 describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {

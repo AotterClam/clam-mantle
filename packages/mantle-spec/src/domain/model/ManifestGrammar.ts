@@ -312,15 +312,9 @@ export interface CtxStaffPredicate {
 export const STAFF_ROLES = ["owner", "editor", "contributor"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-const ROLE_RANK: Record<StaffRole, number> = {
-  owner: 3,
-  editor: 2,
-  contributor: 1,
-};
-
-export function meetsRole(actual: StaffRole, min: StaffRole): boolean {
-  return ROLE_RANK[actual] >= ROLE_RANK[min];
-}
+// `meetsRole` (role-rank comparison) moved to
+// `domain/service/StaffRoleHierarchy.ts` — this file is pure grammar
+// types referenced by the parser.
 
 export function isStaffRole(s: string): s is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(s);

@@ -102,7 +102,10 @@ function checkDuplicates<M extends { kind: string; metadata: { name: string } }>
   for (const m of arr) {
     const c = (seen.get(m.metadata.name) ?? 0) + 1;
     seen.set(m.metadata.name, c);
-    if (c === 2) {
+    if (c >= 2) {
+      // Was `=== 2`, which silently dropped the 3rd+ duplicate. Every
+      // copy past the first deserves its own diagnostic so the author
+      // sees each offending position rather than just one.
       out.push(
         validateDiagnostic({
           code: "DUPLICATE_NAME",
@@ -110,7 +113,7 @@ function checkDuplicates<M extends { kind: string; metadata: { name: string } }>
           path: manifestPath(kind, m.metadata.name, "/metadata/name", filePaths),
           value: m.metadata.name,
           expected: `metadata.name unique within kind ${kind}`,
-          message: `Two ${kind} manifests share metadata.name '${m.metadata.name}'.`,
+          message: `${kind} manifest with duplicate metadata.name '${m.metadata.name}' (copy ${c}).`,
         }),
       );
     }

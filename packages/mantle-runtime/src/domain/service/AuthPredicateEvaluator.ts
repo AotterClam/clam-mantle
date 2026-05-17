@@ -64,5 +64,12 @@ export function evaluatePredicate(pred: AuthPredicate, ctx: HandlerContext): boo
 
 export function describePredicate(pred: AuthPredicate): string {
   if (pred === "ctx.user") return "caller is signed in (ctx.user)";
-  return `caller is staff with role in [${pred["ctx.staff"].join(", ")}]`;
+  if (typeof pred === "object" && pred !== null && "ctx.staff" in pred) {
+    return `caller is staff with role in [${pred["ctx.staff"].join(", ")}]`;
+  }
+  // Exhaustive: if AuthPredicate gains a variant the parser admits but
+  // this function doesn't yet recognise, fail loud rather than throw
+  // on a downstream key access.
+  const _exhaustive: never = pred;
+  throw new Error(`describePredicate: unrecognised AuthPredicate ${JSON.stringify(_exhaustive)}`);
 }

@@ -12,3 +12,4 @@ export * from "./SchemaLoader.js";
 export * from "./EntryDataValidator.js";
 export * from "./SiteDefaultsValidator.js";
 export * from "./JsonSchemaToZod.js";
+export * from "./StaffRoleHierarchy.js";
