@@ -9,7 +9,6 @@ export { RenderEntryLiveUseCase } from "./RenderEntryLiveUseCase.js";
 export { RenderListLiveUseCase } from "./RenderListLiveUseCase.js";
 export { PreviewEntryUseCase } from "./PreviewEntryUseCase.js";
 export { ComposeEntrySeoMetaUseCase } from "./ComposeEntrySeoMetaUseCase.js";
-export {
-  composeSeoIfPathed,
-  type SeoComposer,
-} from "./EntrySeoSupport.js";
+// `composeSeoIfPathed` + `SeoComposer` moved to
+// `domain/service/EntrySeoSupport.ts` so `HtmlPublishOrchestrator`
+// (infra) can import without crossing the infra→usecase boundary.

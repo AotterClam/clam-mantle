@@ -1,4 +1,5 @@
 import type { Manifest } from "../../domain/model/ManifestGrammar.js";
+import type { ManifestFilePaths } from "../../domain/service/ManifestPathDiagnoser.js";
 
 /**
  * Input to the manifest validation use case (Loop 1 of the SDK
@@ -11,10 +12,13 @@ export interface ValidateManifestsRequest {
    *  case greps for each `Procedure.handler.ref` literal and emits a
    *  warning when not found. */
   readonly handlerSource?: string;
-  /** Optional file-path index (`Kind/name` → file + docIndex). When
-   *  the CLI loads from disk, it populates this so diagnostic paths
-   *  point at the consumer's actual files. */
-  readonly filePaths?: ReadonlyMap<string, { readonly file: string; readonly docIndex: number }>;
+  /** Optional file-path index (`Kind/name` → ordered list of file +
+   *  docIndex). When the CLI loads from disk, it populates this so
+   *  diagnostic paths point at the consumer's actual files. The list
+   *  shape (vs. single entry) lets duplicate-manifest diagnostics
+   *  surface every offending source location instead of all pointing
+   *  at whichever copy the loader saw last. */
+  readonly filePaths?: ManifestFilePaths;
   /** Optional site config locales for the locale-vs-Schema consistency
    *  check (ADR-0010). Validate-from-CLI flows leave this absent
    *  (CLI can't reach the runtime DB); boot always passes it. */

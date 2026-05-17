@@ -1,5 +1,9 @@
 import type { SchemaManifest } from "../model/ManifestGrammar.js";
-import { bestMatch, manifestPath } from "./ManifestPathDiagnoser.js";
+import {
+  bestMatch,
+  manifestPath,
+  type ManifestFilePaths,
+} from "./ManifestPathDiagnoser.js";
 import { canonicalizeLocaleList } from "./LocaleCanonicalizer.js";
 import {
   bootDiagnostic,
@@ -29,8 +33,8 @@ export interface CrossSchemaCheckInput {
    *  Boot always has access and should pass it. */
   readonly siteLocales?: ReadonlyArray<string>;
   /** Optional file-path index for nicer diagnostic paths in the
-   *  validate phase. */
-  readonly filePaths?: ReadonlyMap<string, { file: string; docIndex: number }>;
+   *  validate phase. See {@link ManifestFilePaths}. */
+  readonly filePaths?: ManifestFilePaths;
 }
 
 export function checkLocaleAndTranslates(input: CrossSchemaCheckInput): Diagnostic[] {

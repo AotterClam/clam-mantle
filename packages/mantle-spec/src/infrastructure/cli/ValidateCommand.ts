@@ -97,11 +97,12 @@ export async function run(rawArgs: ReadonlyArray<string>): Promise<number> {
     return 2;
   }
 
-  const manifestsRoot = resolve(cwd(), args.manifests);
   const sourceRoot = args.source ? resolve(cwd(), args.source) : null;
 
-  // 1. Load manifests.
-  const { manifests, parseErrors, filePaths } = await loadManifestsFromRoot(args.manifests);
+  // 1. Load manifests. Loader returns the resolved `root` so we don't
+  // re-resolve here and risk drift between the two `cwd()` calls.
+  const { manifests, parseErrors, filePaths, root: manifestsRoot } =
+    await loadManifestsFromRoot(args.manifests);
 
   // 2. Concatenate handler source (if any).
   let handlerSource: string | undefined;
