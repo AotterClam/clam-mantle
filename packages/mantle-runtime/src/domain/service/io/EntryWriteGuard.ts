@@ -5,8 +5,8 @@ import {
   runtimeDiagnostic,
   type SchemaManifest,
 } from "@aotter/mantle-spec";
-import type { EntryRepository } from "../../domain/port/EntryRepository.js";
-import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
+import type { EntryRepository } from "../../port/EntryRepository.js";
+import type { SiteConfigRepository } from "../../port/SiteConfigRepository.js";
 
 export interface AssertEntryWritableArgs {
   readonly opPath: string;

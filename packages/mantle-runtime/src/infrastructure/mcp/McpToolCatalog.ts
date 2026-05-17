@@ -127,6 +127,15 @@ export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
       required: ["id", "expected_version"],
     },
   },
+  {
+    name: "delete_entry",
+    description: "Permanently delete an entry. Cascades to its revisions and approvals. Prefer archive_entry when reversibility matters.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
+    },
+  },
 ];
 
 export const CREATE_DRAFT_PREFIX = "create_draft_";
