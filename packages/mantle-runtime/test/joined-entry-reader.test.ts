@@ -3,7 +3,7 @@ import type { Entry, SchemaManifest } from "@aotter/mantle-spec";
 import {
   joinParentForList,
   joinParentIfTranslation,
-} from "../src/domain/service/JoinedEntryReader.js";
+} from "../src/domain/service/io/JoinedEntryReader.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { postsSchema } from "./fakes/manifests.js";
 

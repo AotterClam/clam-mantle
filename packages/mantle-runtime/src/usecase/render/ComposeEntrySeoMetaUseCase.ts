@@ -6,7 +6,7 @@ import {
   type SiblingTranslation,
 } from "../../domain/service/SeoMetaComposer.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
-import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
+import { readEntryBySlug } from "../../domain/service/io/PublishedEntries.js";
 import type { ComposeEntrySeoMetaRequest } from "../dto/render/ComposeEntrySeoMetaRequest.js";
 
 /**
