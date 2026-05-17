@@ -235,7 +235,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const lifecycleHooks = new RunLifecycleHooksUseCase(
     triggerIndex,
     proceduresByName,
-    invokeProcedure,
+    (req) => invokeProcedure.execute(req),
   );
   entries = new LifecycleHookingEntryRepository(
     innerEntries,
@@ -246,11 +246,13 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const runDeferredHook = new RunDeferredHookUseCase(lifecycleHooks);
   const publicPathResolver = args.publicPathResolver ?? null;
   const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
+  const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(
     args.db,
     args.kv,
     publicPathResolver,
     composeEntrySeoMeta,
+    composeLlmsTxt,
     schemasByName,
   );
 
@@ -272,7 +274,6 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const archive = new ArchiveUseCase(entries, schemasByName, clock, contentPublishEffects);
   const deleteEntry = new DeleteEntryUseCase(entries);
   const executeView = new ExecuteViewUseCase(args.db);
-  const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);
   const composeSitemap = new ComposeSitemapUseCase(args.db);
   const renderEntryLive = new RenderEntryLiveUseCase(
     args.db,

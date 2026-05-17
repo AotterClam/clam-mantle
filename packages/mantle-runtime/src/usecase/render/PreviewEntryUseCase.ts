@@ -2,8 +2,8 @@ import type { ContentState, Entry, SchemaManifest } from "@aotterclam/mantle-spe
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
-import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
-import { joinParentIfTranslation } from "../../domain/service/JoinedEntryReader.js";
+import { readEntryBySlug } from "../../domain/service/io/PublishedEntries.js";
+import { joinParentIfTranslation } from "../../domain/service/io/JoinedEntryReader.js";
 import { renderEntryHtml } from "../../domain/service/HtmlRenderer.js";
 import {
   defaultPreviewBanner,

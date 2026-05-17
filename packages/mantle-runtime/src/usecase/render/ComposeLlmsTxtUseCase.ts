@@ -1,6 +1,6 @@
 import type { Entry } from "@aotterclam/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
-import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
+import { readPublishedEntries } from "../../domain/service/io/PublishedEntries.js";
 import { serializeLlmsTxt } from "../../domain/service/MarkdownSerializer.js";
 import type { ComposeLlmsTxtRequest } from "../dto/render/ComposeLlmsTxtRequest.js";
 

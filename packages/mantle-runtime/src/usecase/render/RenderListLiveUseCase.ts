@@ -1,8 +1,8 @@
 import type { SchemaManifest } from "@aotterclam/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
-import { readPublishedEntries } from "../../domain/service/PublishedEntries.js";
-import { joinParentForList } from "../../domain/service/JoinedEntryReader.js";
+import { readPublishedEntries } from "../../domain/service/io/PublishedEntries.js";
+import { joinParentForList } from "../../domain/service/io/JoinedEntryReader.js";
 import { renderListHtml } from "../../domain/service/HtmlRenderer.js";
 import type { RenderListLiveRequest } from "../dto/render/RenderListLiveRequest.js";
 
