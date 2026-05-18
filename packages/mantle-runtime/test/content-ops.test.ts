@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { DiagnosticError, type SchemaManifest } from "@aotter/mantle-spec";
 import {
   ArchiveUseCase,
@@ -14,7 +14,8 @@ import type { Clock } from "../src/domain/port/Clock.js";
 import type { EntryRepository } from "../src/domain/port/EntryRepository.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import type { SiteConfigRepository } from "../src/domain/port/SiteConfigRepository.js";
-import { EntryVersionConflict } from "../src/domain/model/EntryRow.js";
+import type { ListEntriesResponse } from "../src/usecase/dto/content/index.js";
+import { EntryVersionConflict, type EntryRow } from "../src/domain/model/EntryRow.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
 import { postsSchema } from "./fakes/manifests.js";
 
@@ -780,33 +781,62 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     ).rejects.toMatchObject({ diagnostic: { code: "NOT_FOUND" } });
   });
 
+  // Contract pin. If execute()'s return type drifts back to a wrapper
+  // object (or executePage() loses its cursor-shape), this trips
+  // `pnpm typecheck` in same-repo CI — before a downstream consumer
+  // like a starter ever sees the regression. Counterpart to
+  // mantle-starters' bump-from-sdk validate gate, with faster feedback.
+  it("ListEntriesUseCase type contract: execute → flat array, executePage → cursored", () => {
+    const h = harness();
+    expectTypeOf(h.listEntries.execute)
+      .returns
+      .resolves
+      .toEqualTypeOf<readonly EntryRow[]>();
+    expectTypeOf(h.listEntries.executePage)
+      .returns
+      .resolves
+      .toEqualTypeOf<ListEntriesResponse<EntryRow>>();
+  });
+
+  it("ListEntriesUseCase.execute() returns a flat readonly array (app-code shape)", async () => {
+    const h = harness();
+    await h.createDraft.execute({ collection: "posts", data: { title: "a" }, authorId: null });
+    await h.createDraft.execute({ collection: "posts", data: { title: "b" }, authorId: null });
+    const result = await h.listEntries.execute({ collection: "posts" });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result).toHaveLength(2);
+    // App code does `.find` / `.filter` directly — no `.rows` unwrap.
+    const found = result.find((r) => (r.data as { title?: string }).title === "a");
+    expect(found).toBeDefined();
+  });
+
   it("ListEntriesUseCase filters by status", async () => {
     const h = harness();
     const a = await h.createDraft.execute({ collection: "posts", data: { title: "a" }, authorId: null });
     await h.createDraft.execute({ collection: "posts", data: { title: "b" }, authorId: null });
     await h.requestPublish.execute({ id: a.id });
     const drafts = await h.listEntries.execute({ collection: "posts", status: "draft" });
-    expect(drafts.rows).toHaveLength(1);
+    expect(drafts).toHaveLength(1);
     const published = await h.listEntries.execute({ collection: "posts", status: "published" });
-    expect(published.rows).toHaveLength(1);
+    expect(published).toHaveLength(1);
   });
 
-  it("ListEntriesUseCase returns nextCursor when there are more rows", async () => {
+  it("ListEntriesUseCase.executePage() returns nextCursor when there are more rows", async () => {
     const h = harness();
     for (let i = 1; i <= 5; i++) {
       await h.createDraft.execute({ collection: "posts", data: { title: `t${i}` }, authorId: null });
     }
-    const first = await h.listEntries.execute({ collection: "posts", limit: 2 });
+    const first = await h.listEntries.executePage({ collection: "posts", limit: 2 });
     expect(first.rows).toHaveLength(2);
     expect(first.nextCursor).toBeDefined();
-    const second = await h.listEntries.execute({
+    const second = await h.listEntries.executePage({
       collection: "posts",
       limit: 2,
       cursor: first.nextCursor,
     });
     expect(second.rows).toHaveLength(2);
     expect(second.nextCursor).toBeDefined();
-    const third = await h.listEntries.execute({
+    const third = await h.listEntries.executePage({
       collection: "posts",
       limit: 2,
       cursor: second.nextCursor,
@@ -816,6 +846,17 @@ describe("GetEntryUseCase / ListEntriesUseCase / DeleteEntryUseCase", () => {
     // Pages should not overlap.
     const allIds = [...first.rows, ...second.rows, ...third.rows].map((r) => r.id);
     expect(new Set(allIds).size).toBe(5);
+  });
+
+  it("ListEntriesUseCase.execute() only returns the first page (silent cap)", async () => {
+    const h = harness();
+    for (let i = 1; i <= 5; i++) {
+      await h.createDraft.execute({ collection: "posts", data: { title: `t${i}` }, authorId: null });
+    }
+    // execute() does NOT walk cursors. Caller-supplied limit applies.
+    const flat = await h.listEntries.execute({ collection: "posts", limit: 2 });
+    expect(flat).toHaveLength(2);
+    // Authors who need full walking use executePage() + nextCursor.
   });
 
   it("ListEntriesUseCase clamps caller-supplied limit to MAX_LIMIT (500)", async () => {
