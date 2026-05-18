@@ -130,6 +130,13 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
+          PUBLISH_TAG="${{ steps.ver.outputs.npm_tag }}"
+          # Pre-v0.1 policy: npm latest follows the most user-useful
+          # prerelease. Publishing with the primary tag set to latest
+          # also keeps npmjs.com's package README metadata fresh.
+          if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
+            PUBLISH_TAG=latest
+          fi
           mkdir -p .release-tarballs
           for dir in \
             packages/mantle-spec \
@@ -149,9 +156,21 @@ jobs:
             ".release-tarballs/aotterclam-mantle-$VERSION.tgz"
           do
             npm publish "$tgz" \
-              --tag "${{ steps.ver.outputs.npm_tag }}" \
+              --tag "$PUBLISH_TAG" \
               --access public
           done
+
+          if [[ "$PUBLISH_TAG" != "${{ steps.ver.outputs.npm_tag }}" ]]; then
+            for p in \
+              @aotterclam/mantle-spec \
+              @aotterclam/mantle-admin-ui \
+              @aotterclam/mantle-runtime \
+              @aotterclam/mantle-cloudflare \
+              @aotterclam/mantle
+            do
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}"
+            done
+          fi
 
       - name: Verify npm metadata
         run: |
