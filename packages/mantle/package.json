@@ -49,14 +49,26 @@
     "@aotter/mantle-runtime": "workspace:*",
     "@aotter/mantle-spec": "workspace:*"
   },
+  "peerDependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.6.0",
+    "aws4fetch": "^1.0.20",
+    "better-auth": "^1.6.0",
+    "hono": "^4.12.0",
+    "zod": "^4.0.0"
+  },
   "scripts": {
     "prebuild": "rm -rf dist .tsbuildinfo",
     "build": "tsc -b tsconfig.lib.json",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json"
   },
   "devDependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.6.0",
     "@types/node": "^25",
-    "typescript": "^6.0.3"
+    "aws4fetch": "^1.0.20",
+    "better-auth": "^1.6.11",
+    "hono": "^4.12.19",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.2"
   },
   "engines": {
     "node": ">=22"

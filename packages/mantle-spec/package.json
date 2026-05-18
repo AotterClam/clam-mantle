@@ -37,12 +37,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "yaml": "^2.9.0",
-    "zod": "^4.4.2"
+    "yaml": "^2.9.0"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^25",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.6",
+    "zod": "^4.4.2"
   }
 }
