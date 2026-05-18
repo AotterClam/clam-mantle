@@ -12,6 +12,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # Fast checks that fail the PR quickly. Runs on every push + PR.
   lint:

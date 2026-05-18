@@ -22,7 +22,12 @@ updates:
           - "react"
           - "react-dom"
           - "@types/react*"
+      admin-ui-vite:
+        patterns:
+          - "vite"
+          - "vite-plugin-singlefile"
           - "@vitejs/plugin-react"
+          - "@tailwindcss/vite"
       hono:
         patterns:
           - "hono"
