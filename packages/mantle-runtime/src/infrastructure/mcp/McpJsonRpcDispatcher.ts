@@ -204,7 +204,10 @@ export class McpJsonRpcDispatcher {
       case "list_entries": {
         const collection = args["collection"];
         if (typeof collection !== "string") return MISSING_ARG;
-        return this.useCases.listEntries.execute({
+        // MCP exposes the cursored shape so agents can walk pages
+        // through `nextCursor`. App code reaches for `execute()`
+        // instead and gets a flat array.
+        return this.useCases.listEntries.executePage({
           collection,
           status: args["status"] as ContentState | undefined,
           limit: typeof args["limit"] === "number" ? args["limit"] : undefined,

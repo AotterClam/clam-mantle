@@ -187,7 +187,10 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     const runtime = await ref.get();
     const rawLimit = c.req.query("limit");
     const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : NaN;
-    const result = await runtime.listEntries.execute({
+    // Admin pagination needs the cursored shape — `executePage` returns
+    // `{ rows, nextCursor? }`. `execute()` is the flat-array variant
+    // for app code.
+    const result = await runtime.listEntries.executePage({
       collection,
       status: c.req.query("status") as ContentState | undefined,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
