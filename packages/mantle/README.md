@@ -31,19 +31,21 @@ import { mountServerEndpoints } from "@aotterclam/mantle/cloudflare";
 
 ## Getting started
 
-The fastest path is `npx @aotterclam/create-mantle@alpha <archetype>`, which scaffolds a starter (presence / intake / transaction / blank) wired to this SDK.
+Recommended path: open [mantle.aotterclam.ai](https://mantle.aotterclam.ai/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
+
+If you already know the values and want to bypass the agent interview, call the scaffolder directly:
 
 ```bash
-npx @aotterclam/create-mantle@alpha presence \
+npx @aotterclam/create-mantle@alpha publication \
   --project-name my-site \
   --brand "My Site" \
-  --description "A short description" \
-  --locales en \
+  --description "A short description of what this site does." \
+  --locales "en,zh-TW" \
   --github-owner my-org \
-  --summary "A starter run"
+  --summary "Initial install"
 ```
 
-See `skills/install` in the [Mantle repo](https://github.com/AotterClam/mantle) for the full agent-driven install flow.
+Available starter keys live in [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters): `presence`, `publication`, `intake`, `transaction`, and `blank`. See `skills/install` in the [Mantle repo](https://github.com/AotterClam/mantle/tree/develop/skills/install) for the full agent-driven install flow.
 
 ## Adapter targets
 
@@ -57,8 +59,8 @@ The `mantle-runtime` package never imports Cloudflare-specific types — adapter
 ## Documentation
 
 - [Repo](https://github.com/AotterClam/mantle)
-- [4-atom manifest model (ADR-0001)](https://github.com/AotterClam/mantle/blob/main/docs/adr/0001-four-atom-manifest-model.md)
-- [Release process](https://github.com/AotterClam/mantle/blob/main/docs/release-process.md)
+- [4-atom manifest model (ADR-0001)](https://github.com/AotterClam/mantle/blob/develop/docs/adr/0001-four-atom-manifest-model.md)
+- [Release process](https://github.com/AotterClam/mantle/blob/develop/docs/release-process.md)
 - [Issues](https://github.com/AotterClam/mantle/issues)
 
 ## License

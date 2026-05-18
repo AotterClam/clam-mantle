@@ -1,9 +1,9 @@
 {
   "name": "@aotterclam/mantle",
-  "version": "0.0.11-alpha.3",
+  "version": "0.0.11-alpha.6",
   "description": "Umbrella entry for @aotterclam/mantle. Adopters install this one package and import from subpaths: /spec, /runtime, /cloudflare, /admin-ui. Sub-packages remain individually installable on npm for tooling / alt-adapter authors. The Netlify adapter ships as a private workspace stub in v0.1 — its subpath will be added when the impl lands in v0.2.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/mantle/tree/main/packages/mantle",
+  "homepage": "https://github.com/AotterClam/mantle/tree/develop/packages/mantle",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/AotterClam/mantle.git",
