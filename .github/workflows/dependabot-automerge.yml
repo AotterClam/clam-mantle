@@ -54,6 +54,8 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # `--merge` (not --squash) — match this repo's merge history
-        # (develop integration commits, not squash).
-        run: gh pr merge --auto --merge "$PR_URL"
+        # Rebase merge: keeps `develop` linear and preserves dependabot's
+        # `chore(deps): bump X` subject as the head commit. Squash is
+        # disabled on this repo; merge-commit is allowed but generates
+        # noisy 'Merge pull request #N from ...' subjects we don't want.
+        run: gh pr merge --auto --rebase "$PR_URL"
