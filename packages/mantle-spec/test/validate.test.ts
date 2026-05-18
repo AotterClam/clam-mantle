@@ -191,6 +191,28 @@ describe("check()", () => {
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).toContain("TRANSLATES_PARENT_UNKNOWN");
   });
+
+  it("reports every duplicate including the original (#210 PR12 H1 + PR17 first-copy fix)", () => {
+    // Regression history:
+    //  - original: `c === 2` (silent on 3rd+ copy)
+    //  - PR12: `c >= 2` (flags 2nd, 3rd, 4th — but author still
+    //    can't locate the canonical first copy)
+    //  - PR17: two-pass — flag every occurrence including the first,
+    //    so the author sees every offending position.
+    const manifests: Manifest[] = [
+      schema("posts"),
+      schema("posts"),
+      schema("posts"),
+      schema("posts"),
+      procedure("createPost"),
+    ];
+    const result = check({ manifests });
+    const dups = result.diagnostics.filter((d) => d.code === "DUPLICATE_NAME");
+    expect(dups).toHaveLength(4); // every copy including the original
+    // First-occurrence diagnostic mentions ordinal 1, last mentions 4/4.
+    expect(dups[0]?.message).toMatch(/occurrence 1 of 4/);
+    expect(dups[3]?.message).toMatch(/occurrence 4 of 4/);
+  });
 });
 
 describe("parseManifests() (envelope-shape errors return diagnostics)", () => {
@@ -282,6 +304,113 @@ spec:
     const result = parseManifests(yaml);
     const messages = result.diagnostics.map((d) => d.message).join("\n");
     expect(messages).toMatch(/abort.*after_/);
+  });
+
+  it("rejects errorPolicy: 'abort' when an after_* hook is mixed with before_* hooks", () => {
+    // Regression: the prior guard used `.every(after_*)`, so a mixed
+    // list of before + after with abort silently passed even though
+    // after_* cannot abort.
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: postsMixed }
+spec:
+  source:
+    kind: lifecycle
+    schema: posts
+    on: [before_create, after_create]
+    errorPolicy: abort
+  target: { procedure: doStuff }
+`;
+    const result = parseManifests(yaml);
+    const messages = result.diagnostics.map((d) => d.message).join("\n");
+    expect(messages).toMatch(/abort.*after_/);
+  });
+});
+
+describe("parseManifests() — View.requires.auth", () => {
+  it("accepts a View with requires.auth.all = [ctx.user]", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: privatePosts }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [ctx.user]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("rejects View.requires.auth.all with a role outside STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: secretView }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+
+  it("rejects View.requires.auth.any (DRAFT)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: vAny }
+spec:
+  from: posts
+  requires:
+    auth:
+      any: [ctx.user]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("DRAFT_KEY_USED");
+  });
+
+  it("rejects View.requires.auth.all with a non-STAFF_ROLES role (parser-level)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: View
+metadata: { name: vStaff }
+spec:
+  from: posts
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+});
+
+describe("parseManifests() — YAML alias-bomb regression (#210 H4)", () => {
+  it("surfaces an INVALID_MANIFEST_ENVELOPE diagnostic on exponentially-expanding aliases", () => {
+    // Deep nested aliases: each level multiplies the expansion 10x.
+    // `maxAliasCount: 100` in ManifestParser triggers the yaml lib's
+    // bail — the parser now catches that throw and converts it to a
+    // structured diagnostic instead of propagating as an uncaught
+    // ReferenceError.
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Schema
+metadata: { name: bombed }
+spec:
+  title: Bombed
+  schema:
+    type: object
+    properties:
+      a: &a {x: 1}
+      l1: &l1 [*a, *a, *a, *a, *a, *a, *a, *a, *a, *a]
+      l2: &l2 [*l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1, *l1]
+      l3: &l3 [*l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2, *l2]
+      l4: &l4 [*l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3, *l3]
+      l5: [*l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4, *l4]
+`;
+    const result = parseManifests(yaml);
+    expect(result.manifests).toHaveLength(0);
+    expect(result.diagnostics.map((d) => d.code)).toContain("INVALID_MANIFEST_ENVELOPE");
+    expect(result.diagnostics[0]?.message).toMatch(/alias/i);
   });
 });
 
@@ -451,5 +580,111 @@ spec:
     expect(() =>
       parseManifestsOrThrow("not even yaml: : :", { context: "starters/publication" }),
     ).toThrow(/Manifest parse failed in starters\/publication/);
+  });
+});
+
+describe("parseManifests() — ctx.staff role-enum enforcement", () => {
+  it("rejects ctx.staff with a role that is not in STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: secret }
+spec:
+  input: { type: object }
+  output: { type: object }
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["superadmin"] }]
+  handler: { kind: ref, ref: secretFn }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.code)).toContain("AUTH_PREDICATE_NOT_IN_ENUM");
+  });
+
+  it("accepts ctx.staff with all roles in STAFF_ROLES", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Procedure
+metadata: { name: editor }
+spec:
+  input: { type: object }
+  output: { type: object }
+  requires:
+    auth:
+      all: [{ "ctx.staff": ["owner", "editor"] }]
+  handler: { kind: ref, ref: editorFn }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+  });
+});
+
+/**
+ * Tests for `checkHandlerRefsInSource` — the source-grep that pairs
+ * `Procedure.handler.ref` with an actual registration in the consumer's
+ * `src/`. Two registration patterns are valid evidence:
+ *
+ *   1. Quoted string literal — `registerHandler('captchaCheck', fn)`
+ *      or `handlers: { 'captchaCheck': fn }`.
+ *   2. Unquoted object-property key — `{ captchaCheck: fn }`, the
+ *      JS shorthand the publication / intake / presence starters use
+ *      in `src/handlers/index.ts`'s `buildHandlers()`. Previously this
+ *      pattern was missed (false-positive HANDLER_NOT_REGISTERED).
+ */
+describe("checkHandlerRefsInSource — HANDLER_NOT_REGISTERED", () => {
+  const captchaProcedure = procedure("captchaCheck");
+
+  it("accepts a quoted string-literal registration", () => {
+    const source = `
+      import { register } from "./registry";
+      register('captchaCheck', () => true);
+    `;
+    const result = check({ manifests: [captchaProcedure], handlerSource: source });
+    expect(result.diagnostics.filter((d) => d.code === "HANDLER_NOT_REGISTERED")).toEqual([]);
+  });
+
+  it("accepts an unquoted object-property-key registration (the starters' idiom)", () => {
+    const source = `
+      export function buildHandlers(env) {
+        return {
+          captchaCheck: cloudflareTurnstileCheck({ secret: env.TURNSTILE_SECRET_KEY }),
+          slackNotify: slackNotify,
+        };
+      }
+    `;
+    const result = check({
+      manifests: [captchaProcedure, procedure("slackNotify")],
+      handlerSource: source,
+    });
+    expect(result.diagnostics.filter((d) => d.code === "HANDLER_NOT_REGISTERED")).toEqual([]);
+  });
+
+  it("emits HANDLER_NOT_REGISTERED when the ref is absent from source entirely", () => {
+    const source = `export function buildHandlers() { return {}; }`;
+    const result = check({ manifests: [captchaProcedure], handlerSource: source });
+    const diag = result.diagnostics.find((d) => d.code === "HANDLER_NOT_REGISTERED");
+    expect(diag?.severity).toBe("warning");
+    expect(diag?.value).toBe("captchaCheck");
+  });
+
+  it("does not false-positive on a substring match — `captchaCheckHelper` is not `captchaCheck`", () => {
+    const source = `const captchaCheckHelper = () => true;`;
+    const result = check({ manifests: [captchaProcedure], handlerSource: source });
+    // Substring match would falsely accept this; the property-key regex
+    // requires the identifier followed by `:` (an object key) so the
+    // bare assignment above does NOT count as registration evidence.
+    // The quoted-literal regex also doesn't match. Expect the warning.
+    const diag = result.diagnostics.find((d) => d.code === "HANDLER_NOT_REGISTERED");
+    expect(diag).toBeDefined();
+  });
+
+  it("does not false-positive on a comment that mentions the ref name", () => {
+    const source = `
+      // captchaCheck lives in handlers.ts — see buildHandlers().
+      export function buildHandlers() { return {}; }
+    `;
+    const result = check({ manifests: [captchaProcedure], handlerSource: source });
+    // Comment is not a property key (no \`:\` follows the word) and not
+    // a quoted string. Expect the warning to fire.
+    const diag = result.diagnostics.find((d) => d.code === "HANDLER_NOT_REGISTERED");
+    expect(diag).toBeDefined();
   });
 });

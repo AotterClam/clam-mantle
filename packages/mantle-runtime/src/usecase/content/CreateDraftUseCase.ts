@@ -14,7 +14,7 @@ import {
   schemaUnknownDiagnostic,
   withConflictDiagnostic,
 } from "./diagnostics.js";
-import { assertEntryWritable } from "./EntryWriteGuards.js";
+import { assertEntryWritable } from "../../domain/service/io/EntryWriteGuard.js";
 
 /**
  * `CreateDraftUseCase` — create a new draft entry. Both `simple` and

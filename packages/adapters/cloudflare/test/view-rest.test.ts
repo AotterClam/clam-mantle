@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Manifest } from "@aotter/mantle-spec";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
+import type { Auth } from "../src/auth/createAuth.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
 import {
   InMemoryKv,
@@ -181,5 +182,203 @@ describe("GET /api/views/<name>", () => {
     const h = harness();
     const res = await h.app.request("/api/views/doesNotExist");
     expect(res.status).toBe(404);
+  });
+
+  it("auth-gated View on HTTP route plumbs ctx — passes when staff session is present (#210 PR12 C1)", async () => {
+    // The route must build a HandlerContext from the Better Auth
+    // cookie session and forward it as ExecuteViewRequest.ctx, else
+    // every auth-gated View returns UNAUTHENTICATED for every caller.
+    // We validate the plumbing here by registering an auth-gated View
+    // and a staff session; the view should resolve.
+    const ownerAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Staff", role: "owner", githubLogin: null },
+      }),
+      getUserRole: async () => "owner",
+      methods: [],
+    };
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.mantle.aotter.net/v1",
+        kind: "View",
+        metadata: { name: "staffOnly" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    db.entries.set("p1", row("p1", { slug: "hi", locale: "en" }));
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: ownerAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffOnly");
+    expect(res.status).toBe(200);
+  });
+
+  it("auth-gated View on HTTP route rejects with UNAUTHENTICATED when no session", async () => {
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.mantle.aotter.net/v1",
+        kind: "View",
+        metadata: { name: "staffOnly2" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: stubAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffOnly2");
+    expect(res.status).toBe(401);
+    const body = await res.json() as { ok: boolean; diagnostic?: { code: string } };
+    expect(body.ok).toBe(false);
+    expect(body.diagnostic?.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("auth-gated View returns 403 AUTH_DENIED when session exists but role insufficient (#210 PR13)", async () => {
+    const customerAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Customer", role: null, githubLogin: null },
+      }),
+      getUserRole: async () => null,
+      methods: [],
+    };
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.mantle.aotter.net/v1",
+        kind: "View",
+        metadata: { name: "staffOnly3" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: customerAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffOnly3");
+    expect(res.status).toBe(403);
+    const body = await res.json() as { diagnostic?: { code: string } };
+    expect(body.diagnostic?.code).toBe("AUTH_DENIED");
+  });
+
+  it("auth gate runs BEFORE param coercion — anonymous probe doesn't leak the param contract (#210 PR13 CX2)", async () => {
+    // Pre-PR13: a View with required params would 400 with "missing
+    // locale param" for an anonymous probe, leaking the protected
+    // View's parameter contract. Post-PR13: the auth gate fires
+    // first → 401 UNAUTHENTICATED with no params shape disclosure.
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.mantle.aotter.net/v1",
+        kind: "View",
+        metadata: { name: "staffOnlyWithParams" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: ["ctx.user"] } },
+          params: {
+            type: "object",
+            properties: { secretKey: { type: "string" } },
+            required: ["secretKey"],
+          },
+          filter: { eq: { field: "slug", value: { $param: "secretKey" } } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: stubAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    // Anonymous probe with NO query params — would have 400'd on
+    // missing `secretKey` before the fix.
+    const res = await app.request("/api/views/staffOnlyWithParams");
+    expect(res.status).toBe(401);
+    const body = await res.json() as { diagnostic?: { code: string; message?: string } };
+    expect(body.diagnostic?.code).toBe("UNAUTHENTICATED");
+    // The diagnostic must not mention the param name.
+    expect(body.diagnostic?.message ?? "").not.toContain("secretKey");
+  });
+
+  it("auth predicates evaluated BEFORE param coercion — wrong-role user doesn't leak param contract (codex follow-up)", async () => {
+    // A logged-in user without the required staff role hitting a
+    // staff-gated View with required params must get 403 AUTH_DENIED,
+    // not 400 leaking the View's parameter shape. The first PR13
+    // commit only caught no-session; an authenticated wrong-role
+    // user still slipped through to coerceViewParams.
+    const customerAuth: Auth = {
+      handler: async () => new Response(null, { status: 404 }),
+      getSession: async () => ({
+        session: { id: "s", userId: "u", expiresAt: new Date(Date.now() + 60_000) },
+        user: { id: "u", email: "x@y.z", name: "Customer", role: null, githubLogin: null },
+      }),
+      getUserRole: async () => null,
+      methods: [],
+    };
+    const gatedManifests: Manifest[] = [
+      ...manifests(),
+      {
+        apiVersion: "cms.mantle.aotter.net/v1",
+        kind: "View",
+        metadata: { name: "staffParamsLeak" },
+        spec: {
+          from: "posts",
+          requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+          params: {
+            type: "object",
+            properties: { secretKey: { type: "string" } },
+            required: ["secretKey"],
+          },
+          filter: { eq: { field: "slug", value: { $param: "secretKey" } } },
+        },
+      },
+    ];
+    const db = new InMemoryDatabase();
+    const ref = createCmsRef({
+      manifests: gatedManifests,
+      siteDefaults: { locales: ["en"] },
+      bindings: { db, kv: new InMemoryKv(), assets: new StubAssetServer() },
+      auth: customerAuth,
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/views/staffParamsLeak");
+    expect(res.status).toBe(403);
+    const body = await res.json() as { diagnostic?: { code: string; message?: string } };
+    expect(body.diagnostic?.code).toBe("AUTH_DENIED");
+    expect(body.diagnostic?.message ?? "").not.toContain("secretKey");
   });
 });

@@ -57,13 +57,15 @@ const DEFAULT_PROJECTION = Object.entries(RESERVED_COLUMN)
   .join(", ");
 
 export function compileView(view: ViewManifest, options: CompileViewOptions = {}): CompiledView {
-  const sqlParams: unknown[] = [];
+  const sqlParams: unknown[] = [view.spec.from];
   const selectExpr = buildSelect(view.spec.fields);
   const whereParts: string[] = ["collection = ?"];
-  sqlParams.push(view.spec.from);
   if (view.spec.filter) {
-    const filterSql = compileFilter(view.spec.filter, sqlParams, options.params ?? {});
-    if (filterSql !== null) whereParts.push(`(${filterSql})`);
+    const compiled = compileFilter(view.spec.filter, options.params ?? {});
+    if (compiled !== null) {
+      whereParts.push(`(${compiled.sql})`);
+      sqlParams.push(...compiled.params);
+    }
   }
   const where = `WHERE ${whereParts.join(" AND ")}`;
   const orderBy = buildOrderBy(view.spec.orderBy);
@@ -84,52 +86,57 @@ function fieldExpr(field: string): string {
   if (reserved) {
     return reserved === field ? reserved : `${reserved} AS ${field}`;
   }
-  return `json_extract(data, '$.${escapeJsonKey(field)}') AS ${quoteIdent(field)}`;
+  return `json_extract(data, ${quotedJsonPath(field)}) AS ${quoteIdent(field)}`;
 }
 
 function fieldRefExpr(field: string): string {
   const reserved = RESERVED_COLUMN[field];
   if (reserved) return reserved;
-  return `json_extract(data, '$.${escapeJsonKey(field)}')`;
+  return `json_extract(data, ${quotedJsonPath(field)})`;
+}
+
+interface CompiledFragment {
+  readonly sql: string;
+  readonly params: readonly unknown[];
 }
 
 /**
- * Returns `null` when the node should evaluate to TRUE (no constraint).
- * That happens when an `eq` references a param via `{ $param: <name> }`
- * and the resolved value is `undefined`. v0.1.0 parser enforces
- * required-only param refs, so this drop path is dead code today; it
- * lives here so v0.1.x "optional param ref" promotion is purely a
- * parser change. AND/OR fold over their children: any null child
- * drops; an AND/OR whose children all drop returns null itself.
+ * Returns `null` when the node has no constraint to emit: an `eq`
+ * whose `{ $param }` ref is unresolved, or an AND/OR whose children
+ * all dropped. v0.1.0 parser enforces required-only param refs so
+ * the drop path is dead today; kept so v0.1.x "optional param ref"
+ * promotion is a parser-only change.
+ *
+ * Each node returns its own `{ sql, params }` (vs. pushing into a
+ * shared array) so a dropped sub-tree can never leave orphan params
+ * bound to the parent's `?` placeholders.
  */
 function compileFilter(
   node: FilterAst,
-  sqlParams: unknown[],
   paramValues: Record<string, unknown>,
-): string | null {
+): CompiledFragment | null {
   if ("eq" in node) {
     const value = node.eq.value;
+    let bound: unknown;
     if (isParamRef(value)) {
       const resolved = paramValues[value.$param];
       if (resolved === undefined) return null;
-      sqlParams.push(resolved);
+      bound = resolved;
     } else {
-      sqlParams.push(value);
+      bound = value;
     }
-    return `${fieldRefExpr(node.eq.field)} = ?`;
+    return { sql: `${fieldRefExpr(node.eq.field)} = ?`, params: [bound] };
   }
-  if ("and" in node) {
-    const parts = node.and
-      .map((c) => compileFilter(c, sqlParams, paramValues))
-      .filter((p): p is string => p !== null);
-    if (parts.length === 0) return null;
-    return parts.map((p) => `(${p})`).join(" AND ");
-  }
-  const parts = node.or
-    .map((c) => compileFilter(c, sqlParams, paramValues))
-    .filter((p): p is string => p !== null);
-  if (parts.length === 0) return null;
-  return parts.map((p) => `(${p})`).join(" OR ");
+  const op = "and" in node ? "AND" : "OR";
+  const children = "and" in node ? node.and : node.or;
+  const compiled = children
+    .map((c) => compileFilter(c, paramValues))
+    .filter((c): c is CompiledFragment => c !== null);
+  if (compiled.length === 0) return null;
+  return {
+    sql: compiled.map((c) => `(${c.sql})`).join(` ${op} `),
+    params: compiled.flatMap((c) => c.params),
+  };
 }
 
 function buildOrderBy(
@@ -143,34 +150,51 @@ function buildOrderBy(
   return ` ORDER BY ${parts.join(", ")}`;
 }
 
-function escapeJsonKey(key: string): string {
-  if (key.includes("\\")) {
-    throw new DiagnosticError(
-      runtimeDiagnostic({
-        code: "INTERNAL_ERROR",
-        severity: "error",
-        path: "compileView/escapeJsonKey",
-        value: key,
-        expected: "field name without backslashes (Schema validator gate)",
-        message: `field name '${key}' contains a backslash; Schema validation should have caught this.`,
-      }),
-    );
-  }
-  return key.replace(/'/g, "''");
+// Schema JSON property keys can be arbitrary strings per RFC 8259,
+// but SQLite's JSON1 path syntax (`$."key"`) has no documented way
+// to escape an inner `"` or `\` inside a quoted key — doubled-quote
+// escaping is the SQLite identifier convention, NOT a JSON-path
+// convention. So we always quote the path/alias (admitting hyphens,
+// spaces, etc.) but refuse `"`, `\`, and `\0` in field names —
+// those break either the JSON-path resolution or the SQL string
+// literal. Real Schema authors don't use those characters in keys;
+// rejecting them keeps the path always-resolvable.
+
+const FORBIDDEN_FIELD_CHARS = /["\\\0]/;
+
+function assertFieldNameSafe(name: string, callsite: string): void {
+  if (!FORBIDDEN_FIELD_CHARS.test(name)) return;
+  throw new DiagnosticError(
+    runtimeDiagnostic({
+      code: "INTERNAL_ERROR",
+      severity: "error",
+      path: `compileView/${callsite}`,
+      value: name,
+      expected: 'field name without `"`, `\\`, or NUL',
+      message: `field name '${name}' contains an unrepresentable character (\", \\, or NUL); Schema validation should have caught this.`,
+    }),
+  );
 }
 
+/**
+ * Emit `'$."<field>"'` — a SQL string literal containing a SQLite
+ * JSON path. Doubles single quotes for the surrounding SQL literal
+ * (SQLite literal escape). Field name itself is guaranteed free of
+ * `"` / `\` / NUL by `assertFieldNameSafe`, so the inner double-
+ * quoted key needs no further escape.
+ */
+function quotedJsonPath(field: string): string {
+  assertFieldNameSafe(field, "quotedJsonPath");
+  // Only `'` needs escaping for the surrounding SQL literal; field
+  // is guaranteed free of `"` / `\` / NUL.
+  return `'$."${field.replace(/'/g, "''")}"'`;
+}
+
+/**
+ * SQLite quoted-identifier alias (`"hero-image"`). Used as the result
+ * column name so callers read the field back under its declared key.
+ */
 function quoteIdent(name: string): string {
-  if (name.includes('"')) {
-    throw new DiagnosticError(
-      runtimeDiagnostic({
-        code: "INTERNAL_ERROR",
-        severity: "error",
-        path: "compileView/quoteIdent",
-        value: name,
-        expected: "field name without double-quotes (Schema validator gate)",
-        message: `field name '${name}' contains a double-quote; Schema validation should have caught this.`,
-      }),
-    );
-  }
+  assertFieldNameSafe(name, "quoteIdent");
   return `"${name}"`;
 }

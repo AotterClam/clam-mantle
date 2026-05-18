@@ -515,17 +515,27 @@ function buildAuth(config: CreateAuthConfig) {
     };
     if (!shouldPromoteToOwner(bootstrap, u)) return;
 
+    // Atomic check-then-promote: the `NOT EXISTS` is a GLOBAL guard —
+    // it asks "does any user already hold an admin role?". The whole
+    // statement runs as one D1 op, so two concurrent first signups
+    // can't both win: the loser's UPDATE finds an admin in the
+    // subquery and silently writes zero rows.
     const placeholders = ADMIN_ROLES.map(() => "?").join(",");
-    const existingAdmin = await config.database
-      .prepare(`SELECT id FROM user WHERE role IN (${placeholders}) LIMIT 1`)
-      .bind(...ADMIN_ROLES)
-      .first<{ id: string }>();
-    if (existingAdmin) return;
-
-    await config.database
-      .prepare("UPDATE user SET role = ? WHERE id = ?")
-      .bind("owner", u.id)
+    const result = await config.database
+      .prepare(
+        `UPDATE user SET role = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM user WHERE role IN (${placeholders}))`,
+      )
+      .bind("owner", u.id, ...ADMIN_ROLES)
       .run();
+    if ((result.meta?.changes ?? 0) === 0) {
+      // Operator-visible signal that the rule matched but a prior
+      // admin already exists — otherwise the silent no-op makes a
+      // misconfigured bootstrap rule indistinguishable from a working
+      // first-promotion.
+      console.warn(
+        `[bootstrap] user ${u.id} matched bootstrapOwner rule but promotion was blocked — an admin user already exists.`,
+      );
+    }
   };
   const databaseHooks = {
     user: {

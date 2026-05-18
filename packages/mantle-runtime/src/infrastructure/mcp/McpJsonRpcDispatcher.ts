@@ -177,6 +177,10 @@ export class McpJsonRpcDispatcher {
       if (!viewSegment) return UNKNOWN_TOOL;
       const view = this.viewBySegment.get(viewSegment);
       if (!view || !this.useCases.executeView) return UNKNOWN_TOOL;
+      // Build ctx from the bearer-derived McpAuthContext so the
+      // executeView use case can evaluate `requires.auth.all`. Without
+      // this, every auth-gated public-surface View returned
+      // UNAUTHENTICATED for every caller including authenticated staff.
       const result = await this.useCases.executeView.execute({
         view,
         options: {
@@ -185,6 +189,13 @@ export class McpJsonRpcDispatcher {
           show: typeof args["show"] === "number" ? args["show"] : undefined,
         },
         pathPrefix: `MCP ${name}`,
+        ctx: {
+          user: { id: auth.userId },
+          staff: auth.staff
+            ? { id: auth.staff.userId, role: auth.staff.role }
+            : null,
+          env: {},
+        },
       });
       return result;
     }
@@ -193,10 +204,14 @@ export class McpJsonRpcDispatcher {
       case "list_entries": {
         const collection = args["collection"];
         if (typeof collection !== "string") return MISSING_ARG;
-        return this.useCases.listEntries.execute({
+        // MCP exposes the cursored shape so agents can walk pages
+        // through `nextCursor`. App code reaches for `execute()`
+        // instead and gets a flat array.
+        return this.useCases.listEntries.executePage({
           collection,
           status: args["status"] as ContentState | undefined,
           limit: typeof args["limit"] === "number" ? args["limit"] : undefined,
+          cursor: typeof args["cursor"] === "string" ? args["cursor"] : undefined,
         });
       }
       case "get_entry": {
@@ -220,15 +235,27 @@ export class McpJsonRpcDispatcher {
         if (typeof id !== "string" || typeof expected !== "number") return MISSING_ARG;
         return this.useCases.archive.execute({ id, expectedVersion: expected });
       }
+      case "delete_entry": {
+        const id = args["id"];
+        if (typeof id !== "string") return MISSING_ARG;
+        return this.useCases.deleteEntry.execute({ id });
+      }
       case "create_media_upload": {
         if (!this.useCases.media) return UNKNOWN_TOOL;
         const filename = args["filename"];
         const mimeType = args["mimeType"];
-        if (typeof filename !== "string" || typeof mimeType !== "string") return MISSING_ARG;
+        const byteSize = args["byteSize"];
+        if (
+          typeof filename !== "string" ||
+          typeof mimeType !== "string" ||
+          typeof byteSize !== "number"
+        ) {
+          return MISSING_ARG;
+        }
         return this.useCases.media.createUpload.execute({
           filename,
           mimeType,
-          byteSize: typeof args["byteSize"] === "number" ? args["byteSize"] : undefined,
+          byteSize,
           alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
           caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
           purpose: typeof args["purpose"] === "string" ? args["purpose"] : undefined,

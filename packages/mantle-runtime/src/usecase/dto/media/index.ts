@@ -8,7 +8,11 @@
 export interface CreateMediaUploadRequest {
   readonly filename: string;
   readonly mimeType: string;
-  readonly byteSize?: number;
+  /** Required so the use case enforces the byte ceiling before
+   *  signing a PUT URL — without it the presigned URL accepts an
+   *  unbounded body and the cap only applies at commit, which is
+   *  too late if storage doesn't honor `Content-Length`. */
+  readonly byteSize: number;
   readonly alt?: string;
   readonly caption?: string;
   readonly purpose?: string;

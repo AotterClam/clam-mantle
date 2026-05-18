@@ -14,82 +14,93 @@
 export type Phase = "validate" | "test" | "boot" | "runtime";
 
 /**
- * The full catalog of diagnostic codes the SDK emits across all
- * phases. Per ADR-0008, spec **defines** the catalog (this union);
- * runtime / cli / adapters **emit** them. Codes in the cross-phase
- * and runtime-only sections below are not raised by spec source —
- * they live here because the catalog is the public contract, not the
- * union of what spec happens to throw today. Adding a new code is a
- * grammar-revise event (ADR-0001 § Future grammar discipline).
+ * Closed catalog of diagnostic codes the SDK emits across all phases.
+ * Per ADR-0008, spec **defines** the catalog; runtime / cli / adapters
+ * **emit** them. Codes in the cross-phase and runtime-only sections
+ * below are not raised by spec source — they live here because the
+ * catalog is the public contract, not the union of what spec happens
+ * to throw today. Adding a new code is a grammar-revise event
+ * (ADR-0001 § Future grammar discipline).
+ *
+ * Single source of truth: the const array drives `DiagnosticCode`
+ * (type) and `isDiagnosticCode` (guard), so adding a code is one
+ * edit and `parseWireDiagnostic` stays in sync automatically.
  */
-export type DiagnosticCode =
+export const DIAGNOSTIC_CODES = [
   // Validate-only.
-  | "INVALID_MANIFEST_ENVELOPE"
-  | "DUPLICATE_NAME"
-  | "VIEW_FROM_UNKNOWN_SCHEMA"
-  | "VIEW_FIELD_NOT_IN_SCHEMA"
-  | "VIEW_FILTER_FIELD_NOT_IN_SCHEMA"
-  | "VIEW_PARAMS_INVALID_SHAPE"
-  | "VIEW_PARAMS_RESERVED_NAME"
-  | "VIEW_FILTER_PARAM_REF_UNKNOWN"
-  | "VIEW_FILTER_PARAM_REF_NOT_REQUIRED"
-  | "BIND_VALUE_NOT_IN_ENUM"
-  | "AUTH_PREDICATE_NOT_IN_ENUM"
-  | "UNIQUE_INDEX_FIELD_UNKNOWN"
-  | "DRAFT_KEY_USED"
+  "INVALID_MANIFEST_ENVELOPE",
+  "DUPLICATE_NAME",
+  "VIEW_FROM_UNKNOWN_SCHEMA",
+  "VIEW_FIELD_NOT_IN_SCHEMA",
+  "VIEW_FILTER_FIELD_NOT_IN_SCHEMA",
+  "VIEW_PARAMS_INVALID_SHAPE",
+  "VIEW_PARAMS_RESERVED_NAME",
+  "VIEW_FILTER_PARAM_REF_UNKNOWN",
+  "VIEW_FILTER_PARAM_REF_NOT_REQUIRED",
+  "BIND_VALUE_NOT_IN_ENUM",
+  "AUTH_PREDICATE_NOT_IN_ENUM",
+  "UNIQUE_INDEX_FIELD_UNKNOWN",
+  "DRAFT_KEY_USED",
   // v0.1.x-committed keys present in v0.1.0 manifests are rejected
   // with a code naming the feature (per ADR-0011 § "boot validator
   // framing"), distinct from the speculative-DRAFT bucket.
-  | "LIFECYCLE_NOT_IN_V010"
-  | "HANDLER_BUILTIN_NOT_IN_V010"
-  | "MANIFEST_ROOT_NOT_FOUND"
-  | "MANIFEST_READ_FAILED"
+  "LIFECYCLE_NOT_IN_V010",
+  "HANDLER_BUILTIN_NOT_IN_V010",
+  "MANIFEST_ROOT_NOT_FOUND",
+  "MANIFEST_READ_FAILED",
   // Test-harness only.
-  | "FIXTURE_SCHEMA_VIOLATION"
+  "FIXTURE_SCHEMA_VIOLATION",
   // Cross-phase (validate / boot / runtime as applicable).
-  | "HANDLER_NOT_REGISTERED"
-  | "TRIGGER_TARGET_PROCEDURE_UNKNOWN"
-  | "TRIGGER_PATH_COLLISION"
-  | "TRIGGER_PATH_INVALID"
-  | "MCP_TOOL_NAME_COLLISION"
-  | "PROCEDURE_NOT_FOUND"
-  | "NOT_FOUND"
-  | "METHOD_NOT_ALLOWED"
+  "HANDLER_NOT_REGISTERED",
+  "TRIGGER_TARGET_PROCEDURE_UNKNOWN",
+  "TRIGGER_PATH_COLLISION",
+  "TRIGGER_PATH_INVALID",
+  "MCP_TOOL_NAME_COLLISION",
+  "PROCEDURE_NOT_FOUND",
+  "NOT_FOUND",
+  "METHOD_NOT_ALLOWED",
   // Builtin handlers + lifecycle hooks: validate / boot.
-  | "BUILTIN_HANDLER_SCHEMA_UNKNOWN"
-  | "BUILTIN_HANDLER_SCHEMA_NOT_EDITORIAL"
-  | "LIFECYCLE_SCHEMA_UNKNOWN"
-  | "LIFECYCLE_HOOK_REJECTED"
+  "BUILTIN_HANDLER_SCHEMA_UNKNOWN",
+  "BUILTIN_HANDLER_SCHEMA_NOT_EDITORIAL",
+  "LIFECYCLE_SCHEMA_UNKNOWN",
+  "LIFECYCLE_HOOK_REJECTED",
   // Locale + translates: validate / boot.
-  | "SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES"
-  | "TRANSLATES_PARENT_UNKNOWN"
-  | "TRANSLATES_REQUIRES_LOCALIZED"
-  | "TRANSLATES_FIELD_NOT_IN_PARENT"
-  | "TRANSLATES_FIELD_NOT_IN_CHILD"
-  | "TRANSLATES_PARENT_IS_LOCALIZED"
+  "SCHEMA_LOCALIZED_REQUIRES_SITE_LOCALES",
+  "TRANSLATES_PARENT_UNKNOWN",
+  "TRANSLATES_REQUIRES_LOCALIZED",
+  "TRANSLATES_FIELD_NOT_IN_PARENT",
+  "TRANSLATES_FIELD_NOT_IN_CHILD",
+  "TRANSLATES_PARENT_IS_LOCALIZED",
   // Runtime-only (and test harness when the dispatcher reports them).
-  | "INPUT_VALIDATION_FAILED"
-  | "UNAUTHENTICATED"
-  | "AUTH_DENIED"
-  | "CONFLICT"
-  | "DISPATCHER_NOT_BUILT"
-  | "INTERNAL_ERROR"
-  | "OUTPUT_VALIDATION_FAILED"
+  "INPUT_VALIDATION_FAILED",
+  "UNAUTHENTICATED",
+  "AUTH_DENIED",
+  "CONFLICT",
+  "DISPATCHER_NOT_BUILT",
+  "INTERNAL_ERROR",
+  "OUTPUT_VALIDATION_FAILED",
   // Locale-data invariants: boot + runtime.
-  | "INVALID_LOCALE"
+  "INVALID_LOCALE",
   // Media uploads (runtime-only). Adapter signs presigned PUTs; commit
   // verifies metadata. Codes surface from Create / Commit use cases.
-  | "MEDIA_NOT_CONFIGURED"
-  | "MEDIA_UPLOAD_EXPIRED"
-  | "MEDIA_OBJECT_NOT_FOUND"
-  | "MEDIA_MIME_REJECTED"
-  | "MEDIA_SIZE_EXCEEDED"
-  | "MEDIA_SVG_REJECTED"
-  | "MEDIA_CHECKSUM_MISMATCH"
+  "MEDIA_NOT_CONFIGURED",
+  "MEDIA_UPLOAD_EXPIRED",
+  "MEDIA_OBJECT_NOT_FOUND",
+  "MEDIA_MIME_REJECTED",
+  "MEDIA_SIZE_EXCEEDED",
+  "MEDIA_SVG_REJECTED",
+  "MEDIA_CHECKSUM_MISMATCH",
   // Mantle agent-memory layer (ADR-0016). Validate-time CLI check
   // gates deploy until the install agent's Mantle subagent has
   // written the 5-card welcome letter into mantle/site.md.
-  | "MANTLE_LETTER_NOT_WRITTEN";
+  "MANTLE_LETTER_NOT_WRITTEN",
+] as const;
+
+export type DiagnosticCode = (typeof DIAGNOSTIC_CODES)[number];
+
+export function isDiagnosticCode(s: string): s is DiagnosticCode {
+  return (DIAGNOSTIC_CODES as readonly string[]).includes(s);
+}
 
 export interface Diagnostic {
   readonly code: DiagnosticCode;
@@ -251,7 +262,8 @@ export function parseWireDiagnostic(text: string): Diagnostic | null {
   }
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return null;
   const parsed = raw as Record<string, unknown>;
-  if (typeof parsed["code"] !== "string") return null;
+  const code = parsed["code"];
+  if (typeof code !== "string" || !isDiagnosticCode(code)) return null;
   if (typeof parsed["message"] !== "string") return null;
   if (typeof parsed["path"] !== "string") return null;
   const phase = parsed["phase"];

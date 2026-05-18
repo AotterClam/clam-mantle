@@ -17,6 +17,11 @@ export interface PreviewEntryRequest {
   readonly statusOrder?: ReadonlyArray<ContentState>;
   /** Banner HTML appended just inside `<body>`. Caller composes the
    *  text — runtime doesn't own the localization. Defaults to a bare
-   *  `Preview · {status} · {slug}` block when omitted. */
+   *  `Preview · {status} · {slug}` block when omitted (HTML-escaped
+   *  via `defaultPreviewBanner`).
+   *
+   *  ⚠ Caller-supplied `banner` is injected verbatim — the runtime
+   *  does not escape it. Treat it the same as any other adapter HTML
+   *  payload: the caller owns sanitization. */
   readonly banner?: string;
 }

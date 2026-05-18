@@ -8,8 +8,10 @@ import {
   API_VERSION,
   BUILTIN_OPS,
   LIFECYCLE_HOOKS,
+  STAFF_ROLES,
   VIEW_PARAMS_RESERVED,
   isParamRef,
+  isStaffRole,
   type AuthPredicate,
   type BuiltinOp,
   type FilterAst,
@@ -87,6 +89,7 @@ const V01_HANDLER_KINDS: ReadonlySet<string> = new Set(["ref", "builtin"]);
 const V01_BUILTIN_OPS: ReadonlySet<BuiltinOp> = new Set(BUILTIN_OPS);
 const V01_LIFECYCLE_HOOKS: ReadonlySet<LifecycleHook> = new Set(LIFECYCLE_HOOKS);
 const V01_HOOK_ERROR_POLICIES: ReadonlySet<string> = new Set(["abort", "continue"]);
+const DRAFT_FILTER_OPS: ReadonlySet<string> = new Set(["contains", "not", "in", "like"]);
 const V01_LIFECYCLE_MODES: ReadonlySet<string> = new Set(["simple", "editorial"]);
 
 /** Result of `parseManifests`. */
@@ -166,7 +169,25 @@ function parseOneStream(
       );
       continue;
     }
-    const value = doc.toJS({ maxAliasCount: -1 });
+    // `maxAliasCount: 100` matches the yaml library's recommended safe
+    // default; the prior `-1` (unlimited) leaves the parser open to YAML
+    // bombs (`a: &a [{a: *a, ...}]`) that can exhaust memory before any
+    // grammar validator runs. The lib throws a ReferenceError when the
+    // cap trips — surface as a structured diagnostic, not an uncaught.
+    let value: unknown;
+    try {
+      value = doc.toJS({ maxAliasCount: 100 });
+    } catch (e) {
+      diagnostics.push(
+        validateDiagnostic({
+          code: "INVALID_MANIFEST_ENVELOPE",
+          severity: "error",
+          path: pointerFor(docIndex, "/"),
+          message: `[doc ${docIndex}] YAML alias-expansion limit exceeded: ${e instanceof Error ? e.message : String(e)}`,
+        }),
+      );
+      continue;
+    }
     if (value == null) continue;
     try {
       manifests.push(validateEnvelope(value, docIndex));
@@ -328,6 +349,9 @@ function validateViewSpec(m: ViewManifest, idx: number): ViewManifest {
   if (typeof s["from"] !== "string" || (s["from"] as string).length === 0) {
     throw new ManifestParseError("View.spec.from is required (non-empty string)", idx, "/spec/from");
   }
+  if ("requires" in s && s["requires"] != null) {
+    validateRequires(s["requires"], idx, "View");
+  }
   let paramSchema: JsonSchema | undefined;
   if ("params" in s && s["params"] != null) {
     paramSchema = validateViewParams(s["params"], idx);
@@ -436,8 +460,7 @@ function validateFilterAst(
     }
     return;
   }
-  const draftOps = new Set(["contains", "not", "in", "like"]);
-  if (draftOps.has(op)) {
+  if (DRAFT_FILTER_OPS.has(op)) {
     throw new ManifestParseError(
       `${path} operator '${op}' is DRAFT (see ADR-0001 § "What's DRAFT" / View); not supported in v0.1`,
       idx,
@@ -507,7 +530,7 @@ function validateProcedureSpec(m: ProcedureManifest, idx: number): ProcedureMani
   }
   validateHandlerBinding(handler, idx);
   if ("requires" in s && s["requires"] != null) {
-    validateRequires(s["requires"], idx);
+    validateRequires(s["requires"], idx, "Procedure");
   }
   for (const draft of ["errors", "retry", "idempotency"] as const) {
     if (draft in s) {
@@ -572,15 +595,17 @@ function validateHandlerBinding(h: Record<string, unknown>, idx: number): void {
   }
 }
 
-function validateRequires(req: unknown, idx: number): void {
+function validateRequires(req: unknown, idx: number, atom: "Procedure" | "View"): void {
   if (typeof req !== "object" || req === null) {
-    throw new ManifestParseError("Procedure.spec.requires must be an object", idx);
+    throw new ManifestParseError(`${atom}.spec.requires must be an object`, idx);
   }
   const r = req as Record<string, unknown>;
+  // window / quota are Procedure-only DRAFT keys; reject early on both
+  // atoms so a misplaced key surfaces with a clear diagnostic.
   for (const draft of ["window", "quota"] as const) {
     if (draft in r) {
       throw new ManifestParseError(
-        `Procedure.spec.requires.${draft} is DRAFT (see ADR-0001 § "What's DRAFT" / Procedure); not supported in v0.1`,
+        `${atom}.spec.requires.${draft} is DRAFT (see ADR-0001 § "What's DRAFT" / Procedure); not supported in v0.1`,
         idx,
         undefined,
         "DRAFT_KEY_USED",
@@ -590,12 +615,12 @@ function validateRequires(req: unknown, idx: number): void {
   if (!("auth" in r) || r["auth"] == null) return;
   const auth = r["auth"];
   if (typeof auth !== "object" || auth === null) {
-    throw new ManifestParseError("Procedure.spec.requires.auth must be an object", idx);
+    throw new ManifestParseError(`${atom}.spec.requires.auth must be an object`, idx);
   }
   const a = auth as Record<string, unknown>;
   if ("any" in a) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth.any is DRAFT; v0.1 supports only `all`",
+      `${atom}.spec.requires.auth.any is DRAFT; v0.1 supports only \`all\``,
       idx,
       undefined,
       "DRAFT_KEY_USED",
@@ -603,19 +628,19 @@ function validateRequires(req: unknown, idx: number): void {
   }
   if (!("all" in a)) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth must declare `all` (v0.1)",
+      `${atom}.spec.requires.auth must declare \`all\` (v0.1)`,
       idx,
     );
   }
   const all = a["all"];
   if (!Array.isArray(all) || all.length === 0) {
     throw new ManifestParseError(
-      "Procedure.spec.requires.auth.all must be a non-empty array",
+      `${atom}.spec.requires.auth.all must be a non-empty array`,
       idx,
     );
   }
   for (let i = 0; i < all.length; i++) {
-    validateAuthPredicate(all[i], idx, `Procedure.spec.requires.auth.all[${i}]`);
+    validateAuthPredicate(all[i], idx, `${atom}.spec.requires.auth.all[${i}]`);
   }
 }
 
@@ -629,6 +654,15 @@ function validateAuthPredicate(p: unknown, idx: number, path: string): asserts p
         throw new ManifestParseError(
           `${path}: 'ctx.staff' value must be a non-empty array of role-name strings`,
           idx,
+        );
+      }
+      const badRole = (roles as readonly string[]).find((r) => !isStaffRole(r));
+      if (badRole !== undefined) {
+        throw new ManifestParseError(
+          `${path}: 'ctx.staff' role '${badRole}' is not in STAFF_ROLES (${[...STAFF_ROLES].join(", ")})`,
+          idx,
+          undefined,
+          "AUTH_PREDICATE_NOT_IN_ENUM",
         );
       }
       return;
@@ -706,9 +740,9 @@ function validateLifecycleSource(source: Record<string, unknown>, idx: number): 
         "/spec/source/errorPolicy",
       );
     }
-    if (ep === "abort" && (on as ReadonlyArray<string>).every((h) => typeof h === "string" && h.startsWith("after_"))) {
+    if (ep === "abort" && (on as ReadonlyArray<string>).some((h) => typeof h === "string" && h.startsWith("after_"))) {
       throw new ManifestParseError(
-        "Trigger.spec.source.errorPolicy: 'abort' is invalid on after_* hooks — after_* runs after the response is sent, so abort cannot reach the caller. Move the hook to before_*, or use 'continue'.",
+        "Trigger.spec.source.errorPolicy: 'abort' is invalid when any after_* hook is in `on` — after_* runs after the response is sent, so abort cannot reach the caller. Move after_* hooks to a separate trigger, or use 'continue'.",
         idx,
         "/spec/source/errorPolicy",
       );

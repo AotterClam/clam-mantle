@@ -166,6 +166,14 @@ export type ViewManifest = ManifestEnvelope<"View", ViewManifestSpec>;
 export interface ViewManifestSpec {
   /** Source Schema name (bare; no namespace). */
   readonly from: string;
+  /** Auth gate. Identical shape to `ProcedureManifestSpec.requires.auth`.
+   *  When absent the View is public — `ExecuteViewUseCase` skips the
+   *  predicate check. When present, ALL predicates must hold; the
+   *  runtime enforces with `evaluateAuthAll`. Closed predicate
+   *  vocabulary: `ctx.user`, `{ ctx.staff: [<role>, ...] }`. */
+  readonly requires?: {
+    readonly auth?: { readonly all: readonly AuthPredicate[] };
+  };
   /** Filter AST. v0.1 grammar: eq | and | or. `eq.value` may be a literal
    *  or a `{ $param: <name> }` sentinel referencing `spec.params`. */
   readonly filter?: FilterAst;
@@ -304,15 +312,9 @@ export interface CtxStaffPredicate {
 export const STAFF_ROLES = ["owner", "editor", "contributor"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-const ROLE_RANK: Record<StaffRole, number> = {
-  owner: 3,
-  editor: 2,
-  contributor: 1,
-};
-
-export function meetsRole(actual: StaffRole, min: StaffRole): boolean {
-  return ROLE_RANK[actual] >= ROLE_RANK[min];
-}
+// `meetsRole` (role-rank comparison) moved to
+// `domain/service/StaffRoleHierarchy.ts` — this file is pure grammar
+// types referenced by the parser.
 
 export function isStaffRole(s: string): s is StaffRole {
   return (STAFF_ROLES as readonly string[]).includes(s);

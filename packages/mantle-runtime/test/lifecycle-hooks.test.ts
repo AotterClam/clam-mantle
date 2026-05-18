@@ -65,7 +65,9 @@ function harness(opts: {
   const triggers = opts.triggers.map(makeLifecycleTrigger);
   const triggerIndex = new TriggerIndex(triggers);
   const invoke = new InvokeProcedureUseCase(registry);
-  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, invoke);
+  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, (req) =>
+    invoke.execute(req),
+  );
   const hookedRepo = new LifecycleHookingEntryRepository(
     store,
     triggerIndex,
@@ -147,8 +149,8 @@ describe("LifecycleHookingEntryRepository — before_create", () => {
       }),
     ).rejects.toBeInstanceOf(DiagnosticError);
     // Ensure no row was written.
-    const rows = await h.store.list({ collection: "posts" });
-    expect(rows).toHaveLength(0);
+    const result = await h.store.list({ collection: "posts" });
+    expect(result.rows).toHaveLength(0);
   });
 
   it("does NOT abort when errorPolicy is overridden to 'continue' on a before_* hook", async () => {

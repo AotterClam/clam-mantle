@@ -99,7 +99,9 @@ function harness(opts: {
     idgen,
   );
   const invoke = new InvokeProcedureUseCase(registry, invokeBuiltin);
-  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, invoke);
+  const hookRunner = new RunLifecycleHooksUseCase(triggerIndex, proceduresByName, (req) =>
+    invoke.execute(req),
+  );
   entries = new LifecycleHookingEntryRepository(store, triggerIndex, hookRunner);
 
   return { store, invoke, schemas };
@@ -258,6 +260,42 @@ describe("InvokeBuiltinUseCase — update / delete / upsert", () => {
     expect((archived.data as { version: number }).version).toBe(row.version + 1);
   });
 
+  it("archive on already-archived returns CONFLICT via canTransition (#210 PR12 H4)", async () => {
+    const h = harness();
+    const created = await h.invoke.execute({
+      procedure: builtinProcedure({ name: "createPost", op: "create", schema: "posts" }),
+      input: { title: "doomed" },
+      ctx: { user: { id: "u-1" }, staff: null, env: {} },
+    });
+    if (!created.ok) throw new Error("create failed");
+    const row = created.data as { id: string; version: number };
+    const first = await h.invoke.execute({
+      procedure: builtinProcedure({
+        name: "archivePost",
+        op: "archive",
+        schema: "posts",
+        inputProperties: { id: { type: "string" }, expectedVersion: { type: "number" } },
+      }),
+      input: { id: row.id, expectedVersion: row.version },
+      ctx: { user: { id: "u-1" }, staff: null, env: {} },
+    });
+    expect(first.ok).toBe(true);
+    // Second archive: row is already archived; canTransition rejects.
+    const second = await h.invoke.execute({
+      procedure: builtinProcedure({
+        name: "archivePost",
+        op: "archive",
+        schema: "posts",
+        inputProperties: { id: { type: "string" }, expectedVersion: { type: "number" } },
+      }),
+      input: { id: row.id, expectedVersion: row.version + 1 },
+      ctx: { user: { id: "u-1" }, staff: null, env: {} },
+    });
+    expect(second.ok).toBe(false);
+    if (second.ok) return;
+    expect(second.diagnostic.code).toBe("CONFLICT");
+  });
+
   it("upsert: with unknown id falls through to create", async () => {
     const h = harness();
     const result = await h.invoke.execute({
@@ -353,6 +391,7 @@ describe("InvokeBuiltinUseCase — lifecycle hook integration", () => {
       ctx: { user: null, staff: null, env: {} },
     });
     expect(result.ok).toBe(false);
-    expect(await h.store.list({ collection: "posts" })).toHaveLength(0);
+    const list = await h.store.list({ collection: "posts" });
+    expect(list.rows).toHaveLength(0);
   });
 });

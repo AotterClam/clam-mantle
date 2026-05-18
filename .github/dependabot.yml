@@ -22,11 +22,29 @@ updates:
           - "react"
           - "react-dom"
           - "@types/react*"
+      admin-ui-vite:
+        patterns:
+          - "vite"
+          - "vite-plugin-singlefile"
           - "@vitejs/plugin-react"
+          - "@tailwindcss/vite"
       hono:
         patterns:
           - "hono"
           - "@hono/*"
+      cloudflare:
+        patterns:
+          - "wrangler"
+          - "@cloudflare/*"
+          - "miniflare"
+      runtime-libs:
+        patterns:
+          - "better-auth"
+          - "yaml"
+          - "marked"
+          - "zod"
+          - "aws4fetch"
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -36,3 +54,6 @@ updates:
     labels:
       - area:ci
       - dependencies
+    groups:
+      actions:
+        patterns: ["*"]

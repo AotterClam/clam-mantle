@@ -30,8 +30,12 @@ export interface EntryRepository {
    *  concurrent publish while we try to archive). Bumps version.
    *  Throws `EntryStatusConflict` on guard mismatch. */
   transitionStatus(args: TransitionStatusArgs): Promise<EntryRow>;
-  /** List entries in a collection, optionally filtered by status. */
-  list(args: ListEntriesArgs): Promise<readonly EntryRow[]>;
+  /** List entries in a collection, optionally filtered by status.
+   *  Pass `cursor` from a previous `ListEntriesResult.nextCursor` to
+   *  fetch the next page. Pagination matters because D1 silently
+   *  truncates responses past ~10 MB; without it, large collections
+   *  return partial pages indistinguishable from "no more rows". */
+  list(args: ListEntriesArgs): Promise<ListEntriesResult>;
   /** Find one entry by a top-level JSON data field. Used for runtime
    *  referential checks such as `Schema.spec.translates`. */
   findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null>;
@@ -96,6 +100,11 @@ export interface TransitionStatusArgs extends MutationHookFields {
   readonly collection: string;
   readonly to: ContentState;
   readonly expectedStatus?: ContentState;
+  /** OCC guard. Impls must add `AND version = ?` and throw
+   *  `EntryVersionConflict` on miss, so a concurrent UpdateDraft
+   *  between caller-side validation and the flip cannot publish
+   *  stale data. */
+  readonly expectedVersion?: number;
   readonly now: number;
 }
 
@@ -103,6 +112,17 @@ export interface ListEntriesArgs {
   readonly collection: string;
   readonly status?: ContentState;
   readonly limit?: number;
+  /** Opaque continuation token from a prior `ListEntriesResult.nextCursor`.
+   *  Caller must round-trip without interpreting; format is impl-defined. */
+  readonly cursor?: string;
+}
+
+export interface ListEntriesResult {
+  readonly rows: readonly EntryRow[];
+  /** Present when there may be more rows beyond this page. Undefined
+   *  signals "this is the last page". Pass back as `cursor` to
+   *  continue. */
+  readonly nextCursor?: string;
 }
 
 export interface FindEntryByDataFieldArgs {

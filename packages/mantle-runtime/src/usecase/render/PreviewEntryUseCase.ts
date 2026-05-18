@@ -2,15 +2,18 @@ import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
-import { readEntryBySlug } from "../../domain/service/PublishedEntries.js";
-import { joinParentIfTranslation } from "../../domain/service/JoinedEntryReader.js";
+import { readEntryBySlug } from "../../domain/service/io/PublishedEntries.js";
+import { joinParentIfTranslation } from "../../domain/service/io/JoinedEntryReader.js";
 import { renderEntryHtml } from "../../domain/service/HtmlRenderer.js";
-import { injectPreviewBanner } from "../../domain/service/PreviewBanner.js";
+import {
+  defaultPreviewBanner,
+  injectPreviewBanner,
+} from "../../domain/service/PreviewBanner.js";
 import type { PreviewEntryRequest } from "../dto/render/PreviewEntryRequest.js";
 import {
   composeSeoIfPathed,
   type SeoComposer,
-} from "./EntrySeoSupport.js";
+} from "../../domain/service/EntrySeoSupport.js";
 
 /** Default fallback: prefer drafts, fall back to published, then
  *  archived. Authors typically open `?preview=1` to see WIP. */
@@ -65,9 +68,7 @@ export class PreviewEntryUseCase {
       seo,
     });
     if (html === null) return null;
-    const banner =
-      request.banner ??
-      `<div class="preview-banner">Preview · ${entry.status} · ${request.slug}</div>`;
+    const banner = request.banner ?? defaultPreviewBanner(entry.status, request.slug);
     return injectPreviewBanner(html, banner);
   }
 }

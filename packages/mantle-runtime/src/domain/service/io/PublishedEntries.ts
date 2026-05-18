@@ -1,5 +1,5 @@
 import { type ContentState, type Entry } from "@aotter/mantle-spec";
-import type { DatabaseDriver } from "../port/DatabaseDriver.js";
+import type { DatabaseDriver } from "../../port/DatabaseDriver.js";
 
 /**
  * Cross-collection scan of `status='published'` entries. Pure read,
@@ -115,6 +115,10 @@ export interface ReadEntryByDataFieldArgs {
   readonly status?: ContentState;
 }
 
+// Single-segment allowlist (no dots). Deliberately stricter than
+// ViewSqlCompiler.SAFE_FIELD_NAME (which accepts dotted JSON paths
+// like `foo.bar` for multi-segment view projections). Both regexes
+// exist on purpose; keep them in sync conceptually but distinct.
 const SAFE_FIELD_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function assertSafeField(field: string): void {

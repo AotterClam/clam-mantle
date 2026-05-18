@@ -21,20 +21,35 @@ import {
 import {
   readEntryById,
   readPublishedEntries,
-} from "../../domain/service/PublishedEntries.js";
+} from "../../domain/service/io/PublishedEntries.js";
 import {
   joinParentForList,
   joinParentIfTranslation,
-} from "../../domain/service/JoinedEntryReader.js";
+} from "../../domain/service/io/JoinedEntryReader.js";
 import { serializeEntryAsMarkdown } from "../../domain/service/MarkdownSerializer.js";
 import {
   renderEntryHtml,
   renderListHtml,
 } from "../../domain/service/HtmlRenderer.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
-import { ComposeLlmsTxtUseCase } from "../../usecase/render/ComposeLlmsTxtUseCase.js";
-import { composeSeoIfPathed } from "../../usecase/render/EntrySeoSupport.js";
-import type { ComposeEntrySeoMetaUseCase } from "../../usecase/render/ComposeEntrySeoMetaUseCase.js";
+import {
+  composeSeoIfPathed,
+  type SeoComposer,
+} from "../../domain/service/EntrySeoSupport.js";
+
+/**
+ * Structural contract of the llms.txt composer the orchestrator
+ * accepts. Kept here (vs. importing the concrete use-case class) so
+ * infrastructure doesn't cross the `infrastructure→usecase` boundary
+ * — the runtime assembly root wires in `ComposeLlmsTxtUseCase`,
+ * which satisfies this shape.
+ */
+export interface LlmsTxtComposer {
+  execute(args: {
+    readonly site: SiteConfig;
+    readonly locale: string | null;
+  }): Promise<string>;
+}
 
 /**
  * `HtmlPublishOrchestrator` — the publish pipeline. Renders + writes
@@ -51,17 +66,14 @@ import type { ComposeEntrySeoMetaUseCase } from "../../usecase/render/ComposeEnt
 const DEFAULT_DOCTYPE = "<!DOCTYPE html>\n";
 
 export class HtmlPublishOrchestrator implements PublishOrchestrator {
-  private readonly composeLlmsTxt: ComposeLlmsTxtUseCase;
-
   constructor(
     private readonly db: DatabaseDriver,
     private readonly kv: KvCache,
     private readonly paths: PublicPathResolver | null,
-    private readonly composeSeo: ComposeEntrySeoMetaUseCase,
+    private readonly composeSeo: SeoComposer,
+    private readonly composeLlmsTxt: LlmsTxtComposer,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
-  ) {
-    this.composeLlmsTxt = new ComposeLlmsTxtUseCase(db);
-  }
+  ) {}
 
   async publish(request: PublishEntryRequest): Promise<void> {
     const raw = await readEntryById(this.db, request.entryId);

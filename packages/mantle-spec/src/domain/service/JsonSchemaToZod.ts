@@ -30,6 +30,14 @@ import type { JsonSchema } from "../model/ManifestGrammar.js";
  * Cloudflare Workers (V8 isolate-level codegen-from-strings is off).
  */
 export function jsonSchemaToZod(schema: JsonSchema): ZodType {
+  const base = buildBase(schema);
+  // `nullable: true` is a v0.1 grammar extension on top of plain JSON
+  // Schema; without this wrap, a field declared nullable rejects `null`
+  // at validation time even though the manifest author opted in.
+  return schema.nullable === true ? base.nullable() : base;
+}
+
+function buildBase(schema: JsonSchema): ZodType {
   const t = schema.type;
 
   // Multiple types in `type: [...]` — produce a union over each element.

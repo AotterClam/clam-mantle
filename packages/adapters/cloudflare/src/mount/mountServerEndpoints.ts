@@ -14,6 +14,7 @@ import {
 import {
   ViewParamCoercionError,
   coerceViewParams,
+  evaluateAuthAll,
   matchPath,
   type CmsRuntime,
   type HandlerContext,
@@ -52,7 +53,8 @@ export function mountServerEndpoints(
     const viewName = v.metadata.name;
     app.get(`/api/views/${viewName}`, async (c) => {
       const runtime = await ref.get();
-      return handleViewRequest(c.req.raw, runtime, viewName);
+      const waitUntil = readWaitUntil(c);
+      return handleViewRequest(c.req.raw, runtime, viewName, ref.auth, waitUntil);
     });
   }
   mountAdminBetterAuth(app, ref, ref.auth);
@@ -183,11 +185,18 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       });
     }
     const runtime = await ref.get();
-    const rows = await runtime.listEntries.execute({
+    const rawLimit = c.req.query("limit");
+    const parsedLimit = rawLimit ? Number.parseInt(rawLimit, 10) : NaN;
+    // Admin pagination needs the cursored shape — `executePage` returns
+    // `{ rows, nextCursor? }`. `execute()` is the flat-array variant
+    // for app code.
+    const result = await runtime.listEntries.executePage({
       collection,
       status: c.req.query("status") as ContentState | undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      cursor: c.req.query("cursor") ?? undefined,
     });
-    const items = rows.map((row) => ({
+    const items = result.rows.map((row) => ({
       id: row.id,
       collection: row.collection,
       locale: row.locale ?? null,
@@ -196,7 +205,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       title: row.data.title,
       updated_at: row.updatedAt,
     }));
-    return jsonResponse(200, { items, next_cursor: null });
+    return jsonResponse(200, { items, next_cursor: result.nextCursor ?? null });
   });
 
   // Three-step direct-upload flow: POST /uploads (capability) → caller
@@ -216,23 +225,27 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       caption?: unknown;
       purpose?: unknown;
     };
-    if (typeof body.filename !== "string" || typeof body.mimeType !== "string") {
+    if (
+      typeof body.filename !== "string" ||
+      typeof body.mimeType !== "string" ||
+      typeof body.byteSize !== "number"
+    ) {
       return jsonResponse(400, {
         ok: false,
         diagnostic: runtimeDiagnostic({
           code: "INPUT_VALIDATION_FAILED",
           severity: "error",
           path: `POST ${MEDIA_UPLOADS_PATH}`,
-          expected: "{ filename: string, mimeType: string, byteSize?: number }",
+          expected: "{ filename: string, mimeType: string, byteSize: number }",
         }),
       });
     }
-    const { filename, mimeType } = body;
+    const { filename, mimeType, byteSize } = body;
     return runUseCase(`POST ${MEDIA_UPLOADS_PATH}`, () =>
       media.createUpload.execute({
         filename,
         mimeType,
-        byteSize: typeof body.byteSize === "number" ? body.byteSize : undefined,
+        byteSize,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
         purpose: typeof body.purpose === "string" ? body.purpose : undefined,
@@ -335,15 +348,49 @@ async function handleViewRequest(
   req: Request,
   runtime: CmsRuntime,
   viewName: string,
+  auth: Auth,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
 ): Promise<Response> {
   const view = runtime.viewsByName.get(viewName);
   if (!view) {
     return jsonError({ status: 500, code: "INTERNAL_ERROR", message: `View '${viewName}' missing post-boot.` });
   }
 
-  const url = new URL(req.url);
   const viewPath = `GET /api/views/${viewName}`;
 
+  // Resolve caller identity FIRST and evaluate `requires.auth.all`
+  // BEFORE param coercion. Two reasons:
+  //   (1) a param-coercion 400 against an auth-gated View would leak
+  //       the View's parameter contract to an unauthorized caller —
+  //       this matters for both anonymous probes AND authenticated
+  //       users without the required role.
+  //   (2) the UNAUTHENTICATED branch in ExecuteViewUseCase only fires
+  //       when ctx is undefined, so passing a guest ctx for no-session
+  //       would collapse 401 and 403 into the same AUTH_DENIED.
+  const ctx = await buildViewCtx(req, auth, waitUntil);
+  if (view.spec.requires?.auth) {
+    if (!ctx) {
+      return jsonResponse(401, {
+        ok: false,
+        diagnostic: runtimeDiagnostic({
+          code: "UNAUTHENTICATED",
+          severity: "error",
+          path: viewPath,
+          expected: "authenticated session",
+          message: `View '${viewName}' requires authentication.`,
+        }),
+      });
+    }
+    const denial = evaluateAuthAll(view.spec.requires, ctx, viewPath, "runtime");
+    if (denial) {
+      return jsonResponse(HTTP_STATUS_BY_CODE[denial.code] ?? 403, {
+        ok: false,
+        diagnostic: denial,
+      });
+    }
+  }
+
+  const url = new URL(req.url);
   const page = parsePositiveInt(url.searchParams.get(PAGE_PARAM));
   const show = parsePositiveInt(url.searchParams.get(SHOW_PARAM));
 
@@ -370,6 +417,7 @@ async function handleViewRequest(
     view,
     pathPrefix: viewPath,
     options: { params, page, show },
+    ctx,
   });
 
   if (result.ok) {
@@ -377,6 +425,28 @@ async function handleViewRequest(
   }
   const status = HTTP_STATUS_BY_CODE[result.diagnostic.code] ?? 500;
   return jsonResponse(status, { ok: false, diagnostic: result.diagnostic });
+}
+
+/**
+ * Resolve caller identity for a View request from the Better Auth
+ * cookie session. Returns `undefined` when there is no session at all
+ * so callers can distinguish 401 (no session) from 403 (session but
+ * wrong role) — `ExecuteViewUseCase` produces `UNAUTHENTICATED` for
+ * `ctx: undefined` and `AUTH_DENIED` for a ctx whose predicates fail.
+ */
+async function buildViewCtx(
+  req: Request,
+  auth: Auth,
+  waitUntil: ((p: Promise<unknown>) => void) | undefined,
+): Promise<HandlerContext | undefined> {
+  const session = await auth.getSession(req);
+  if (!session) return undefined;
+  const wu = waitUntil ? { waitUntil } : {};
+  const role = await auth.getUserRole(session.user.id);
+  const staff = role && ADMIN_ROLE_SET.has(role)
+    ? { id: session.user.id, role: role as AdminRole }
+    : null;
+  return { user: { id: session.user.id }, staff, env: {}, ...wu };
 }
 
 function parsePositiveInt(raw: string | null): number | undefined {

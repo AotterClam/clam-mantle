@@ -145,6 +145,16 @@ class InMemoryStatement implements PreparedStatement {
       return { rows: r ? [{ version: r.version }] : [], changes: 0 };
     }
 
+    // SELECT version, status FROM entries WHERE id = ? — used by
+    // transitionStatus disambiguation (one SELECT covers both checks).
+    if (sql.startsWith("SELECT version, status FROM entries WHERE id = ?")) {
+      const r = this.db.entries.get(p[0] as string);
+      return {
+        rows: r ? [{ version: r.version, status: r.status }] : [],
+        changes: 0,
+      };
+    }
+
     // UPDATE entries SET data = ?, version = ?, updated_at = ? WHERE id = ? AND version = ? RETURNING …
     if (sql.startsWith("UPDATE entries SET data = ?, version = ?, updated_at = ? WHERE id = ? AND version = ? RETURNING")) {
       const [data, version, updated_at, id, expected] = p as [string, number, number, string, number];
@@ -480,13 +490,22 @@ function readValue(row: EntryRecord, ref: string): unknown {
   if (ref === "created_at") return row.created_at;
   if (ref === "updated_at") return row.updated_at;
   if (ref === "author_id") return row.author_id;
-  const m = ref.match(/^json_extract\(data, '\$\.([^']+)'\)$/);
-  if (m) {
-    const key = m[1]!;
+  // Accept both legacy `$.field` and quoted `$."field"` forms (the
+  // compiler always emits the quoted form post-PR14; legacy form
+  // kept for any straggling hand-written SQL in this harness).
+  const key = parseJsonExtractKey(ref);
+  if (key !== null) {
     const data = JSON.parse(row.data) as Record<string, unknown>;
     return data[key];
   }
   throw new Error(`fake DB: unsupported field ref '${ref}'`);
+}
+
+function parseJsonExtractKey(ref: string): string | null {
+  const quoted = ref.match(/^json_extract\(data, '\$\."(.+)"'\)$/);
+  if (quoted) return quoted[1]!.replace(/''/g, "'");
+  const bare = ref.match(/^json_extract\(data, '\$\.([^'"]+)'\)$/);
+  return bare ? bare[1]! : null;
 }
 
 function projectRow(row: EntryRecord, projection: string): Record<string, unknown> {
@@ -501,10 +520,14 @@ function projectRow(row: EntryRecord, projection: string): Record<string, unknow
     else if (part === "author_id AS authorId") out["authorId"] = row.author_id;
     else if (part === "data") out["data"] = row.data;
     else {
-      const aliasMatch = part.match(/^json_extract\(data, '\$\.([^']+)'\) AS "([^"]+)"$/);
+      // Match either `json_extract(data, '$.<bare>')` or
+      // `json_extract(data, '$."<quoted>"')` aliased as `"<name>"`.
+      const aliasMatch = part.match(/^json_extract\(data, ('(?:[^']|'')*')\) AS "([^"]+)"$/);
       if (aliasMatch) {
+        const key = parseJsonExtractKey(`json_extract(data, ${aliasMatch[1]!})`);
+        if (key === null) throw new Error(`fake DB: unsupported view projection part '${part}'`);
         const data = JSON.parse(row.data) as Record<string, unknown>;
-        out[aliasMatch[2]!] = data[aliasMatch[1]!];
+        out[aliasMatch[2]!] = data[key];
       } else {
         throw new Error(`fake DB: unsupported view projection part '${part}'`);
       }

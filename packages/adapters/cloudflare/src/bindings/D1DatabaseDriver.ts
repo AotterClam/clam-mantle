@@ -89,11 +89,31 @@ class D1Migrations implements MigrationRunner {
   async runAll(migrations: ReadonlyArray<Migration>): Promise<void> {
     await this.db
       .prepare(
-        `CREATE TABLE IF NOT EXISTS _mantle_migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`,
+        `CREATE TABLE IF NOT EXISTS _migrations (id TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`,
       )
       .run();
+    // One-time copy from pre-rename `_mantle_migrations`: idempotent
+    // via `INSERT OR IGNORE` + `IF EXISTS`, so re-running on every
+    // boot is harmless after the rows have landed. We deliberately
+    // DON'T drop the legacy table — codex CX1 showed that any
+    // copy-then-drop ordering races between concurrent boots
+    // (Worker B's INSERT runs after Worker A's DROP succeeds and
+    // crashes with `no such table`). Leaving the legacy table
+    // around costs a few KB; eliminating it isn't worth the race
+    // class. A standalone op (`mantle migrate drop-legacy`) can
+    // remove it later under operator control if desired.
+    const legacy = await this.db
+      .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='_mantle_migrations'`)
+      .first<{ name: string }>();
+    if (legacy) {
+      await this.db
+        .prepare(
+          `INSERT OR IGNORE INTO _migrations (id, applied_at) SELECT id, applied_at FROM _mantle_migrations`,
+        )
+        .run();
+    }
     const applied = await this.db
-      .prepare(`SELECT id FROM _mantle_migrations`)
+      .prepare(`SELECT id FROM _migrations`)
       .all<{ id: string }>();
     const seen = new Set((applied.results ?? []).map((r) => r.id));
     for (const m of migrations) {
@@ -102,7 +122,7 @@ class D1Migrations implements MigrationRunner {
       const ops: D1PreparedStatement[] = statements.map((s) => this.db.prepare(s));
       ops.push(
         this.db
-          .prepare(`INSERT INTO _mantle_migrations (id, applied_at) VALUES (?, ?)`)
+          .prepare(`INSERT INTO _migrations (id, applied_at) VALUES (?, ?)`)
           .bind(m.id, Date.now()),
       );
       await this.db.batch(ops);

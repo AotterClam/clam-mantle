@@ -14,6 +14,7 @@ import type {
   FindEntryByDataFieldArgs,
   FindEntryByDataFieldsArgs,
   ListEntriesArgs,
+  ListEntriesResult,
   MutationHookFields,
   TransitionStatusArgs,
   UpdateEntryArgs,
@@ -159,7 +160,7 @@ export class LifecycleHookingEntryRepository implements EntryRepository {
     return row;
   }
 
-  list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {
+  list(args: ListEntriesArgs): Promise<ListEntriesResult> {
     return this.inner.list(args);
   }
 

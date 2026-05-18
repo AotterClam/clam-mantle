@@ -7,10 +7,12 @@ import type {
   FindEntryByDataFieldArgs,
   FindEntryByDataFieldsArgs,
   ListEntriesArgs,
+  ListEntriesResult,
   TransitionStatusArgs,
   UpdateEntryArgs,
 } from "../../domain/port/EntryRepository.js";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import { clampLimit } from "../../domain/service/Pagination.js";
 import {
   EntryStatusConflict,
   EntryVersionConflict,
@@ -121,48 +123,75 @@ export class DatabaseEntryRepository implements EntryRepository {
   }
 
   async transitionStatus(args: TransitionStatusArgs): Promise<EntryRow> {
-    const guarded = args.expectedStatus !== undefined;
-    const sql =
-      `UPDATE entries SET status = ?, version = version + 1, updated_at = ?
-       WHERE id = ?${guarded ? " AND status = ?" : ""}
-       RETURNING id, collection, status, version, data, author_id, created_at, updated_at`;
-    const stmt = guarded
-      ? this.db.prepare(sql).bind(args.to, args.now, args.id, args.expectedStatus)
-      : this.db.prepare(sql).bind(args.to, args.now, args.id);
-    const row = await stmt.first<EntryDbRow>();
-    if (!row) {
-      const after = await this.db
-        .prepare(`SELECT status FROM entries WHERE id = ?`)
-        .bind(args.id)
-        .first<{ status: string }>();
-      throw new EntryStatusConflict(
-        args.id,
-        args.expectedStatus ?? args.to,
-        (after?.status as ContentState | undefined) ?? args.to,
-      );
+    const { expectedStatus, expectedVersion } = args;
+    const guards: string[] = [];
+    const binds: unknown[] = [args.to, args.now, args.id];
+    if (expectedStatus !== undefined) {
+      guards.push(" AND status = ?");
+      binds.push(expectedStatus);
     }
-    return rowFromDb(row);
+    if (expectedVersion !== undefined) {
+      guards.push(" AND version = ?");
+      binds.push(expectedVersion);
+    }
+    const row = await this.db
+      .prepare(
+        `UPDATE entries SET status = ?, version = version + 1, updated_at = ?
+         WHERE id = ?${guards.join("")}
+         RETURNING id, collection, status, version, data, author_id, created_at, updated_at`,
+      )
+      .bind(...binds)
+      .first<EntryDbRow>();
+    if (row) return rowFromDb(row);
+    // Disambiguate version- vs. status-conflict from a single SELECT —
+    // splitting into two SELECTs leaves a TOCTOU window where a third
+    // concurrent writer between the two reads can flip which guard
+    // appears to have failed.
+    const after = await this.db
+      .prepare(`SELECT version, status FROM entries WHERE id = ?`)
+      .bind(args.id)
+      .first<{ version: number; status: string }>();
+    if (expectedVersion !== undefined && after && after.version !== expectedVersion) {
+      throw new EntryVersionConflict(args.id, expectedVersion, after.version);
+    }
+    throw new EntryStatusConflict(
+      args.id,
+      expectedStatus ?? args.to,
+      (after?.status as ContentState | undefined) ?? args.to,
+    );
   }
 
-  async list(args: ListEntriesArgs): Promise<readonly EntryRow[]> {
-    const limit = args.limit ?? 100;
+  async list(args: ListEntriesArgs): Promise<ListEntriesResult> {
+    // Use the shared clamp so direct repo callers (tests, future
+    // adapters that bypass the use case) get the same default page
+    // size as ListEntriesUseCase — not a silently different 100.
+    const limit = clampLimit(args.limit);
+    const offset = decodeCursor(args.cursor);
+    // Fetch limit+1 to detect a next page without a second query —
+    // the extra row never reaches the caller.
+    const probe = limit + 1;
     const stmt = args.status
       ? this.db
           .prepare(
             `SELECT id, collection, status, version, data, author_id, created_at, updated_at
              FROM entries WHERE collection = ? AND status = ?
-             ORDER BY updated_at DESC LIMIT ?`,
+             ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`,
           )
-          .bind(args.collection, args.status, limit)
+          .bind(args.collection, args.status, probe, offset)
       : this.db
           .prepare(
             `SELECT id, collection, status, version, data, author_id, created_at, updated_at
              FROM entries WHERE collection = ?
-             ORDER BY updated_at DESC LIMIT ?`,
+             ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`,
           )
-          .bind(args.collection, limit);
+          .bind(args.collection, probe, offset);
     const rows = await stmt.all<EntryDbRow>();
-    return rows.map(rowFromDb);
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      rows: page.map(rowFromDb),
+      nextCursor: hasMore ? encodeCursor(offset + limit) : undefined,
+    };
   }
 
   async findByDataField(args: FindEntryByDataFieldArgs): Promise<EntryRow | null> {
@@ -257,4 +286,19 @@ function rowFromDb(row: EntryDbRow): EntryRow {
 
 function jsonPathForTopLevelField(field: string): string {
   return `$."${field.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * `list()` cursor: offset-based, prefixed so a future row-value cursor
+ * (`(updatedAt,id)` tuple) can coexist by switching on the prefix.
+ * Callers treat it as opaque.
+ */
+const CURSOR_PREFIX = "o:";
+function encodeCursor(offset: number): string {
+  return `${CURSOR_PREFIX}${offset}`;
+}
+function decodeCursor(cursor: string | undefined): number {
+  if (!cursor || !cursor.startsWith(CURSOR_PREFIX)) return 0;
+  const n = Number(cursor.slice(CURSOR_PREFIX.length));
+  return Number.isInteger(n) && n >= 0 ? n : 0;
 }

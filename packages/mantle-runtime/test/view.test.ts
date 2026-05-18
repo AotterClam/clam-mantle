@@ -36,7 +36,7 @@ describe("compileView", () => {
         filter: { eq: { field: "locale", value: "en-US" } },
       }),
     );
-    expect(c.sql).toContain(`json_extract(data, '$.locale') = ?`);
+    expect(c.sql).toContain(`json_extract(data, '$."locale"') = ?`);
   });
 
   it("compiles `and` of multiple eqs", () => {
@@ -81,7 +81,7 @@ describe("compileView", () => {
       { params: { locale: "zh-TW" } },
     );
     expect(c.params).toEqual(["posts", "zh-TW"]);
-    expect(c.sql).toContain(`json_extract(data, '$.locale') = ?`);
+    expect(c.sql).toContain(`json_extract(data, '$."locale"') = ?`);
   });
 
   it("drops a filter eq whose param-ref resolves to undefined (forward-compat for v0.1.x optional)", () => {
@@ -99,6 +99,79 @@ describe("compileView", () => {
     );
     expect(c.params).toEqual(["posts", "published"]);
     expect(c.sql).not.toContain("locale");
+  });
+
+  it("partial-drop in nested AND keeps params bound 1:1 with `?` placeholders", () => {
+    // Regression: compileFilter now returns {sql, params} per node so
+    // dropped sub-trees can never push orphan params into the parent.
+    const c = compileView(
+      view({
+        from: "posts",
+        params: {
+          type: "object",
+          properties: { tag: { type: "string" } },
+          required: ["tag"],
+        },
+        filter: {
+          and: [
+            { eq: { field: "status", value: "published" } },
+            {
+              and: [
+                { eq: { field: "locale", value: "en-US" } },
+                { eq: { field: "tag", value: { $param: "tag" } } },
+              ],
+            },
+          ],
+        },
+      }),
+      { params: {} },
+    );
+    expect(c.params).toEqual(["posts", "published", "en-US"]);
+    const placeholders = (c.sql.match(/\?/g) ?? []).length;
+    expect(placeholders).toBe(3);
+  });
+
+  it("accepts hyphenated field names via quoted JSON paths (#210 PR14 / codex CX3)", () => {
+    // Schema property keys are arbitrary JSON strings per RFC 8259;
+    // the prior identifier-only allowlist rejected legitimate
+    // manifests at query time. Now we always quote the path + alias.
+    const c = compileView(
+      view({
+        from: "posts",
+        fields: ["hero-image"],
+        filter: { eq: { field: "hero-image", value: "x" } },
+      }),
+    );
+    expect(c.sql).toContain(`json_extract(data, '$."hero-image"')`);
+    expect(c.sql).toMatch(/AS "hero-image"/);
+    expect(c.params).toEqual(["posts", "x"]);
+  });
+
+  it("safely escapes single quotes in field names without rejecting them", () => {
+    // Outer SQL literal uses `'...'` so inner `'` doubles to `''`;
+    // the field still resolves to the original key at JSON path time.
+    const c = compileView(
+      view({
+        from: "posts",
+        filter: { eq: { field: `foo'bar`, value: "x" } },
+      }),
+    );
+    expect(c.sql).toContain(`json_extract(data, '$."foo''bar"')`);
+    expect(c.params).toEqual(["posts", "x"]);
+  });
+
+  it("rejects field names containing `\"`, `\\`, or NUL (SQLite JSON path can't resolve them)", () => {
+    // SQLite JSON1 path syntax `$."key"` has no documented escape for
+    // an inner `"` or `\`. Codex CX3 follow-up: previously this PR
+    // tried to escape via doubling but SQLite returns NULL for such
+    // paths. Reject instead — Schema authors don't write these.
+    for (const bad of [`foo"bar`, `foo\\bar`, "foo\0bar"]) {
+      expect(() =>
+        compileView(
+          view({ from: "posts", filter: { eq: { field: bad, value: "x" } } }),
+        ),
+      ).toThrow(/unrepresentable character|NUL|"|\\/);
+    }
   });
 
   it("emits no WHERE filter when every filter clause drops", () => {
@@ -168,6 +241,70 @@ describe("ExecuteViewUseCase", () => {
     expect((result.result.rows[0] as { id: string }).id).toBe("p1");
     expect(result.result.page).toBe(1);
     expect(result.result.hasMore).toBe(false);
+  });
+
+  it("rejects an auth-gated View when ctx is missing (UNAUTHENTICATED)", async () => {
+    const db = new InMemoryDatabase();
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: ["ctx.user"] } },
+      }),
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostic.code).toBe("UNAUTHENTICATED");
+  });
+
+  it("denies an auth-gated View when the predicate fails (AUTH_DENIED)", async () => {
+    const db = new InMemoryDatabase();
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+      }),
+      ctx: {
+        user: { id: "u1" },
+        staff: null,
+        env: {},
+        request: new Request("https://example.com/"),
+        waitUntil: () => {},
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.diagnostic.code).toBe("AUTH_DENIED");
+  });
+
+  it("allows an auth-gated View when the staff role matches", async () => {
+    const db = new InMemoryDatabase();
+    db.entries.set("p1", {
+      id: "p1",
+      collection: "posts",
+      status: "published",
+      version: 1,
+      data: JSON.stringify({ title: "Hi" }),
+      author_id: null,
+      created_at: 1,
+      updated_at: 2,
+    });
+    const useCase = new ExecuteViewUseCase(db);
+    const result = await useCase.execute({
+      view: view({
+        from: "posts",
+        requires: { auth: { all: [{ "ctx.staff": ["owner"] }] } },
+      }),
+      ctx: {
+        user: { id: "u1" },
+        staff: { id: "u1", role: "owner" },
+        env: {},
+        request: new Request("https://example.com/"),
+        waitUntil: () => {},
+      },
+    });
+    expect(result.ok).toBe(true);
   });
 
   it("hasMore=true when result fills the requested page exactly", async () => {

@@ -48,12 +48,12 @@ export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
       properties: {
         filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
         mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
-        byteSize: { type: "number", description: "Optional. When provided, enforced in the signed PUT and at commit." },
+        byteSize: { type: "number", description: "Required. Caller-supplied byte size — enforced against the per-runtime byte ceiling before a presigned URL is minted." },
         alt: { type: "string" },
         caption: { type: "string" },
         purpose: { type: "string", description: "Optional purpose tag (e.g. 'post-cover')." },
       },
-      required: ["filename", "mimeType"],
+      required: ["filename", "mimeType", "byteSize"],
     },
   },
   {
@@ -76,13 +76,14 @@ export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
 export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
   {
     name: "list_entries",
-    description: "List entries in a collection. Optional filter by status.",
+    description: "List entries in a collection. Optional filter by status. Result is { rows, nextCursor? }: when `nextCursor` is present, pass it back as `cursor` to fetch the next page. Absent `nextCursor` means this is the last page.",
     inputSchema: {
       type: "object",
       properties: {
         collection: { type: "string" },
         status: { type: "string", enum: ["draft", "published", "archived"] },
         limit: { type: "number" },
+        cursor: { type: "string", description: "Opaque continuation token from a previous list_entries response." },
       },
       required: ["collection"],
     },
@@ -124,6 +125,15 @@ export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
         expected_version: { type: "number" },
       },
       required: ["id", "expected_version"],
+    },
+  },
+  {
+    name: "delete_entry",
+    description: "Permanently delete an entry. Cascades to its revisions and approvals. Prefer archive_entry when reversibility matters.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string" } },
+      required: ["id"],
     },
   },
 ];
