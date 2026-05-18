@@ -22,14 +22,22 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 
 ## Try it cold
 
+Recommended path: open [mantle.aotterclam.ai](https://mantle.aotterclam.ai/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
+
+If you already know the values and want to bypass the agent interview, call the scaffolder directly:
+
 ```bash
-npm create @aotterclam/mantle@alpha my-site
+npx @aotterclam/create-mantle@alpha publication \
+  --project-name my-site \
+  --brand "My Site" \
+  --description "A short description of what this site does." \
+  --locales "en,zh-TW" \
+  --github-owner "<your-github-login>" \
+  --summary "Initial install"
 cd my-site
 ```
 
-The scaffolder asks for your archetype + theme + name and produces a Cloudflare-Worker-ready project. See [`skills/install/SKILL.md`](./skills/install/SKILL.md) for the agent-guided flow.
-
-Or paste a two-URL prompt from the landing page at [mantle.aotterclam.ai](https://mantle.aotterclam.ai/) into Claude Code / Cursor / Codex — same install, friendlier surface.
+Starter source lives in [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
 
 > **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/AotterClam/mantle/issues/1).
 
@@ -80,19 +88,20 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 ## Starters
 
-Six-family taxonomy (#58). v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
+Starter taxonomy. v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
 
-End-user starters live in the [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters) monorepo. Real-user installs run `npx @aotterclam/create-mantle <archetype>`, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` into the user's directory, and initializes a fresh user-owned Git repo without `origin` set. Premium / per-customer starters live in the private sibling [`AotterClam/mantle-starters-premium`](https://github.com/AotterClam/mantle-starters-premium).
+End-user starters live in the [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters) monorepo. Real-user installs run `npx @aotterclam/create-mantle <archetype>`, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` + optional theme overlays into the user's directory, and initializes a fresh user-owned Git repo without `origin` set. See the [starter README](https://github.com/AotterClam/mantle-starters#readme) for the current archetype/theme keys and source layout. Premium / per-customer starters live in the private sibling [`AotterClam/mantle-starters-premium`](https://github.com/AotterClam/mantle-starters-premium).
 
 | Starter | Family | Status | What |
 |---|---|---|---|
-| [`mantle-starters/publication`](https://github.com/AotterClam/mantle-starters/tree/main/publication) | publication | v0.1.0 (available) | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
-| [`mantle-starters/blank`](https://github.com/AotterClam/mantle-starters/tree/main/blank) | — | v0.1.0 (available) | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
-| `starters/leads-inbox/` | leads-inbox | v0.1.0 (planned) | Multi-form intake + lead status (new / qualified / contacted / won / lost) + assignment + agent-operated follow-up. May ship initially as a documented variant of `publication` before a dedicated directory lands. |
-| `starters/micro-shop/` | micro-shop | v0.1.0 (planned) | Small catalog + order intake on pure D1 (~100 orders/day). Stripe Checkout, cookie cart, agent-operated order handling. |
-| `starters/booking/` | booking | v0.2+ | Services / availability / appointment requests / reminders / cancellation. Blocks on DO + Queue infra (issue #21). |
-| `starters/community/` | community | v0.2+ | Member posts, comments, likes, reactions, moderation queue, agent-assisted moderation. Blocks on end-user auth (v0.2). |
-| `starters/fan-club/` | fan-club | v0.2+ | Creator/member content with private posts and membership tiers. Blocks on end-user auth + row-level visibility grammar + Stripe entitlement. |
+| [`mantle-starters/presence`](https://github.com/AotterClam/mantle-starters/tree/develop/presence) | presence | available | Brand / service presence site with pages and a contact surface. |
+| [`mantle-starters/publication`](https://github.com/AotterClam/mantle-starters/tree/develop/publication) | publication | available | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| [`mantle-starters/intake`](https://github.com/AotterClam/mantle-starters/tree/develop/intake) | intake | available | Publication shape plus structured `leads` Schema, staff-only lead View, and anonymous lead submission. |
+| [`mantle-starters/transaction`](https://github.com/AotterClam/mantle-starters/tree/develop/transaction) | transaction | available | Small catalog + cart + checkout/order workflow on Cloudflare primitives; sized for low-volume direct commerce. |
+| [`mantle-starters/blank`](https://github.com/AotterClam/mantle-starters/tree/develop/blank) | — | available | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
+| [`mantle-starters/reservation`](https://github.com/AotterClam/mantle-starters/tree/develop/reservation) | reservation | roadmap note | Routes users to `intake` as the v0.1 holding pattern until booking primitives land. |
+| `community` | community | roadmap | Member posts, comments, likes, reactions, moderation queue, agent-assisted moderation. Blocks on end-user auth. |
+| `membership` | membership | roadmap | Private posts, paid newsletters, portals, or fan-club style content. Blocks on end-user auth + row-level visibility grammar + provider-backed entitlements. |
 
 ## Repo conventions
 
