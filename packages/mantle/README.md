@@ -31,19 +31,21 @@ import { mountServerEndpoints } from "@aotter/mantle/cloudflare";
 
 ## Getting started
 
-The fastest path is `npx @aotter/create-mantle@alpha <archetype>`, which scaffolds a starter (presence / intake / transaction / blank) wired to this SDK.
+Recommended path: open [the Mantle landing page](https://the Mantle landing page/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
+
+If you already know the values and want to bypass the agent interview, call the scaffolder directly:
 
 ```bash
-npx @aotter/create-mantle@alpha presence \
+npx @aotter/create-mantle@alpha publication \
   --project-name my-site \
   --brand "My Site" \
-  --description "A short description" \
-  --locales en \
+  --description "A short description of what this site does." \
+  --locales "en,zh-TW" \
   --github-owner my-org \
-  --summary "A starter run"
+  --summary "Initial install"
 ```
 
-See `skills/install` in the [Mantle repo](https://github.com/aotter/mantle) for the full agent-driven install flow.
+Available starter keys live in [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters): `presence`, `publication`, `intake`, `transaction`, and `blank`. See `skills/install` in the [Mantle repo](https://github.com/aotter/mantle/tree/develop/skills/install) for the full agent-driven install flow.
 
 ## Adapter targets
 
@@ -57,8 +59,8 @@ The `mantle-runtime` package never imports Cloudflare-specific types — adapter
 ## Documentation
 
 - [Repo](https://github.com/aotter/mantle)
-- [4-atom manifest model (ADR-0001)](https://github.com/aotter/mantle/blob/main/docs/adr/0001-four-atom-manifest-model.md)
-- [Release process](https://github.com/aotter/mantle/blob/main/docs/release-process.md)
+- [4-atom manifest model (ADR-0001)](https://github.com/aotter/mantle/blob/develop/docs/adr/0001-four-atom-manifest-model.md)
+- [Release process](https://github.com/aotter/mantle/blob/develop/docs/release-process.md)
 - [Issues](https://github.com/aotter/mantle/issues)
 
 ## License

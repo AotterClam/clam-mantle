@@ -104,9 +104,10 @@ The full chain:
 mantle: git push tag v0.0.11-alpha.4
       │
       ▼
-release.yml: pnpm install → build → test (gate) → bump package.json
-             to tag version → pnpm -r publish (with --tag inferred
-             from prerelease suffix) → GitHub release → repository_dispatch
+release.yml: pnpm install → build → test (gate) → verify package.json
+             versions match the tag → pnpm -r publish (with --tag
+             inferred from prerelease suffix) → GitHub release →
+             repository_dispatch
              to mantle-starters
                    │
                    ▼
