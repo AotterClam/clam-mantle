@@ -36,17 +36,25 @@
   "dependencies": {
     "@aotterclam/mantle-admin-ui": "workspace:*",
     "@aotterclam/mantle-runtime": "workspace:*",
-    "@aotterclam/mantle-spec": "workspace:*",
+    "@aotterclam/mantle-spec": "workspace:*"
+  },
+  "peerDependencies": {
     "@cloudflare/workers-oauth-provider": "^0.6.0",
     "aws4fetch": "^1.0.20",
-    "better-auth": "^1.6.11",
-    "hono": "^4.12.19"
+    "better-auth": "^1.6.0",
+    "hono": "^4.12.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.6.0",
     "@cloudflare/workers-types": "^4.20260517.1",
     "@types/node": "^25",
+    "aws4fetch": "^1.0.20",
+    "better-auth": "^1.6.11",
+    "hono": "^4.12.19",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6",
-    "wrangler": "^4.92.0"
+    "wrangler": "^4.92.0",
+    "zod": "^4.4.2"
   }
 }
