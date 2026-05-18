@@ -100,14 +100,29 @@ jobs:
           echo "npm_tag=$NPM_TAG" >> "$GITHUB_OUTPUT"
           echo "Tag $TAG → version $VERSION → npm dist-tag $NPM_TAG"
 
-      - name: Bump every workspace package.json to ${{ steps.ver.outputs.version }}
+      - name: Verify package versions match ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
-          # pnpm -r exec runs in each workspace package. `npm version`
-          # with --no-git-tag-version writes to package.json only.
-          # `--allow-same-version` is a no-op safety net if the tag
-          # accidentally matches the current package.json version.
-          pnpm -r --filter './packages/**' exec npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version --allow-same-version
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            const expected = '${{ steps.ver.outputs.version }}';
+            const paths = [
+              'packages/mantle-spec/package.json',
+              'packages/mantle-admin-ui/package.json',
+              'packages/mantle-runtime/package.json',
+              'packages/adapters/cloudflare/package.json',
+              'packages/mantle/package.json',
+            ];
+            let failed = false;
+            for (const path of paths) {
+              const pkg = JSON.parse(readFileSync(path, 'utf8'));
+              if (pkg.version !== expected) {
+                console.error(path + ' version ' + pkg.version + ' does not match tag version ' + expected);
+                failed = true;
+              }
+            }
+            if (failed) process.exit(1);
+          "
 
       - name: Publish to npm
         env:
@@ -121,6 +136,25 @@ jobs:
             --tag "${{ steps.ver.outputs.npm_tag }}" \
             --no-git-checks \
             --access public
+
+      - name: Verify npm metadata
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          for p in \
+            @aotter/mantle-spec \
+            @aotter/mantle-admin-ui \
+            @aotter/mantle-runtime \
+            @aotter/mantle-cloudflare \
+            @aotter/mantle
+          do
+            npm view "$p@$VERSION" version readmeFilename --json
+          done
+          README_LEN=$(npm view "@aotter/mantle@$VERSION" readme --json | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
+          if [ "$README_LEN" -lt 200 ]; then
+            echo "::error::@aotter/mantle@$VERSION npm readme is empty or unexpectedly short"
+            exit 1
+          fi
 
       - name: Create GitHub release
         env:
