@@ -129,32 +129,49 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
-          # `workspace:*` deps in published packages get rewritten to
-          # the actual version by pnpm publish, so the umbrella
-          # @aotterclam/mantle pkg's subpath deps line up automatically.
-          pnpm -r --filter './packages/**' publish \
-            --tag "${{ steps.ver.outputs.npm_tag }}" \
-            --no-git-checks \
-            --access public
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p .release-tarballs
+          for dir in \
+            packages/mantle-spec \
+            packages/mantle-admin-ui \
+            packages/mantle-runtime \
+            packages/adapters/cloudflare \
+            packages/mantle
+          do
+            pnpm -C "$dir" pack --pack-destination "$PWD/.release-tarballs"
+          done
+
+          for tgz in \
+            ".release-tarballs/aotterclam-mantle-spec-$VERSION.tgz" \
+            ".release-tarballs/aotterclam-mantle-admin-ui-$VERSION.tgz" \
+            ".release-tarballs/aotterclam-mantle-runtime-$VERSION.tgz" \
+            ".release-tarballs/aotterclam-mantle-cloudflare-$VERSION.tgz" \
+            ".release-tarballs/aotterclam-mantle-$VERSION.tgz"
+          do
+            npm publish "$tgz" \
+              --tag "${{ steps.ver.outputs.npm_tag }}" \
+              --access public
+          done
 
       - name: Verify npm metadata
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          for p in \
-            @aotterclam/mantle-spec \
-            @aotterclam/mantle-admin-ui \
-            @aotterclam/mantle-runtime \
-            @aotterclam/mantle-cloudflare \
-            @aotterclam/mantle
-          do
-            npm view "$p@$VERSION" version readmeFilename --json
+          PACKAGES='@aotterclam/mantle-spec @aotterclam/mantle-admin-ui @aotterclam/mantle-runtime @aotterclam/mantle-cloudflare @aotterclam/mantle'
+          for attempt in 1 2 3 4 5 6 7 8; do
+            READY=1
+            for p in $PACKAGES; do
+              npm view "$p@$VERSION" version readmeFilename --json || READY=0
+            done
+            README_LEN=$((npm view "@aotterclam/mantle@$VERSION" readme --json 2>/dev/null || true) | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
+            if [ "$READY" = 1 ] && [ "$README_LEN" -ge 200 ]; then
+              exit 0
+            fi
+            echo "npm metadata not ready yet (attempt $attempt, mantle readme length $README_LEN); retrying"
+            sleep 15
           done
-          README_LEN=$(npm view "@aotterclam/mantle@$VERSION" readme --json | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
-          if [ "$README_LEN" -lt 200 ]; then
-            echo "::error::@aotterclam/mantle@$VERSION npm readme is empty or unexpectedly short"
-            exit 1
-          fi
+          echo "::error::npm metadata did not become ready or @aotterclam/mantle@$VERSION readme stayed empty"
+          exit 1
 
       - name: Create GitHub release
         env:
