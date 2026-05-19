@@ -6,6 +6,26 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.11-alpha.9] - 2026-05-19
+
+### Breaking
+
+- **`@aotterclam/mantle-spec`**: `SiteConfig` gains a required `media: { purposes: readonly string[] }` field (the runtime read shape; always present after seed, possibly empty). `SiteDefaults` (author-time, written in `clam.config.ts`) gains an optional `media?: { purposes?: readonly string[] }`. Consumers constructing a `SiteConfig` literal must include `media: { purposes: [] }` at minimum (#262 / #263). Boot-time `assertSiteDefaultsCanonical` now also throws `InvalidMediaPurposesError` if any declared purpose fails the `^[a-z0-9]+(-[a-z0-9]+)*$` slug shape.
+- **`@aotterclam/mantle-runtime`**: `create_media_upload` is now fail-closed on purpose. Calls with a `purpose` not in `siteDefaults.media.purposes`, with a missing `purpose`, or against a deployment that declared no purposes at all are rejected with the new `MEDIA_PURPOSE_REJECTED` diagnostic (HTTP 400). Deployments that previously relied on the unrestricted free-form `purpose` string must declare their taxonomy in `clam.config.ts > siteDefaults.media.purposes` before upgrading. There is no warn-and-allow compatibility mode.
+- **`@aotterclam/mantle-runtime`**: `CreateMediaUploadUseCase` constructor signature gains a `SiteConfigRepository` parameter between `clock` and `opts`. Adopters that construct the use case directly (not via `createCmsRuntime`) need to update the call site.
+- **`@aotterclam/mantle-runtime`**: `McpUseCases.media` (used by adopters wiring `McpJsonRpcDispatcher` directly) gains a required `purposes: readonly string[]` field. The dispatcher reads it to mark `create_media_upload`'s `purpose` schema as `required` + emits the declared purposes as an `enum`, so agents see the right contract via `tools/list`.
+
+### Added
+
+- **`@aotterclam/mantle-spec`**: new exports `SiteMediaConfig`, `SiteMediaDefaults`, `MEDIA_PURPOSE_SLUG_PATTERN`, `InvalidMediaPurposesError`, `MEDIA_PURPOSE_REJECTED` diagnostic code (HTTP 400 mapping).
+- **`@aotterclam/mantle-runtime`**: new port method `SiteConfigRepository.readMediaPurposes()`. `DatabaseSiteConfigRepository` seeds + loads the declared set via the same `INSERT … ON CONFLICT DO NOTHING` discipline as other site config keys, so operator edits via admin Settings stay sticky across deploys.
+- **`@aotterclam/mantle-cloudflare`**: `createMcpApiHandler` rebuilds the MCP tool catalog when `site_config.mediaPurposes` changes within the same isolate. Operator edits take effect without a redeploy; tools/list reflects the current taxonomy.
+
+### Changed
+
+- **`@aotterclam/mantle-cloudflare`**: `create_media_upload` / `commit_media_upload` MCP tools are hidden from `tools/list` when either `mediaStorage` is unbound OR `siteDefaults.media.purposes` is empty (previously only the former). Symmetric "no first-party media uploads" gate.
+- **`@aotterclam/mantle-cloudflare`**: `create_media_upload` MCP schema marks `purpose` as required and emits the declared `siteDefaults.media.purposes` as a JSON Schema `enum` so agents reading `tools/list` self-correct without a round trip.
+
 ## [0.0.9-alpha] - 2026-05-15
 
 ### Breaking
