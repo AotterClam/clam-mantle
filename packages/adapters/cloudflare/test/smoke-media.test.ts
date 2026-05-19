@@ -7,6 +7,7 @@ import type {
   MediaStorage,
 } from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
+import { createMcpApiHandler } from "../src/mount/mountMcp.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import type { Auth } from "../src/auth/createAuth.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
@@ -295,3 +296,64 @@ describe("smoke: /admin/api/media/uploads", () => {
     expect(h.storage!.commitCalls).toHaveLength(1);
   });
 });
+
+describe("smoke: MCP media tool catalog", () => {
+  it("refreshes create_media_upload purpose enum when site_config changes", async () => {
+    const db = new InMemoryDatabase();
+    const storage = new FakeMediaStorage();
+    const ref = createCmsRef({
+      manifests: manifests(),
+      siteDefaults: {
+        media: { purposes: ["post-cover"] },
+      },
+      bindings: {
+        db,
+        kv: new InMemoryKv(),
+        assets: new StubAssetServer(),
+        mediaStorage: storage,
+      },
+      auth: staffAuth(),
+    });
+    const handler = createMcpApiHandler({ ref, surface: "staff" });
+    const props = { props: { userId: STAFF_USER.id, role: "owner" } };
+
+    const first = await handler.fetch!(
+      jsonRpcReq("tools/list"),
+      {},
+      props as unknown as ExecutionContext,
+    );
+    const firstBody = (await first.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: { properties?: Record<string, Record<string, unknown>> };
+        }>;
+      };
+    };
+    expect(
+      firstBody.result.tools.find((t) => t.name === "create_media_upload")
+        ?.inputSchema.properties?.purpose?.enum,
+    ).toEqual(["post-cover"]);
+
+    db.siteConfig.set("mediaPurposes", "product-gallery");
+
+    const second = await handler.fetch!(
+      jsonRpcReq("tools/list"),
+      {},
+      props as unknown as ExecutionContext,
+    );
+    const secondBody = (await second.json()) as typeof firstBody;
+    expect(
+      secondBody.result.tools.find((t) => t.name === "create_media_upload")
+        ?.inputSchema.properties?.purpose?.enum,
+    ).toEqual(["product-gallery"]);
+  });
+});
+
+function jsonRpcReq(method: string, params?: unknown): Request {
+  return new Request("https://example.test/mcp/staff", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+}
