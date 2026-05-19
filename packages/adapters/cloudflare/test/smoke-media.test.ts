@@ -7,6 +7,7 @@ import type {
   MediaStorage,
 } from "@aotterclam/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
+import { createMcpApiHandler } from "../src/mount/mountMcp.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";
 import type { Auth } from "../src/auth/createAuth.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";
@@ -112,10 +113,20 @@ interface Harness {
   storage: FakeMediaStorage | null;
 }
 
-function harness(opts: { withMedia: boolean; auth: Auth }): Harness {
+function harness(opts: {
+  withMedia: boolean;
+  auth: Auth;
+  /** Declared media purposes; defaults to a non-empty set so existing
+   *  smoke cases that exercise mime / size / commit paths can pass
+   *  fail-closed purpose enforcement (#262) with `purpose: "post-cover"`. */
+  mediaPurposes?: readonly string[];
+}): Harness {
   const storage = opts.withMedia ? new FakeMediaStorage() : null;
   const ref = createCmsRef({
     manifests: manifests(),
+    siteDefaults: {
+      media: { purposes: opts.mediaPurposes ?? ["post-cover"] },
+    },
     bindings: {
       db: new InMemoryDatabase(),
       kv: new InMemoryKv(),
@@ -182,12 +193,52 @@ describe("smoke: /admin/api/media/uploads", () => {
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.exe", mimeType: "application/octet-stream", byteSize: 100 }),
+      body: JSON.stringify({
+        filename: "x.exe",
+        mimeType: "application/octet-stream",
+        byteSize: 100,
+        purpose: "post-cover",
+      }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
     expect(body.ok).toBe(false);
     expect(body.diagnostic.code).toBe("MEDIA_MIME_REJECTED");
+  });
+
+  it("rejects undeclared purpose with MEDIA_PURPOSE_REJECTED (#262)", async () => {
+    const h = harness({ withMedia: true, auth: staffAuth() });
+    const res = await h.app.request("/admin/api/media/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 100,
+        purpose: "mcp-e2e",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
+    expect(body.ok).toBe(false);
+    expect(body.diagnostic.code).toBe("MEDIA_PURPOSE_REJECTED");
+  });
+
+  it("rejects upload when no purposes declared (#262 fail-closed)", async () => {
+    const h = harness({ withMedia: true, auth: staffAuth(), mediaPurposes: [] });
+    const res = await h.app.request("/admin/api/media/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 100,
+        purpose: "post-cover",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { diagnostic: { code: string } };
+    expect(body.diagnostic.code).toBe("MEDIA_PURPOSE_REJECTED");
   });
 
   it("rejects request missing byteSize with INPUT_VALIDATION_FAILED (mandatory ceiling check)", async () => {
@@ -220,7 +271,12 @@ describe("smoke: /admin/api/media/uploads", () => {
     const createRes = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.png", mimeType: "image/png", byteSize: 2048 }),
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 2048,
+        purpose: "post-cover",
+      }),
     });
     expect(createRes.status).toBe(200);
     const created = (await createRes.json()) as { uploadId: string };
@@ -240,3 +296,64 @@ describe("smoke: /admin/api/media/uploads", () => {
     expect(h.storage!.commitCalls).toHaveLength(1);
   });
 });
+
+describe("smoke: MCP media tool catalog", () => {
+  it("refreshes create_media_upload purpose enum when site_config changes", async () => {
+    const db = new InMemoryDatabase();
+    const storage = new FakeMediaStorage();
+    const ref = createCmsRef({
+      manifests: manifests(),
+      siteDefaults: {
+        media: { purposes: ["post-cover"] },
+      },
+      bindings: {
+        db,
+        kv: new InMemoryKv(),
+        assets: new StubAssetServer(),
+        mediaStorage: storage,
+      },
+      auth: staffAuth(),
+    });
+    const handler = createMcpApiHandler({ ref, surface: "staff" });
+    const props = { props: { userId: STAFF_USER.id, role: "owner" } };
+
+    const first = await handler.fetch!(
+      jsonRpcReq("tools/list"),
+      {},
+      props as unknown as ExecutionContext,
+    );
+    const firstBody = (await first.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: { properties?: Record<string, Record<string, unknown>> };
+        }>;
+      };
+    };
+    expect(
+      firstBody.result.tools.find((t) => t.name === "create_media_upload")
+        ?.inputSchema.properties?.purpose?.enum,
+    ).toEqual(["post-cover"]);
+
+    db.siteConfig.set("mediaPurposes", "product-gallery");
+
+    const second = await handler.fetch!(
+      jsonRpcReq("tools/list"),
+      {},
+      props as unknown as ExecutionContext,
+    );
+    const secondBody = (await second.json()) as typeof firstBody;
+    expect(
+      secondBody.result.tools.find((t) => t.name === "create_media_upload")
+        ?.inputSchema.properties?.purpose?.enum,
+    ).toEqual(["product-gallery"]);
+  });
+});
+
+function jsonRpcReq(method: string, params?: unknown): Request {
+  return new Request("https://example.test/mcp/staff", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+}

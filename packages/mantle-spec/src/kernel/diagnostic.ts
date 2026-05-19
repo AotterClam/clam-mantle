@@ -90,6 +90,7 @@ export const DIAGNOSTIC_CODES = [
   "MEDIA_SIZE_EXCEEDED",
   "MEDIA_SVG_REJECTED",
   "MEDIA_CHECKSUM_MISMATCH",
+  "MEDIA_PURPOSE_REJECTED",
   // Mantle agent-memory layer (ADR-0016). Validate-time CLI check
   // gates deploy until the install agent's Mantle subagent has
   // written the 5-card welcome letter into mantle/site.md.
@@ -150,6 +151,7 @@ export const HTTP_STATUS_BY_CODE: Readonly<Partial<Record<DiagnosticCode, Runtim
   MEDIA_SIZE_EXCEEDED: 400,
   MEDIA_SVG_REJECTED: 400,
   MEDIA_CHECKSUM_MISMATCH: 409,
+  MEDIA_PURPOSE_REJECTED: 400,
 };
 
 /** Resolve a Diagnostic's HTTP status for wire egress; unknown codes

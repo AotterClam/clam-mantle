@@ -39,27 +39,11 @@ export interface McpToolDefinition {
 }
 
 export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
-  {
-    name: "create_media_upload",
-    description:
-      "Issue a short-lived direct-upload capability for a media object. The caller PUTs the bytes to the returned uploadUrl using the requiredHeaders, then calls commit_media_upload with the same uploadId. Only registered when the runtime has a media storage adapter bound.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
-        mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
-        byteSize: { type: "number", description: "Required. Caller-supplied byte size — enforced against the per-runtime byte ceiling before a presigned URL is minted." },
-        alt: { type: "string" },
-        caption: { type: "string" },
-        purpose: { type: "string", description: "Optional purpose tag (e.g. 'post-cover')." },
-      },
-      required: ["filename", "mimeType", "byteSize"],
-    },
-  },
+  buildCreateMediaUploadTool(),
   {
     name: "commit_media_upload",
     description:
-      "Commit a previously-PUT object. Verifies the bytes landed at the storage backend and writes commit metadata. Returns the committed MediaAsset including its publicUrl. Only registered when the runtime has a media storage adapter bound.",
+      "Commit a previously-PUT object. Verifies the bytes landed at the storage backend and writes commit metadata. Returns the committed MediaAsset including its publicUrl. Only registered when the runtime has a media storage adapter bound and a media.purposes taxonomy declared.",
     inputSchema: {
       type: "object",
       properties: {
@@ -72,6 +56,40 @@ export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
     },
   },
 ];
+
+function buildMediaTools(mediaPurposes: readonly string[]): readonly McpToolDefinition[] {
+  return [
+    buildCreateMediaUploadTool(mediaPurposes),
+    MEDIA_TOOLS[1]!,
+  ];
+}
+
+function buildCreateMediaUploadTool(
+  mediaPurposes: readonly string[] = [],
+): McpToolDefinition {
+  const purpose: Record<string, unknown> = {
+    type: "string",
+    description: "Required purpose tag declared by this starter.",
+  };
+  if (mediaPurposes.length > 0) purpose["enum"] = [...mediaPurposes];
+  return {
+    name: "create_media_upload",
+    description:
+      "Issue a short-lived direct-upload capability for a media object. The caller PUTs the bytes to the returned uploadUrl using the requiredHeaders, then calls commit_media_upload with the same uploadId. Only registered when the runtime has a media storage adapter bound and a media.purposes taxonomy declared.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
+        mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
+        byteSize: { type: "number", description: "Required. Caller-supplied byte size — enforced against the per-runtime byte ceiling before a presigned URL is minted." },
+        alt: { type: "string" },
+        caption: { type: "string" },
+        purpose,
+      },
+      required: ["filename", "mimeType", "byteSize", "purpose"],
+    },
+  };
+}
 
 export const GENERIC_TOOLS: readonly McpToolDefinition[] = [
   {
@@ -154,6 +172,10 @@ export interface BuildMcpToolCatalogOpts {
    *  Adapters set this from the runtime's `media` field (non-null when
    *  a `mediaStorage` was bound). */
   readonly mediaEnabled?: boolean;
+  /** Declared `siteDefaults.media.purposes`; when supplied, the
+   *  `create_media_upload` schema marks purpose as required and emits
+   *  this set as an enum so agents can self-correct from tools/list. */
+  readonly mediaPurposes?: readonly string[];
   /** Staff surface exposes authoring / lifecycle tools. Public
    *  surface exposes only read-only View queries for v0.1. */
   readonly surface?: McpToolSurface;
@@ -169,7 +191,7 @@ export function buildMcpToolCatalog(
     return (opts.views ?? []).map(buildQueryViewTool);
   }
   const out: McpToolDefinition[] = [...GENERIC_TOOLS];
-  if (opts.mediaEnabled) out.push(...MEDIA_TOOLS);
+  if (opts.mediaEnabled) out.push(...buildMediaTools(opts.mediaPurposes ?? []));
   for (const s of schemas) {
     out.push(buildCreateTool(s));
     out.push(buildUpdateTool(s));

@@ -49,7 +49,10 @@ export function createMcpApiHandler(
   // runtime instance, the cached dispatcher would silently keep
   // pointing at the pre-reset use-cases. A WeakMap also lets the GC
   // reclaim the dispatcher if the runtime is replaced.
-  const dispatcherCache = new WeakMap<object, McpJsonRpcDispatcher>();
+  const dispatcherCache = new WeakMap<object, {
+    readonly mediaPurposesKey: string;
+    readonly dispatcher: McpJsonRpcDispatcher;
+  }>();
 
   return {
     async fetch(request, _env, ctx) {
@@ -60,9 +63,20 @@ export function createMcpApiHandler(
         return forbidden();
       }
       const runtime = await ref.get();
-      let dispatcher = dispatcherCache.get(runtime);
-      if (!dispatcher) {
-        dispatcher = new McpJsonRpcDispatcher(
+      // Media tools require BOTH a storage adapter AND a declared
+      // `media.purposes` taxonomy (#262). Empty purposes →
+      // create_media_upload would always fail-closed, so don't surface
+      // the tools in tools/list at all. Read this before consulting the
+      // dispatcher cache so operator edits to site_config update the
+      // MCP catalog without a redeploy/runtime reset.
+      const mediaPurposes = runtime.media
+        ? await runtime.siteConfig.readMediaPurposes()
+        : [];
+      const mediaPurposesKey = mediaPurposes.join("\u0000");
+      let cached = dispatcherCache.get(runtime);
+      if (!cached || cached.mediaPurposesKey !== mediaPurposesKey) {
+        const mediaEnabled = runtime.media !== null && mediaPurposes.length > 0;
+        const dispatcher = new McpJsonRpcDispatcher(
           {
             listEntries: runtime.listEntries,
             getEntry: runtime.getEntry,
@@ -73,10 +87,11 @@ export function createMcpApiHandler(
             archive: runtime.archive,
             deleteEntry: runtime.deleteEntry,
             executeView: runtime.executeView,
-            media: runtime.media
+            media: mediaEnabled && runtime.media
               ? {
                   createUpload: runtime.media.createUpload,
                   commitUpload: runtime.media.commitUpload,
+                  purposes: mediaPurposes,
                 }
               : undefined,
           },
@@ -86,9 +101,10 @@ export function createMcpApiHandler(
             views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
           },
         );
-        dispatcherCache.set(runtime, dispatcher);
+        cached = { mediaPurposesKey, dispatcher };
+        dispatcherCache.set(runtime, cached);
       }
-      return dispatcher.dispatch(request, {
+      return cached.dispatcher.dispatch(request, {
         userId: props.userId,
         staff: role && ADMIN_ROLE_SET.has(role)
           ? { userId: props.userId, role: role as StaffRole }

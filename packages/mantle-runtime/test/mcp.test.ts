@@ -152,6 +152,46 @@ describe("McpJsonRpcDispatcher", () => {
     expect(createPosts?.inputSchema.properties?.coverUrl?.["x-mcp-hint"]).toBe("media-image");
   });
 
+  it("tools/list marks media purpose required and exposes declared purpose enum", async () => {
+    const { dispatcher: _unused, ...h } = buildHarness();
+    const dispatcher = new McpJsonRpcDispatcher(
+      {
+        listEntries: new ListEntriesUseCase(h.store, new Map([["posts", postsSchema()]])),
+        getEntry: new GetEntryUseCase(h.store),
+        createDraft: new CreateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }, { next: () => "x" }),
+        updateDraft: new UpdateDraftUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        requestPublish: new RequestPublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        unpublish: new UnpublishUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        archive: new ArchiveUseCase(h.store, new Map([["posts", postsSchema()]]), { now: () => 0 }),
+        deleteEntry: new DeleteEntryUseCase(h.store),
+        media: {
+          createUpload: { execute: async () => ({}) } as never,
+          commitUpload: { execute: async () => ({}) } as never,
+          purposes: ["post-cover", "product-gallery"],
+        },
+      },
+      [postsSchema()],
+    );
+    const res = await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" });
+    const body = (await res.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          inputSchema: {
+            required?: string[];
+            properties?: Record<string, Record<string, unknown>>;
+          };
+        }>;
+      };
+    };
+    const mediaTool = body.result.tools.find((t) => t.name === "create_media_upload");
+    expect(mediaTool?.inputSchema.required).toContain("purpose");
+    expect(mediaTool?.inputSchema.properties?.purpose?.enum).toEqual([
+      "post-cover",
+      "product-gallery",
+    ]);
+  });
+
   it("tools/call create_draft_posts creates an entry through the use case", async () => {
     const { dispatcher, store } = buildHarness();
     const res = await dispatcher.dispatch(
