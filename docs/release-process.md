@@ -490,19 +490,21 @@ infrastructure-config drift, not application bug.
 For renames spanning SDK + starters + landing (or any
 SDK-depends-on-published-SDK chain):
 
-1. Source-level rename in all repos, open PRs, **do not merge yet**.
-2. Verify each PR's CI (where present); typecheck on source-only
-   without lockfile refresh.
-3. From the SDK rename branch: `pnpm build`, then `pnpm -r publish
-   --no-git-checks --access public --tag alpha`. Verify no `workspace:*`
-   leak (see "Alpha publish command" above).
-4. On each consumer PR (starters, landing): bump the SDK dep to the
-   freshly-published version, run `pnpm install`, push the refreshed
-   lockfile.
-5. Merge consumer PRs.
-6. Smoke-test live URLs.
-7. Deprecate old packages: `npm deprecate @aotter/OLD@'*' "Renamed
-   to @aotter/NEW"`.
+1. Source-level rename in all repos. Consumer repos may temporarily use
+   npm aliases (for example `@aotter/mantle` →
+   `npm:@aotter/mantle@<old-version>`) so CI can pass before the
+   first `@aotter/*` SDK release exists.
+2. Merge the starters / landing workflow changes before pushing the SDK
+   release tag, so the fanout understands the new package names.
+3. Merge the SDK rename PR, then push the next `v*` tag. The SDK
+   `release.yml` publishes `@aotter/*` through GitHub Actions using
+   `NPM_TOKEN`; do not publish locally.
+4. Let `bump-from-sdk.yml` replace the temporary consumer aliases with
+   the freshly published real `@aotter/*` version, regenerate lockfiles,
+   and promote through starters → landing.
+5. Smoke-test live URLs.
+6. Deprecate old packages: `npm deprecate @aotter/mantle@'*'
+   "Renamed to @aotter/mantle"` (repeat for the subpackages).
 
 GitHub repo renames (`gh repo rename`) and local-dir renames can happen
 anytime — GitHub auto-redirects old URLs to new ones; no consumer

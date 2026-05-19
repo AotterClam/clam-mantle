@@ -35,7 +35,7 @@ Starter source and direct scaffolder usage live in [`aotter/mantle-starters`](ht
 - **Apps (OLTP)** — `mantle` (this repo) and future apps. Build a content-driven web service by declaring atoms in YAML; the runtime ships dispatcher + auth + render + MCP for free.
 - **Modeling (OLAP)** — [`aotter-mantle`](https://github.com/aotter/aotter-mantle) (sibling project). Turn enterprise Excel/CSV files into Kimball-modeled DuckLake warehouses by declaring star-schema configs in YAML.
 
-> Note: the two halves intentionally live in different GitHub orgs (`aotter` for mantle, `aotter` for aotter-mantle) — different release cadences, different licensing posture.
+> Note: the two halves intentionally live as separate repos under the `aotter` org — different release cadences, different licensing posture.
 
 The shared spirit: **agents write config, runtime carries the complexity**. Hard problems — schema validation, cache invalidation, OAuth, locale canonicalization, JSON Schema → zod conversion, transactional state — live in the runtime, where they're written once by people who understand them. The authoring surface is YAML the agent fills in, where mistakes are caught by structured diagnostics before they become production failures. Non-coders get AI leverage safely; the runtime is the load-bearing part.
 
