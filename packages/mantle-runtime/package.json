@@ -1,19 +1,20 @@
 {
-  "name": "@aotterclam/mantle-runtime",
-  "version": "0.0.11-alpha.10",
+  "name": "@aotter/mantle-runtime",
+  "version": "0.0.11-alpha.11",
   "description": "Runtime engine for mantle: dispatcher + entry-writer + view executor + content-ops + render pipeline + auth + MCP. Defines adapter-agnostic ports. MUST NOT import D1Database / KVNamespace types.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/mantle/tree/develop/packages/mantle-runtime",
+  "homepage": "https://github.com/aotter/mantle/tree/develop/packages/mantle-runtime",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/mantle.git",
+    "url": "git+https://github.com/aotter/mantle.git",
     "directory": "packages/mantle-runtime"
   },
   "type": "module",
   "sideEffects": false,
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "alpha",
+    "registry": "https://registry.npmjs.org"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -34,7 +35,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@aotterclam/mantle-spec": "workspace:*"
+    "@aotter/mantle-spec": "workspace:*"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

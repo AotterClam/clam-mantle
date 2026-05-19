@@ -214,7 +214,7 @@ manifest grammar reference. Manifest TS types live in
 `packages/mantle-spec/`. Starter manifests under
 `starters/` declare instances of each. Runtime dispatcher /
 View executor / Procedure dispatcher are tracked under the
-v0.1.0 ship list in [AotterClam/mantle](https://github.com/AotterClam/mantle).
+v0.1.0 ship list in [aotter/mantle](https://github.com/aotter/mantle).
 
 ---
 

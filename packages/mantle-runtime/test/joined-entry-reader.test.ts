@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Entry, SchemaManifest } from "@aotterclam/mantle-spec";
+import type { Entry, SchemaManifest } from "@aotter/mantle-spec";
 import {
   joinParentForList,
   joinParentIfTranslation,

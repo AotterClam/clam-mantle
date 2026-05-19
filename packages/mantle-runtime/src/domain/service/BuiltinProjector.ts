@@ -3,7 +3,7 @@ import {
   CLAM_BIND_VALUES,
   type ClamBindValue,
   type SchemaManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { HandlerContext } from "../model/HandlerContext.js";
 
 /**

@@ -11,7 +11,7 @@ You're installing a mantle site for the user. The composed URL inlined this brie
 
 ## Ground truth
 
-`@aotterclam/mantle-*` exposes **exactly four declarative atoms** scoped to `cms.clam.ai/v1`, mapping 1-to-1 to Postgres primitives:
+`@aotter/mantle-*` exposes **exactly four declarative atoms** scoped to `cms.clam.ai/v1`, mapping 1-to-1 to Postgres primitives:
 
 | Atom | Postgres analog | External surface |
 |---|---|---|
@@ -20,7 +20,7 @@ You're installing a mantle site for the user. The composed URL inlined this brie
 | **Procedure** | `CREATE FUNCTION` | none directly; needs a Trigger to bind it |
 | **Trigger** | `CREATE TRIGGER` + cron + REST route + LISTEN/NOTIFY | binding atom — turns Procedures into HTTP / lifecycle / MCP surfaces |
 
-Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/AotterClam/mantle/develop/docs/design-atoms.md>.
+Anything domain-shaped (Form, Membership, Workflow) is **composed in the consumer project** from these four plus user TypeScript. Full grammar reference: <https://raw.githubusercontent.com/aotter/mantle/develop/docs/design-atoms.md>.
 
 After `create-mantle` runs, the scaffold's ground truth lives in:
 
@@ -245,7 +245,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
 11. **Commit.** If step 4 produced an adjustment, that's its own commit. Then the main commit: `mantle: notes from install interview`.
 
-12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/AotterClam/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
+12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/aotter/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
 
 ## Adjustment window — between scaffold and provision
 

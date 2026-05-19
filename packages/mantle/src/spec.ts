@@ -1,1 +1,1 @@
-export * from "@aotterclam/mantle-spec";
+export * from "@aotter/mantle-spec";

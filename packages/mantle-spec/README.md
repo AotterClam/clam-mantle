@@ -1,4 +1,4 @@
-# @aotterclam/mantle-spec
+# @aotter/mantle-spec
 
 Spec engine for mantle.
 

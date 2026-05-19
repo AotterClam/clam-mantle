@@ -180,7 +180,7 @@ A different default value on its own is not on this list. Default tweaks live in
 
 This makes the implicit explicit. The SDK's auth surface is committee-curated; un-curated knobs require either a justified first-class field or an architectural change to remove the dependency on that knob.
 
-### 8. Path to `@aotterclam/mantle-better-auth` separate package (deferred)
+### 8. Path to `@aotter/mantle-better-auth` separate package (deferred)
 
 When `mantle-netlify` lands, the Better Auth wiring moves to its own package. Today the seam is in place:
 
@@ -192,10 +192,10 @@ When `mantle-netlify` lands, the Better Auth wiring moves to its own package. To
 The future split looks like:
 
 ```
-@aotterclam/mantle-runtime           ← ports + use cases (today)
-@aotterclam/mantle-better-auth       ← createAuth + EmailSender impls + appleClientSecret (new, when needed)
-@aotterclam/mantle-cloudflare        ← Workers adapter; depends on (or accepts) Auth-shape (today)
-@aotterclam/mantle-netlify           ← Netlify adapter; same shape (v0.2)
+@aotter/mantle-runtime           ← ports + use cases (today)
+@aotter/mantle-better-auth       ← createAuth + EmailSender impls + appleClientSecret (new, when needed)
+@aotter/mantle-cloudflare        ← Workers adapter; depends on (or accepts) Auth-shape (today)
+@aotter/mantle-netlify           ← Netlify adapter; same shape (v0.2)
 ```
 
 The pivot point — when to extract — is when the second adapter (`mantle-netlify`) needs the same wiring. Until then, in-place co-location is cheaper than a new package boundary.
@@ -414,5 +414,5 @@ The original ADR-0014 §"Auth as contract, Better Auth as default" framing stays
 ### Future work
 
 - A `@cloudflare/vitest-pool-workers`-based integration test covering the full OAuth flow (DCR → consent → token → MCP RPC). Node-vitest can't load `@cloudflare/workers-oauth-provider` because it imports from `cloudflare:workers`.
-- Starters (`AotterClam/mantle-starters`) migration to the same top-level OAuthProvider shape. All 8 archetypes currently use the pre-carve-out `mountMcp` API and need updating before the next starter tag.
+- Starters (`aotter/mantle-starters`) migration to the same top-level OAuthProvider shape. All 8 archetypes currently use the pre-carve-out `mountMcp` API and need updating before the next starter tag.
 - Track whether Anthropic relaxes (1) the `/mcp` resource-path-prefix requirement and (2) the no-colon-in-scope requirement. Both are de-facto MCP client behaviors, not RFC requirements; if upstream relaxes them, the SDK can re-introduce `mcp:read` / `mcp:staff` scopes for finer-grained delegation.

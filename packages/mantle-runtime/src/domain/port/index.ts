@@ -1,7 +1,7 @@
 /**
  * `domain/port/` — interface contracts the use cases depend on.
  * Concrete implementations live in `infrastructure/` (or in adapter
- * packages like `@aotterclam/mantle-cloudflare`).
+ * packages like `@aotter/mantle-cloudflare`).
  *
  * Required adapter ports — `DatabaseDriver`, `KvCache`, `AssetServer`.
  * Optional feature ports — `MediaStorage` (public-bucket media

@@ -1,4 +1,4 @@
-declare const __CLAM_MANTLE_VERSION__: string;
+declare const __AOTTER_MANTLE_VERSION__: string;
 
 // Side-effect CSS imports (`import "./styles/index.css"`) — Vite
 // handles these by injecting the stylesheet into the bundle.

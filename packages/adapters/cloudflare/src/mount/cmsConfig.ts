@@ -3,8 +3,8 @@ import type {
   CreateCmsRuntimeArgs,
   PublicPathResolver,
   TemplateRegistry,
-} from "@aotterclam/mantle-runtime";
-import type { Manifest, SiteDefaults } from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-runtime";
+import type { Manifest, SiteDefaults } from "@aotter/mantle-spec";
 import type { Auth } from "../auth/createAuth.js";
 
 /**

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import type { Manifest } from "@aotterclam/mantle-spec";
-import { TemplateRegistry } from "@aotterclam/mantle-runtime";
+import type { Manifest } from "@aotter/mantle-spec";
+import { TemplateRegistry } from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { mountPublicRoutes } from "../src/mount/mountPublicRoutes.js";
 import { InMemoryDatabase } from "../../../mantle-runtime/test/fakes/database.js";

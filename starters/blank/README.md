@@ -2,7 +2,7 @@
 
 The `blank` starter now lives in the standalone starters monorepo:
 
-[`AotterClam/mantle-starters/blank/`](https://github.com/AotterClam/mantle-starters/tree/develop/blank)
+[`aotter/mantle-starters/blank/`](https://github.com/aotter/mantle-starters/tree/develop/blank)
 
 (Repo URL above is the post-rename name; if your tooling still pins
 the original `mantle-starter-publication`, GitHub auto-redirects.)
@@ -27,4 +27,4 @@ before it ships.
 ## See also
 
 - [`packages/adapters/netlify/README.md`](../../packages/adapters/netlify/README.md) — same stub pattern, different reason.
-- [`AotterClam/mantle#97`](https://github.com/AotterClam/mantle/issues/97) — Epic that moved the starters out.
+- [`aotter/mantle#97`](https://github.com/aotter/mantle/issues/97) — Epic that moved the starters out.

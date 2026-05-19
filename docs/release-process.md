@@ -84,7 +84,7 @@ landing deploy. The human steps are:
    ```
 
 5. **Pre-v0.1 alpha shortcut**: cut the release directly from `develop` — open a release PR with base=`develop` titled `release: publish alpha.N as pre-v1 latest`, merge with a merge commit, tag the develop merge commit, push the tag. Skip steps 6–8. `main` updates less frequently than alphas; promotion happens when an alpha graduates to beta/stable. (Per practice since alpha.7; see [§ Pre-v0.1 alpha cadence](#pre-v01-alpha-cadence) below.)
-6. **Stable / beta / RC**: open a release PR base=`main`, head=`develop`. The PR title MUST contain the literal substring `release: bump @aotterclam/mantle* to vX.Y.Z` — that exact phrase is the trigger contract for `mantle-starters/.github/workflows/tag-and-dispatch-landing.yml`'s tag job. Anything else and the landing chain skips tagging.
+6. **Stable / beta / RC**: open a release PR base=`main`, head=`develop`. The PR title MUST contain the literal substring `release: bump @aotter/mantle* to vX.Y.Z` — that exact phrase is the trigger contract for `mantle-starters/.github/workflows/tag-and-dispatch-landing.yml`'s tag job. Anything else and the landing chain skips tagging.
 7. Review the diff for accidental unreleased work.
 8. Merge with a merge commit.
 9. Tag the merge commit:
@@ -133,9 +133,9 @@ The audit takes ~30 seconds and rules out the most common fanout failure. Do it 
 `bump-from-sdk.yml` / `bump-from-starters.yml` failed at the validate / typecheck gate because the SDK release introduced a code-shape break? Re-firing the workflow won't help — it'll fail the same gate on the same source. The fix-forward path:
 
 1. Branch off `develop` (starters) or `main` (landing): `release/vX.Y.Z`.
-2. Replicate what the bump workflow would have done — bump every `@aotterclam/mantle*` dep + own `version` in package.json files, refresh lockfile via `pnpm install --no-frozen-lockfile`, update `sources.json.version` (starters only).
+2. Replicate what the bump workflow would have done — bump every `@aotter/mantle*` dep + own `version` in package.json files, refresh lockfile via `pnpm install --no-frozen-lockfile`, update `sources.json.version` (starters only).
 3. Add whatever source-code fixes satisfy the new SDK shape.
-4. Commit subject MUST be `release: bump @aotterclam/mantle* to vX.Y.Z` (starters) or `release: bump @aotterclam/mantle to vX.Y.Z` (landing) — `tag-and-dispatch-landing.yml` filters on this in starters; landing has no equivalent filter but the convention keeps history consistent.
+4. Commit subject MUST be `release: bump @aotter/mantle* to vX.Y.Z` (starters) or `release: bump @aotter/mantle to vX.Y.Z` (landing) — `tag-and-dispatch-landing.yml` filters on this in starters; landing has no equivalent filter but the convention keeps history consistent.
 5. Open PR base=`develop` (starters) or base=`main` (landing), CI passes now that lockfile + source are in sync, rebase-merge.
 6. **Don't** re-fire `bump-from-sdk.yml` afterwards — it'll error with `No changes after bump — was the SDK version the same as current?` because your fast-path PR already did the bump. The workflow's only purpose was to produce the same end state your PR did.
 7. If develop→main promote is part of the flow (post-v0.1), reuse the literal `release: bump...` subject from step 4 as the promote PR title so the landing tag job fires.
@@ -166,7 +166,7 @@ release.yml: pnpm install → build → test (gate) → verify package.json
              to mantle-starters
                    │
                    ▼
-mantle-starters/bump-from-sdk.yml: bump @aotterclam/mantle* deps
+mantle-starters/bump-from-sdk.yml: bump @aotter/mantle* deps
              + own version + sources.json.version → pnpm install →
              validate × 5 starters (gate) → typecheck × 5 (gate) →
              PR onto main → auto-approve + auto-merge
@@ -176,7 +176,7 @@ mantle-starters/tag-and-dispatch-landing.yml: tag the merge commit
              vX.Y.Z → repository_dispatch to mantle-landing
                    │
                    ▼
-mantle-landing/bump-from-starters.yml: bump @aotterclam/mantle* dep
+mantle-landing/bump-from-starters.yml: bump @aotter/mantle* dep
              + own version (so STARTER_VERSION const updates) →
              pnpm install → typecheck (gate) → wrangler dry build (gate) →
              PR onto main → auto-approve + auto-merge
@@ -195,10 +195,10 @@ Repo secrets:
 
 | Repo | Secret | Purpose |
 |---|---|---|
-| `AotterClam/mantle` | `NPM_TOKEN` | npm publish access to `@aotterclam/*` |
-| `AotterClam/mantle` | `RELEASE_FANOUT_TOKEN` | cross-repo dispatch to `mantle-starters` |
-| `AotterClam/mantle-starters` | `RELEASE_FANOUT_TOKEN` | open release PR + cross-repo dispatch to `mantle-landing` |
-| `AotterClam/mantle-landing` | `RELEASE_FANOUT_TOKEN` | open release PR (deploy is `deploy.yml`'s job) |
+| `aotter/mantle` | `NPM_TOKEN` | npm publish access to `@aotter/*` |
+| `aotter/mantle` | `RELEASE_FANOUT_TOKEN` | cross-repo dispatch to `mantle-starters` |
+| `aotter/mantle-starters` | `RELEASE_FANOUT_TOKEN` | open release PR + cross-repo dispatch to `mantle-landing` |
+| `aotter/mantle-landing` | `RELEASE_FANOUT_TOKEN` | open release PR (deploy is `deploy.yml`'s job) |
 
 `RELEASE_FANOUT_TOKEN` is the same fine-grained PAT across all three
 repos — easier to manage than three separate tokens. Required
@@ -238,7 +238,7 @@ fires automatically via the cross-repo dispatch.
 | `v0.1.0-rc.1` | `rc` | prerelease |
 
 Without the inference, every prerelease would land on `latest` and
-break adopters running `npm install @aotterclam/mantle` without an
+break adopters running `npm install @aotter/mantle` without an
 explicit tag. The mapping is in the "Extract version + infer npm tag"
 step of `release.yml`.
 
@@ -253,14 +253,14 @@ the selected npm version.
 
 For `0.0.x-alpha`, publish SDK packages in dependency order:
 
-1. `@aotterclam/mantle-spec`
-2. `@aotterclam/mantle-admin-ui`
-3. `@aotterclam/mantle-runtime`
-4. `@aotterclam/mantle-cloudflare`
-5. `@aotterclam/mantle` (umbrella — depends on all four above; publish last so its exact-pinned `dependencies` resolve)
+1. `@aotter/mantle-spec`
+2. `@aotter/mantle-admin-ui`
+3. `@aotter/mantle-runtime`
+4. `@aotter/mantle-cloudflare`
+5. `@aotter/mantle` (umbrella — depends on all four above; publish last so its exact-pinned `dependencies` resolve)
 
 The umbrella is the adopter-facing entry: a single dep, subpath imports
-`@aotterclam/mantle/{spec,runtime,cloudflare,admin-ui}`. Sub-packages
+`@aotter/mantle/{spec,runtime,cloudflare,admin-ui}`. Sub-packages
 stay individually installable for tooling / alt-adapter authors.
 
 Do **not** publish starter packages during alpha unless a separate PR
@@ -269,14 +269,14 @@ Current starter install flow downloads starter source tarballs from
 GitHub/template refs, extracts them without preserving the template
 repo remote, and uses npm as the runtime dependency source.
 
-Do **not** publish `@aotterclam/mantle-netlify` while it is a stub.
+Do **not** publish `@aotter/mantle-netlify` while it is a stub.
 
-`create-mantle` lives in `AotterClam/mantle-starters`, not here. The
+`create-mantle` lives in `aotter/mantle-starters`, not here. The
 scaffolder couples to starter content (sources.json, merge layout,
 placeholder macros) and has zero coupling to SDK runtime, so it ships
 from the starters repo as a GitHub release tarball. Releases on this SDK
 repo do not attach a create-mantle tarball and must not publish
-`@aotterclam/create-mantle`.
+`@aotter/create-mantle`.
 
 `skills/install/SKILL.md` consumes the command composed by the landing
 page. Human-facing direct usage belongs in the `mantle-starters` README,
@@ -304,7 +304,7 @@ pnpm -C packages/mantle-admin-ui   pack --pack-destination /tmp/clam-pack
 pnpm -C packages/mantle-runtime    pack --pack-destination /tmp/clam-pack
 pnpm -C packages/adapters/cloudflare    pack --pack-destination /tmp/clam-pack
 pnpm -C packages/mantle            pack --pack-destination /tmp/clam-pack
-tar tzf /tmp/clam-pack/aotterclam-mantle-<ver>.tgz | head    # spot-check
+tar tzf /tmp/clam-pack/aotter-mantle-<ver>.tgz | head    # spot-check
 ```
 
 Confirm each tarball contains only intended `dist`, `README.md`,
@@ -317,11 +317,11 @@ workspace-only artifacts.
 Publish prerelease packages with the `alpha` dist-tag, in dep order:
 
 ```bash
-pnpm publish --filter @aotterclam/mantle-spec       --no-git-checks --access public
-pnpm publish --filter @aotterclam/mantle-admin-ui   --no-git-checks --access public
-pnpm publish --filter @aotterclam/mantle-runtime    --no-git-checks --access public
-pnpm publish --filter @aotterclam/mantle-cloudflare --no-git-checks --access public
-pnpm publish --filter @aotterclam/mantle            --no-git-checks --access public
+pnpm publish --filter @aotter/mantle-spec       --no-git-checks --access public
+pnpm publish --filter @aotter/mantle-admin-ui   --no-git-checks --access public
+pnpm publish --filter @aotter/mantle-runtime    --no-git-checks --access public
+pnpm publish --filter @aotter/mantle-cloudflare --no-git-checks --access public
+pnpm publish --filter @aotter/mantle            --no-git-checks --access public
 ```
 
 Or one-shot:
@@ -347,7 +347,7 @@ shipped broken via `npm publish` and had to be republished at
 Confirm zero `workspace:*` leaked into published deps:
 
 ```bash
-for p in @aotterclam/mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
+for p in @aotter/mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
   echo "=== $p"
   npm view "$p@alpha" dependencies --json | grep -i workspace && echo "  ⚠ LEAK"
 done
@@ -359,13 +359,13 @@ the pre-v0.1 `latest` policy above, that's the correct behavior; no
 action needed. Add the `alpha` tag explicitly only if it's missing:
 
 ```bash
-npm dist-tag add @aotterclam/mantle@<ver> alpha
+npm dist-tag add @aotter/mantle@<ver> alpha
 ```
 
 After publishing, verify:
 
 ```bash
-for p in @aotterclam/mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
+for p in @aotter/mantle{-spec,-admin-ui,-runtime,-cloudflare,}; do
   npm view "$p" version dist-tags --json
 done
 ```
@@ -382,8 +382,8 @@ also smoke-test installability after publish:
 ```bash
 mkdir -p /tmp/install-smoke && cd /tmp/install-smoke
 echo '{"name":"smoke","private":true}' > package.json
-npm install @aotterclam/mantle@alpha --no-package-lock --no-save
-ls node_modules/@aotterclam/mantle  # expect: dist/ package.json README.md
+npm install @aotter/mantle@alpha --no-package-lock --no-save
+ls node_modules/@aotter/mantle  # expect: dist/ package.json README.md
 ```
 
 If `npm install` 404s for >15 min despite `pnpm publish` succeeding,
@@ -401,7 +401,7 @@ is broken:
 Example:
 
 ```bash
-npm deprecate @aotterclam/mantle-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
+npm deprecate @aotter/mantle-runtime@0.0.7-alpha "Broken alpha; use 0.0.8-alpha"
 ```
 
 Only unpublish when the tarball contains secrets, private files, or a
@@ -432,7 +432,7 @@ of pre-flight; skipping them cost a half-day of outage when ignored.
 
 A naive `sed s/OLD/NEW/g` matches OLD as a **substring** of unrelated
 identifiers. Concrete trap: renaming `clam-mantle` → `mantle` hit
-`aotterclam-mantle` (the CF worker name) → `aottermantle`. The
+`aotter-mantle` (the CF worker name) → `aottermantle`. The
 auto-deploy after merge created an orphan worker without secrets;
 `mantle.aotterclam.ai` returned 503 for 30 minutes.
 
@@ -490,19 +490,21 @@ infrastructure-config drift, not application bug.
 For renames spanning SDK + starters + landing (or any
 SDK-depends-on-published-SDK chain):
 
-1. Source-level rename in all repos, open PRs, **do not merge yet**.
-2. Verify each PR's CI (where present); typecheck on source-only
-   without lockfile refresh.
-3. From the SDK rename branch: `pnpm build`, then `pnpm -r publish
-   --no-git-checks --access public --tag alpha`. Verify no `workspace:*`
-   leak (see "Alpha publish command" above).
-4. On each consumer PR (starters, landing): bump the SDK dep to the
-   freshly-published version, run `pnpm install`, push the refreshed
-   lockfile.
-5. Merge consumer PRs.
-6. Smoke-test live URLs.
-7. Deprecate old packages: `npm deprecate @aotterclam/OLD@'*' "Renamed
-   to @aotterclam/NEW"`.
+1. Source-level rename in all repos. Consumer repos may temporarily use
+   npm aliases (for example `@aotter/mantle` →
+   `npm:@aotterclam/mantle@<old-version>`) so CI can pass before the
+   first `@aotter/*` SDK release exists.
+2. Merge the starters / landing workflow changes before pushing the SDK
+   release tag, so the fanout understands the new package names.
+3. Merge the SDK rename PR, then push the next `v*` tag. The SDK
+   `release.yml` publishes `@aotter/*` through GitHub Actions using
+   `NPM_TOKEN`; do not publish locally.
+4. Let `bump-from-sdk.yml` replace the temporary consumer aliases with
+   the freshly published real `@aotter/*` version, regenerate lockfiles,
+   and promote through starters → landing.
+5. Smoke-test live URLs.
+6. Deprecate old packages: `npm deprecate @aotterclam/mantle@'*'
+   "Renamed to @aotter/mantle"` (repeat for the subpackages).
 
 GitHub repo renames (`gh repo rename`) and local-dir renames can happen
 anytime — GitHub auto-redirects old URLs to new ones; no consumer
@@ -539,7 +541,7 @@ Use hotfixes only for released `main` defects.
       ran (see "Cross-cutting rename playbook"); infra-config diff
       explicitly reviewed; consumer-repo lockfiles refreshed after the
       SDK publish lands.
-- [ ] If promoting `develop → main` (post-v0.1, or first-stable), the promote PR title contains the literal substring `release: bump @aotterclam/mantle* to vX.Y.Z` so `tag-and-dispatch-landing.yml`'s tag job fires.
+- [ ] If promoting `develop → main` (post-v0.1, or first-stable), the promote PR title contains the literal substring `release: bump @aotter/mantle* to vX.Y.Z` so `tag-and-dispatch-landing.yml`'s tag job fires.
 - [ ] Smoke-tested live downstream URL (e.g. `mantle.aotterclam.ai`)
       after consumer-repo deploys — CI green is not enough when infra
       config (wrangler.toml `name`, D1 / KV / DO bindings) shifted.

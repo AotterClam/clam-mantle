@@ -37,7 +37,7 @@ export class InvalidMediaPurposesError extends Error {
         `. Each purpose must match ${MEDIA_PURPOSE_SLUG_PATTERN.source} — ` +
         `lowercase alphanumerics, dash-separated, no leading/trailing or ` +
         `repeated dashes. Examples: 'product-cover', 'post-cover', ` +
-        `'product-gallery'. See AotterClam/mantle#262.`,
+        `'product-gallery'. See aotter/mantle#262.`,
     );
     this.name = "InvalidMediaPurposesError";
   }

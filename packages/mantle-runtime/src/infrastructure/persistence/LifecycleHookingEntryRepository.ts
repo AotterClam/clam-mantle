@@ -1,4 +1,4 @@
-import type { LifecycleHook } from "@aotterclam/mantle-spec";
+import type { LifecycleHook } from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { HandlerContext } from "../../domain/model/HandlerContext.js";
 import {

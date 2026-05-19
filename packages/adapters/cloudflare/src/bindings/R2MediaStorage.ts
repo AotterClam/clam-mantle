@@ -1,5 +1,5 @@
 import { AwsClient } from "aws4fetch";
-import { DiagnosticError, makeDiagnostic } from "@aotterclam/mantle-spec";
+import { DiagnosticError, makeDiagnostic } from "@aotter/mantle-spec";
 import {
   RandomUuidGenerator,
   extensionForMime,
@@ -11,7 +11,7 @@ import {
   type IdGenerator,
   type MediaAsset,
   type MediaStorage,
-} from "@aotterclam/mantle-runtime";
+} from "@aotter/mantle-runtime";
 
 /**
  * `R2MediaStorage` — `MediaStorage` adapter backed by Cloudflare R2,

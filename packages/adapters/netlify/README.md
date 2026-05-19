@@ -1,4 +1,4 @@
-# `@aotterclam/mantle-netlify` — STUB
+# `@aotter/mantle-netlify` — STUB
 
 Netlify Functions adapter for mantle. **Coming v0.2.**
 
@@ -8,7 +8,7 @@ This package is intentionally empty in v0.1.0.
 
 It exists as an **engineering forcing function**.
 
-The required adapter ports defined in `@aotterclam/mantle-runtime`
+The required adapter ports defined in `@aotter/mantle-runtime`
 (`DatabaseDriver`, `KvCache`, `AssetServer`) only stay
 adapter-agnostic if there's pressure to implement them in more than
 one place. Auth is supplied by an adapter-owned Better Auth instance;
@@ -37,4 +37,4 @@ Open an issue. Implementation work for the second adapter is a discrete chunk; o
 
 ## Until v0.2
 
-Use [`@aotterclam/mantle-cloudflare`](../cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).
+Use [`@aotter/mantle-cloudflare`](../cloudflare/README.md). Cloudflare Workers gives you D1 + KV + ASSETS in one place at zero cost (no credit card needed for the v0.1.0 starter set).

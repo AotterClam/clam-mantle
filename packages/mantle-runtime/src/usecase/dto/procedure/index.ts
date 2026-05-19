@@ -2,7 +2,7 @@ import type {
   Diagnostic,
   Phase,
   ProcedureManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { HandlerContext } from "../../../domain/model/HandlerContext.js";
 
 /**

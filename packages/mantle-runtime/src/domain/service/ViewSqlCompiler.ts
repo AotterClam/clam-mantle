@@ -5,7 +5,7 @@ import {
   runtimeDiagnostic,
   type FilterAst,
   type ViewManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import { clampPage, clampShow } from "./Pagination.js";
 
 /**

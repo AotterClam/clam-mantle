@@ -1,4 +1,4 @@
-import { DiagnosticError } from "@aotterclam/mantle-spec";
+import { DiagnosticError } from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import type { GetEntryRequest } from "../dto/content/index.js";

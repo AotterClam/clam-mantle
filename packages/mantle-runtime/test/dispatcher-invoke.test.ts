@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { runtimeDiagnostic } from "@aotterclam/mantle-spec";
+import { runtimeDiagnostic } from "@aotter/mantle-spec";
 import type { HandlerContext } from "../src/domain/model/HandlerContext.js";
 import { InMemoryHandlerRegistry } from "../src/domain/port/HandlerRegistry.js";
 import {

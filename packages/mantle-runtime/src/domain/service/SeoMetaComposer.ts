@@ -1,4 +1,4 @@
-import { toUrlLocale, type Entry, type SiteConfig } from "@aotterclam/mantle-spec";
+import { toUrlLocale, type Entry, type SiteConfig } from "@aotter/mantle-spec";
 import type { SeoMeta } from "../model/SeoMeta.js";
 import { absoluteUrl, appendMarkdownExt } from "./AbsoluteUrl.js";
 import { hasMarkdownBody } from "./MarkdownSerializer.js";

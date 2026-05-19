@@ -1,4 +1,4 @@
-# @aotterclam/mantle-cloudflare
+# @aotter/mantle-cloudflare
 
 Cloudflare Workers adapter for mantle.
 

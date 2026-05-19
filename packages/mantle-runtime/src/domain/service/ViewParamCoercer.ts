@@ -1,4 +1,4 @@
-import type { JsonSchema, ViewManifest } from "@aotterclam/mantle-spec";
+import type { JsonSchema, ViewManifest } from "@aotter/mantle-spec";
 
 /**
  * Coerce a public REST query string into the typed param map declared

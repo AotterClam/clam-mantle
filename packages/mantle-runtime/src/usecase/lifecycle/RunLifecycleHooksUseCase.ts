@@ -3,7 +3,7 @@ import {
   runtimeDiagnostic,
   type ProcedureManifest,
   type TriggerManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { HandlerContext, HandlerLifecycleEvent } from "../../domain/model/HandlerContext.js";
 import type {
   LifecycleHookRunner,

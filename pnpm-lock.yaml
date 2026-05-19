@@ -10,13 +10,13 @@ importers:
 
   packages/adapters/cloudflare:
     dependencies:
-      '@aotterclam/mantle-admin-ui':
+      '@aotter/mantle-admin-ui':
         specifier: workspace:*
         version: link:../../mantle-admin-ui
-      '@aotterclam/mantle-runtime':
+      '@aotter/mantle-runtime':
         specifier: workspace:*
         version: link:../../mantle-runtime
-      '@aotterclam/mantle-spec':
+      '@aotter/mantle-spec':
         specifier: workspace:*
         version: link:../../mantle-spec
     devDependencies:
@@ -55,16 +55,16 @@ importers:
 
   packages/mantle:
     dependencies:
-      '@aotterclam/mantle-admin-ui':
+      '@aotter/mantle-admin-ui':
         specifier: workspace:*
         version: link:../mantle-admin-ui
-      '@aotterclam/mantle-cloudflare':
+      '@aotter/mantle-cloudflare':
         specifier: workspace:*
         version: link:../adapters/cloudflare
-      '@aotterclam/mantle-runtime':
+      '@aotter/mantle-runtime':
         specifier: workspace:*
         version: link:../mantle-runtime
-      '@aotterclam/mantle-spec':
+      '@aotter/mantle-spec':
         specifier: workspace:*
         version: link:../mantle-spec
     devDependencies:
@@ -159,7 +159,7 @@ importers:
 
   packages/mantle-runtime:
     dependencies:
-      '@aotterclam/mantle-spec':
+      '@aotter/mantle-spec':
         specifier: workspace:*
         version: link:../mantle-spec
     devDependencies:

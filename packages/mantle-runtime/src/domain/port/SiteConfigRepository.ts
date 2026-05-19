@@ -1,4 +1,4 @@
-import type { SiteConfig, SiteDefaults } from "@aotterclam/mantle-spec";
+import type { SiteConfig, SiteDefaults } from "@aotter/mantle-spec";
 
 /**
  * `SiteConfigRepository` — the `site_config` row read/write surface

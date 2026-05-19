@@ -1,4 +1,4 @@
-import type { ContentState, SiteConfig } from "@aotterclam/mantle-spec";
+import type { ContentState, SiteConfig } from "@aotter/mantle-spec";
 
 /**
  * Request DTO for `RenderEntryLiveUseCase` — renders a single entry

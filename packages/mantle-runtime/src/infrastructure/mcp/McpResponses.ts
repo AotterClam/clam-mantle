@@ -3,7 +3,7 @@ import {
   redactForWire,
   runtimeDiagnostic,
   type Diagnostic,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 
 export function jsonRpcOk(id: unknown, result: unknown): Response {
   return new Response(JSON.stringify({ jsonrpc: "2.0", id, result }), {

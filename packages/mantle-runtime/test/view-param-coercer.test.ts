@@ -3,7 +3,7 @@ import {
   ViewParamCoercionError,
   coerceViewParams,
 } from "../src/domain/service/ViewParamCoercer.js";
-import type { JsonSchema, ViewManifest } from "@aotterclam/mantle-spec";
+import type { JsonSchema, ViewManifest } from "@aotter/mantle-spec";
 
 function view(params: JsonSchema | undefined): ViewManifest {
   return {

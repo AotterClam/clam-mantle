@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   ProcedureManifest,
   SchemaManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { InMemoryHandlerRegistry } from "../src/domain/port/HandlerRegistry.js";

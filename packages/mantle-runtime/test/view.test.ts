@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compileView } from "../src/domain/service/ViewSqlCompiler.js";
 import { ExecuteViewUseCase } from "../src/usecase/view/ExecuteViewUseCase.js";
 import { InMemoryDatabase } from "./fakes/database.js";
-import type { ViewManifest } from "@aotterclam/mantle-spec";
+import type { ViewManifest } from "@aotter/mantle-spec";
 
 function view(opts: Partial<ViewManifest["spec"]> & { from: string }): ViewManifest {
   return {

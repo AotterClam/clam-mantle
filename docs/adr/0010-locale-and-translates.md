@@ -423,8 +423,8 @@ When configuring a new consumer:
 
 Accepted for v0.1.0. The POC shipped the grammar, runtime gate, and
 `siteDefaults` seed; the v0.1.0 rebuild ports the same shapes into
-the new package layout (`@aotterclam/mantle-spec` for the manifest
-grammar, `@aotterclam/mantle-runtime` for the gate, the CF adapter
+the new package layout (`@aotter/mantle-spec` for the manifest
+grammar, `@aotter/mantle-runtime` for the gate, the CF adapter
 for `createCmsRuntime().bootInit()` + `DatabaseSiteConfigRepository.seed`):
 
 - Grammar in `packages/mantle-spec/src/domain/model/ManifestGrammar.ts`

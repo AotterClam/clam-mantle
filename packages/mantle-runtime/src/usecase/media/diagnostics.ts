@@ -1,4 +1,4 @@
-import { makeDiagnostic, type Diagnostic } from "@aotterclam/mantle-spec";
+import { makeDiagnostic, type Diagnostic } from "@aotter/mantle-spec";
 
 const PHASE = "runtime" as const;
 

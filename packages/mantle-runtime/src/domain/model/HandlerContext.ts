@@ -1,4 +1,4 @@
-import type { LifecycleHook, StaffRole } from "@aotterclam/mantle-spec";
+import type { LifecycleHook, StaffRole } from "@aotter/mantle-spec";
 
 /**
  * `HandlerContext` — auth + bindings handed to every Procedure

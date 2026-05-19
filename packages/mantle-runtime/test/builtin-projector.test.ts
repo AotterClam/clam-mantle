@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SchemaManifest } from "@aotterclam/mantle-spec";
+import type { SchemaManifest } from "@aotter/mantle-spec";
 import { projectAndStamp } from "../src/domain/service/BuiltinProjector.js";
 
 const schema: SchemaManifest = {

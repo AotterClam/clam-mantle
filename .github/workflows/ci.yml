@@ -36,7 +36,7 @@ jobs:
       - name: Build dist (typecheck + emit) for spec / runtime / admin-ui / cloudflare
         # Vitest tests for cloudflare import runtime/admin UI via dist/,
         # so build before test. Spec + runtime tests use src/ directly.
-        run: pnpm -r --filter '@aotterclam/mantle-spec' --filter '@aotterclam/mantle-runtime' --filter '@aotterclam/mantle-admin-ui' --filter '@aotterclam/mantle-cloudflare' build
+        run: pnpm -r --filter '@aotter/mantle-spec' --filter '@aotter/mantle-runtime' --filter '@aotter/mantle-admin-ui' --filter '@aotter/mantle-cloudflare' build
 
       - name: Re-link bins now that dist/ exists
         # First `pnpm install` runs before SDK build, so spec's
@@ -51,7 +51,7 @@ jobs:
 
       - name: Typecheck workspace
         # Starter typecheck/validate moved out with PR #108 (blank
-        # migrated to AotterClam/mantle-starters); run there now.
+        # migrated to aotter/mantle-starters); run there now.
         run: pnpm typecheck
 
       - run: pnpm test

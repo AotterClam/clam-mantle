@@ -1,4 +1,4 @@
-import type { ViewManifest } from "@aotterclam/mantle-spec";
+import type { ViewManifest } from "@aotter/mantle-spec";
 import type { HandlerContext } from "../../../domain/model/HandlerContext.js";
 import type { CompileViewOptions } from "../../../domain/service/ViewSqlCompiler.js";
 

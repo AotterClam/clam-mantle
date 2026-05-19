@@ -7,7 +7,7 @@
 #   3. `pnpm -r publish` with npm dist-tag inferred from the prerelease
 #      suffix (see § "npm tag inference" below)
 #   4. Create a GitHub release with auto-generated notes
-#   5. Dispatch `AotterClam/mantle-starters` with the new SDK version
+#   5. Dispatch `aotter/mantle-starters` with the new SDK version
 #      so its `bump-from-sdk.yml` workflow opens a downstream bump PR
 #
 # Steps 2-3 of the fanout (starters bump → tag → landing bump → deploy)
@@ -17,7 +17,7 @@
 # ── Operator setup (one-time, repo secrets) ───────────────────────────
 #
 #   NPM_TOKEN              — npm automation token with publish access to
-#                            `@aotterclam/*`. Repo Settings → Secrets →
+#                            `@aotter/*`. Repo Settings → Secrets →
 #                            Actions → New repository secret.
 #
 #   RELEASE_FANOUT_TOKEN   — fine-grained PAT (or GitHub App installation
@@ -40,7 +40,7 @@
 #
 # The mapping is in the "Extract version + infer npm tag" step. Without
 # it, every prerelease would land on `latest` and break adopters running
-# `npm install @aotterclam/mantle` without a tag.
+# `npm install @aotter/mantle` without a tag.
 
 name: release
 
@@ -149,26 +149,27 @@ jobs:
           done
 
           for tgz in \
-            ".release-tarballs/aotterclam-mantle-spec-$VERSION.tgz" \
-            ".release-tarballs/aotterclam-mantle-admin-ui-$VERSION.tgz" \
-            ".release-tarballs/aotterclam-mantle-runtime-$VERSION.tgz" \
-            ".release-tarballs/aotterclam-mantle-cloudflare-$VERSION.tgz" \
-            ".release-tarballs/aotterclam-mantle-$VERSION.tgz"
+            ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-runtime-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-$VERSION.tgz"
           do
             npm publish "$tgz" \
+              --registry https://registry.npmjs.org \
               --tag "$PUBLISH_TAG" \
               --access public
           done
 
           if [[ "$PUBLISH_TAG" != "${{ steps.ver.outputs.npm_tag }}" ]]; then
             for p in \
-              @aotterclam/mantle-spec \
-              @aotterclam/mantle-admin-ui \
-              @aotterclam/mantle-runtime \
-              @aotterclam/mantle-cloudflare \
-              @aotterclam/mantle
+              @aotter/mantle-spec \
+              @aotter/mantle-admin-ui \
+              @aotter/mantle-runtime \
+              @aotter/mantle-cloudflare \
+              @aotter/mantle
             do
-              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}"
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" --registry https://registry.npmjs.org
             done
           fi
 
@@ -176,20 +177,20 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          PACKAGES='@aotterclam/mantle-spec @aotterclam/mantle-admin-ui @aotterclam/mantle-runtime @aotterclam/mantle-cloudflare @aotterclam/mantle'
+          PACKAGES='@aotter/mantle-spec @aotter/mantle-admin-ui @aotter/mantle-runtime @aotter/mantle-cloudflare @aotter/mantle'
           for attempt in 1 2 3 4 5 6 7 8; do
             READY=1
             for p in $PACKAGES; do
-              npm view "$p@$VERSION" version readmeFilename --json || READY=0
+              npm view "$p@$VERSION" version readmeFilename --json --registry https://registry.npmjs.org || READY=0
             done
-            README_LEN=$((npm view "@aotterclam/mantle@$VERSION" readme --json 2>/dev/null || true) | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
+            README_LEN=$((npm view "@aotter/mantle@$VERSION" readme --json --registry https://registry.npmjs.org 2>/dev/null || true) | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
             if [ "$READY" = 1 ] && [ "$README_LEN" -ge 200 ]; then
               exit 0
             fi
             echo "npm metadata not ready yet (attempt $attempt, mantle readme length $README_LEN); retrying"
             sleep 15
           done
-          echo "::error::npm metadata did not become ready or @aotterclam/mantle@$VERSION readme stayed empty"
+          echo "::error::npm metadata did not become ready or @aotter/mantle@$VERSION readme stayed empty"
           exit 1
 
       - name: Create GitHub release
@@ -216,7 +217,7 @@ jobs:
             echo "::warning::RELEASE_FANOUT_TOKEN not set — starters bump skipped. SDK is published; set the secret and re-dispatch via the Actions UI to continue the fanout."
             exit 0
           fi
-          gh api repos/AotterClam/mantle-starters/dispatches \
+          gh api "repos/${{ github.repository_owner }}/mantle-starters/dispatches" \
             -f event_type=sdk-published \
             -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
             -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"

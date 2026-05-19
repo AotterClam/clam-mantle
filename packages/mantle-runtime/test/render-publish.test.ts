@@ -11,7 +11,7 @@ import {
 import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { InMemoryKv } from "./fakes/kv.js";
-import type { SiteConfig } from "@aotterclam/mantle-spec";
+import type { SiteConfig } from "@aotter/mantle-spec";
 
 const site: SiteConfig = {
   title: "Blog",

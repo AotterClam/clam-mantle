@@ -1,4 +1,4 @@
-# @aotterclam/mantle-admin-ui
+# @aotter/mantle-admin-ui
 
 Admin SPA shell for mantle.
 

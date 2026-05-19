@@ -1,4 +1,4 @@
-import { toUrlLocale, type Entry } from "@aotterclam/mantle-spec";
+import { toUrlLocale, type Entry } from "@aotter/mantle-spec";
 import { entrySlug } from "./PublishKeys.js";
 
 /**

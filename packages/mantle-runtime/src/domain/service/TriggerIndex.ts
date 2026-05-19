@@ -1,4 +1,4 @@
-import type { LifecycleHook, TriggerManifest } from "@aotterclam/mantle-spec";
+import type { LifecycleHook, TriggerManifest } from "@aotter/mantle-spec";
 
 /**
  * Pre-built `(schema, hook) → Trigger[]` index for the lifecycle hook

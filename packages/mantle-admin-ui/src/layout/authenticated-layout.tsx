@@ -28,7 +28,7 @@ import { SkipToMain } from "./skip-to-main";
 import { statusLabel } from "../features/content/status";
 import { readSidebarOpenCookie } from "../context/layout-provider";
 import { t } from "../app/i18n";
-import { AdminAttribution } from "../brand/aotter-clam";
+import { AdminAttribution } from "../brand/aotter-mantle";
 import type { AdminBrand, NavGroupData, NavItem, NavLink } from "./types";
 
 interface AuthenticatedLayoutProps {

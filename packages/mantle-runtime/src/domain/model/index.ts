@@ -1,5 +1,5 @@
 /** `domain/model/` — runtime-only POs/VOs. Spec types come from
- *  `@aotterclam/mantle-spec`. */
+ *  `@aotter/mantle-spec`. */
 export * from "./EntryRow.js";
 export * from "./HandlerContext.js";
 export type { SeoMeta } from "./SeoMeta.js";

@@ -1,4 +1,4 @@
-import type { Entry, SiteConfig } from "@aotterclam/mantle-spec";
+import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import {
   composeEntrySeoMeta,

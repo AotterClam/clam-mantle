@@ -1,10 +1,10 @@
 # SKILL.md briefs (mantle)
 
-Agent-readable skill briefs for consumers of `@aotterclam/mantle-*`. Discoverable by URL — no plugin install needed.
+Agent-readable skill briefs for consumers of `@aotter/mantle-*`. Discoverable by URL — no plugin install needed.
 
 | Skill | When to invoke |
 |---|---|
-| [`install`](install/SKILL.md) | User wants to start a new mantle project (empty repo / "I want a publication site" / "headless CMS for my Next.js"). Invokes the `create-mantle` release tarball from the [starters monorepo](https://github.com/AotterClam/mantle-starters). |
+| [`install`](install/SKILL.md) | User wants to start a new mantle project (empty repo / "I want a publication site" / "headless CMS for my Next.js"). Invokes the `create-mantle` release tarball from the [starters monorepo](https://github.com/aotter/mantle-starters). |
 | [`customize-design`](customize-design/SKILL.md) | User wants to rebrand or restyle a publication starter project. Walks the L1–L4 theme stack (tokens / extraCss+icons+i18n / Header+Footer / whole-template). |
 | [`extend`](extend/SKILL.md) | User has an existing project and wants to add a Schema / View / Procedure / Trigger or wire a feature (contact form, search, newsletter signup). |
 | [`provision`](provision/SKILL.md) | User wants to deploy to production: OAuth verifier swap, secrets, prod D1/KV, custom domain. |

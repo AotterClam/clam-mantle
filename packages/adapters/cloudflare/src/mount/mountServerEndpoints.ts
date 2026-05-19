@@ -10,7 +10,7 @@ import {
   type ContentState,
   type Diagnostic,
   type SchemaManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import {
   ViewParamCoercionError,
   coerceViewParams,
@@ -18,8 +18,8 @@ import {
   matchPath,
   type CmsRuntime,
   type HandlerContext,
-} from "@aotterclam/mantle-runtime";
-import { indexHtml } from "@aotterclam/mantle-admin-ui";
+} from "@aotter/mantle-runtime";
+import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
 import { AOTTER_FAVICON_SVG } from "../assets/aotterFavicon.js";

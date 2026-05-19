@@ -45,7 +45,7 @@ long generic interview.
 Published npm packages are the runtime dependency source. Starter files
 may still be copied from the GitHub repo or a release tag, but
 `setup:site` rewrites `workspace:*` dependencies to the requested
-`@aotterclam/mantle-*` npm version before `pnpm install`. This keeps
+`@aotter/mantle-*` npm version before `pnpm install`. This keeps
 consumer projects independent from the monorepo and avoids private-repo
 token friction in the install path.
 
@@ -125,7 +125,7 @@ they are debugging a failed provision.
 
 - `skills/install/SKILL.md` and `skills/provision/SKILL.md` encode the
   current agent workflow.
-- `AotterClam/mantle-starter-publication` and `starters/blank` both
+- `aotter/mantle-starter-publication` and `starters/blank` both
   ship `setup:site`.
 - The publication starter ships `provision:up`; `seed:initial` remains
   a test/contributor utility, not part of real-user provisioning.

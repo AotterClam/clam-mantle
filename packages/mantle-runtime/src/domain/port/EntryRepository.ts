@@ -1,4 +1,4 @@
-import type { ContentState } from "@aotterclam/mantle-spec";
+import type { ContentState } from "@aotter/mantle-spec";
 import type { EntryRow } from "../model/EntryRow.js";
 import type { HandlerContext } from "../model/HandlerContext.js";
 

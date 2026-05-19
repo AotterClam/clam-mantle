@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SiteConfig } from "@aotterclam/mantle-spec";
+import type { SiteConfig } from "@aotter/mantle-spec";
 import {
   inferLocaleFromPath,
   isKnownLocale,

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   DeferredHookEnvelope,
   CmsRuntime,
-} from "@aotterclam/mantle-runtime";
+} from "@aotter/mantle-runtime";
 import {
   WorkersQueueHookDispatcher,
   createQueueHandler,

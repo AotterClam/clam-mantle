@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EmailSender } from "@aotterclam/mantle-runtime";
+import type { EmailSender } from "@aotter/mantle-runtime";
 import {
   buildSocialProviders,
   createAuth,

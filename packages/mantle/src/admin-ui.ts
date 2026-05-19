@@ -1,1 +1,1 @@
-export * from "@aotterclam/mantle-admin-ui";
+export * from "@aotter/mantle-admin-ui";

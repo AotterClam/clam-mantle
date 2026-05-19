@@ -1,4 +1,4 @@
-import type { EmailSender, EmailSendArgs } from "@aotterclam/mantle-runtime";
+import type { EmailSender, EmailSendArgs } from "@aotter/mantle-runtime";
 
 /**
  * Dev convenience: writes the email to `console.log` instead of
