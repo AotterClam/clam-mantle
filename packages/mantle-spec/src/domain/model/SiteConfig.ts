@@ -41,6 +41,22 @@ export interface SiteConfig {
   /** Absolute or root-relative favicon URL. Omit to use the SDK's
    *  default aotter mark at `/favicon.svg`. */
   readonly faviconUrl?: string;
+  /** Starter-declared media taxonomy. Empty array = no first-party
+   *  media uploads permitted; the runtime disables the
+   *  `create_media_upload` / `commit_media_upload` MCP tools and the
+   *  admin upload lifecycle on deployments that don't declare any
+   *  purpose, symmetric with "no `MediaStorage` configured". When
+   *  non-empty, `create_media_upload` rejects any `purpose` not in
+   *  this set with `MEDIA_PURPOSE_REJECTED`. */
+  readonly media: SiteMediaConfig;
+}
+
+/** Runtime read shape for the `media` section of `SiteConfig`. Always
+ *  present after seed; `purposes` may be empty when the consumer
+ *  didn't declare any. Per-field `x-mantle-media` (manifest extension)
+ *  is intentionally out of scope for v0.1 — see #262. */
+export interface SiteMediaConfig {
+  readonly purposes: readonly string[];
 }
 
 /**
@@ -77,4 +93,25 @@ export interface SiteDefaults {
   readonly origin?: string;
   /** Absolute or root-relative favicon URL. */
   readonly faviconUrl?: string;
+  /** Starter-declared media taxonomy. See `SiteConfig.media` for
+   *  runtime semantics. Omit the whole `media` key (or declare it
+   *  with an empty `purposes` array) on archetypes that don't
+   *  exercise first-party media uploads — the runtime will keep the
+   *  upload tools disabled, symmetric with "no `MediaStorage`
+   *  configured". Slug-shaped (`^[a-z0-9]+(-[a-z0-9]+)*$`); validated
+   *  synchronously at boot. */
+  readonly media?: SiteMediaDefaults;
 }
+
+export interface SiteMediaDefaults {
+  readonly purposes?: ReadonlyArray<string>;
+}
+
+/** Slug regex for `media.purposes` entries. Matches a lowercase
+ *  alphanumeric word, optionally followed by dash-separated
+ *  alphanumeric segments — no leading/trailing dashes, no double
+ *  dashes. The R2 adapter already uses a looser variant of this for
+ *  storage-key prefixes (`/^[a-z0-9-]+$/`); spec-level validation is
+ *  stricter so admin / docs / object-store dashboards see clean
+ *  slugs. */
+export const MEDIA_PURPOSE_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;

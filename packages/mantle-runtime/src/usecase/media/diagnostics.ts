@@ -75,3 +75,32 @@ export function mediaObjectNotFoundDiagnostic(opPath: string, uploadId: string):
     suggestion: "PUT the file to the upload URL before calling commit_media_upload",
   });
 }
+
+/** Caller supplied a `purpose` that this deployment did not declare in
+ *  `siteDefaults.media.purposes`. Fail-closed per #262: alpha has no
+ *  production consumers, so there is no warn-and-allow compatibility
+ *  mode — undeclared purposes are always rejected. The `expected`
+ *  field carries the declared set so agents can self-correct without
+ *  another round trip. */
+export function mediaPurposeRejectedDiagnostic(
+  opPath: string,
+  purpose: string | undefined,
+  declared: readonly string[],
+): Diagnostic {
+  const expected =
+    declared.length > 0
+      ? `purpose ∈ {${declared.map((p) => `'${p}'`).join(", ")}}`
+      : "media uploads are not enabled on this deployment (no `media.purposes` declared in siteDefaults)";
+  return makeDiagnostic({
+    code: "MEDIA_PURPOSE_REJECTED",
+    phase: PHASE,
+    severity: "error",
+    path: opPath,
+    value: purpose ?? "(missing)",
+    expected,
+    suggestion:
+      declared.length > 0
+        ? "pass one of the declared purposes; starters own the taxonomy"
+        : "add `media.purposes` to `siteDefaults` in mantleConfig.ts to enable uploads",
+  });
+}

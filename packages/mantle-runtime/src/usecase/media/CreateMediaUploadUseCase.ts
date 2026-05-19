@@ -2,12 +2,14 @@ import { DiagnosticError } from "@aotter/mantle-spec";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
 import type { MediaStorage } from "../../domain/port/MediaStorage.js";
+import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 import type {
   CreateMediaUploadRequest,
   CreateMediaUploadResponse,
 } from "../dto/media/index.js";
 import {
   mediaMimeRejectedDiagnostic,
+  mediaPurposeRejectedDiagnostic,
   mediaSizeExceededDiagnostic,
   mediaSvgRejectedDiagnostic,
 } from "./diagnostics.js";
@@ -26,6 +28,7 @@ export class CreateMediaUploadUseCase {
     private readonly storage: MediaStorage,
     private readonly kv: KvCache,
     private readonly clock: Clock,
+    private readonly siteConfig: SiteConfigRepository,
     private readonly opts: { readonly allowSvg: boolean; readonly maxBytes?: number } = {
       allowSvg: false,
     },
@@ -34,6 +37,19 @@ export class CreateMediaUploadUseCase {
   async execute(request: CreateMediaUploadRequest): Promise<CreateMediaUploadResponse> {
     const opPath = "usecase/CreateMediaUpload";
     const maxBytes = this.opts.maxBytes ?? DEFAULT_MAX_BYTES;
+
+    // Fail-closed purpose enforcement (#262). Empty `media.purposes` —
+    // either undeclared or operator-cleared — disables uploads entirely
+    // at this layer; the MCP tool catalog + admin endpoint also gate on
+    // the same condition for cleaner UX. Reading per request rather
+    // than snapshotting at boot lets operator edits via the admin
+    // Settings page take effect without a redeploy.
+    const declared = await this.siteConfig.readMediaPurposes();
+    if (declared.length === 0 || !request.purpose || !declared.includes(request.purpose)) {
+      throw new DiagnosticError(
+        mediaPurposeRejectedDiagnostic(opPath, request.purpose, declared),
+      );
+    }
 
     if (request.mimeType === MEDIA_SVG_MIME && !this.opts.allowSvg) {
       throw new DiagnosticError(mediaSvgRejectedDiagnostic(opPath));

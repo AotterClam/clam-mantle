@@ -19,4 +19,9 @@ export interface SiteConfigRepository {
   seed(defaults: SiteDefaults | undefined): Promise<void>;
   load(): Promise<SiteConfig>;
   readLocales(): Promise<readonly string[]>;
+  /** Declared media purpose taxonomy (`SiteConfig.media.purposes`).
+   *  Empty array when the deployment didn't declare any — symmetric
+   *  with "no `MediaStorage` configured" and used by the MCP tool
+   *  catalog to gate `create_media_upload` / `commit_media_upload`. */
+  readMediaPurposes(): Promise<readonly string[]>;
 }

@@ -66,6 +66,7 @@ export interface McpUseCases {
   readonly media?: {
     readonly createUpload: CreateMediaUploadUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
+    readonly purposes: readonly string[];
   };
 }
 
@@ -90,6 +91,7 @@ export class McpJsonRpcDispatcher {
     this.catalog = buildMcpToolCatalog(schemas, {
       surface: options.surface ?? "staff",
       mediaEnabled: useCases.media !== undefined,
+      mediaPurposes: useCases.media?.purposes,
       views: options.views,
     });
     this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;

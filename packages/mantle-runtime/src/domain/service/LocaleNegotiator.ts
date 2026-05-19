@@ -35,6 +35,7 @@ export function siteConfigFromDefaults(defaults: SiteDefaults): SiteConfig {
     locales,
     canonicalLocale: locales[0] ?? null,
     faviconUrl: defaults.faviconUrl,
+    media: { purposes: [...(defaults.media?.purposes ?? [])] },
   };
 }
 
