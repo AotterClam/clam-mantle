@@ -5,7 +5,7 @@ import {
   type SchemaManifest,
   type StaffRole,
   type ViewManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import {
   ArchiveUseCase,
   CreateDraftUseCase,
@@ -124,7 +124,7 @@ export class McpJsonRpcDispatcher {
         return jsonRpcOk(id, {
           protocolVersion: "2025-03-26",
           capabilities: { tools: { listChanged: false } },
-          serverInfo: { name: "@aotterclam/mantle-runtime/mcp", version: "0.0.7-alpha" },
+          serverInfo: { name: "@aotter/mantle-runtime/mcp", version: "0.0.7-alpha" },
         });
       case "tools/list":
         return jsonRpcOkRaw(id, this.catalogWireJson);

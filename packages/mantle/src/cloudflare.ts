@@ -1,1 +1,1 @@
-export * from "@aotterclam/mantle-cloudflare";
+export * from "@aotter/mantle-cloudflare";

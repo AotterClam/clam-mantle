@@ -1,7 +1,7 @@
 import {
   DiagnosticError,
   type SchemaManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { EntryRow } from "../../domain/model/EntryRow.js";
 import type { EntryRepository } from "../../domain/port/EntryRepository.js";
 import { clampLimit } from "../../domain/service/Pagination.js";

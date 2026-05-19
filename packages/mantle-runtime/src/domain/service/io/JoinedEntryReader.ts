@@ -1,4 +1,4 @@
-import type { ContentState, Entry, SchemaManifest } from "@aotterclam/mantle-spec";
+import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../port/DatabaseDriver.js";
 import {
   readEntriesByDataFieldIn,

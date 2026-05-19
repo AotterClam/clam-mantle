@@ -1,4 +1,4 @@
-# @aotterclam/mantle-runtime
+# @aotter/mantle-runtime
 
 Runtime engine for mantle.
 

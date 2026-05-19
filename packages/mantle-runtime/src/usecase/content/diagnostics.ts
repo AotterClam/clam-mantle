@@ -3,7 +3,7 @@ import {
   runtimeDiagnostic,
   type ContentState,
   type Diagnostic,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import {
   EntryStatusConflict,
   EntryVersionConflict,

@@ -3,7 +3,7 @@ import {
   serializeEntryAsMarkdown,
   serializeLlmsTxt,
 } from "../src/domain/service/MarkdownSerializer.js";
-import type { Entry, SiteConfig } from "@aotterclam/mantle-spec";
+import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 
 const site: SiteConfig = {
   title: "Blog",

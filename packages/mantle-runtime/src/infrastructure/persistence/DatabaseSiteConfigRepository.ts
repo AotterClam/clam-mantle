@@ -2,7 +2,7 @@ import {
   assertSiteDefaultsCanonical,
   type SiteConfig,
   type SiteDefaults,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepository.js";
 
@@ -85,7 +85,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       origin: m.get(KEYS.origin) ?? "",
       locales,
       canonicalLocale: locales[0] ?? null,
-      brand: m.get(KEYS.brand) ?? "Clam CMS",
+      brand: m.get(KEYS.brand) ?? "AotterMantle",
       faviconUrl: m.get(KEYS.faviconUrl) || undefined,
       media: { purposes },
     };

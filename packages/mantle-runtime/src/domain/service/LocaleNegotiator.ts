@@ -3,7 +3,7 @@ import {
   toUrlLocale,
   type SiteConfig,
   type SiteDefaults,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 
 /**
  * Locale + SiteConfig helpers used at request entry by every public

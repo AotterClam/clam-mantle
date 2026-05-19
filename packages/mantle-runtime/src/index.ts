@@ -1,12 +1,12 @@
 /**
- * `@aotterclam/mantle-runtime` — public surface.
+ * `@aotter/mantle-runtime` — public surface.
  *
  * Adapter-agnostic runtime engine for mantle. Layered per the
  * Aotter clean-architecture convention (mirrors `aotter-clam/clam/core`):
  *
  *   domain ← usecase ← infrastructure ← runtime.ts (assembly root)
  *
- * Adapters (e.g. `@aotterclam/mantle-cloudflare`) implement the
+ * Adapters (e.g. `@aotter/mantle-cloudflare`) implement the
  * required port interfaces in `domain/port/` and call `createCmsRuntime`
  * to compose everything. Optional feature ports (for example media
  * hosting) stay adapter-agnostic and are only wired when enabled.

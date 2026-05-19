@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import type { ContentState, SiteConfig } from "@aotterclam/mantle-spec";
+import type { ContentState, SiteConfig } from "@aotter/mantle-spec";
 import {
   entryHtmlKeyFromParts,
   entryMarkdownKeyFromParts,
@@ -12,7 +12,7 @@ import {
   toUrlLocale,
   type CmsRuntime,
   type KvCache,
-} from "@aotterclam/mantle-runtime";
+} from "@aotter/mantle-runtime";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 

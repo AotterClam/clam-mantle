@@ -1,4 +1,4 @@
-import type { Entry, SiteConfig } from "@aotterclam/mantle-spec";
+import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 import type { SeoMeta } from "../model/SeoMeta.js";
 import type { PublicPathResolver } from "./PublicPathResolver.js";
 

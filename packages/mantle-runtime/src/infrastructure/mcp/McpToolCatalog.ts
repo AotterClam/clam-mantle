@@ -2,7 +2,7 @@ import {
   CLAM_BIND_KEYWORD,
   type SchemaManifest,
   type ViewManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 
 /**

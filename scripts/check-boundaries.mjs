@@ -68,16 +68,16 @@ function checkPackageDirection() {
     {
       dir: "packages/mantle-spec/src",
       forbidden: [
-        "@aotterclam/mantle-runtime",
-        "@aotterclam/mantle-cloudflare",
+        "@aotter/mantle-runtime",
+        "@aotter/mantle-cloudflare",
       ],
       message: "spec must not import runtime/cloudflare packages",
     },
     {
       dir: "packages/mantle-runtime/src",
       forbidden: [
-        "@aotterclam/mantle-cloudflare",
-        "@aotterclam/mantle-netlify",
+        "@aotter/mantle-cloudflare",
+        "@aotter/mantle-netlify",
       ],
       message: "runtime must not import adapter packages",
     },

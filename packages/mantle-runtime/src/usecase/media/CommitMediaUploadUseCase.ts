@@ -1,4 +1,4 @@
-import { DiagnosticError } from "@aotterclam/mantle-spec";
+import { DiagnosticError } from "@aotter/mantle-spec";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
 import type { MediaAsset, MediaStorage } from "../../domain/port/MediaStorage.js";

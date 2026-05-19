@@ -1,6 +1,6 @@
 # mantle
 
-[![CI](https://github.com/AotterClam/mantle/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/AotterClam/mantle/actions/workflows/ci.yml)
+[![CI](https://github.com/aotter/mantle/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/aotter/mantle/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 [![Status: Experimental](https://img.shields.io/badge/status-experimental-orange.svg)](#status)
@@ -24,9 +24,9 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 
 Recommended path: open [mantle.aotterclam.ai](https://mantle.aotterclam.ai/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
 
-Starter source and direct scaffolder usage live in [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
+Starter source and direct scaffolder usage live in [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
 
-> **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/AotterClam/mantle/issues/1).
+> **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
 ## Part of CLAM
 
@@ -35,7 +35,7 @@ Starter source and direct scaffolder usage live in [`AotterClam/mantle-starters`
 - **Apps (OLTP)** — `mantle` (this repo) and future apps. Build a content-driven web service by declaring atoms in YAML; the runtime ships dispatcher + auth + render + MCP for free.
 - **Modeling (OLAP)** — [`aotter-clam`](https://github.com/aotter/aotter-clam) (sibling project). Turn enterprise Excel/CSV files into Kimball-modeled DuckLake warehouses by declaring star-schema configs in YAML.
 
-> Note: the two halves intentionally live in different GitHub orgs (`AotterClam` for mantle, `aotter` for aotter-clam) — different release cadences, different licensing posture.
+> Note: the two halves intentionally live as separate repos under the `aotter` org — different release cadences, different licensing posture.
 
 The shared spirit: **agents write config, runtime carries the complexity**. Hard problems — schema validation, cache invalidation, OAuth, locale canonicalization, JSON Schema → zod conversion, transactional state — live in the runtime, where they're written once by people who understand them. The authoring surface is YAML the agent fills in, where mistakes are caught by structured diagnostics before they become production failures. Non-coders get AI leverage safely; the runtime is the load-bearing part.
 
@@ -67,26 +67,26 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 | Package | Role |
 |---|---|
-| `@aotterclam/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
-| `@aotterclam/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
-| `@aotterclam/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
-| `@aotterclam/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS. Ships `createAuth()` — the Better Auth-backed *default* implementation of the SDK's `Auth` contract (see [ADR-0014](docs/adr/0014-auth-better-auth-and-multi-tenant-mcp.md) § "Auth as contract, Better Auth as default"); replace by passing your own `Auth` instance. |
-| `@aotterclam/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
+| `@aotter/mantle-spec` | Spec engine — types + parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env deps. |
+| `@aotter/mantle-runtime` | Runtime engine — dispatcher + entry-writer + view executor + content-ops + render + MCP. Defines required adapter ports plus optional feature ports. |
+| `@aotter/mantle-admin-ui` | Admin SPA — React 19 + Vite + Tailwind v4. In development; ships in v0.1.0. |
+| `@aotter/mantle-cloudflare` | Cloudflare Workers adapter. Implements ports against D1 / KV / ASSETS. Ships `createAuth()` — the Better Auth-backed *default* implementation of the SDK's `Auth` contract (see [ADR-0014](docs/adr/0014-auth-better-auth-and-multi-tenant-mcp.md) § "Auth as contract, Better Auth as default"); replace by passing your own `Auth` instance. |
+| `@aotter/mantle-netlify` | **Stub.** Coming v0.2. Engineering forcing function: keeps `mantle-runtime` adapter-agnostic. |
 
 ## Starters
 
 Starter taxonomy. v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
 
-End-user starters live in the [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters) monorepo. The install Skill invokes the scaffolder distributed by that repo, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` + optional theme overlays, and initializes a fresh user-owned Git repo without `origin` set. See the [starter README](https://github.com/AotterClam/mantle-starters#readme) for the current archetype/theme keys, direct invocation, and source layout. Premium / per-customer starters live in the private sibling [`AotterClam/mantle-starters-premium`](https://github.com/AotterClam/mantle-starters-premium).
+End-user starters live in the [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) monorepo. The install Skill invokes the scaffolder distributed by that repo, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` + optional theme overlays, and initializes a fresh user-owned Git repo without `origin` set. See the [starter README](https://github.com/aotter/mantle-starters#readme) for the current archetype/theme keys, direct invocation, and source layout. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium).
 
 | Starter | Family | Status | What |
 |---|---|---|---|
-| [`mantle-starters/presence`](https://github.com/AotterClam/mantle-starters/tree/develop/presence) | presence | available | Brand / service presence site with pages and a contact surface. |
-| [`mantle-starters/publication`](https://github.com/AotterClam/mantle-starters/tree/develop/publication) | publication | available | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
-| [`mantle-starters/intake`](https://github.com/AotterClam/mantle-starters/tree/develop/intake) | intake | available | Publication shape plus structured `leads` Schema, staff-only lead View, and anonymous lead submission. |
-| [`mantle-starters/transaction`](https://github.com/AotterClam/mantle-starters/tree/develop/transaction) | transaction | available | Small catalog + cart + checkout/order workflow on Cloudflare primitives; sized for low-volume direct commerce. |
-| [`mantle-starters/blank`](https://github.com/AotterClam/mantle-starters/tree/develop/blank) | — | available | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
-| [`mantle-starters/reservation`](https://github.com/AotterClam/mantle-starters/tree/develop/reservation) | reservation | roadmap note | Routes users to `intake` as the v0.1 holding pattern until booking primitives land. |
+| [`mantle-starters/presence`](https://github.com/aotter/mantle-starters/tree/develop/presence) | presence | available | Brand / service presence site with pages and a contact surface. |
+| [`mantle-starters/publication`](https://github.com/aotter/mantle-starters/tree/develop/publication) | publication | available | Owner-published content — landing pages, articles, docs-lite, project updates, basic contact form. Multi-locale posts/pages, Cloudflare Turnstile, per-slug `.md` mirror, llms.txt, SEO/AEO. |
+| [`mantle-starters/intake`](https://github.com/aotter/mantle-starters/tree/develop/intake) | intake | available | Publication shape plus structured `leads` Schema, staff-only lead View, and anonymous lead submission. |
+| [`mantle-starters/transaction`](https://github.com/aotter/mantle-starters/tree/develop/transaction) | transaction | available | Small catalog + cart + checkout/order workflow on Cloudflare primitives; sized for low-volume direct commerce. |
+| [`mantle-starters/blank`](https://github.com/aotter/mantle-starters/tree/develop/blank) | — | available | Headless API + MCP only. Drop-in backend for consumers bringing their own frontend (Next.js / Astro / native / partner). |
+| [`mantle-starters/reservation`](https://github.com/aotter/mantle-starters/tree/develop/reservation) | reservation | roadmap note | Routes users to `intake` as the v0.1 holding pattern until booking primitives land. |
 | `community` | community | roadmap | Member posts, comments, likes, reactions, moderation queue, agent-assisted moderation. Blocks on end-user auth. |
 | `membership` | membership | roadmap | Private posts, paid newsletters, portals, or fan-club style content. Blocks on end-user auth + row-level visibility grammar + provider-backed entitlements. |
 

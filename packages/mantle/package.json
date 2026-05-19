@@ -1,12 +1,12 @@
 {
-  "name": "@aotterclam/mantle",
-  "version": "0.0.11-alpha.10",
-  "description": "Umbrella entry for @aotterclam/mantle. Adopters install this one package and import from subpaths: /spec, /runtime, /cloudflare, /admin-ui. Sub-packages remain individually installable on npm for tooling / alt-adapter authors. The Netlify adapter ships as a private workspace stub in v0.1 — its subpath will be added when the impl lands in v0.2.",
+  "name": "@aotter/mantle",
+  "version": "0.0.11-alpha.11",
+  "description": "Umbrella entry for @aotter/mantle. Adopters install this one package and import from subpaths: /spec, /runtime, /cloudflare, /admin-ui. Sub-packages remain individually installable on npm for tooling / alt-adapter authors. The Netlify adapter ships as a private workspace stub in v0.1 — its subpath will be added when the impl lands in v0.2.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/mantle/tree/develop/packages/mantle",
+  "homepage": "https://github.com/aotter/mantle/tree/develop/packages/mantle",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/mantle.git",
+    "url": "git+https://github.com/aotter/mantle.git",
     "directory": "packages/mantle"
   },
   "type": "module",
@@ -15,7 +15,8 @@
   "types": "./dist/spec.d.ts",
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "alpha",
+    "registry": "https://registry.npmjs.org"
   },
   "exports": {
     ".": {
@@ -44,10 +45,10 @@
     "README.md"
   ],
   "dependencies": {
-    "@aotterclam/mantle-admin-ui": "workspace:*",
-    "@aotterclam/mantle-cloudflare": "workspace:*",
-    "@aotterclam/mantle-runtime": "workspace:*",
-    "@aotterclam/mantle-spec": "workspace:*"
+    "@aotter/mantle-admin-ui": "workspace:*",
+    "@aotter/mantle-cloudflare": "workspace:*",
+    "@aotter/mantle-runtime": "workspace:*",
+    "@aotter/mantle-spec": "workspace:*"
   },
   "peerDependencies": {
     "@cloudflare/workers-oauth-provider": "^0.6.0",

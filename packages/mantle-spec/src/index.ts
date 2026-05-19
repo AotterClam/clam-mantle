@@ -1,5 +1,5 @@
 /**
- * `@aotterclam/mantle-spec` — public surface.
+ * `@aotter/mantle-spec` — public surface.
  *
  * Pure spec engine: kernel + domain (model + service) + usecase +
  * infrastructure (CLI). Zero env / adapter deps. Imported by

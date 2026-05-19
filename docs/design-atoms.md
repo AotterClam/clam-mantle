@@ -1,6 +1,6 @@
 # Design atoms — the 4 things this SDK exposes
 
-> If you're an AI working in a project that consumes `@aotterclam/mantle-*`,
+> If you're an AI working in a project that consumes `@aotter/mantle-*`,
 > read this first. It explains the entire surface area in one page.
 >
 > **Status**: v0.1 grammar lock. Atoms are shipped; rich sub-spec
@@ -236,7 +236,7 @@ authorId:
 ```
 
 **Implementation status**: declared in
-`@aotterclam/mantle-spec` as the `CLAM_REF_KEYWORD` constant; SDK
+`@aotter/mantle-spec` as the `CLAM_REF_KEYWORD` constant; SDK
 currently passes it through to consumers (admin UI uses it for picker
 widgets) but does not enforce referential integrity at write time.
 
@@ -261,7 +261,7 @@ coverUrl:
 ```
 
 **Implementation status**: declared in
-`@aotterclam/mantle-spec` as the `MCP_HINT_KEYWORD` constant; the
+`@aotter/mantle-spec` as the `MCP_HINT_KEYWORD` constant; the
 conventional values are exported as `MCP_HINTS` / `MEDIA_MCP_HINTS`.
 MCP tool schemas preserve the hint for agents. Admin surfaces expose
 media-shaped fields but first-party upload hosting is optional and not
@@ -497,7 +497,7 @@ That split is intentional and load-bearing.
   draft-2020-12 JSON Schema documents. This is what AI authors and
   human authors write, what the admin UI feeds JSON Forms, and what
   the OpenAPI emitter relays unchanged.
-- **Runtime engine** = zod (v3). The `@aotterclam/mantle-spec`
+- **Runtime engine** = zod (v3). The `@aotter/mantle-spec`
   package ships a JSON-Schema → zod converter
   (`src/json-schema-zod.ts`); the runtime calls the converted zod
   schema on every Procedure invocation, View parameter parse, and
@@ -597,7 +597,7 @@ Cloudflare D1 / KV abstract away.
 
 All collections share one `entries` table (defined by the
 Cloudflare adapter's storage migrations in
-`@aotterclam/mantle-cloudflare`):
+`@aotter/mantle-cloudflare`):
 
 ```sql
 CREATE TABLE entries (
@@ -621,7 +621,7 @@ a top-level column.
 
 `uniqueIndexes` declarations compile into virtual generated columns +
 partial unique indexes via the spec engine's DDL emitter
-(`@aotterclam/mantle-spec`); different collections coexist on the
+(`@aotter/mantle-spec`); different collections coexist on the
 same table without colliding because the generated-column expression
 is gated by `WHEN collection = '<name>'`.
 
@@ -697,7 +697,7 @@ remain valid `cms.clam.ai/v1` deployments.
 **v0.1 commitment**: D1 only via the Cloudflare adapter. Hyperdrive +
 PG path is documented as the upgrade route but not implemented. SDKs
 and starters target D1 exclusively. The Netlify adapter package
-(`@aotterclam/mantle-netlify`) is a README stub for v0.2; its
+(`@aotter/mantle-netlify`) is a README stub for v0.2; its
 existence is an engineering forcing function ensuring the runtime
 package stays portable across adapters.
 

@@ -1,4 +1,4 @@
-import type { ContentState, Entry, SchemaManifest } from "@aotterclam/mantle-spec";
+import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";

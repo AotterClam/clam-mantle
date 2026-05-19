@@ -1,5 +1,5 @@
-import { McpJsonRpcDispatcher } from "@aotterclam/mantle-runtime";
-import type { StaffRole, ViewManifest } from "@aotterclam/mantle-spec";
+import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
+import type { StaffRole, ViewManifest } from "@aotter/mantle-spec";
 import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
 import type { OAuthApiProps } from "../oauth/mountOAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";

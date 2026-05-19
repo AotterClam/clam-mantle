@@ -64,7 +64,7 @@ export function AccessDeniedView({
   );
 }
 
-// Mirrors `AuthMethodInfo` exported from `@aotterclam/mantle-cloudflare`
+// Mirrors `AuthMethodInfo` exported from `@aotter/mantle-cloudflare`
 // (see `createAuth.ts`). Duplicated here because the admin SPA is built
 // adapter-agnostic and can't import from the adapter package; the
 // `/api/auth/methods` endpoint is the wire contract between them.
@@ -192,7 +192,7 @@ function MethodSection({
  * names don't translate, so this stays language-agnostic — the
  * surrounding "Continue with …" template is the only translated
  * piece. Mirrors the `SocialProviderId` union in
- * `@aotterclam/mantle-cloudflare`; kept here (not split into a
+ * `@aotter/mantle-cloudflare`; kept here (not split into a
  * shared constants file) because adapters and the SPA evolve
  * independently — the only consumer is one call site below.
  */

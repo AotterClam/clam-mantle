@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
-import { DiagnosticError, type SchemaManifest } from "@aotterclam/mantle-spec";
+import { DiagnosticError, type SchemaManifest } from "@aotter/mantle-spec";
 import {
   ArchiveUseCase,
   CreateDraftUseCase,

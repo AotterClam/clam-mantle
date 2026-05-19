@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Entry, SiteConfig } from "@aotterclam/mantle-spec";
+import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 import {
   composeEntrySeoMeta,
   renderSeoTagsHtml,

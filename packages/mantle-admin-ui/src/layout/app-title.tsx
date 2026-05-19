@@ -5,7 +5,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "../ui/sidebar";
-import { AotterClamMark } from "../brand/aotter-clam";
+import { AotterMantleMark } from "../brand/aotter-mantle";
 import type { AdminBrand } from "./types";
 
 interface AppTitleProps {
@@ -25,7 +25,7 @@ export function AppTitle({ brand }: AppTitleProps): React.ReactElement {
         >
           <a href={href} onClick={() => setOpenMobile(false)}>
             <span className="bg-primary/10 text-primary flex aspect-square size-8 items-center justify-center rounded-lg ring-1 ring-border">
-              <AotterClamMark className="size-5" />
+              <AotterMantleMark className="size-5" />
             </span>
             <div data-sidebar-label className="grid flex-1 text-start text-sm leading-tight">
               <span className="truncate font-semibold">{brand.title}</span>

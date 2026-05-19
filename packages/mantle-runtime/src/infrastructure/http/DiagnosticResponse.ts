@@ -2,7 +2,7 @@ import {
   httpStatusFor,
   redactForWire,
   type Diagnostic,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 
 /**
  * Build the HTTP response for a Diagnostic. Strips `candidates` per

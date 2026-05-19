@@ -6,7 +6,7 @@ import {
   type SiteDefaults,
   type TriggerManifest,
   type ViewManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { AnyHandler } from "./domain/model/HandlerContext.js";
 import type { TemplateRegistry } from "./domain/model/TemplateRegistry.js";
 import type { AssetServer } from "./domain/port/AssetServer.js";

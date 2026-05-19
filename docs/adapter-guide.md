@@ -4,7 +4,7 @@ This guide is the fresh-developer entry point for implementing a new mantle plat
 
 Read this with [ADR-0011](adr/0011-adapter-port-spec.md). The source of truth for TypeScript shapes is `packages/mantle-runtime/src/domain/port/`.
 
-Adapter packages live under `packages/adapters/<platform>/` using a plural `adapters` bucket. The npm package names stay unchanged, for example `@aotterclam/mantle-cloudflare`. Keep adapters in this monorepo until the runtime/spec API is stable enough that coordinated releases across separate repositories would not create version skew for starters.
+Adapter packages live under `packages/adapters/<platform>/` using a plural `adapters` bucket. The npm package names stay unchanged, for example `@aotter/mantle-cloudflare`. Keep adapters in this monorepo until the runtime/spec API is stable enough that coordinated releases across separate repositories would not create version skew for starters.
 
 ## Required runtime ports
 
@@ -34,7 +34,7 @@ Test seams such as `Clock` and `IdGenerator` are injectable through `createCmsRu
 Adapters compose the runtime through `createCmsRuntime`:
 
 ```ts
-import { createCmsRuntime } from "@aotterclam/mantle-runtime";
+import { createCmsRuntime } from "@aotter/mantle-runtime";
 
 const runtime = createCmsRuntime({
   manifests,
@@ -86,7 +86,7 @@ Minimum auth/MCP behavior:
 
 ## Static assets
 
-`AssetServer` is required because every adapter must have a strategy for serving the prebuilt admin UI from `@aotterclam/mantle-admin-ui`. The adapter may serve those files from platform assets, a static publish directory, object storage plus CDN, or a filesystem bundle. Return `null` from `AssetServer.fetch()` when a specific asset is not found so the adapter can fall back to the admin SPA catchall.
+`AssetServer` is required because every adapter must have a strategy for serving the prebuilt admin UI from `@aotter/mantle-admin-ui`. The adapter may serve those files from platform assets, a static publish directory, object storage plus CDN, or a filesystem bundle. Return `null` from `AssetServer.fetch()` when a specific asset is not found so the adapter can fall back to the admin SPA catchall.
 
 ## Implementation checklist
 

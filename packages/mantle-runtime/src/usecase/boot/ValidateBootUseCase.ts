@@ -7,7 +7,7 @@ import {
   type ProcedureManifest,
   type SchemaManifest,
   type TriggerManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 

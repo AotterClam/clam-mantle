@@ -107,7 +107,7 @@ Use `.github/pull_request_template.md`. Link issues with `Closes #NN` only when 
 
 Read the relevant ADRs before touching architecture. The most common gates are:
 
-- Runtime must stay adapter-agnostic. `@aotterclam/mantle-runtime` must not import Cloudflare-specific types.
+- Runtime must stay adapter-agnostic. `@aotter/mantle-runtime` must not import Cloudflare-specific types.
 - Manifest grammar is locked at v0.1. New grammar keys or closed-enum entries need grammar-revise work before implementation.
 - New top-level `domain/`, `usecase/`, or `infrastructure/` folders need an ADR-lite paragraph in the PR body.
 - Trust-boundary changes, auth changes, MCP surface changes, persistence boundaries, and public HTTP semantics need `needs-adr` unless an existing ADR clearly covers the decision.

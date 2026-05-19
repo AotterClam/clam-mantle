@@ -4,7 +4,7 @@ import {
   CLAM_BIND_KEYWORD,
   runtimeDiagnostic,
   type SchemaManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { EntryRepository } from "../../port/EntryRepository.js";
 import type { SiteConfigRepository } from "../../port/SiteConfigRepository.js";
 

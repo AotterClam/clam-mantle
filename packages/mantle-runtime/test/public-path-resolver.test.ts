@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Entry } from "@aotterclam/mantle-spec";
+import type { Entry } from "@aotter/mantle-spec";
 import { createPublicPathResolver } from "../src/domain/service/PublicPathResolver.js";
 
 function entry(overrides: Partial<Entry> & { id?: string; collection: string }): Entry {

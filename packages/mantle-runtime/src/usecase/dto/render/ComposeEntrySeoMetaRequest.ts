@@ -1,4 +1,4 @@
-import type { Entry, SiteConfig } from "@aotterclam/mantle-spec";
+import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 import type { PublicPathResolver } from "../../../domain/service/PublicPathResolver.js";
 
 /**

@@ -1,1 +1,1 @@
-export * from "@aotterclam/mantle-runtime";
+export * from "@aotter/mantle-runtime";

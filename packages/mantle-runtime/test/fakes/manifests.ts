@@ -4,7 +4,7 @@ import type {
   SchemaManifest,
   TriggerManifest,
   ViewManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 
 /**
  * Hand-built manifests for tests. Mirrors the shape `parseManifests`

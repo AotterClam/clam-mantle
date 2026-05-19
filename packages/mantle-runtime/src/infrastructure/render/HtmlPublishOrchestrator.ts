@@ -4,7 +4,7 @@ import {
   type Entry,
   type SchemaManifest,
   type SiteConfig,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { KvCache } from "../../domain/port/KvCache.js";

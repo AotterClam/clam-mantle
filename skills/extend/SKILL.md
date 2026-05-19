@@ -2,7 +2,7 @@
 name: mantle extend
 description: Add new functionality to an existing mantle project — a new Schema, View, Procedure, or Trigger; or wire a feature like a contact form, newsletter signup, comment thread, or filtered list page. Use when the user already has a mantle project and wants to grow it.
 when_to_invoke: |
-  Working dir contains `manifests/`, `package.json` includes `@aotterclam/*`. The user describes a new content type, a public REST query, a write endpoint, or a side-effect on entry mutation.
+  Working dir contains `manifests/`, `package.json` includes `@aotter/*`. The user describes a new content type, a public REST query, a write endpoint, or a side-effect on entry mutation.
 applies_to: mantle@v0.1.0
 ---
 
@@ -15,7 +15,7 @@ The 4-atom manifest model:
 - **Procedure** — the typed callable
 - **Trigger** — the event binding (HTTP / lifecycle / cron)
 
-Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts, or read the full grammar reference at <https://raw.githubusercontent.com/AotterClam/mantle/develop/docs/design-atoms.md>.
+Closed enums (`x-clam-bind` values, `ctx.*` predicates, `Trigger.source.kind`, `Procedure.handler.kind`) are checked by `pnpm validate` — diagnostics return `code` + `suggestion`. If grammar is unclear, run `pnpm introspect` against the current project to see what the manifest compiler accepts, or read the full grammar reference at <https://raw.githubusercontent.com/aotter/mantle/develop/docs/design-atoms.md>.
 
 ## Match the user's request to atoms
 

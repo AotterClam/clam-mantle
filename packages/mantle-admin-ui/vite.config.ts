@@ -21,7 +21,7 @@ const rootPackage = JSON.parse(
  *
  * Dev workflow (one port, 8787, from a cloned publication starter):
  *   Terminal 1:  pnpm dev
- *   Terminal 2:  pnpm -F @aotterclam/mantle-admin-ui watch
+ *   Terminal 2:  pnpm -F @aotter/mantle-admin-ui watch
  *
  * `watch` runs `vite build --watch` so every source edit auto-rebuilds
  * `dist/index.html` + `dist/index-html.js`. wrangler dev sees the
@@ -34,7 +34,7 @@ const rootPackage = JSON.parse(
 export default defineConfig({
   base: "/admin/",
   define: {
-    __CLAM_MANTLE_VERSION__: JSON.stringify(rootPackage.version ?? "0.0.0"),
+    __AOTTER_MANTLE_VERSION__: JSON.stringify(rootPackage.version ?? "0.0.0"),
   },
   plugins: [
     react(),

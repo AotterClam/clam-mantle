@@ -1,4 +1,4 @@
-import { type ContentState, type Entry } from "@aotterclam/mantle-spec";
+import { type ContentState, type Entry } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../port/DatabaseDriver.js";
 
 /**

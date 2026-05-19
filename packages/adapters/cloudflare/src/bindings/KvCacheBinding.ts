@@ -1,4 +1,4 @@
-import type { KvCache, KvListResult, KvPutOptions } from "@aotterclam/mantle-runtime";
+import type { KvCache, KvListResult, KvPutOptions } from "@aotter/mantle-runtime";
 
 /**
  * `KvCache` impl wrapping Cloudflare Workers KV. Pure pass-through —

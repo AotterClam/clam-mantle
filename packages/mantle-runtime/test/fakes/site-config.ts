@@ -1,4 +1,4 @@
-import type { SiteConfig, SiteDefaults } from "@aotterclam/mantle-spec";
+import type { SiteConfig, SiteDefaults } from "@aotter/mantle-spec";
 import type { SiteConfigRepository } from "../../src/domain/port/SiteConfigRepository.js";
 
 /** Minimal `SiteConfigRepository` for tests. Holds `mediaPurposes` in

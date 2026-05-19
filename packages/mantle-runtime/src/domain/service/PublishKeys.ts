@@ -1,4 +1,4 @@
-import { toUrlLocale, type Entry } from "@aotterclam/mantle-spec";
+import { toUrlLocale, type Entry } from "@aotter/mantle-spec";
 
 /**
  * KV key derivation. Centralised so the publish pipeline (writer) and

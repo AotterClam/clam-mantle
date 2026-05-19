@@ -7,7 +7,7 @@ import {
   type Diagnostic,
   type Phase,
   type ProcedureManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { ZodType } from "zod";
 import { evaluateAuthAll } from "../../domain/service/AuthPredicateEvaluator.js";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";

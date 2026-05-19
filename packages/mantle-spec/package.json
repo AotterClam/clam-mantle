@@ -1,19 +1,20 @@
 {
-  "name": "@aotterclam/mantle-spec",
-  "version": "0.0.11-alpha.10",
+  "name": "@aotter/mantle-spec",
+  "version": "0.0.11-alpha.11",
   "description": "Spec engine for mantle: types + manifest YAML parse + validate + diagnostics + JSON-Schema → zod converter + CLI. Zero env / adapter deps.",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/AotterClam/mantle/tree/develop/packages/mantle-spec",
+  "homepage": "https://github.com/aotter/mantle/tree/develop/packages/mantle-spec",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AotterClam/mantle.git",
+    "url": "git+https://github.com/aotter/mantle.git",
     "directory": "packages/mantle-spec"
   },
   "type": "module",
   "sideEffects": false,
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "alpha",
+    "registry": "https://registry.npmjs.org"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

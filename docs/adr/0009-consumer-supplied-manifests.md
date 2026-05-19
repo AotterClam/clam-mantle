@@ -87,7 +87,7 @@ produces them is their choice.
 
 ### Adapter scope for v0.1.0
 
-The Cloudflare adapter (`@aotterclam/mantle-cloudflare`) is the
+The Cloudflare adapter (`@aotter/mantle-cloudflare`) is the
 only shipping adapter in v0.1.0, so the Text-import-via-`[[rules]]`
 pattern is the canonical path. When other adapters (Netlify, etc.)
 ship, they will need their own equivalent text-import mechanism, but
@@ -208,7 +208,7 @@ provide a hook for the SDK to read consumer files — that's the
 consumer's bundler's job, which is exactly what Text-imported YAML
 is for.
 
-**(C) Separate `@aotterclam/mantle-manifests-<consumer>` package** —
+**(C) Separate `@aotter/mantle-manifests-<consumer>` package** —
 each consumer ships their manifests as an npm package; the SDK
 imports from `mantle-manifests-blog` etc. Rejected: 1:N package
 overhead for what should be a directory of YAML files. Tooling pain
@@ -257,7 +257,7 @@ Accepted for v0.1.0. The implementation slice:
 - `CmsConfig` carries `manifests?: readonly string[]`.
 - The mount factory builds the registry from the consumer-supplied
   YAML; no SDK fallback.
-- The `@aotterclam/mantle-cloudflare` package ships zero embedded
+- The `@aotter/mantle-cloudflare` package ships zero embedded
   manifests.
 - The starter at `starters/blog/` is self-contained: `manifests/`,
   `src/yaml.d.ts`, `wrangler.toml` `[[rules]]` block, and
@@ -267,4 +267,4 @@ Accepted for v0.1.0. The implementation slice:
   (e.g. `consumer-manifest:[2]#/spec/...`) so deploy logs point at
   the right file.
 
-Tracking: AotterClam/mantle.
+Tracking: aotter/mantle.

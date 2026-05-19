@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SiteConfig } from "@aotterclam/mantle-spec";
+import type { SiteConfig } from "@aotter/mantle-spec";
 import { ComposeLlmsTxtUseCase } from "../src/usecase/render/ComposeLlmsTxtUseCase.js";
 import { ComposeSitemapUseCase } from "../src/usecase/render/ComposeSitemapUseCase.js";
 import { InMemoryDatabase } from "./fakes/database.js";

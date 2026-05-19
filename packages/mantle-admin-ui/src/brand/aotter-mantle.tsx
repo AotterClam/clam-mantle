@@ -1,12 +1,12 @@
 import * as React from "react";
 import { cn } from "../lib/utils";
 
-export const CLAM_MANTLE_PACKAGE = "@aotterclam/mantle";
-export const CLAM_MANTLE_VERSION = __CLAM_MANTLE_VERSION__;
-export const AOTTER_CLAM_HOME_URL = "https://aotterclam.com";
-export const CLAM_MANTLE_GITHUB_URL = "https://github.com/AotterClam/mantle";
+export const AOTTER_MANTLE_PACKAGE = "@aotter/mantle";
+export const AOTTER_MANTLE_VERSION = __AOTTER_MANTLE_VERSION__;
+export const AOTTER_MANTLE_NPM_URL = "https://www.npmjs.com/package/@aotter/mantle";
+export const AOTTER_MANTLE_GITHUB_URL = "https://github.com/aotter/mantle";
 
-export function AotterClamMark({
+export function AotterMantleMark({
   className,
   title,
 }: {
@@ -38,25 +38,25 @@ export function AdminAttribution(): React.ReactElement {
         "text-muted-foreground shadow-[var(--glass-shadow)] backdrop-blur-md md:flex",
       )}
     >
-      <AotterClamMark className="size-4 text-primary" />
+      <AotterMantleMark className="size-4 text-primary" />
       <a
-        href={AOTTER_CLAM_HOME_URL}
+        href={AOTTER_MANTLE_NPM_URL}
         target="_blank"
         rel="noreferrer"
         className="font-medium text-foreground/80 hover:text-primary"
       >
-        {CLAM_MANTLE_PACKAGE}
+        {AOTTER_MANTLE_PACKAGE}
       </a>
       <span aria-hidden>·</span>
       <a
-        href={CLAM_MANTLE_GITHUB_URL}
+        href={AOTTER_MANTLE_GITHUB_URL}
         target="_blank"
         rel="noreferrer"
         className="hover:text-primary"
       >
         GitHub
       </a>
-      <span aria-label={`version ${CLAM_MANTLE_VERSION}`}>v{CLAM_MANTLE_VERSION}</span>
+      <span aria-label={`version ${AOTTER_MANTLE_VERSION}`}>v{AOTTER_MANTLE_VERSION}</span>
     </div>
   );
 }

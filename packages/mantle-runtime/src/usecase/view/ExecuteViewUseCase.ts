@@ -2,7 +2,7 @@ import {
   makeDiagnostic,
   runtimeDiagnostic,
   type Diagnostic,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import { evaluateAuthAll } from "../../domain/service/AuthPredicateEvaluator.js";
 import { compileView } from "../../domain/service/ViewSqlCompiler.js";

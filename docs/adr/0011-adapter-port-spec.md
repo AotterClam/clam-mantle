@@ -6,11 +6,11 @@
 
 ## Context
 
-`@aotterclam/mantle-runtime` is adapter-agnostic. It owns dispatcher, entry-writer, view executor, content-ops, render pipeline, boot validation, and MCP JSON-RPC dispatch. It depends only on `@aotterclam/mantle-spec` and a small set of TypeScript interfaces it defines itself.
+`@aotter/mantle-runtime` is adapter-agnostic. It owns dispatcher, entry-writer, view executor, content-ops, render pipeline, boot validation, and MCP JSON-RPC dispatch. It depends only on `@aotter/mantle-spec` and a small set of TypeScript interfaces it defines itself.
 
-`@aotterclam/mantle-cloudflare` is the only adapter shipping in v0.1.0. It binds the runtime's interfaces against Cloudflare Workers' D1, KV, ASSETS, and supplies a Better Auth instance (per ADR-0014) for sign-in + MCP bearer validation.
+`@aotter/mantle-cloudflare` is the only adapter shipping in v0.1.0. It binds the runtime's interfaces against Cloudflare Workers' D1, KV, ASSETS, and supplies a Better Auth instance (per ADR-0014) for sign-in + MCP bearer validation.
 
-`@aotterclam/mantle-netlify` is a v0.2 stub — README only. It exists in the package layout as an engineering forcing function: with N=1 adapter, "adapter-agnostic" silently rots in PR review (a `D1Database` import slips into runtime, then a second, then five). With a second adapter visible in the workspace (even if its impl is a TODO), reviewers have somewhere to point when blocking the slip.
+`@aotter/mantle-netlify` is a v0.2 stub — README only. It exists in the package layout as an engineering forcing function: with N=1 adapter, "adapter-agnostic" silently rots in PR review (a `D1Database` import slips into runtime, then a second, then five). With a second adapter visible in the workspace (even if its impl is a TODO), reviewers have somewhere to point when blocking the slip.
 
 This ADR fixes the contract so:
 - Future adapter authors have a stable target.
@@ -21,7 +21,7 @@ The POC accumulated multiple half-decisions about this seam (POC ADR-0015 docume
 
 ## Decision
 
-**Three required adapter ports**, defined as TypeScript interfaces in `@aotterclam/mantle-runtime/src/domain/port/`. Concrete adapters provide implementations and inject them into `createCmsRuntime`.
+**Three required adapter ports**, defined as TypeScript interfaces in `@aotter/mantle-runtime/src/domain/port/`. Concrete adapters provide implementations and inject them into `createCmsRuntime`.
 
 | Port | Surface |
 |---|---|
@@ -138,7 +138,7 @@ export interface AssetServer {
 
 CF adapter: wraps `env.ASSETS.fetch(req)`. Future: filesystem read, S3+CDN, Netlify static-publish dir.
 
-The admin SPA itself lives in `@aotterclam/mantle-admin-ui` as a pre-built `dist/`. The adapter binds `AssetServer` to whatever serves that `dist/`; the runtime knows nothing about static asset serving except "ask the port and pass through the response."
+The admin SPA itself lives in `@aotter/mantle-admin-ui` as a pre-built `dist/`. The adapter binds `AssetServer` to whatever serves that `dist/`; the runtime knows nothing about static asset serving except "ask the port and pass through the response."
 
 ## How adapters wire ports
 
@@ -155,7 +155,7 @@ import {
   AssetsAssetServer,
   D1DatabaseDriver,
   KvCacheBinding,
-} from "@aotterclam/mantle-cloudflare";
+} from "@aotter/mantle-cloudflare";
 
 const auth = createAuth({
   database: env.DB,
@@ -209,7 +209,7 @@ There's no module-global state holding adapter-specific bindings.
 ## Consequences
 
 **Hard-enforced boundaries**:
-- `@aotterclam/mantle-runtime` MUST NOT import `D1Database`, `KVNamespace`, `Fetcher` (CF Workers ASSETS), `@cloudflare/*`, or any other adapter-specific type. CI will lint for this; PR reviewers can grep.
+- `@aotter/mantle-runtime` MUST NOT import `D1Database`, `KVNamespace`, `Fetcher` (CF Workers ASSETS), `@cloudflare/*`, or any other adapter-specific type. CI will lint for this; PR reviewers can grep.
 - A new required port can be added only by amending this ADR and updating ALL adapters (CF + Netlify stub) in the same change. Optional feature ports must be documented here and must state when adapters are required to implement them.
 - Removing a port is also possible (if a port is found to overlap or be unnecessary), again by amending this ADR.
 
@@ -221,7 +221,7 @@ There's no module-global state holding adapter-specific bindings.
 - The runtime's test suite exercises against in-memory port impls; the adapter's test suite exercises the binding against real CF resources via `wrangler dev` or live deploy.
 
 **The Netlify stub's job**:
-- The `@aotterclam/mantle-netlify` package's README declares a public commitment to an N>=2 adapter world. If a PR adds CF-specific code to runtime, reviewers point at the stub README and reject. The stub doesn't have to ship code to perform its function — its existence is the constraint.
+- The `@aotter/mantle-netlify` package's README declares a public commitment to an N>=2 adapter world. If a PR adds CF-specific code to runtime, reviewers point at the stub README and reject. The stub doesn't have to ship code to perform its function — its existence is the constraint.
 
 ## Alternatives considered
 
@@ -231,26 +231,26 @@ There's no module-global state holding adapter-specific bindings.
 
 **(c) Function-injection (no interfaces, just functions)** — Runtime accepts a record of functions: `{ dbPrepare, kvGet, kvPut, sessionRead, … }`. **Rejected**: TypeScript interfaces are more discoverable (an adapter author IDE-jumps from `DatabaseDriver` to its surface; jumping from `dbPrepare` is harder). Interfaces also document grouping; functions don't.
 
-**(d) Plugin pattern (each port is a separate package)** — `@aotterclam/mantle-port-database`, `@aotterclam/mantle-port-kv`, etc., and runtime depends on one package per port. **Rejected**: the port set is too small to warrant per-port packages. The current 5-package structure (spec / runtime / admin-ui / cloudflare / netlify) is already at the boundary of "too many"; splitting further increases the maintenance tax without useful benefit. Ports are TS interfaces in `mantle-runtime`'s `src/domain/port/` directory — that's enough.
+**(d) Plugin pattern (each port is a separate package)** — `@aotter/mantle-port-database`, `@aotter/mantle-port-kv`, etc., and runtime depends on one package per port. **Rejected**: the port set is too small to warrant per-port packages. The current 5-package structure (spec / runtime / admin-ui / cloudflare / netlify) is already at the boundary of "too many"; splitting further increases the maintenance tax without useful benefit. Ports are TS interfaces in `mantle-runtime`'s `src/domain/port/` directory — that's enough.
 
 **(e) gRPC / wire-protocol seam** — Make ports a network protocol so adapters can be in any language. **Rejected**: the runtime is not an external service, it's a TypeScript library that adapters compose into a single Worker / Function. Network seam adds latency, deployment complexity, and operational surface for zero authoring benefit. The ports are in-process; they always will be.
 
 ## How to apply
 
-When you're authoring `@aotterclam/mantle-runtime` code:
+When you're authoring `@aotter/mantle-runtime` code:
 
 1. If you reach for a CF-specific type, **stop**. Define a method on a port instead.
 2. If a port is missing the method you need, **amend this ADR first** in the same PR, then add the method. Adapters in the same PR.
 3. Tests must use port mocks (in-memory implementations) — never reach into a real D1 / KV from runtime tests.
 
-When you're authoring an adapter (`@aotterclam/mantle-cloudflare` for v0.1.0; future `mantle-netlify`, `mantle-bun`, …):
+When you're authoring an adapter (`@aotter/mantle-cloudflare` for v0.1.0; future `mantle-netlify`, `mantle-bun`, …):
 
 1. Read `mantle-runtime/src/domain/port/`. Implement each required port against your runtime's primitives.
 2. Compose the runtime via `createCmsRuntime({ db, kv, assets, manifests, handlers, templates, siteDefaults, ... })`.
 3. Call `runtime.bootInit()` once before serving CMS traffic.
 4. Bind to your HTTP framework — Hono on CF, Netlify Functions handler, raw `fetch` Worker, …
 5. Provide adapter-owned auth and map sessions/scopes/roles into runtime handler context.
-6. Bundle `@aotterclam/mantle-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetServer` to it.
+6. Bundle `@aotter/mantle-admin-ui`'s `dist/` via your runtime's static-asset surface and bind `AssetServer` to it.
 
 When you're reviewing a PR:
 

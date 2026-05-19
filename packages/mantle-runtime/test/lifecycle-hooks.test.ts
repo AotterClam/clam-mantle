@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DiagnosticError,
   type ProcedureManifest,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type {
   DeferredHookEnvelope,

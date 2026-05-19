@@ -3,7 +3,7 @@ import {
   type AuthPredicate,
   type Diagnostic,
   type Phase,
-} from "@aotterclam/mantle-spec";
+} from "@aotter/mantle-spec";
 import type { HandlerContext } from "../model/HandlerContext.js";
 
 /**

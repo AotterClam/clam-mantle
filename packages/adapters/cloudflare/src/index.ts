@@ -1,5 +1,5 @@
 /**
- * `@aotterclam/mantle-cloudflare` — Cloudflare Workers adapter for
+ * `@aotter/mantle-cloudflare` — Cloudflare Workers adapter for
  * mantle. The only place in the codebase that may import D1Database
  * / KVNamespace / Fetcher; runtime stays portable per ADR-0011.
  */

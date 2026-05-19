@@ -5,7 +5,7 @@ import type {
   CreateUploadArgs,
   Manifest,
   MediaStorage,
-} from "@aotterclam/mantle-runtime";
+} from "@aotter/mantle-runtime";
 import { createCmsRef } from "../src/mount/bootRuntimeOnce.js";
 import { createMcpApiHandler } from "../src/mount/mountMcp.js";
 import { mountServerEndpoints } from "../src/mount/mountServerEndpoints.js";

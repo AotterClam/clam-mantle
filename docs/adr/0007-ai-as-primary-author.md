@@ -32,7 +32,7 @@ This ADR documents what that thesis means concretely for mantle's
 authoring contract.
 
 The primary author/integrator of consumer apps that depend on
-`@aotterclam/mantle-*` is expected to be Claude Code (or a peer LLM
+`@aotter/mantle-*` is expected to be Claude Code (or a peer LLM
 agent) running inside the consumer project. Human contributors review
 and steer, but the moment-to-moment work — wiring a manifest, writing
 a Procedure handler, registering it at boot, bisecting a failure — is
@@ -87,7 +87,7 @@ network. Runs in the AI's terminal in milliseconds. Reads YAML files
 and handler registration source files; emits structured diagnostics;
 exits non-zero on any error.
 
-The CLI ships in the `@aotterclam/mantle-spec` package — it's the
+The CLI ships in the `@aotter/mantle-spec` package — it's the
 spec authority for what a v0.1 manifest must look like.
 
 What it catches:
@@ -121,7 +121,7 @@ or Views directly without going through HTTP.
 Target API sketch:
 
 ```ts
-import { createTestDispatcher } from "@aotterclam/mantle-runtime/testing";
+import { createTestDispatcher } from "@aotter/mantle-runtime/testing";
 import { manifests } from "../manifests"; // loaded by build hook
 import { handlers } from "../handlers";   // map of ref → fn
 
@@ -216,7 +216,7 @@ discipline.
 (Folded in from POC ADR-0013, which was a separate ADR in the POC tree
 and is consolidated here in v0.1.0.)
 
-Two AI agents read and write to a `@aotterclam/mantle-*` deployment:
+Two AI agents read and write to a `@aotter/mantle-*` deployment:
 
 1. **The coder agent** — Claude Code (cc) running inside the
    consumer's repo. Edits manifests, handlers, scaffold files,
@@ -276,12 +276,12 @@ SDK TS API instead of needing a matching MCP tool).
 
 Concrete artifacts today:
 - `skills/<name>/SKILL.md` files in the
-  [`AotterClam/mantle`](https://github.com/AotterClam/mantle)
+  [`aotter/mantle`](https://github.com/aotter/mantle)
   repo, discoverable by URL. Distribution as a Claude plugin is
   **optional** (a v0.1.x convenience), not required — the canonical
   location is the in-repo path, and any agent that can fetch a URL
   can consume them.
-- `mantle validate` CLI (shipped in `@aotterclam/mantle-spec`)
+- `mantle validate` CLI (shipped in `@aotter/mantle-spec`)
 - `mantle emit-openapi` CLI (likewise)
 - Public testing harness (planned; current coverage is SDK tests +
   starter integration smokes)
@@ -303,7 +303,7 @@ Concrete artifacts today:
 
 A small third category exists: APIs that only the **runtime itself**
 consumes (the dispatcher, the boot validator, the diagnostic types).
-These are exported from `@aotterclam/mantle-spec` for the coder to
+These are exported from `@aotter/mantle-spec` for the coder to
 import inside their handler code, but are not CLI commands and not
 MCP tools — they're library types.
 

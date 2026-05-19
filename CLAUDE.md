@@ -1,6 +1,6 @@
 # CLAUDE.md — orientation for AI contributors
 
-This is `@aotterclam/mantle-*`: MCP-native headless CMS for Cloudflare Workers, built around a 4-atom YAML manifest model. **v0.1.0 is in development**; until v0.1.0 tags, the runtime is stubbed in places and ships in incremental commits per the plan in [#1](https://github.com/AotterClam/mantle/issues/1).
+This is `@aotter/mantle-*`: MCP-native headless CMS for Cloudflare Workers, built around a 4-atom YAML manifest model. **v0.1.0 is in development**; until v0.1.0 tags, the runtime is stubbed in places and ships in incremental commits per the plan in [#1](https://github.com/aotter/mantle/issues/1).
 
 ## CLAM thesis (read first)
 
@@ -39,18 +39,18 @@ This is the lens for every architectural decision in this codebase.
 | `packages/mantle-admin-ui/` | React 19 + Vite admin SPA. Pre-built `dist/` consumed via workspace dep by adapters. |
 | `packages/adapters/cloudflare/` | Cloudflare Workers adapter. Hono-based; binds D1, KV, ASSETS, Better Auth, and optional R2 media. |
 | `packages/adapters/netlify/` | **README stub.** Coming v0.2. The stub is an engineering forcing function. |
-| [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, `blank/`, etc. Also hosts `packages/create-mantle` — the npx scaffolder that fetches the starters tarball, merges `_common/` + `<archetype>/`, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. **The scaffolder is intentionally not on npm**; consumers run it via `npx https://github.com/AotterClam/mantle-starters/releases/download/<tag>/aotterclam-create-mantle-<tag>.tgz` per `skills/install/SKILL.md`. Premium / per-customer starters live in the private sibling [`AotterClam/mantle-starters-premium`](https://github.com/AotterClam/mantle-starters-premium). |
+| [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) | End-user starters monorepo. Contains `_common/` (AGENTS.md + mantle/site.md templates per ADR-0016), `publication/`, `blank/`, etc. Also hosts `packages/create-mantle` — the npx scaffolder that fetches the starters tarball, merges `_common/` + `<archetype>/`, fills `{{PLACEHOLDER}}` macros per ADR-0016, prints RUN_NOTES JSON. **The scaffolder is intentionally not on npm**; consumers run it via `npx https://github.com/aotter/mantle-starters/releases/download/<tag>/aotter-create-mantle-<tag>.tgz` per `skills/install/SKILL.md`. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium). |
 | `starters/blank/` | **README stub.** Migrated to `mantle-starters/blank/` (#99). The stub is the same engineering forcing function as `packages/adapters/netlify/`. |
 | `starters/_archive/` | Frozen snapshots of retired starters. Not maintained. |
 
 ## Hard invariants (cross-cutting; never violate)
 
-- **`@aotterclam/mantle-runtime` MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-specific type.** It defines port interfaces; concrete adapters bind them. Violating this collapses the rebuild's reason for existing — the Netlify stub is the public reminder.
+- **`@aotter/mantle-runtime` MUST NOT import `D1Database` / `KVNamespace` / any Cloudflare-specific type.** It defines port interfaces; concrete adapters bind them. Violating this collapses the rebuild's reason for existing — the Netlify stub is the public reminder.
 - **Manifest grammar is locked at v0.1.** DRAFT keys (see [ADR-0001 §"Future grammar discipline"](docs/adr/0001-four-atom-manifest-model.md)) are documented but **must not** be implemented in code, types, or starter manifests until promoted.
 - **Atom name stability**: Schema / View / Procedure / Trigger. No renames.
 - **Closed enums for `x-clam-bind` and `ctx.*` predicates** — see (incoming) ADR-0002. New entries go through grammar-revise, not ad-hoc.
 - **Cloudflare-only for v0.1.0.** The Netlify package is a README. PG-via-Hyperdrive, Bun, Deno — all v0.2+.
-- **`@aotterclam/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
+- **`@aotter/mantle-spec` exports must keep `sideEffects: false`** — the admin SPA depends on tree-shaking; without this flag, importing any subpath drags `yaml` (and at one point `ajv`) into the bundle. zod stays small.
 - **Runtime validators use zod (Workers-CSP-safe).** Manifest authoring stays JSON Schema. The JSON-Schema → zod converter lives in `mantle-spec/src/domain/service/JsonSchemaToZod.ts`.
 
 ### Clean-architecture layout (mirrors `aotter-clam/clam/core`)
