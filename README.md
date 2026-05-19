@@ -24,20 +24,7 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 
 Recommended path: open [the Mantle landing page](https://the Mantle landing page/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
 
-If you already know the values and want to bypass the agent interview, call the scaffolder directly:
-
-```bash
-npx @aotter/create-mantle@alpha publication \
-  --project-name my-site \
-  --brand "My Site" \
-  --description "A short description of what this site does." \
-  --locales "en,zh-TW" \
-  --github-owner "<your-github-login>" \
-  --summary "Initial install"
-cd my-site
-```
-
-Starter source lives in [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
+Starter source and direct scaffolder usage live in [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
 
 > **Prerelease.** This repo is a clean rebuild of the v0.0.x POC. Until v0.1.0 tags, the API surface is in flux — alpha and beta releases may introduce breaking changes. Current published versions and channel policy are documented in [`docs/release-process.md`](docs/release-process.md). Track the rebuild plan at [#1](https://github.com/aotter/mantle/issues/1).
 
@@ -90,7 +77,7 @@ For a guided install, follow the steps in [`skills/install/SKILL.md`](skills/ins
 
 Starter taxonomy. v0.1.0 ships the available rows; the rest are roadmap so agents can pick the closest fit and either fall back to `blank` or wait for the family to land.
 
-End-user starters live in the [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) monorepo. Real-user installs run `npx @aotter/create-mantle <archetype>`, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` + optional theme overlays into the user's directory, and initializes a fresh user-owned Git repo without `origin` set. See the [starter README](https://github.com/aotter/mantle-starters#readme) for the current archetype/theme keys and source layout. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium).
+End-user starters live in the [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters) monorepo. The install Skill invokes the scaffolder distributed by that repo, which downloads a pinned source tarball, merges `_common/` + `<archetype>/` + optional theme overlays, and initializes a fresh user-owned Git repo without `origin` set. See the [starter README](https://github.com/aotter/mantle-starters#readme) for the current archetype/theme keys, direct invocation, and source layout. Premium / per-customer starters live in the private sibling [`aotter/mantle-starters-premium`](https://github.com/aotter/mantle-starters-premium).
 
 | Starter | Family | Status | What |
 |---|---|---|---|
