@@ -4,11 +4,13 @@
 #
 #   1. Build + test (gate — bad tag never publishes)
 #   2. Write the tag's version into every public package.json
-#   3. `pnpm -r publish` with npm dist-tag inferred from the prerelease
+#   3. Pack every public SDK package
+#   4. Publish to npmjs with npm dist-tag inferred from the prerelease
 #      suffix (see § "npm tag inference" below)
-#   4. Create a GitHub release with auto-generated notes
-#   5. Dispatch `aotter/mantle-starters` with the new SDK version
+#   5. Create a GitHub release with auto-generated notes
+#   6. Dispatch `aotter/mantle-starters` with the new SDK version
 #      so its `bump-from-sdk.yml` workflow opens a downstream bump PR
+#   7. Mirror the same package tarballs to GitHub Packages
 #
 # Steps 2-3 of the fanout (starters bump → tag → landing bump → deploy)
 # live in the downstream repos' workflows; see the issue body for the
@@ -16,9 +18,13 @@
 #
 # ── Operator setup (one-time, repo secrets) ───────────────────────────
 #
-#   NPM_TOKEN              — npm automation token with publish access to
+#   NPM_TOKEN              — npmjs automation token with publish access to
 #                            `@aotter/*`. Repo Settings → Secrets →
 #                            Actions → New repository secret.
+#
+#   GitHub Packages publish uses this workflow's GITHUB_TOKEN, so no extra
+#   package secret is needed. The packages are mirrors; npmjs remains the
+#   canonical public registry for adopters.
 #
 #   RELEASE_FANOUT_TOKEN   — fine-grained PAT (or GitHub App installation
 #                            token) with `contents: write` +
@@ -57,6 +63,7 @@ concurrency:
 
 permissions:
   contents: write   # create GitHub release
+  packages: write   # mirror SDK packages to GitHub Packages
   id-token: write   # npm provenance (when we opt in later)
 
 jobs:
@@ -124,7 +131,32 @@ jobs:
             if (failed) process.exit(1);
           "
 
-      - name: Publish to npm
+      - name: Pack release tarballs
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p .release-tarballs
+          for dir in \
+            packages/mantle-spec \
+            packages/mantle-admin-ui \
+            packages/mantle-runtime \
+            packages/adapters/cloudflare \
+            packages/mantle
+          do
+            pnpm -C "$dir" pack --pack-destination "$PWD/.release-tarballs"
+          done
+
+          for tgz in \
+            ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-runtime-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-$VERSION.tgz"
+          do
+            test -f "$tgz"
+          done
+
+      - name: Publish to npmjs
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -137,17 +169,6 @@ jobs:
           if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
             PUBLISH_TAG=latest
           fi
-          mkdir -p .release-tarballs
-          for dir in \
-            packages/mantle-spec \
-            packages/mantle-admin-ui \
-            packages/mantle-runtime \
-            packages/adapters/cloudflare \
-            packages/mantle
-          do
-            pnpm -C "$dir" pack --pack-destination "$PWD/.release-tarballs"
-          done
-
           for tgz in \
             ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
             ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
@@ -222,3 +243,40 @@ jobs:
             -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
             -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"
           echo "Dispatched mantle-starters bump-from-sdk for ${{ steps.ver.outputs.version }}"
+
+      - name: Mirror to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm config set //npm.pkg.github.com/:_authToken "$NODE_AUTH_TOKEN"
+          VERSION="${{ steps.ver.outputs.version }}"
+          PUBLISH_TAG="${{ steps.ver.outputs.npm_tag }}"
+          if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
+            PUBLISH_TAG=latest
+          fi
+
+          for tgz in \
+            ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-runtime-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz" \
+            ".release-tarballs/aotter-mantle-$VERSION.tgz"
+          do
+            npm publish "$tgz" \
+              --registry https://npm.pkg.github.com \
+              --tag "$PUBLISH_TAG" \
+              --access public
+          done
+
+          if [[ "$PUBLISH_TAG" != "${{ steps.ver.outputs.npm_tag }}" ]]; then
+            for p in \
+              @aotter/mantle-spec \
+              @aotter/mantle-admin-ui \
+              @aotter/mantle-runtime \
+              @aotter/mantle-cloudflare \
+              @aotter/mantle
+            do
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" --registry https://npm.pkg.github.com
+            done
+          fi
