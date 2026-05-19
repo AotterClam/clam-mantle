@@ -33,19 +33,7 @@ import { mountServerEndpoints } from "@aotterclam/mantle/cloudflare";
 
 Recommended path: open [mantle.aotterclam.ai](https://mantle.aotterclam.ai/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
 
-If you already know the values and want to bypass the agent interview, call the scaffolder directly:
-
-```bash
-npx @aotterclam/create-mantle@alpha publication \
-  --project-name my-site \
-  --brand "My Site" \
-  --description "A short description of what this site does." \
-  --locales "en,zh-TW" \
-  --github-owner my-org \
-  --summary "Initial install"
-```
-
-Available starter keys live in [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters): `presence`, `publication`, `intake`, `transaction`, and `blank`. See `skills/install` in the [Mantle repo](https://github.com/AotterClam/mantle/tree/develop/skills/install) for the full agent-driven install flow.
+Available starter keys and direct scaffolder usage live in [`AotterClam/mantle-starters`](https://github.com/AotterClam/mantle-starters): `presence`, `publication`, `intake`, `transaction`, and `blank`. See `skills/install` in the [Mantle repo](https://github.com/AotterClam/mantle/tree/develop/skills/install) for the full agent-driven install flow.
 
 ## Adapter targets
 

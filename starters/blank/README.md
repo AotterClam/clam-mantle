@@ -2,15 +2,15 @@
 
 The `blank` starter now lives in the standalone starters monorepo:
 
-[`AotterClam/mantle-starters/blank/`](https://github.com/AotterClam/mantle-starters/tree/main/blank)
+[`AotterClam/mantle-starters/blank/`](https://github.com/AotterClam/mantle-starters/tree/develop/blank)
 
 (Repo URL above is the post-rename name; if your tooling still pins
 the original `mantle-starter-publication`, GitHub auto-redirects.)
 
 ## Why this moved
 
-Real-user installs go through `@aotterclam/create-mantle`, which
-fetches a tagged tarball of the starters monorepo and merges
+Real-user installs go through the `create-mantle` scaffolder distributed
+by the starters monorepo, which fetches a tagged tarball and merges
 `_common/` + `<archetype>/` into the user's empty directory. Keeping
 `starters/blank` inside this SDK monorepo created two problems:
 
