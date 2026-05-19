@@ -61,7 +61,7 @@ If any is missing or below the minimum, surface install hints once and stop unti
 - pnpm ≥ 9: `corepack enable && corepack prepare pnpm@latest --activate`, or `npm install -g pnpm@9`
 - git: system package manager (Homebrew on macOS, apt on Debian/Ubuntu, winget on Windows)
 
-Also confirm the current working directory is empty (or contains only files the user already accepted as part of the install). `create-mantle` writes into this directory directly; collisions with pre-existing files are surprising and rarely what the user wanted.
+Also confirm the current working directory is an appropriate parent directory for the new project, and that no child directory already exists with the authorized `<<PROJECT_NAME>>`. `create-mantle` writes into `./<<PROJECT_NAME>>`; collisions with pre-existing files are surprising and rarely what the user wanted.
 
 Don't proceed to the interview until preflight passes.
 
@@ -134,9 +134,9 @@ If the archetype hint says `status: roadmap`, follow its **Refuse path** — the
 
 ## When to act
 
-### Why `npx create-mantle` is a destructive action under Auto Mode
+### Why running `create-mantle` is a destructive action under Auto Mode
 
-Invoking `npx create-mantle` is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/clamConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
+Invoking the `create-mantle` release tarball is **not low-risk work**. The command writes the user's site identity — brand, audience, locale, description — into `mantle/site.md` and `src/clamConfig.ts` `siteDefaults`, then runs `git init` and `pnpm install`. Those values drive, perpetually:
 
 - every page's SEO `<meta description>`
 - locale routing for the entire site (canonical + redirects)
@@ -146,7 +146,7 @@ Invoking `npx create-mantle` is **not low-risk work**. The command writes the us
 
 Wrong values ship into the user's first-load impression and cannot be cleanly walked back without wiping the scaffold and re-scaffolding from empty.
 
-**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the `npx` invocation under clause 4. Each marker (`<<...>>`) in the composed `## Run this` block (see end of this document) must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these marker values.
+**Auto Mode's contract has four clauses. Clauses 1–3 say "execute immediately / minimize interruptions / prefer action". Clause 4 is the carve-out: do not take overly destructive actions without authorization.** This Skill classifies the scaffolder invocation under clause 4. Each marker (`<<...>>`) in the composed `## Run this` block (see end of this document) must be a value the user has personally seen and nodded on. Auto-derivation — from the user's email, the current working directory's name, the archetype query, the theme query, or "the locale of the message the user wrote to me" — is **not** authorization. That kind of inference is what Auto Mode's clauses 1–3 want for low-risk work. This Skill specifically does not accept it for these marker values.
 
 If you have not had a turn where the user looked at the exact value and replied affirmatively (or supplied a replacement), the value is unauthorized.
 
@@ -173,7 +173,7 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    Do not modify the literal flags or the archetype positional. Do not invent additional flags. If a marker has no authorized value, you're still in the interview — return there.
 
-   The CLI fetches `sources.json` at runtime from `mantle-starters/main`, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
+   The CLI fetches `sources.json` at runtime from `mantle-starters/develop` unless the composed command pins another ref, downloads the starters tarball, merges `_common/` + `<archetype>/` + (optional) `themes/<theme>/`, fills `{{PLACEHOLDER}}` macros, renames `.template` files, runs `git init` and `pnpm install`. RUN_NOTES JSON arrives on stdout.
 
 3. **Read the RUN_NOTES.** The `files_written` list is your scaffold inventory. Walk the ground-truth files — at minimum `manifests/`, `src/clamConfig.ts`, `mantle/site.md` — before deciding anything else.
 

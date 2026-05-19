@@ -216,31 +216,16 @@ repo remote, and uses npm as the runtime dependency source.
 
 Do **not** publish `@aotterclam/mantle-netlify` while it is a stub.
 
-`@aotterclam/create-mantle` lives in `AotterClam/mantle-starters`,
-not here. The scaffolder couples to starter content (sources.json,
-merge layout, placeholder macros) and has zero coupling to SDK runtime,
-so it ships from the starters repo. Releases on this SDK repo no longer
-attach a create-mantle tarball — that asset is published to npm
-from the starters repo's matching release tag.
+`create-mantle` lives in `AotterClam/mantle-starters`, not here. The
+scaffolder couples to starter content (sources.json, merge layout,
+placeholder macros) and has zero coupling to SDK runtime, so it ships
+from the starters repo as a GitHub release tarball. Releases on this SDK
+repo do not attach a create-mantle tarball and must not publish
+`@aotterclam/create-mantle`.
 
-Adopters install via the `npm create` shortcut (npm 7+ resolves
-`@aotterclam/mantle` to `@aotterclam/create-mantle`):
-
-```bash
-npm create @aotterclam/mantle@alpha <archetype> -- \
-  --project-name "..." \
-  --brand "..." \
-  --description "..." \
-  --locales "..." \
-  --github-owner "..." \
-  --summary "..."
-```
-
-Equivalent direct invocations: `npx @aotterclam/create-mantle@alpha
-<archetype> ...` or pinning to an exact version
-`npx @aotterclam/create-mantle@0.0.10-alpha.1 ...`.
-
-`skills/install/SKILL.md` carries the canonical invocation.
+`skills/install/SKILL.md` consumes the command composed by the landing
+page. Human-facing direct usage belongs in the `mantle-starters` README,
+not this SDK repo.
 
 ### Pre-publish checks
 
