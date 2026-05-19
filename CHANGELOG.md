@@ -6,6 +6,16 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.11-alpha.10] - 2026-05-19
+
+No SDK code changes. alpha.10 re-spins the release fanout to ship starter content that should have been part of alpha.9 (see aotter/mantle-starters#140).
+
+### Why
+
+v0.0.11-alpha.9 made `SiteConfig.media` required and fail-closed `create_media_upload` on undeclared purposes, but the paired `mantle-starters` release tag `v0.0.11-alpha.9` was cut from a starter state that didn't yet declare `siteDefaults.media.purposes` in any archetype's `mantleConfig.ts`. Consumers running `create-mantle@v0.0.11-alpha.9` to scaffold publication / intake / transaction therefore got a starter that fail-closed every `create_media_upload` with `MEDIA_PURPOSE_REJECTED`.
+
+The taxonomy fix landed on `mantle-starters` develop after the alpha.9 tag was already published. alpha.10 republishes the SDK packages so `bump-from-sdk.yml` regenerates the `mantle-starters` v0.0.11-alpha.10 tag + GitHub release tarball with the corrected starter content. See `docs/release-process.md` § "Re-spin release for a downstream-content-only fix" for the recipe; future SDK breaking changes should run the § "Cross-repo type-shape changes" audit to avoid this situation.
+
 ## [0.0.11-alpha.9] - 2026-05-19
 
 ### Breaking
