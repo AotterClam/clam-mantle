@@ -85,7 +85,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       origin: m.get(KEYS.origin) ?? "",
       locales,
       canonicalLocale: locales[0] ?? null,
-      brand: m.get(KEYS.brand) ?? "Mantle CMS",
+      brand: m.get(KEYS.brand) ?? "AotterMantle",
       faviconUrl: m.get(KEYS.faviconUrl) || undefined,
       media: { purposes },
     };

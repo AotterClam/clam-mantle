@@ -1,10 +1,18 @@
 # Changelog
 
-All notable changes to mantle are documented here.
+All notable changes to AotterMantle are documented here.
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning once public v0.1.0 tags begin. Pre-v0.1.0 alpha releases may still change public APIs.
 
 ## [Unreleased]
+
+## [0.0.11-alpha.11] - 2026-05-19
+
+### Changed
+
+- Renamed the public SDK packages from `@aotter/mantle*` to `@aotter/mantle*`.
+- Updated package metadata, docs, release fanout, and GitHub repository links for the `aotter/mantle` migration.
+- Added explicit npmjs.org registry usage in the release workflow so `@aotter/*` publishes through GitHub Actions even when local or org npm config points that scope at another registry.
 
 ## [0.0.11-alpha.10] - 2026-05-19
 

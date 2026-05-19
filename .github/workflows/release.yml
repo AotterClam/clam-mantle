@@ -156,6 +156,7 @@ jobs:
             ".release-tarballs/aotter-mantle-$VERSION.tgz"
           do
             npm publish "$tgz" \
+              --registry https://registry.npmjs.org \
               --tag "$PUBLISH_TAG" \
               --access public
           done
@@ -168,7 +169,7 @@ jobs:
               @aotter/mantle-cloudflare \
               @aotter/mantle
             do
-              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}"
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" --registry https://registry.npmjs.org
             done
           fi
 
@@ -180,9 +181,9 @@ jobs:
           for attempt in 1 2 3 4 5 6 7 8; do
             READY=1
             for p in $PACKAGES; do
-              npm view "$p@$VERSION" version readmeFilename --json || READY=0
+              npm view "$p@$VERSION" version readmeFilename --json --registry https://registry.npmjs.org || READY=0
             done
-            README_LEN=$((npm view "@aotter/mantle@$VERSION" readme --json 2>/dev/null || true) | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
+            README_LEN=$((npm view "@aotter/mantle@$VERSION" readme --json --registry https://registry.npmjs.org 2>/dev/null || true) | node -e "let s=''; process.stdin.on('data',d=>s+=d); process.stdin.on('end',()=>{const v=s.trim()?JSON.parse(s):''; console.log((v || '').length);})")
             if [ "$READY" = 1 ] && [ "$README_LEN" -ge 200 ]; then
               exit 0
             fi
@@ -216,7 +217,7 @@ jobs:
             echo "::warning::RELEASE_FANOUT_TOKEN not set — starters bump skipped. SDK is published; set the secret and re-dispatch via the Actions UI to continue the fanout."
             exit 0
           fi
-          gh api repos/aotter/mantle-starters/dispatches \
+          gh api "repos/${{ github.repository_owner }}/mantle-starters/dispatches" \
             -f event_type=sdk-published \
             -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
             -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"

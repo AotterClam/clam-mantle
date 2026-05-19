@@ -6,9 +6,9 @@
 * @guyspy
 
 # Engine packages
-/packages/mantle-spec/        @guyspy
-/packages/mantle-runtime/     @guyspy
-/packages/mantle-admin-ui/    @guyspy
+/packages/mantle-spec/          @guyspy
+/packages/mantle-runtime/       @guyspy
+/packages/mantle-admin-ui/      @guyspy
 /packages/adapters/cloudflare/  @guyspy
 /packages/adapters/netlify/     @guyspy
 

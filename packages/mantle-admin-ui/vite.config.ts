@@ -34,7 +34,7 @@ const rootPackage = JSON.parse(
 export default defineConfig({
   base: "/admin/",
   define: {
-    __MANTLE_VERSION__: JSON.stringify(rootPackage.version ?? "0.0.0"),
+    __AOTTER_MANTLE_VERSION__: JSON.stringify(rootPackage.version ?? "0.0.0"),
   },
   plugins: [
     react(),
