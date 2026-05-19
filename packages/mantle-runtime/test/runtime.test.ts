@@ -60,6 +60,39 @@ describe("createCmsRuntime + bootInit", () => {
     await expect(runtime.bootInit()).rejects.toBeInstanceOf(BootValidationError);
   });
 
+  it("bootInit seeds media.purposes and readMediaPurposes returns them (#262)", async () => {
+    const db = new InMemoryDatabase();
+    const runtime = createCmsRuntime({
+      manifests: [],
+      db,
+      kv: new InMemoryKv(),
+      assets: noopAssets,
+      siteDefaults: {
+        media: { purposes: ["post-cover", "product-gallery"] },
+      },
+    });
+    await runtime.bootInit();
+    const repo = new DatabaseSiteConfigRepository(db);
+    const purposes = await repo.readMediaPurposes();
+    expect([...purposes].sort()).toEqual(["post-cover", "product-gallery"]);
+    const site = await repo.load();
+    expect([...site.media.purposes].sort()).toEqual(["post-cover", "product-gallery"]);
+  });
+
+  it("readMediaPurposes returns empty when siteDefaults declares none", async () => {
+    const db = new InMemoryDatabase();
+    const runtime = createCmsRuntime({
+      manifests: [],
+      db,
+      kv: new InMemoryKv(),
+      assets: noopAssets,
+      siteDefaults: { brand: "No-media starter" },
+    });
+    await runtime.bootInit();
+    const purposes = await new DatabaseSiteConfigRepository(db).readMediaPurposes();
+    expect(purposes).toEqual([]);
+  });
+
   it("seedSiteDefaults respects ON CONFLICT DO NOTHING semantics", async () => {
     const db = new InMemoryDatabase();
     const runtime = createCmsRuntime({

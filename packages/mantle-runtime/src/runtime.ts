@@ -299,6 +299,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
           args.mediaStorage,
           args.kv,
           clock,
+          siteConfig,
           { allowSvg: args.mediaAllowSvg ?? false, maxBytes: args.mediaMaxBytes },
         ),
         commitUpload: new CommitMediaUploadUseCase(

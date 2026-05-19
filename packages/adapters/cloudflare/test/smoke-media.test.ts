@@ -112,10 +112,20 @@ interface Harness {
   storage: FakeMediaStorage | null;
 }
 
-function harness(opts: { withMedia: boolean; auth: Auth }): Harness {
+function harness(opts: {
+  withMedia: boolean;
+  auth: Auth;
+  /** Declared media purposes; defaults to a non-empty set so existing
+   *  smoke cases that exercise mime / size / commit paths can pass
+   *  fail-closed purpose enforcement (#262) with `purpose: "post-cover"`. */
+  mediaPurposes?: readonly string[];
+}): Harness {
   const storage = opts.withMedia ? new FakeMediaStorage() : null;
   const ref = createCmsRef({
     manifests: manifests(),
+    siteDefaults: {
+      media: { purposes: opts.mediaPurposes ?? ["post-cover"] },
+    },
     bindings: {
       db: new InMemoryDatabase(),
       kv: new InMemoryKv(),
@@ -182,12 +192,52 @@ describe("smoke: /admin/api/media/uploads", () => {
     const res = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.exe", mimeType: "application/octet-stream", byteSize: 100 }),
+      body: JSON.stringify({
+        filename: "x.exe",
+        mimeType: "application/octet-stream",
+        byteSize: 100,
+        purpose: "post-cover",
+      }),
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
     expect(body.ok).toBe(false);
     expect(body.diagnostic.code).toBe("MEDIA_MIME_REJECTED");
+  });
+
+  it("rejects undeclared purpose with MEDIA_PURPOSE_REJECTED (#262)", async () => {
+    const h = harness({ withMedia: true, auth: staffAuth() });
+    const res = await h.app.request("/admin/api/media/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 100,
+        purpose: "mcp-e2e",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { ok: boolean; diagnostic: { code: string } };
+    expect(body.ok).toBe(false);
+    expect(body.diagnostic.code).toBe("MEDIA_PURPOSE_REJECTED");
+  });
+
+  it("rejects upload when no purposes declared (#262 fail-closed)", async () => {
+    const h = harness({ withMedia: true, auth: staffAuth(), mediaPurposes: [] });
+    const res = await h.app.request("/admin/api/media/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 100,
+        purpose: "post-cover",
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { diagnostic: { code: string } };
+    expect(body.diagnostic.code).toBe("MEDIA_PURPOSE_REJECTED");
   });
 
   it("rejects request missing byteSize with INPUT_VALIDATION_FAILED (mandatory ceiling check)", async () => {
@@ -220,7 +270,12 @@ describe("smoke: /admin/api/media/uploads", () => {
     const createRes = await h.app.request("/admin/api/media/uploads", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ filename: "x.png", mimeType: "image/png", byteSize: 2048 }),
+      body: JSON.stringify({
+        filename: "x.png",
+        mimeType: "image/png",
+        byteSize: 2048,
+        purpose: "post-cover",
+      }),
     });
     expect(createRes.status).toBe(200);
     const created = (await createRes.json()) as { uploadId: string };

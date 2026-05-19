@@ -26,7 +26,13 @@ const KEYS = {
   origin: "origin",
   locales: "locales",
   faviconUrl: "faviconUrl",
+  mediaPurposes: "mediaPurposes",
 } as const;
+
+function splitCsv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+}
 
 export class DatabaseSiteConfigRepository implements SiteConfigRepository {
   constructor(private readonly db: DatabaseDriver) {}
@@ -57,6 +63,10 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
     if (defaults.locales && defaults.locales.length > 0) {
       stmts.push(insert(KEYS.locales, defaults.locales.join(",")));
     }
+    const purposes = defaults.media?.purposes;
+    if (purposes && purposes.length > 0) {
+      stmts.push(insert(KEYS.mediaPurposes, purposes.join(",")));
+    }
     if (stmts.length > 0) {
       await this.db.batch(stmts);
     }
@@ -67,10 +77,8 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       .prepare(`SELECT key, value FROM site_config`)
       .all<{ key: string; value: string }>();
     const m = new Map(rows.map((r) => [r.key, r.value]));
-    const localesRaw = m.get(KEYS.locales) ?? "";
-    const locales = localesRaw
-      ? localesRaw.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
-      : [];
+    const locales = splitCsv(m.get(KEYS.locales));
+    const purposes = splitCsv(m.get(KEYS.mediaPurposes));
     return {
       title: m.get(KEYS.title) ?? "CMS",
       description: m.get(KEYS.description) ?? "",
@@ -79,6 +87,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       canonicalLocale: locales[0] ?? null,
       brand: m.get(KEYS.brand) ?? "Mantle CMS",
       faviconUrl: m.get(KEYS.faviconUrl) || undefined,
+      media: { purposes },
     };
   }
 
@@ -87,7 +96,14 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       .prepare(`SELECT value FROM site_config WHERE key = ?`)
       .bind(KEYS.locales)
       .first<{ value: string }>();
-    if (!row?.value) return [];
-    return row.value.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    return splitCsv(row?.value);
+  }
+
+  async readMediaPurposes(): Promise<readonly string[]> {
+    const row = await this.db
+      .prepare(`SELECT value FROM site_config WHERE key = ?`)
+      .bind(KEYS.mediaPurposes)
+      .first<{ value: string }>();
+    return splitCsv(row?.value);
   }
 }

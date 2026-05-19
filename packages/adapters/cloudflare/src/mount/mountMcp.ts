@@ -62,6 +62,14 @@ export function createMcpApiHandler(
       const runtime = await ref.get();
       let dispatcher = dispatcherCache.get(runtime);
       if (!dispatcher) {
+        // Media tools require BOTH a storage adapter AND a declared
+        // `media.purposes` taxonomy (#262). Empty purposes →
+        // create_media_upload would always fail-closed, so don't
+        // surface the tools in tools/list at all.
+        const mediaPurposes = runtime.media
+          ? await runtime.siteConfig.readMediaPurposes()
+          : [];
+        const mediaEnabled = runtime.media !== null && mediaPurposes.length > 0;
         dispatcher = new McpJsonRpcDispatcher(
           {
             listEntries: runtime.listEntries,
@@ -73,7 +81,7 @@ export function createMcpApiHandler(
             archive: runtime.archive,
             deleteEntry: runtime.deleteEntry,
             executeView: runtime.executeView,
-            media: runtime.media
+            media: mediaEnabled && runtime.media
               ? {
                   createUpload: runtime.media.createUpload,
                   commitUpload: runtime.media.commitUpload,
