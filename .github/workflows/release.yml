@@ -249,7 +249,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          npm config set //npm.pkg.github.com/:_authToken "$NODE_AUTH_TOKEN"
+          GPR_NPMRC="$PWD/.npmrc.github"
+          {
+            echo "@aotter:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}"
+            echo "always-auth=true"
+          } > "$GPR_NPMRC"
           VERSION="${{ steps.ver.outputs.version }}"
           PUBLISH_TAG="${{ steps.ver.outputs.npm_tag }}"
           if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
@@ -273,6 +278,7 @@ jobs:
             )
             gpr_tgz="$GITHUB_WORKSPACE/.github-package-tarballs/$(basename "$tgz")"
             npm publish "$gpr_tgz" \
+              --userconfig "$GPR_NPMRC" \
               --registry https://npm.pkg.github.com \
               --tag "$PUBLISH_TAG" \
               --access public
@@ -287,6 +293,8 @@ jobs:
               @aotter/mantle-cloudflare \
               @aotter/mantle
             do
-              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" --registry https://npm.pkg.github.com
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" \
+                --userconfig "$GPR_NPMRC" \
+                --registry https://npm.pkg.github.com
             done
           fi
