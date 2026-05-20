@@ -6,6 +6,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.11-alpha.13] - 2026-05-20
+
+### Changed
+
+- **release**: re-spin after `0.0.11-alpha.12` so the fixed release workflow publishes the SDK mirror to GitHub Packages as well as npm.
+
 ## [0.0.11-alpha.12] - 2026-05-20
 
 ### Changed
