@@ -72,7 +72,11 @@ export function createMcpApiHandler(
       const mediaPurposes = runtime.media
         ? await runtime.siteConfig.readMediaPurposes()
         : [];
-      const mediaPurposesKey = mediaPurposes.join("\u0000");
+      // Serialise the whole policy set as the cache key — name + required
+      // mimes + per-mime maxBytes all participate. Operator edits to any
+      // of these (admin Settings → media taxonomy) rebuild the dispatcher
+      // so tools/list reflects the latest contract without a redeploy.
+      const mediaPurposesKey = JSON.stringify(mediaPurposes);
       let cached = dispatcherCache.get(runtime);
       if (!cached || cached.mediaPurposesKey !== mediaPurposesKey) {
         const mediaEnabled = runtime.media !== null && mediaPurposes.length > 0;

@@ -47,6 +47,15 @@ export class InMemoryDatabase implements DatabaseDriver {
   staff = new Map<string, StaffRecord>();
   users = new Map<string, UserRecord>();
   siteConfig = new Map<string, string>();
+  mediaAssets = new Map<string, {
+    id: string;
+    created_at: number;
+    owner_id: string | null;
+    alt: string | null;
+    caption: string | null;
+    variants: string;
+    metadata: string | null;
+  }>();
   appliedMigrations = new Set<string>();
 
   prepare(sql: string): PreparedStatement {
@@ -293,6 +302,36 @@ class InMemoryStatement implements PreparedStatement {
       const key = p[0] as string;
       const v = this.db.siteConfig.get(key);
       return { rows: v !== undefined ? [{ value: v }] : [], changes: 0 };
+    }
+
+    // INSERT INTO media_assets (...) ... ON CONFLICT(id) DO UPDATE SET ...
+    if (sql.startsWith("INSERT INTO media_assets")) {
+      const [id, created_at, owner_id, alt, caption, variants, metadata] = p as [
+        string, number, string | null, string | null, string | null, string, string | null,
+      ];
+      this.db.mediaAssets.set(id, { id, created_at, owner_id, alt, caption, variants, metadata });
+      return { rows: [], changes: 1 };
+    }
+
+    // SELECT ... FROM media_assets WHERE id = ?
+    if (sql.startsWith("SELECT id, created_at, owner_id, alt, caption, variants, metadata FROM media_assets WHERE id = ?")) {
+      const r = this.db.mediaAssets.get(p[0] as string);
+      return { rows: r ? [r as unknown as Record<string, unknown>] : [], changes: 0 };
+    }
+
+    // SELECT ... FROM media_assets WHERE id IN (?, ?, ...)
+    if (sql.startsWith("SELECT id, created_at, owner_id, alt, caption, variants, metadata FROM media_assets WHERE id IN")) {
+      const ids = new Set(p as string[]);
+      const rows = [...this.db.mediaAssets.values()].filter((r) => ids.has(r.id));
+      return { rows: rows as unknown as Record<string, unknown>[], changes: 0 };
+    }
+
+    // DELETE FROM media_assets WHERE id = ?
+    if (sql.startsWith("DELETE FROM media_assets WHERE id = ?")) {
+      const id = p[0] as string;
+      const had = this.db.mediaAssets.has(id);
+      this.db.mediaAssets.delete(id);
+      return { rows: [], changes: had ? 1 : 0 };
     }
 
     // SELECT user_id, role, granted_by, granted_at FROM staff WHERE user_id = ?

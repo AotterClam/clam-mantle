@@ -32,7 +32,5 @@ export interface CmsConfig {
   };
   /** Pass-through to runtime: SVG opt-in flag (default false). */
   readonly mediaAllowSvg?: boolean;
-  /** Pass-through to runtime: byte ceiling for uploads (default 25MB). */
-  readonly mediaMaxBytes?: number;
   readonly auth: Auth;
 }

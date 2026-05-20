@@ -6,6 +6,90 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.11-alpha.14] - 2026-05-20
+
+### Breaking
+
+- **`@aotter/mantle-spec`**: `SiteConfig.media.purposes` reshaped from
+  `readonly string[]` to `readonly MediaPurposePolicy[]` —
+  `{ name, required: string[], maxBytes: Record<mime, number> }` per
+  purpose. `SiteDefaults.media.purposes` matches. New exports
+  `MediaPurposePolicy`, `MediaPurposeIssue`. `InvalidMediaPurposesError`
+  now carries `issues[]` (structured `{ name, reason, detail? }`)
+  instead of `invalidPurposes[]`. See aotter/mantle#272.
+- **`@aotter/mantle-spec`**: new diagnostic codes
+  `MEDIA_VARIANTS_INCOMPLETE`, `MEDIA_VARIANT_SIZE_EXCEEDED`,
+  `MEDIA_VARIANTS_SUSPICIOUS_SIZE`, `MEDIA_ASSET_NOT_FOUND` with
+  HTTP 400/400/400/404 mapping.
+- **`@aotter/mantle-runtime`**: `MediaAsset` reshaped — required
+  `variants: ReadonlyArray<MediaVariant>` replaces the top-level
+  `publicUrl` / `storageKey` / `mimeType` / `byteSize`. New helper
+  `pickPrimaryVariant(asset)` for renderers that want a single URL.
+- **`@aotter/mantle-runtime`**: `MediaStorage` port multi-variant.
+  `createUpload` now takes `{ uploadGroupId, purpose, variants[], … }`
+  and returns `{ uploadGroupId, capabilities[], expiresAt }`.
+  `commitUpload` takes `{ uploadGroupId, variants[], alt?, caption?, now }`
+  and returns the full `MediaAsset`. `getPublicUrl` / `deleteObject`
+  take `{ storageKey }` only; the asset-id → storage-key lookup
+  happens at the use-case layer via `MediaAssetRepository`. Removed
+  type alias `DeleteAssetArgs`; added `CreateUploadVariantSpec`,
+  `CommitUploadVariantSpec`, `UploadCapability`, `DeleteObjectArgs`,
+  `MediaVariant`, `MediaVariantRole`.
+- **`@aotter/mantle-runtime`**: MCP `create_media_upload` schema
+  changed — `mimeType`/`byteSize` top-level fields replaced by a
+  required `variants: [{ mimeType, byteSize, role }, ...]` array.
+  `commit_media_upload` takes `uploadGroupId` instead of `uploadId`.
+  The per-purpose policy summary (required mimes + per-mime byte
+  caps) is inlined into the `create_media_upload` tool description
+  so MCP agents see the contract via `tools/list`.
+- **`@aotter/mantle-runtime`**: `CreateMediaUploadUseCase` ctor adds
+  `IdGenerator` between `clock` and `siteConfig`; drops the
+  `maxBytes` opts field (per-purpose caps replace it).
+  `CommitMediaUploadUseCase` ctor adds `MediaAssetRepository`; drops
+  the `maxBytes` opts field. Adopters constructing these use cases
+  directly need to update call sites.
+- **`@aotter/mantle-runtime`**: `SiteConfigRepository.readMediaPurposes()`
+  returns `readonly MediaPurposePolicy[]` (was `readonly string[]`).
+  `McpUseCases.media.purposes` follows the same shape.
+- **`@aotter/mantle-cloudflare`**: `CmsConfig.mediaMaxBytes` removed —
+  per-purpose caps replace the runtime-wide ceiling. `R2MediaStorage`
+  rewritten for multi-variant; storage-key layout is now
+  `<purpose>/<uploadGroupId>/<role>.<ext>`. `getPublicUrl` /
+  `deleteObject` follow the new port shape. Removed support for the
+  `checksum` field on commit — the multi-variant HEAD-verify path
+  enforces mime + size invariants; client-side checksums can be
+  reintroduced later if needed.
+- **`@aotter/mantle-cloudflare`**: admin `POST /admin/api/media/uploads`
+  accepts the variants manifest. The commit endpoint is
+  `POST /admin/api/media/uploads/:uploadGroupId/commit` (param
+  renamed from `:uploadId`).
+
+### Added
+
+- **`@aotter/mantle-runtime`**: `MediaAssetRepository` port and
+  `DatabaseMediaAssetRepository` impl for the new `media_assets`
+  D1 table (migration `0002-media-assets`). Persists committed
+  assets keyed by `MediaAsset.id`; `findManyByIds` batches at
+  100 ids per query for the renderer's DataLoader-style consumer.
+- **`@aotter/mantle-runtime`**: `runtime.media.resolve(id)` and
+  `runtime.media.resolveMany(ids)` materialise `MediaAsset`s from
+  entry-data references for the render path.
+- **`@aotter/mantle-runtime`**: `image/avif` added to
+  `MEDIA_MIME_ALLOWLIST` + `extensionForMime` map.
+
+### Why
+
+See ADR-0017. toa-shop hit two gaps in the pre-#272 media subsystem:
+URL-in-entry tied content to bucket identity, and one-artifact-per-
+upload made `<picture>` impossible without ugly downstream
+workarounds. The fix ships agent-side optimization (`sharp` runs
+where it works, not in workerd) + asset-id refs (entries store
+`MediaAsset.id` via the existing `x-mantle-ref` extension; renderer
+resolves at render time) + per-purpose policy enforcement (required
+mime set, per-mime byte caps, suspicious-shape heuristic). The
+companion `@aotter/mantle-media-tools` agent CLI ships separately
+from `mantle-starters`.
+
 ## [0.0.11-alpha.13] - 2026-05-20
 
 ### Changed

@@ -208,10 +208,11 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     return jsonResponse(200, { items, next_cursor: result.nextCursor ?? null });
   });
 
-  // Three-step direct-upload flow: POST /uploads (capability) → caller
-  // PUTs directly to R2 S3 (Worker bypassed) → POST /uploads/:id/commit.
+  // Two-step multi-variant direct-upload flow (#272):
+  //   POST /uploads (variants manifest) → caller PUTs every variant
+  //   directly to R2 S3 (Worker bypassed) → POST /uploads/:groupId/commit.
   const MEDIA_UPLOADS_PATH = "/admin/api/media/uploads";
-  const MEDIA_COMMIT_PATH = "/admin/api/media/uploads/:uploadId/commit";
+  const MEDIA_COMMIT_PATH = "/admin/api/media/uploads/:uploadGroupId/commit";
 
   guarded("post", MEDIA_UPLOADS_PATH, async (c) => {
     const runtime = await ref.get();
@@ -219,16 +220,15 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_UPLOADS_PATH}`);
     const body = (await c.req.raw.json().catch(() => ({}))) as {
       filename?: unknown;
-      mimeType?: unknown;
-      byteSize?: unknown;
+      purpose?: unknown;
+      variants?: unknown;
       alt?: unknown;
       caption?: unknown;
-      purpose?: unknown;
     };
     if (
       typeof body.filename !== "string" ||
-      typeof body.mimeType !== "string" ||
-      typeof body.byteSize !== "number"
+      typeof body.purpose !== "string" ||
+      !Array.isArray(body.variants)
     ) {
       return jsonResponse(400, {
         ok: false,
@@ -236,19 +236,56 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
           code: "INPUT_VALIDATION_FAILED",
           severity: "error",
           path: `POST ${MEDIA_UPLOADS_PATH}`,
-          expected: "{ filename: string, mimeType: string, byteSize: number }",
+          expected:
+            "{ filename: string, purpose: string, variants: [{ mimeType, byteSize, role }, ...] }",
         }),
       });
     }
-    const { filename, mimeType, byteSize } = body;
+    const variants: Array<{ mimeType: string; byteSize: number; role: "primary" | "alternate" | "fallback" }> = [];
+    for (const raw of body.variants) {
+      if (raw === null || typeof raw !== "object") {
+        return jsonResponse(400, {
+          ok: false,
+          diagnostic: runtimeDiagnostic({
+            code: "INPUT_VALIDATION_FAILED",
+            severity: "error",
+            path: `POST ${MEDIA_UPLOADS_PATH}`,
+            expected: "variants[] entries are objects with { mimeType, byteSize, role }",
+          }),
+        });
+      }
+      const v = raw as Record<string, unknown>;
+      const mimeType = v["mimeType"];
+      const byteSize = v["byteSize"];
+      const role = v["role"];
+      if (
+        typeof mimeType !== "string" ||
+        typeof byteSize !== "number" ||
+        !Number.isSafeInteger(byteSize) ||
+        byteSize <= 0 ||
+        (role !== "primary" && role !== "alternate" && role !== "fallback")
+      ) {
+        return jsonResponse(400, {
+          ok: false,
+          diagnostic: runtimeDiagnostic({
+            code: "INPUT_VALIDATION_FAILED",
+            severity: "error",
+            path: `POST ${MEDIA_UPLOADS_PATH}`,
+            expected:
+              "each variant: { mimeType: string, byteSize: positive integer, role: 'primary'|'alternate'|'fallback' }",
+          }),
+        });
+      }
+      variants.push({ mimeType, byteSize, role });
+    }
+    const { filename, purpose } = body;
     return runUseCase(`POST ${MEDIA_UPLOADS_PATH}`, () =>
       media.createUpload.execute({
         filename,
-        mimeType,
-        byteSize,
+        purpose,
+        variants,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
-        purpose: typeof body.purpose === "string" ? body.purpose : undefined,
       }),
     );
   });
@@ -259,18 +296,16 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
     if (!media) return mediaNotConfiguredResponse(`POST ${MEDIA_COMMIT_PATH}`);
     // Hono only invokes this handler when the route matched, so the
     // path param is always present at runtime.
-    const uploadId = c.req.param("uploadId")!;
+    const uploadGroupId = c.req.param("uploadGroupId")!;
     const body = (await c.req.raw.json().catch(() => ({}))) as {
       alt?: unknown;
       caption?: unknown;
-      checksum?: unknown;
     };
     return runUseCase(`POST ${MEDIA_COMMIT_PATH}`, () =>
       media.commitUpload.execute({
-        uploadId,
+        uploadGroupId,
         alt: typeof body.alt === "string" ? body.alt : undefined,
         caption: typeof body.caption === "string" ? body.caption : undefined,
-        checksum: typeof body.checksum === "string" ? body.checksum : undefined,
       }),
     );
   });

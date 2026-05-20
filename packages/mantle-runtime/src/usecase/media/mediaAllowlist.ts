@@ -11,6 +11,7 @@ export const MEDIA_MIME_ALLOWLIST = [
   "image/png",
   "image/jpeg",
   "image/webp",
+  "image/avif",
   "image/gif",
 ] as const;
 
@@ -50,6 +51,8 @@ export function extensionForMime(mime: string): string {
       return "jpg";
     case "image/webp":
       return "webp";
+    case "image/avif":
+      return "avif";
     case "image/gif":
       return "gif";
     case MEDIA_SVG_MIME:

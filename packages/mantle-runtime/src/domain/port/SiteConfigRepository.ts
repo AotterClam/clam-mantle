@@ -1,4 +1,4 @@
-import type { SiteConfig, SiteDefaults } from "@aotter/mantle-spec";
+import type { MediaPurposePolicy, SiteConfig, SiteDefaults } from "@aotter/mantle-spec";
 
 /**
  * `SiteConfigRepository` — the `site_config` row read/write surface
@@ -23,5 +23,5 @@ export interface SiteConfigRepository {
    *  Empty array when the deployment didn't declare any — symmetric
    *  with "no `MediaStorage` configured" and used by the MCP tool
    *  catalog to gate `create_media_upload` / `commit_media_upload`. */
-  readMediaPurposes(): Promise<readonly string[]>;
+  readMediaPurposes(): Promise<readonly MediaPurposePolicy[]>;
 }

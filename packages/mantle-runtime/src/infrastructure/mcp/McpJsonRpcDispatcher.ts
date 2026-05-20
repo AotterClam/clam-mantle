@@ -2,10 +2,12 @@ import {
   DiagnosticError,
   redactForWire,
   type ContentState,
+  type MediaPurposePolicy,
   type SchemaManifest,
   type StaffRole,
   type ViewManifest,
 } from "@aotter/mantle-spec";
+import type { MediaVariantRole } from "../../domain/port/MediaStorage.js";
 import {
   ArchiveUseCase,
   CreateDraftUseCase,
@@ -62,11 +64,14 @@ export interface McpUseCases {
   readonly deleteEntry: DeleteEntryUseCase;
   readonly executeView?: ExecuteViewUseCase;
   /** Optional. When set, `create_media_upload` and `commit_media_upload`
-   *  appear in the catalog and route here. */
+   *  appear in the catalog and route here. `purposes` is the
+   *  declared taxonomy (#272 shape — name + required mimes + maxBytes
+   *  per mime); the catalog inlines the policy summary into the
+   *  create tool's description. */
   readonly media?: {
     readonly createUpload: CreateMediaUploadUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
-    readonly purposes: readonly string[];
+    readonly purposes: readonly MediaPurposePolicy[];
   };
 }
 
@@ -245,33 +250,53 @@ export class McpJsonRpcDispatcher {
       case "create_media_upload": {
         if (!this.useCases.media) return UNKNOWN_TOOL;
         const filename = args["filename"];
-        const mimeType = args["mimeType"];
-        const byteSize = args["byteSize"];
+        const purpose = args["purpose"];
+        const rawVariants = args["variants"];
         if (
           typeof filename !== "string" ||
-          typeof mimeType !== "string" ||
-          typeof byteSize !== "number"
+          typeof purpose !== "string" ||
+          !Array.isArray(rawVariants)
         ) {
           return MISSING_ARG;
         }
+        const variants: Array<{
+          mimeType: string;
+          byteSize: number;
+          role: MediaVariantRole;
+        }> = [];
+        for (const raw of rawVariants) {
+          if (raw === null || typeof raw !== "object") return MISSING_ARG;
+          const v = raw as Record<string, unknown>;
+          const mimeType = v["mimeType"];
+          const byteSize = v["byteSize"];
+          const role = v["role"];
+          if (
+            typeof mimeType !== "string" ||
+            typeof byteSize !== "number" ||
+            !Number.isSafeInteger(byteSize) ||
+            byteSize <= 0 ||
+            (role !== "primary" && role !== "alternate" && role !== "fallback")
+          ) {
+            return MISSING_ARG;
+          }
+          variants.push({ mimeType, byteSize, role });
+        }
         return this.useCases.media.createUpload.execute({
           filename,
-          mimeType,
-          byteSize,
+          purpose,
+          variants,
           alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
           caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
-          purpose: typeof args["purpose"] === "string" ? args["purpose"] : undefined,
         });
       }
       case "commit_media_upload": {
         if (!this.useCases.media) return UNKNOWN_TOOL;
-        const uploadId = args["uploadId"];
-        if (typeof uploadId !== "string") return MISSING_ARG;
+        const uploadGroupId = args["uploadGroupId"];
+        if (typeof uploadGroupId !== "string") return MISSING_ARG;
         return this.useCases.media.commitUpload.execute({
-          uploadId,
+          uploadGroupId,
           alt: typeof args["alt"] === "string" ? args["alt"] : undefined,
           caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
-          checksum: typeof args["checksum"] === "string" ? args["checksum"] : undefined,
         });
       }
       default: {

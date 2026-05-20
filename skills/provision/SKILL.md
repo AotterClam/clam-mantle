@@ -64,6 +64,8 @@ Don't run `wrangler d1 create` / `wrangler kv namespace create` / `wrangler secr
 
 1. **Preflight** — `pnpm validate --phase deploy` (or `pnpm validate:deploy`) + `pnpm typecheck` + `gh auth status` (confirm gh-login matches `ADMIN_GITHUB_LOGIN`). The `--phase deploy` flag is the readiness gate: it re-enables `MANTLE_LETTER_NOT_WRITTEN` plus any future pre-deploy-only checks. If the install Skill's Mantle subagent (step 9) didn't fill the welcome cards, this is where it surfaces — return to install before continuing.
 
+   If GitHub CLI auth fails or shows the wrong login, pause provision as a recoverable auth step. Tell the user the local install is already committed/validated, state the expected GitHub login, ask them to run `gh auth login -h github.com` or switch to the expected account, and ask them to reply when done. Do not ask for Cloudflare credentials yet. When they return, re-run `gh auth status`, then continue with step 2. Keep the project path, commit SHA, validation status, and expected login in your status message so the next turn can resume without rediscovery.
+
 2. **Get CF API token from user.** Via stdin (`! read -rsp …`), env var, or chat paste — user's choice. Set `CLOUDFLARE_API_TOKEN` in env and confirm `pnpm exec wrangler whoami` returns the expected account.
 
 3. **`pnpm provision:plan -- --project-name X`.** Print the precomputed values. Ask the user to register the GitHub OAuth App with those exact values (Homepage URL, Authorization callback URL). The user generates a Client Secret and copies both Client ID and Secret back.

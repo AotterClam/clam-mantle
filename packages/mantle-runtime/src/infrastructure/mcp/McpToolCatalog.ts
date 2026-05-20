@@ -1,5 +1,6 @@
 import {
   MANTLE_BIND_KEYWORD,
+  type MediaPurposePolicy,
   type SchemaManifest,
   type ViewManifest,
 } from "@aotter/mantle-spec";
@@ -38,55 +39,106 @@ export interface McpToolDefinition {
   readonly inputSchema: Record<string, unknown>;
 }
 
-export const MEDIA_TOOLS: readonly McpToolDefinition[] = [
-  buildCreateMediaUploadTool(),
-  {
-    name: "commit_media_upload",
-    description:
-      "Commit a previously-PUT object. Verifies the bytes landed at the storage backend and writes commit metadata. Returns the committed MediaAsset including its publicUrl. Only registered when the runtime has a media storage adapter bound and a media.purposes taxonomy declared.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        uploadId: { type: "string", description: "Returned by create_media_upload." },
-        alt: { type: "string" },
-        caption: { type: "string" },
-        checksum: { type: "string", description: "Optional client-side sha256; verified against storage etag when supplied." },
+export const COMMIT_MEDIA_UPLOAD_TOOL: McpToolDefinition = {
+  name: "commit_media_upload",
+  description:
+    "Commit a previously-PUT variant bundle. Verifies every variant landed at the storage backend (HEAD + bytes per declared mime) and writes the committed MediaAsset to the media_assets table. Returns the asset with its variants populated. Only registered when the runtime has a media storage adapter bound and a media.purposes taxonomy declared.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      uploadGroupId: {
+        type: "string",
+        description:
+          "Logical asset id returned by create_media_upload as `uploadGroupId`; passed verbatim to commit.",
       },
-      required: ["uploadId"],
+      alt: { type: "string" },
+      caption: { type: "string" },
     },
+    required: ["uploadGroupId"],
   },
-];
+};
 
-function buildMediaTools(mediaPurposes: readonly string[]): readonly McpToolDefinition[] {
-  return [
-    buildCreateMediaUploadTool(mediaPurposes),
-    MEDIA_TOOLS[1]!,
-  ];
+function buildMediaTools(
+  mediaPurposes: readonly MediaPurposePolicy[],
+): readonly McpToolDefinition[] {
+  return [buildCreateMediaUploadTool(mediaPurposes), COMMIT_MEDIA_UPLOAD_TOOL];
 }
 
 function buildCreateMediaUploadTool(
-  mediaPurposes: readonly string[] = [],
+  mediaPurposes: readonly MediaPurposePolicy[] = [],
 ): McpToolDefinition {
   const purpose: Record<string, unknown> = {
     type: "string",
-    description: "Required purpose tag declared by this starter.",
+    description:
+      "Required purpose tag declared by this starter. Determines the required variant mime set + per-mime byte caps.",
   };
-  if (mediaPurposes.length > 0) purpose["enum"] = [...mediaPurposes];
+  if (mediaPurposes.length > 0) purpose["enum"] = mediaPurposes.map((p) => p.name);
+
+  const policySummary =
+    mediaPurposes.length > 0
+      ? "Purpose policies in this deployment:\n" +
+        mediaPurposes
+          .map(
+            (p) =>
+              `  • ${p.name} — required mimes: ${p.required.join(", ")}; ` +
+              `maxBytes: ${Object.entries(p.maxBytes)
+                .map(([m, b]) => `${m}=${b}`)
+                .join(", ")}`,
+          )
+          .join("\n")
+      : "";
+
   return {
     name: "create_media_upload",
     description:
-      "Issue a short-lived direct-upload capability for a media object. The caller PUTs the bytes to the returned uploadUrl using the requiredHeaders, then calls commit_media_upload with the same uploadId. Only registered when the runtime has a media storage adapter bound and a media.purposes taxonomy declared.",
+      "Issue short-lived direct-upload capabilities for every variant of one logical media asset. " +
+      "Multi-variant by default (#272): one call yields N presigned PUTs (one per declared mime). " +
+      "Optimization runs agent-side via @aotter/mantle-media-tools; the Worker only verifies " +
+      "policy. After uploading every variant, call commit_media_upload with the returned " +
+      "uploadGroupId. Only registered when the runtime has a media storage adapter bound and a " +
+      "media.purposes taxonomy declared." +
+      (policySummary ? `\n\n${policySummary}` : ""),
     inputSchema: {
       type: "object",
       properties: {
-        filename: { type: "string", description: "Original filename — used in object metadata only; the storage key is server-generated." },
-        mimeType: { type: "string", description: "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif. SVG only with adapter opt-in." },
-        byteSize: { type: "number", description: "Required. Caller-supplied byte size — enforced against the per-runtime byte ceiling before a presigned URL is minted." },
+        filename: {
+          type: "string",
+          description:
+            "Original filename — used in object metadata only; storage keys are server-generated.",
+        },
+        purpose,
+        variants: {
+          type: "array",
+          minItems: 1,
+          description:
+            "One entry per format the agent has prepared. Must cover every mime in the purpose's `required` set; one variant must carry role='primary' (the format `<img>` falls back to). Modern formats (avif/webp) MUST NOT exceed the fallback's byteSize — the runtime rejects suspicious sizing.",
+          items: {
+            type: "object",
+            properties: {
+              mimeType: {
+                type: "string",
+                description:
+                  "Content-Type. Allowlist: image/png, image/jpeg, image/webp, image/gif, image/avif. SVG only with adapter opt-in.",
+              },
+              byteSize: {
+                type: "number",
+                description:
+                  "Caller-declared payload size. Verified against the purpose's `maxBytes[mimeType]` before a presigned URL is minted.",
+              },
+              role: {
+                type: "string",
+                enum: ["primary", "alternate", "fallback"],
+                description:
+                  "`primary` is the `<img>` fallback (typically jpeg/png); `alternate` is preferred via `<picture><source>` (avif/webp).",
+              },
+            },
+            required: ["mimeType", "byteSize", "role"],
+          },
+        },
         alt: { type: "string" },
         caption: { type: "string" },
-        purpose,
       },
-      required: ["filename", "mimeType", "byteSize", "purpose"],
+      required: ["filename", "purpose", "variants"],
     },
   };
 }
@@ -174,8 +226,11 @@ export interface BuildMcpToolCatalogOpts {
   readonly mediaEnabled?: boolean;
   /** Declared `siteDefaults.media.purposes`; when supplied, the
    *  `create_media_upload` schema marks purpose as required and emits
-   *  this set as an enum so agents can self-correct from tools/list. */
-  readonly mediaPurposes?: readonly string[];
+   *  this set as an enum so agents can self-correct from tools/list.
+   *  The policy summary (required mimes + per-mime byte caps) is also
+   *  inlined into the tool description so agents see the contract
+   *  without a separate `get_schema` round trip. */
+  readonly mediaPurposes?: readonly MediaPurposePolicy[];
   /** Staff surface exposes authoring / lifecycle tools. Public
    *  surface exposes only read-only View queries for v0.1. */
   readonly surface?: McpToolSurface;

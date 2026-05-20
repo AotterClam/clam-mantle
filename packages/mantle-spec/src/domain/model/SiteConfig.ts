@@ -53,10 +53,39 @@ export interface SiteConfig {
 
 /** Runtime read shape for the `media` section of `SiteConfig`. Always
  *  present after seed; `purposes` may be empty when the consumer
- *  didn't declare any. Per-field `x-mantle-media` (manifest extension)
- *  is intentionally out of scope for v0.1 — see #262. */
+ *  didn't declare any. Each purpose carries the required mime set the
+ *  Worker enforces and the per-mime byte cap the uploader is held to. */
 export interface SiteMediaConfig {
-  readonly purposes: readonly string[];
+  readonly purposes: readonly MediaPurposePolicy[];
+}
+
+/**
+ * Per-purpose policy. `name` is the slug consumers reference from
+ * `create_media_upload`; `required` is the closed set of mime types
+ * the variants manifest MUST cover; `maxBytes` caps each variant's
+ * byteSize keyed by its declared mime.
+ *
+ * Optimization runs agent-side (`@aotter/mantle-media-tools`); the
+ * Worker only verifies the uploaded bytes match the policy. The
+ * runtime also enforces a "suspicious shape" heuristic so an uploader
+ * that ships a 200KB jpeg + a 400KB "avif" (i.e. forgot to optimize)
+ * fails closed rather than producing a `<picture>` that's slower than
+ * a plain `<img>`.
+ */
+export interface MediaPurposePolicy {
+  /** Lowercase-slug identifier; matches `MEDIA_PURPOSE_SLUG_PATTERN`. */
+  readonly name: string;
+  /** Mime types every upload for this purpose must include in its
+   *  variants manifest. Order is semantic — the first entry is the
+   *  conventional `role: "primary"` (the format `<img>` falls back to);
+   *  subsequent entries are `role: "alternate"` candidates the
+   *  `<picture>` element prefers. Non-empty. */
+  readonly required: readonly string[];
+  /** Per-mime byte cap, keyed by mime type. MUST cover every mime in
+   *  `required`; mimes outside `required` are ignored. The use case
+   *  rejects with `MEDIA_VARIANT_SIZE_EXCEEDED` when a variant's
+   *  declared `byteSize` exceeds its cap. */
+  readonly maxBytes: Readonly<Record<string, number>>;
 }
 
 /**
@@ -98,16 +127,16 @@ export interface SiteDefaults {
    *  with an empty `purposes` array) on archetypes that don't
    *  exercise first-party media uploads — the runtime will keep the
    *  upload tools disabled, symmetric with "no `MediaStorage`
-   *  configured". Slug-shaped (`^[a-z0-9]+(-[a-z0-9]+)*$`); validated
-   *  synchronously at boot. */
+   *  configured". Each purpose's `name` is slug-shaped
+   *  (`^[a-z0-9]+(-[a-z0-9]+)*$`); validated synchronously at boot. */
   readonly media?: SiteMediaDefaults;
 }
 
 export interface SiteMediaDefaults {
-  readonly purposes?: ReadonlyArray<string>;
+  readonly purposes?: ReadonlyArray<MediaPurposePolicy>;
 }
 
-/** Slug regex for `media.purposes` entries. Matches a lowercase
+/** Slug regex for `media.purposes[].name`. Matches a lowercase
  *  alphanumeric word, optionally followed by dash-separated
  *  alphanumeric segments — no leading/trailing dashes, no double
  *  dashes. The R2 adapter already uses a looser variant of this for
