@@ -200,6 +200,10 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    This secret is **local only** — `.dev.vars` is gitignored and never reaches Cloudflare. Production's secret is minted separately by `provision:up` (see the provision Skill). Tell the user this distinction explicitly so they don't try to reuse the local value or expect it to follow them to prod.
 
+   **Start local preview and explain empty-content states.** Run `pnpm dev` after validation and `.dev.vars` setup, then probe the public home route, `/admin`, and any obvious list/API route the archetype exposes. A fresh scaffold may legitimately return 404 on `/` or locale home routes (`/en`, `/zh-TW`, etc.) because D1/KV has no `home` page yet. Treat that as an empty-site state, not a broken install.
+
+   When the public home route is empty/404, tell the user plainly: "the worker is running; the public homepage has no content yet." Then ask whether they want a **local preview seed** so they can see the homepage and, for post-shaped archetypes, a couple of sample posts in the browser. Do not run generic test fixtures or seed content without explicit consent. If they say yes, keep the seed preview-only and local: use user-approved copy from the interview or step 6 drafting, make it clear it is not production content, and do not commit local DB/KV artifacts or `.dev.vars`. If they say no, continue with the install flow; production content can be created later through `/admin` or MCP.
+
 6. **Pre-provision dialogue — preview + voice elicitation (this is a chatter zone, not a checklist).**
 
    Before writing `mantle/site.md` prose or dispatching the Mantle subagent, open a small conversation with the user. The goals are (a) let them peek at what just got built, (b) **draw voice material out of them by writing something concrete together** rather than asking abstract "what's your register" questions.
@@ -239,13 +243,13 @@ If any value is unauthorized — including auto-derivation that "looks reasonabl
 
    **You stay in your normal register throughout.** You never write the welcome letter yourself; Mantle's voice is encapsulated in the subagent prompt template that `pnpm mantle:prompt` filled. This is the whole reason for the delegation — register isolation. Don't peek-and-confirm the cards before they're written; the letter is a small surprise the user discovers in `mantle/site.md`.
 
-   While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from the interview matches.
+   While the subagent works, prepare provision context: `gh auth status`, confirm the GitHub identity from the interview matches. If `gh auth status` reports an invalid token, missing login, or the wrong GitHub account, do not end with a bare "run `gh auth login`" instruction. Say that install is complete and provision is blocked only on GitHub re-auth, tell the user exactly which login is expected, ask them to run `gh auth login -h github.com` (or switch accounts) and reply when done, then resume from provision preflight in the same conversation.
 
 10. **When the Mantle subagent returns**, run `pnpm validate --phase deploy` (or `pnpm validate:deploy` if the starter ships that script) — `MANTLE_LETTER_NOT_WRITTEN` should now clear, since the cards are filled. If it still fires, card1 / card4 / card5 weren't all written; check the subagent's reply for what went wrong, fix or re-dispatch. This is also the readiness gate before handing off to provision.
 
 11. **Commit.** If step 4 produced an adjustment, that's its own commit. Then the main commit: `mantle: notes from install interview`.
 
-12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/aotter/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. Don't promise production-readiness until provision completes and a second agent connects through MCP.
+12. **Continue to provision — don't push a URL onto the user.** Provision is the next phase in the same conversation. Replace `install` with `provision` in the composed URL you read at the start, keep the same `?type=` + `?theme=` query, fetch that URL, follow it. Fall back to `https://raw.githubusercontent.com/aotter/mantle/develop/skills/provision/SKILL.md` if the landing origin isn't in working context. The user's next involvement is supplying the Cloudflare API token when provision asks — everything before that is your job. If GitHub CLI auth is invalid, the user's next involvement is re-auth first; after they reply that it is fixed, re-run `gh auth status` and then continue provision. Don't promise production-readiness until provision completes and a second agent connects through MCP.
 
 ## Adjustment window — between scaffold and provision
 
