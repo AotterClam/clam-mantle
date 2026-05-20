@@ -167,7 +167,26 @@ describe("McpJsonRpcDispatcher", () => {
         media: {
           createUpload: { execute: async () => ({}) } as never,
           commitUpload: { execute: async () => ({}) } as never,
-          purposes: ["post-cover", "product-gallery"],
+          purposes: [
+            {
+              name: "post-cover",
+              required: ["image/avif", "image/webp", "image/jpeg"],
+              maxBytes: {
+                "image/avif": 200_000,
+                "image/webp": 300_000,
+                "image/jpeg": 500_000,
+              },
+            },
+            {
+              name: "product-gallery",
+              required: ["image/avif", "image/webp", "image/jpeg"],
+              maxBytes: {
+                "image/avif": 250_000,
+                "image/webp": 400_000,
+                "image/jpeg": 600_000,
+              },
+            },
+          ],
         },
       },
       [postsSchema()],

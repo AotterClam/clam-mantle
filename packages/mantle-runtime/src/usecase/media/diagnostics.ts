@@ -21,7 +21,7 @@ export function mediaMimeRejectedDiagnostic(opPath: string, mime: string): Diagn
     severity: "error",
     path: opPath,
     value: mime,
-    expected: "one of: image/png, image/jpeg, image/webp, image/gif",
+    expected: "one of: image/png, image/jpeg, image/webp, image/avif, image/gif",
   });
 }
 

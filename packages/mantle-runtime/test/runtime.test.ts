@@ -60,23 +60,45 @@ describe("createCmsRuntime + bootInit", () => {
     await expect(runtime.bootInit()).rejects.toBeInstanceOf(BootValidationError);
   });
 
-  it("bootInit seeds media.purposes and readMediaPurposes returns them (#262)", async () => {
+  it("bootInit seeds media.purposes and readMediaPurposes returns them (#272 policy shape)", async () => {
     const db = new InMemoryDatabase();
+    const seeded = [
+      {
+        name: "post-cover",
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 200_000,
+          "image/webp": 300_000,
+          "image/jpeg": 500_000,
+        },
+      },
+      {
+        name: "product-gallery",
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 250_000,
+          "image/webp": 400_000,
+          "image/jpeg": 600_000,
+        },
+      },
+    ] as const;
     const runtime = createCmsRuntime({
       manifests: [],
       db,
       kv: new InMemoryKv(),
       assets: noopAssets,
-      siteDefaults: {
-        media: { purposes: ["post-cover", "product-gallery"] },
-      },
+      siteDefaults: { media: { purposes: seeded } },
     });
     await runtime.bootInit();
     const repo = new DatabaseSiteConfigRepository(db);
     const purposes = await repo.readMediaPurposes();
-    expect([...purposes].sort()).toEqual(["post-cover", "product-gallery"]);
+    expect(purposes.map((p) => p.name).sort()).toEqual(["post-cover", "product-gallery"]);
+    expect(purposes.find((p) => p.name === "post-cover")?.maxBytes["image/avif"]).toBe(200_000);
     const site = await repo.load();
-    expect([...site.media.purposes].sort()).toEqual(["post-cover", "product-gallery"]);
+    expect(site.media.purposes.map((p) => p.name).sort()).toEqual([
+      "post-cover",
+      "product-gallery",
+    ]);
   });
 
   it("readMediaPurposes returns empty when siteDefaults declares none", async () => {
