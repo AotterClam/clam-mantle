@@ -51,11 +51,11 @@
     "@aotter/mantle-spec": "workspace:*"
   },
   "peerDependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.6.0",
-    "aws4fetch": "^1.0.20",
-    "better-auth": "^1.6.0",
-    "hono": "^4.12.0",
-    "zod": "^4.0.0"
+    "@cloudflare/workers-oauth-provider": "catalog:peer",
+    "aws4fetch": "catalog:peer",
+    "better-auth": "catalog:peer",
+    "hono": "catalog:peer",
+    "zod": "catalog:peer"
   },
   "scripts": {
     "prebuild": "rm -rf dist .tsbuildinfo",
@@ -63,13 +63,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.lib.json"
   },
   "devDependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.6.0",
-    "@types/node": "^25",
-    "aws4fetch": "^1.0.20",
-    "better-auth": "^1.6.11",
-    "hono": "^4.12.21",
-    "typescript": "^6.0.3",
-    "zod": "^4.4.2"
+    "@cloudflare/workers-oauth-provider": "catalog:",
+    "@types/node": "catalog:",
+    "aws4fetch": "catalog:",
+    "better-auth": "catalog:",
+    "hono": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
   },
   "engines": {
     "node": ">=22"
