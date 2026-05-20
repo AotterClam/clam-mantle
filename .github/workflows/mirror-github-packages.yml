@@ -105,6 +105,7 @@ jobs:
           if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
             PUBLISH_TAG=latest
           fi
+          mkdir -p .github-package-tarballs
 
           declare -a PACKAGES=(
             "@aotter/mantle-spec:.release-tarballs/aotter-mantle-spec-$VERSION.tgz"
@@ -120,10 +121,28 @@ jobs:
             if npm view "$pkg@$VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
               echo "$pkg@$VERSION already exists on GitHub Packages; skipping publish"
             else
-              npm publish "$tgz" \
+              work="$(mktemp -d)"
+              tar -xzf "$tgz" -C "$work"
+              node --input-type=module - "$work/package/package.json" <<'NODE'
+                import { readFileSync, writeFileSync } from 'node:fs';
+                const path = process.argv[2];
+                const pkg = JSON.parse(readFileSync(path, 'utf8'));
+                pkg.publishConfig = {
+                  ...(pkg.publishConfig ?? {}),
+                  registry: 'https://npm.pkg.github.com',
+                };
+                writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+NODE
+              (
+                cd "$work/package"
+                npm pack --pack-destination "$GITHUB_WORKSPACE/.github-package-tarballs" >/dev/null
+              )
+              gpr_tgz="$GITHUB_WORKSPACE/.github-package-tarballs/$(basename "$tgz")"
+              npm publish "$gpr_tgz" \
                 --registry https://npm.pkg.github.com \
                 --tag "$PUBLISH_TAG" \
                 --access public
+              rm -rf "$work"
             fi
           done
 
