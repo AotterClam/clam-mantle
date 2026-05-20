@@ -425,8 +425,23 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
     expect(raw).not.toBeNull();
     const record = JSON.parse(raw!);
     expect(record.purpose).toBe("post-cover");
+    expect(record.filename).toBe("cover.png");
     expect(record.variants).toHaveLength(3);
     expect(record.variants[0].storageKey).toContain("asset-1");
+  });
+
+  it("forwards filename to storage.createUpload", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await useCase.execute({
+      filename: "hero-2026.png",
+      purpose: "post-cover",
+      variants: THREE_VARIANTS,
+    });
+    expect(storage.createCalls).toHaveLength(1);
+    expect(storage.createCalls[0]!.filename).toBe("hero-2026.png");
   });
 
   it("rejects SVG by default", async () => {
@@ -501,6 +516,10 @@ describe("CommitMediaUploadUseCase (#272)", () => {
     expect(asset.variants).toHaveLength(3);
     expect(asset.variants.find((v) => v.role === "primary")?.mimeType).toBe("image/jpeg");
     expect(asset.alt).toBe("an image");
+    // filename round-trips from create-time KV record into the
+    // commit-time CommitUploadArgs so the adapter can stamp it.
+    expect(storage.commitCalls).toHaveLength(1);
+    expect(storage.commitCalls[0]!.filename).toBe("x.png");
     expect(assets.saved).toHaveLength(1);
     expect(assets.saved[0]!.id).toBe(created.uploadGroupId);
     expect(await kv.get(`media:pending:${created.uploadGroupId}`)).toBeNull();

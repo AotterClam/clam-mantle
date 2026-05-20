@@ -90,6 +90,7 @@ export class CreateMediaUploadUseCase {
     const result = await this.storage.createUpload({
       uploadGroupId,
       purpose: request.purpose,
+      filename: request.filename,
       variants: variantSpecs,
       now,
       expiresAt,
@@ -105,6 +106,7 @@ export class CreateMediaUploadUseCase {
 
     const record: PendingUploadRecord = {
       purpose: request.purpose,
+      filename: request.filename,
       variants: pendingVariants,
       alt: request.alt,
       caption: request.caption,

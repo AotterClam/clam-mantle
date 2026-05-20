@@ -81,6 +81,11 @@ export interface CreateUploadArgs {
    *  common path. */
   readonly uploadGroupId: string;
   readonly purpose: string;
+  /** Original filename — stamped into each variant's customMetadata
+   *  at commit time. Storage keys remain server-generated; the
+   *  filename is purely for operator visibility in R2 / S3 dashboards
+   *  and for renderers that want to recover a download name. */
+  readonly filename: string;
   readonly variants: ReadonlyArray<CreateUploadVariantSpec>;
   readonly now: number;
   readonly expiresAt: number;
@@ -121,11 +126,16 @@ export interface UploadCapability {
  * `MediaAsset`, verify the stored object's actual content-type
  * matches `mimeType` and actual byte size ≤ `maxBytes`. Any failure
  * rejects the whole bundle with `DiagnosticError(MEDIA_MIME_REJECTED)`
- * or `MEDIA_SIZE_EXCEEDED`. Without adapter-side verification, a
- * caller can declare `image/png` and PUT a PDF.
+ * or `MEDIA_VARIANT_SIZE_EXCEEDED`. Without adapter-side verification,
+ * a caller can declare `image/png` and PUT a PDF.
  */
 export interface CommitUploadArgs {
   readonly uploadGroupId: string;
+  /** Original filename forwarded from the create-time call; adapter
+   *  stamps it into each variant's customMetadata so operator
+   *  dashboards see the human-meaningful name alongside the
+   *  server-generated storage key. */
+  readonly filename: string;
   readonly variants: ReadonlyArray<CommitUploadVariantSpec>;
   readonly alt?: string;
   readonly caption?: string;

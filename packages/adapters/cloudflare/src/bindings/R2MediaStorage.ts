@@ -191,6 +191,7 @@ export class R2MediaStorage implements MediaStorage {
       alt: args.alt,
       caption: args.caption,
       createdAt: args.now,
+      metadata: { filename: args.filename },
     };
   }
 
@@ -232,6 +233,7 @@ export class R2MediaStorage implements MediaStorage {
       committedAt: String(args.now),
       role: spec.role,
       uploadGroupId: args.uploadGroupId,
+      filename: args.filename,
     };
     if (args.alt) customMetadata["alt"] = args.alt;
     if (args.caption) customMetadata["caption"] = args.caption;

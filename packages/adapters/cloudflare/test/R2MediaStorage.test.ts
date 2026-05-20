@@ -200,6 +200,7 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
 
     const asset = await storage.commitUpload({
       uploadGroupId: "asset-abc",
+      filename: "hero-2026.jpg",
       variants: [
         { mimeType: "image/avif", role: "alternate", storageKey: "post-cover/asset-abc/alternate.avif", maxBytes: 200_000 },
         { mimeType: "image/webp", role: "alternate", storageKey: "post-cover/asset-abc/alternate.webp", maxBytes: 300_000 },
@@ -216,10 +217,16 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
     expect(primary.mimeType).toBe("image/jpeg");
     expect(primary.publicUrl).toBe("https://media.example.test/post-cover/asset-abc/primary.jpg");
     expect(asset.alt).toBe("the cover");
+    expect(asset.metadata?.["filename"]).toBe("hero-2026.jpg");
     expect(state.puts).toHaveLength(3);
     expect(state.puts[2]?.customMetadata?.["committedAt"]).toBe(String(NOW));
     expect(state.puts[2]?.customMetadata?.["role"]).toBe("primary");
     expect(state.puts[2]?.customMetadata?.["uploadGroupId"]).toBe("asset-abc");
+    // Filename is stamped onto every variant's customMetadata so
+    // operators see the human name in the R2 dashboard.
+    for (const put of state.puts) {
+      expect(put.customMetadata?.["filename"]).toBe("hero-2026.jpg");
+    }
   });
 
   it("rejects the whole commit when any variant is missing", async () => {
@@ -229,6 +236,7 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
     await expect(
       storage.commitUpload({
         uploadGroupId: "asset",
+        filename: "x.jpg",
         variants: [
           { mimeType: "image/avif", role: "alternate", storageKey: "post-cover/asset/alternate.avif", maxBytes: 200_000 },
           { mimeType: "image/jpeg", role: "primary",   storageKey: "post-cover/asset/primary.jpg",     maxBytes: 500_000 },
@@ -244,6 +252,7 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
     await expect(
       storage.commitUpload({
         uploadGroupId: "asset",
+        filename: "x.jpg",
         variants: [
           { mimeType: "image/jpeg", role: "primary", storageKey: "post-cover/asset/primary.jpg", maxBytes: 500_000 },
         ],
@@ -258,6 +267,7 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
     await expect(
       storage.commitUpload({
         uploadGroupId: "asset",
+        filename: "x.jpg",
         variants: [
           { mimeType: "image/jpeg", role: "primary", storageKey: "post-cover/asset/primary.jpg", maxBytes: 500_000 },
         ],
@@ -272,6 +282,7 @@ describe("R2MediaStorage.commitUpload (multi-variant)", () => {
     await expect(
       storage.commitUpload({
         uploadGroupId: "asset",
+        filename: "x.avif",
         variants: [
           { mimeType: "image/avif", role: "alternate", storageKey: "post-cover/asset/alternate.avif", maxBytes: 200_000 },
         ],

@@ -51,6 +51,7 @@ export class CommitMediaUploadUseCase {
 
     const asset = await this.storage.commitUpload({
       uploadGroupId: request.uploadGroupId,
+      filename: record.filename,
       variants: variantSpecs,
       alt: request.alt ?? record.alt,
       caption: request.caption ?? record.caption,

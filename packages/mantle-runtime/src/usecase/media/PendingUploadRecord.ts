@@ -11,6 +11,10 @@ import type { MediaVariantRole } from "../../domain/port/MediaStorage.js";
  */
 export interface PendingUploadRecord {
   readonly purpose: string;
+  /** Original filename — forwarded by commit into R2 customMetadata
+   *  on every variant. Preserved here so the commit path sees it
+   *  without a second hop. */
+  readonly filename: string;
   readonly variants: ReadonlyArray<PendingUploadVariant>;
   readonly alt?: string;
   readonly caption?: string;
