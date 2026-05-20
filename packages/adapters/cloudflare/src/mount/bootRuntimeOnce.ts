@@ -26,7 +26,6 @@ export function createCmsRef(config: CmsConfig): CmsRuntimeRef {
     siteDefaults: config.siteDefaults,
     publicPathResolver: config.publicPathResolver,
     mediaAllowSvg: config.mediaAllowSvg,
-    mediaMaxBytes: config.mediaMaxBytes,
     db: config.bindings.db,
     kv: config.bindings.kv,
     assets: config.bindings.assets,
