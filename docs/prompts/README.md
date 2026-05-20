@@ -10,7 +10,7 @@ The single sentence the user pastes into Claude Code / Cursor / Codex / any MCP-
 <localized verb> <SKILL_INSTALL_URL> <localized connector> <SKILL_ARCHETYPE_URL> <localized "for this purpose">: <Archetype name>.
 ```
 
-Two URLs, no YAML, no form fields. The skill reads both URLs, then [Mantle](../../skills/install/SKILL.md) conducts a soft conversation to gather the rest. The official landing page at [the Mantle landing page](https://the Mantle landing page/) (source: [`aotter/mantle-landing`](https://github.com/aotter/mantle-landing)) generates this string dynamically from `src/starterArchetypes.ts` — the files in this directory are direct-paste fallbacks and references for documentation.
+Two URLs, no YAML, no form fields. The skill reads both URLs, then [Mantle](../../skills/install/SKILL.md) conducts a soft conversation to gather the rest. The official landing page at the Mantle landing page (source: [`aotter/mantle-landing`](https://github.com/aotter/mantle-landing)) generates this string dynamically from `src/starterArchetypes.ts` — the files in this directory are direct-paste fallbacks and references for documentation.
 
 ## File naming
 

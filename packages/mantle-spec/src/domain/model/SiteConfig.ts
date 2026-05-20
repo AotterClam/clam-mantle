@@ -39,7 +39,7 @@ export interface SiteConfig {
    *  can ship one and agencies can override the other. */
   readonly brand: string;
   /** Absolute or root-relative favicon URL. Omit to use the SDK's
-   *  default aotter mark at `/favicon.svg`. */
+   *  default AotterMantle mark at `/favicon.svg`. */
   readonly faviconUrl?: string;
   /** Starter-declared media taxonomy. Empty array = no first-party
    *  media uploads permitted; the runtime disables the

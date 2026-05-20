@@ -491,8 +491,8 @@ For renames spanning SDK + starters + landing (or any
 SDK-depends-on-published-SDK chain):
 
 1. Source-level rename in all repos. Consumer repos may temporarily use
-   npm aliases (for example `@aotter/mantle` →
-   `npm:@aotter/mantle@<old-version>`) so CI can pass before the
+   npm aliases (for example the new package name pointing at a
+   pre-rename package version) so CI can pass before the
    first `@aotter/*` SDK release exists.
 2. Merge the starters / landing workflow changes before pushing the SDK
    release tag, so the fanout understands the new package names.
@@ -503,8 +503,8 @@ SDK-depends-on-published-SDK chain):
    the freshly published real `@aotter/*` version, regenerate lockfiles,
    and promote through starters → landing.
 5. Smoke-test live URLs.
-6. Deprecate old packages: `npm deprecate @aotter/mantle@'*'
-   "Renamed to @aotter/mantle"` (repeat for the subpackages).
+6. Deprecate old packages with `npm deprecate` and a message pointing
+   to `@aotter/mantle` (repeat for the subpackages).
 
 GitHub repo renames (`gh repo rename`) and local-dir renames can happen
 anytime — GitHub auto-redirects old URLs to new ones; no consumer

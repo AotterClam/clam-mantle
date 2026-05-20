@@ -10,7 +10,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Changed
 
-- Renamed the public SDK packages from `@aotter/mantle*` to `@aotter/mantle*`.
+- Renamed the public SDK packages from the pre-rename scope to `@aotter/mantle*`.
 - Updated package metadata, docs, release fanout, and GitHub repository links for the `aotter/mantle` migration.
 - Added explicit npmjs.org registry usage in the release workflow so `@aotter/*` publishes through GitHub Actions even when local or org npm config points that scope at another registry.
 
@@ -126,7 +126,7 @@ First beta on the road to v0.1.0. Channel moves from `alpha` to `beta` — packa
 - `publication/src/mantleConfig.ts`: `brand` / `title` / `description` now use `{{BRAND}}` / `{{DESCRIPTION}}` placeholder macros instead of literal `"Mantle Publication"` fallbacks. Real installs no longer seed D1 `site_config` with the literal default (mantle-starters #31).
 - Install Skill cover-image source switched from the deprecated `source.unsplash.com` (2023 end-of-life, returning 503) to LoremFlickr; verification uses GET (not HEAD — Cloudflare-fronted image services reject HEAD with 405) (#145).
 - `publication` / `presence` / `intake` Header components hide the language popover when `localesAvailable.length <= 1` — monolingual sites no longer render a single-item dropdown.
-- `docs/release-process.md` clarifies that `@aotter/create-mantle` is intentionally not published to npm; consumers invoke it via `npx <github-release-tarball-url>` (#146).
+- `docs/release-process.md` clarifies that the retired `create-mantle` package is intentionally not published to npm; consumers invoke it via `npx <github-release-tarball-url>` (#146).
 - `CLAUDE.md` "Where things live" table now surfaces `docs/release-process.md`, `CONTRIBUTING.md`, `CHANGELOG.md`; README adds quick-links so release / contribution docs are discoverable from the repo entry points (#146).
 
 ### Removed
@@ -138,7 +138,7 @@ First beta on the road to v0.1.0. Channel moves from `alpha` to `beta` — packa
 ### Added
 
 - ADR-0016 site semantic layer: `AGENTS.md` (cross-tool entry) + `mantle/site.md` (Mantle's frontmatter + section bodies), filled from `{{PLACEHOLDER}}` templates and updated atomically (#107).
-- `@aotter/create-mantle` npx scaffolder: fetches the starters monorepo tarball, merges `_common/` + `<archetype>/`, substitutes ADR-0016 placeholders, prints RUN_NOTES JSON. Replaces the manual `curl … | tar -xzf` + `setup:site` ritual (#109).
+- Retired `create-mantle` npx scaffolder: fetches the starters monorepo tarball, merges `_common/` + `<archetype>/`, substitutes ADR-0016 placeholders, prints RUN_NOTES JSON. Replaces the manual `curl … | tar -xzf` + `setup:site` ritual (#109).
 - 8 archetype briefs under `skills/install/archetypes/` — 4 ready/extension (`presence`, `publication`, `intake`, `blank`) + 4 roadmap-refuse (`transaction`, `reservation`, `community`, `membership`) (#110).
 
 ### Changed

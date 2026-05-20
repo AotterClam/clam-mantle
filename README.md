@@ -22,7 +22,7 @@ Agent-native headless CMS where AI agents are first-class authors — locked-gra
 
 ## Try it cold
 
-Recommended path: open [the Mantle landing page](https://the Mantle landing page/), pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
+Recommended path: open the Mantle landing page, pick an archetype and theme, then paste the generated prompt into Claude Code / Cursor / Codex. The install Skill asks the right follow-up questions and then runs the scaffolder for you.
 
 Starter source and direct scaffolder usage live in [`aotter/mantle-starters`](https://github.com/aotter/mantle-starters); this repo carries the SDK, runtime, adapter packages, and agent skills.
 
