@@ -38,12 +38,19 @@ export type { AssetServer } from "./domain/port/AssetServer.js";
 export type {
   MediaStorage,
   CreateUploadArgs,
+  CreateUploadVariantSpec,
   CreateUploadResult,
+  UploadCapability,
   CommitUploadArgs,
+  CommitUploadVariantSpec,
   GetPublicUrlArgs,
-  DeleteAssetArgs,
+  DeleteObjectArgs,
   MediaAsset,
+  MediaVariant,
+  MediaVariantRole,
 } from "./domain/port/MediaStorage.js";
+export { pickPrimaryVariant } from "./domain/port/MediaStorage.js";
+export type { MediaAssetRepository } from "./domain/port/MediaAssetRepository.js";
 export type {
   EmailSender,
   EmailSendArgs,

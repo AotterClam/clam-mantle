@@ -61,9 +61,11 @@ import {
 } from "./usecase/media/index.js";
 import type { PublicPathResolver } from "./domain/service/PublicPathResolver.js";
 
+import type { MediaAsset } from "./domain/port/MediaStorage.js";
 import { TemplateRegistry as TemplateRegistryImpl } from "./domain/model/TemplateRegistry.js";
 import { TriggerIndex } from "./domain/service/TriggerIndex.js";
 import { DatabaseEntryRepository } from "./infrastructure/persistence/DatabaseEntryRepository.js";
+import { DatabaseMediaAssetRepository } from "./infrastructure/persistence/DatabaseMediaAssetRepository.js";
 import { DatabaseSiteConfigRepository } from "./infrastructure/persistence/DatabaseSiteConfigRepository.js";
 import { LifecycleHookingEntryRepository } from "./infrastructure/persistence/LifecycleHookingEntryRepository.js";
 import { HtmlPublishOrchestrator } from "./infrastructure/render/index.js";
@@ -110,8 +112,6 @@ export interface CreateCmsRuntimeArgs {
   /** Whether the SVG mime is allowed in `CreateMediaUpload`. Default
    *  false; object stores don't sanitize SVG payloads. */
   readonly mediaAllowSvg?: boolean;
-  /** Optional override of the default 25 MB upload byte ceiling. */
-  readonly mediaMaxBytes?: number;
   /** Optional deferred-delivery dispatcher for `after_*` lifecycle
    *  hooks. When set, after-hooks are enqueued through it instead of
    *  riding `ctx.waitUntil` / inline-await. Cloudflare adapter wires
@@ -155,11 +155,19 @@ export interface CmsRuntime {
    *  hreflangs) without rebuilding the mapping. */
   readonly publicPathResolver: PublicPathResolver | null;
   /** Pre-wired media use cases when `mediaStorage` was supplied; null
-   *  otherwise. Adapters route admin endpoints + MCP tools off this. */
+   *  otherwise. Adapters route admin endpoints + MCP tools off this.
+   *
+   *  `resolve` / `resolveMany` materialise the variants set of a
+   *  committed asset by id — entry data references assets via
+   *  `x-mantle-ref: media_assets`, and renderers call these to emit
+   *  `<picture>`. `resolveMany` batches a render-pass's worth of
+   *  references in one DB round trip. */
   readonly media: {
     readonly storage: MediaStorage;
     readonly createUpload: CreateMediaUploadUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
+    resolve(id: string): Promise<MediaAsset | null>;
+    resolveMany(ids: readonly string[]): Promise<ReadonlyMap<string, MediaAsset>>;
   } | null;
   /** Drive a deferred after-hook from an enqueued envelope. Adapter
    *  queue consumers call `runDeferredHook.execute({ envelope, env })`
@@ -292,6 +300,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   );
   const validateBoot = new ValidateBootUseCase();
 
+  const mediaAssets = new DatabaseMediaAssetRepository(args.db);
   const media = args.mediaStorage
     ? {
         storage: args.mediaStorage,
@@ -299,15 +308,18 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
           args.mediaStorage,
           args.kv,
           clock,
+          idgen,
           siteConfig,
-          { allowSvg: args.mediaAllowSvg ?? false, maxBytes: args.mediaMaxBytes },
+          { allowSvg: args.mediaAllowSvg ?? false },
         ),
         commitUpload: new CommitMediaUploadUseCase(
           args.mediaStorage,
           args.kv,
           clock,
-          { maxBytes: args.mediaMaxBytes },
+          mediaAssets,
         ),
+        resolve: (id: string) => mediaAssets.findById(id),
+        resolveMany: (ids: readonly string[]) => mediaAssets.findManyByIds(ids),
       }
     : null;
 
