@@ -273,6 +273,8 @@ export class McpJsonRpcDispatcher {
           if (
             typeof mimeType !== "string" ||
             typeof byteSize !== "number" ||
+            !Number.isSafeInteger(byteSize) ||
+            byteSize <= 0 ||
             (role !== "primary" && role !== "alternate" && role !== "fallback")
           ) {
             return MISSING_ARG;

@@ -261,6 +261,8 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       if (
         typeof mimeType !== "string" ||
         typeof byteSize !== "number" ||
+        !Number.isSafeInteger(byteSize) ||
+        byteSize <= 0 ||
         (role !== "primary" && role !== "alternate" && role !== "fallback")
       ) {
         return jsonResponse(400, {
@@ -270,7 +272,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
             severity: "error",
             path: `POST ${MEDIA_UPLOADS_PATH}`,
             expected:
-              "each variant: { mimeType: string, byteSize: number, role: 'primary'|'alternate'|'fallback' }",
+              "each variant: { mimeType: string, byteSize: positive integer, role: 'primary'|'alternate'|'fallback' }",
           }),
         });
       }

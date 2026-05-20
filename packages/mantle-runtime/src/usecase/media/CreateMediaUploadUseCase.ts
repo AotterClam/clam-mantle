@@ -143,6 +143,18 @@ export class CreateMediaUploadUseCase {
         mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
       );
     }
+    // Closed set: the policy declares which mimes belong to this
+    // purpose. Extras (e.g. an `image/png` alongside the declared
+    // avif/webp/jpeg trio) would land without a per-mime byte cap
+    // and bypass the size gate entirely. Reject any supplied mime
+    // outside `policy.required`.
+    const allowed = new Set(policy.required);
+    const extras = request.variants.filter((v) => !allowed.has(v.mimeType));
+    if (extras.length > 0) {
+      throw new DiagnosticError(
+        mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
+      );
+    }
     // Exactly one primary. Storage key layout is `<group>/<role>.<ext>`,
     // so two primaries collide on the same R2 key + ambiguate which
     // variant `<img>` falls back to. Same for any duplicated (mime, role)
@@ -169,15 +181,32 @@ export class CreateMediaUploadUseCase {
    *  adapter signs presigned PUT URLs. Mantle docs / ADR-0017
    *  promise this gate at create time — without it, oversized
    *  variants only fail after R2 has accepted the bytes (wasted
-   *  upload + potential bill). */
+   *  upload + potential bill).
+   *
+   *  Also gates on positive-integer byteSize. JSON-RPC and HTTP
+   *  validation only narrow to `typeof === "number"`, so 0, -1, or
+   *  0.5 can reach here and produce signed URLs against a maxBytes
+   *  comparison that accepts them. */
   private assertVariantSizesUnderCap(
     opPath: string,
     request: CreateMediaUploadRequest,
     policy: MediaPurposePolicy,
   ): void {
     for (const v of request.variants) {
+      if (!Number.isSafeInteger(v.byteSize) || v.byteSize <= 0) {
+        throw new DiagnosticError(
+          mediaVariantSizeExceededDiagnostic(opPath, v.mimeType, v.byteSize, 0),
+        );
+      }
       const cap = policy.maxBytes[v.mimeType];
-      if (cap === undefined) continue; // mime not in policy.required is rejected upstream
+      // mime outside policy.required was already rejected in
+      // assertVariantsCoverPolicy; defensive check so a future
+      // refactor doesn't silently uncap.
+      if (cap === undefined) {
+        throw new DiagnosticError(
+          mediaVariantSizeExceededDiagnostic(opPath, v.mimeType, v.byteSize, 0),
+        );
+      }
       if (v.byteSize > cap) {
         throw new DiagnosticError(
           mediaVariantSizeExceededDiagnostic(opPath, v.mimeType, v.byteSize, cap),

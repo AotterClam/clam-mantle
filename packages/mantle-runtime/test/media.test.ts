@@ -218,6 +218,59 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
     expect(storage.createCalls).toHaveLength(0);
   });
 
+  it("rejects extra mime types outside the purpose's required set", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "post-cover",
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 200_000,
+          "image/webp": 300_000,
+          "image/jpeg": 500_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await expect(
+      useCase.execute({
+        filename: "x.jpg",
+        purpose: "post-cover",
+        variants: [
+          { mimeType: "image/avif", byteSize: 60_000, role: "alternate" },
+          { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+          { mimeType: "image/jpeg", byteSize: 110_000, role: "primary" },
+          // Not in policy.required — would land without a cap.
+          { mimeType: "image/png", byteSize: 10_000_000, role: "alternate" },
+        ],
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANTS_INCOMPLETE" } });
+    expect(storage.createCalls).toHaveLength(0);
+  });
+
+  it.each([0, -1, 0.5, NaN, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects non-positive-integer byteSize: %s",
+    async (badSize) => {
+      const storage = new FakeMediaStorage();
+      const kv = new InMemoryKv();
+      const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+      const useCase = makeCreateUseCase({ storage, kv, site });
+      await expect(
+        useCase.execute({
+          filename: "x.jpg",
+          purpose: "post-cover",
+          variants: [
+            { mimeType: "image/avif", byteSize: 60_000, role: "alternate" },
+            { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+            { mimeType: "image/jpeg", byteSize: badSize, role: "primary" },
+          ],
+        }),
+      ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANT_SIZE_EXCEEDED" } });
+      expect(storage.createCalls).toHaveLength(0);
+    },
+  );
+
   it("rejects oversized variant at create time (before signing)", async () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();
