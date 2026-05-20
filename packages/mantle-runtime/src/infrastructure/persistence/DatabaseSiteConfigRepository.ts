@@ -1,5 +1,6 @@
 import {
   assertSiteDefaultsCanonical,
+  type MediaPurposePolicy,
   type SiteConfig,
   type SiteDefaults,
 } from "@aotter/mantle-spec";
@@ -14,6 +15,14 @@ import type { SiteConfigRepository } from "../../domain/port/SiteConfigRepositor
  *
  * The runtime calls `seed` once during bootInit; the result of `load`
  * is what every render path and template sees.
+ *
+ * `mediaPurposes` is JSON-encoded (an array of `MediaPurposePolicy`
+ * objects) because the v0.1.x → v0.1.x #272 shape carries
+ * per-purpose required mime set + per-mime byte caps. Older CSV-form
+ * rows from pre-#272 deployments would round-trip as a single string;
+ * pre-v0.1 means we accept the breaking change rather than maintain
+ * a parser fork — operators rerun seed (or wipe the row) after
+ * upgrading.
  *
  * Lives in `infrastructure/persistence/` because it talks to the DB
  * directly. Pure-domain validation (`assertSiteDefaultsCanonical`)
@@ -32,6 +41,17 @@ const KEYS = {
 function splitCsv(raw: string | undefined): string[] {
   if (!raw) return [];
   return raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+function parseMediaPurposes(raw: string | undefined): readonly MediaPurposePolicy[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as readonly MediaPurposePolicy[];
+  } catch {
+    return [];
+  }
 }
 
 export class DatabaseSiteConfigRepository implements SiteConfigRepository {
@@ -65,7 +85,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
     }
     const purposes = defaults.media?.purposes;
     if (purposes && purposes.length > 0) {
-      stmts.push(insert(KEYS.mediaPurposes, purposes.join(",")));
+      stmts.push(insert(KEYS.mediaPurposes, JSON.stringify(purposes)));
     }
     if (stmts.length > 0) {
       await this.db.batch(stmts);
@@ -78,7 +98,7 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
       .all<{ key: string; value: string }>();
     const m = new Map(rows.map((r) => [r.key, r.value]));
     const locales = splitCsv(m.get(KEYS.locales));
-    const purposes = splitCsv(m.get(KEYS.mediaPurposes));
+    const purposes = parseMediaPurposes(m.get(KEYS.mediaPurposes));
     return {
       title: m.get(KEYS.title) ?? "CMS",
       description: m.get(KEYS.description) ?? "",
@@ -99,11 +119,11 @@ export class DatabaseSiteConfigRepository implements SiteConfigRepository {
     return splitCsv(row?.value);
   }
 
-  async readMediaPurposes(): Promise<readonly string[]> {
+  async readMediaPurposes(): Promise<readonly MediaPurposePolicy[]> {
     const row = await this.db
       .prepare(`SELECT value FROM site_config WHERE key = ?`)
       .bind(KEYS.mediaPurposes)
       .first<{ value: string }>();
-    return splitCsv(row?.value);
+    return parseMediaPurposes(row?.value);
   }
 }

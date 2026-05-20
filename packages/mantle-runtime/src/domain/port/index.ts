@@ -44,12 +44,19 @@ export type {
 export type {
   MediaStorage,
   CreateUploadArgs,
+  CreateUploadVariantSpec,
   CreateUploadResult,
+  UploadCapability,
   CommitUploadArgs,
+  CommitUploadVariantSpec,
   GetPublicUrlArgs,
-  DeleteAssetArgs,
+  DeleteObjectArgs,
   MediaAsset,
+  MediaVariant,
+  MediaVariantRole,
 } from "./MediaStorage.js";
+export { pickPrimaryVariant } from "./MediaStorage.js";
+export type { MediaAssetRepository } from "./MediaAssetRepository.js";
 export type {
   EmailSender,
   EmailSendArgs,

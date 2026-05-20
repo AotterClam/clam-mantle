@@ -161,4 +161,22 @@ export const CANONICAL_MIGRATIONS: readonly Migration[] = [
       CREATE INDEX IF NOT EXISTS oauthConsent_userId_idx ON oauthConsent (userId);
     `,
   },
+  {
+    id: "0002-media-assets",
+    description:
+      "media_assets table — committed MediaAsset rows for #272 multi-variant uploads. Entry data references rows by id (x-mantle-ref: media_assets); runtime.media.resolve materialises the variants set at render time.",
+    sql: `
+      CREATE TABLE IF NOT EXISTS media_assets (
+        id          TEXT PRIMARY KEY,
+        created_at  INTEGER NOT NULL,
+        owner_id    TEXT,
+        alt         TEXT,
+        caption     TEXT,
+        variants    TEXT NOT NULL,
+        metadata    TEXT
+      );
+      CREATE INDEX IF NOT EXISTS media_assets_by_owner_created
+        ON media_assets (owner_id, created_at DESC);
+    `,
+  },
 ];
