@@ -6,6 +6,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+## [0.0.11-alpha.12] - 2026-05-20
+
+### Changed
+
+- **BREAKING**: complete the public grammar/contract rename from the pre-rename vocabulary to Mantle vocabulary. Manifest `apiVersion` is now `cms.mantle.aotter.net/v1`; extension keys/env vars/internal queue names now use `mantle` naming.
+- **release**: re-spin SDK packages so downstream starters can validate the renamed manifest grammar from npm instead of relying on local unreleased SDK builds.
+
 ## [0.0.11-alpha.11] - 2026-05-19
 
 ### Changed
