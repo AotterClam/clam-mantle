@@ -179,6 +179,75 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
     ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANTS_INCOMPLETE" } });
   });
 
+  it("rejects when two variants share role='primary' (storage-key collision)", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await expect(
+      useCase.execute({
+        filename: "x.png",
+        purpose: "post-cover",
+        variants: [
+          { mimeType: "image/avif", byteSize: 60_000, role: "primary" },
+          { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+          { mimeType: "image/jpeg", byteSize: 110_000, role: "primary" },
+        ],
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANTS_INCOMPLETE" } });
+    expect(storage.createCalls).toHaveLength(0);
+  });
+
+  it("rejects when two variants share the same (mimeType, role) pair", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await expect(
+      useCase.execute({
+        filename: "x.png",
+        purpose: "post-cover",
+        variants: [
+          { mimeType: "image/avif", byteSize: 60_000, role: "alternate" },
+          { mimeType: "image/avif", byteSize: 50_000, role: "alternate" },
+          { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+          { mimeType: "image/jpeg", byteSize: 110_000, role: "primary" },
+        ],
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANTS_INCOMPLETE" } });
+    expect(storage.createCalls).toHaveLength(0);
+  });
+
+  it("rejects oversized variant at create time (before signing)", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "post-cover",
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 50_000,
+          "image/webp": 80_000,
+          "image/jpeg": 100_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await expect(
+      useCase.execute({
+        filename: "x.jpg",
+        purpose: "post-cover",
+        variants: [
+          { mimeType: "image/avif", byteSize: 40_000, role: "alternate" },
+          { mimeType: "image/webp", byteSize: 60_000, role: "alternate" },
+          // jpeg overshoots the 100k cap — must reject BEFORE storage.createUpload
+          { mimeType: "image/jpeg", byteSize: 150_000, role: "primary" },
+        ],
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANT_SIZE_EXCEEDED" } });
+    expect(storage.createCalls).toHaveLength(0);
+  });
+
   it("forwards per-mime maxBytes from the purpose policy to the adapter", async () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();

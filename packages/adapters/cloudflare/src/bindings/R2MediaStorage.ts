@@ -150,11 +150,12 @@ export class R2MediaStorage implements MediaStorage {
     }
 
     // Enforce the asset-shape invariant the renderer depends on. The
-    // use case already validated `primary` is in the create-time
-    // declaration; this is a belt-and-suspenders check on the
-    // adapter-side commit path.
-    const hasPrimary = variants.some((v) => v.role === "primary");
-    if (!hasPrimary) {
+    // use case already validated this at create time; this is a
+    // belt-and-suspenders check at the adapter-side commit path.
+    // Exactly one primary, no duplicated (mime, role) pair (the latter
+    // would have already collided on storage key in createUpload).
+    const primaries = variants.filter((v) => v.role === "primary");
+    if (primaries.length !== 1) {
       throw new DiagnosticError(
         makeDiagnostic({
           code: "MEDIA_VARIANTS_INCOMPLETE",
@@ -165,6 +166,23 @@ export class R2MediaStorage implements MediaStorage {
           value: variants.map((v) => v.role).join(","),
         }),
       );
+    }
+    const seenKey = new Set<string>();
+    for (const v of variants) {
+      const key = `${v.mimeType}/${v.role}`;
+      if (seenKey.has(key)) {
+        throw new DiagnosticError(
+          makeDiagnostic({
+            code: "MEDIA_VARIANTS_INCOMPLETE",
+            phase: "runtime",
+            severity: "error",
+            path: "adapter/R2MediaStorage/commitUpload",
+            expected: "unique (mimeType, role) per variant",
+            value: key,
+          }),
+        );
+      }
+      seenKey.add(key);
     }
 
     return {
