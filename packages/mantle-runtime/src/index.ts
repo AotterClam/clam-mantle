@@ -48,6 +48,8 @@ export type {
   MediaAsset,
   MediaVariant,
   MediaVariantRole,
+  PutVariantBytesArgs,
+  PutVariantBytesResult,
 } from "./domain/port/MediaStorage.js";
 export { pickPrimaryVariant } from "./domain/port/MediaStorage.js";
 export type { MediaAssetRepository } from "./domain/port/MediaAssetRepository.js";

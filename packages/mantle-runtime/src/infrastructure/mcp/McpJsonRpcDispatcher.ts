@@ -21,6 +21,7 @@ import {
 import {
   CommitMediaUploadUseCase,
   CreateMediaUploadUseCase,
+  UploadMediaVariantUseCase,
 } from "../../usecase/media/index.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 import { ExecuteViewUseCase } from "../../usecase/view/index.js";
@@ -63,13 +64,14 @@ export interface McpUseCases {
   readonly archive: ArchiveUseCase;
   readonly deleteEntry: DeleteEntryUseCase;
   readonly executeView?: ExecuteViewUseCase;
-  /** Optional. When set, `create_media_upload` and `commit_media_upload`
-   *  appear in the catalog and route here. `purposes` is the
-   *  declared taxonomy (#272 shape — name + required mimes + maxBytes
-   *  per mime); the catalog inlines the policy summary into the
-   *  create tool's description. */
+  /** Optional. When set, `create_media_upload`, `upload_media_variant`,
+   *  and `commit_media_upload` appear in the catalog and route here.
+   *  `purposes` is the declared taxonomy (#272 shape — name +
+   *  required mimes + maxBytes per mime); the catalog inlines the
+   *  policy summary into the create tool's description. */
   readonly media?: {
     readonly createUpload: CreateMediaUploadUseCase;
+    readonly uploadVariant: UploadMediaVariantUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
     readonly purposes: readonly MediaPurposePolicy[];
   };
@@ -289,6 +291,27 @@ export class McpJsonRpcDispatcher {
           caption: typeof args["caption"] === "string" ? args["caption"] : undefined,
         });
       }
+      case "upload_media_variant": {
+        if (!this.useCases.media) return UNKNOWN_TOOL;
+        const uploadGroupId = args["uploadGroupId"];
+        const role = args["role"];
+        const mimeType = args["mimeType"];
+        const bytesBase64 = args["bytesBase64"];
+        if (
+          typeof uploadGroupId !== "string" ||
+          typeof mimeType !== "string" ||
+          typeof bytesBase64 !== "string" ||
+          (role !== "primary" && role !== "alternate" && role !== "fallback")
+        ) {
+          return MISSING_ARG;
+        }
+        return this.useCases.media.uploadVariant.execute({
+          uploadGroupId,
+          role,
+          mimeType,
+          bytes: decodeBase64(bytesBase64),
+        });
+      }
       case "commit_media_upload": {
         if (!this.useCases.media) return UNKNOWN_TOOL;
         const uploadGroupId = args["uploadGroupId"];
@@ -371,5 +394,16 @@ function stripViewReservedArgs(args: Record<string, unknown>): Record<string, un
     if (VIEW_RESERVED_ARG_KEYS.includes(k)) continue;
     out[k] = v;
   }
+  return out;
+}
+
+/** Decode a base64 string to a Uint8Array. Used by `upload_media_variant`
+ *  to deserialize the agent-supplied bytes payload before the use case
+ *  hands it to the storage adapter. `atob` is available in V8 + workerd;
+ *  no Node-only `Buffer` reach. */
+function decodeBase64(input: string): Uint8Array {
+  const bin = atob(input);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }

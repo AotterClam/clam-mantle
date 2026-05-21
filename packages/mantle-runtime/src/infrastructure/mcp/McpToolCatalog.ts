@@ -40,6 +40,46 @@ export interface McpToolDefinition {
   readonly inputSchema: Record<string, unknown>;
 }
 
+export const UPLOAD_MEDIA_VARIANT_TOOL: McpToolDefinition = {
+  name: "upload_media_variant",
+  description:
+    "Upload one variant's bytes for an in-flight media upload as a base64 " +
+    "payload over MCP — sandboxed-agent alternative to the presigned PUT URLs " +
+    "from create_media_upload. Use this when the agent can't reach the storage " +
+    "backend directly (e.g. Claude Cowork's outbound proxy doesn't allowlist R2 " +
+    "hosts; MCP traffic gets to the Worker via api.anthropic.com). Worker writes " +
+    "server-side via the bound MediaStorage adapter; the storage-key layout " +
+    "matches the presigned path so commit verifies the same object. Editor / " +
+    "browser uploads should continue using create_media_upload + direct PUT — " +
+    "this tool is the agent-side fallback, not a replacement.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      uploadGroupId: {
+        type: "string",
+        description: "Logical asset id from create_media_upload, passed verbatim.",
+      },
+      role: {
+        type: "string",
+        enum: ["primary", "alternate", "fallback"],
+        description:
+          "Role of the variant being uploaded; must match a declared role in the create_media_upload manifest.",
+      },
+      mimeType: {
+        type: "string",
+        description:
+          "Variant mime type; must match the mime declared for this role in create_media_upload.",
+      },
+      bytesBase64: {
+        type: "string",
+        description:
+          "Base64-encoded raw variant bytes. Roughly 33% size inflation over the binary payload; for variants larger than a few MB use the presigned-PUT path instead.",
+      },
+    },
+    required: ["uploadGroupId", "role", "mimeType", "bytesBase64"],
+  },
+};
+
 export const COMMIT_MEDIA_UPLOAD_TOOL: McpToolDefinition = {
   name: "commit_media_upload",
   description:
@@ -62,7 +102,11 @@ export const COMMIT_MEDIA_UPLOAD_TOOL: McpToolDefinition = {
 function buildMediaTools(
   mediaPurposes: readonly MediaPurposePolicy[],
 ): readonly McpToolDefinition[] {
-  return [buildCreateMediaUploadTool(mediaPurposes), COMMIT_MEDIA_UPLOAD_TOOL];
+  return [
+    buildCreateMediaUploadTool(mediaPurposes),
+    UPLOAD_MEDIA_VARIANT_TOOL,
+    COMMIT_MEDIA_UPLOAD_TOOL,
+  ];
 }
 
 function buildCreateMediaUploadTool(
