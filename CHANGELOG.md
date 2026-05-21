@@ -4,8 +4,6 @@ All notable changes to AotterMantle are documented here.
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning once public v0.1.0 tags begin. Pre-v0.1.0 alpha releases may still change public APIs.
 
-## [Unreleased]
-
 ## [0.0.11-alpha.14] - 2026-05-20
 
 ### Breaking

@@ -35,8 +35,9 @@ and early consumer projects that can tolerate churn.
   beta; otherwise it follows the most recent alpha. Once v0.1.0
   stable ships, `latest` switches to stable-only and never points
   at a prerelease again.
-- Required before publish: `pnpm run check`, changelog entry,
-  release PR merged to `main`, tag pushed.
+- Required before publish: `pnpm run check`, changelog entry (written
+  at release time, see playbook step 2 below), release PR merged to
+  `main`, tag pushed.
 
 ### Beta
 
@@ -75,7 +76,12 @@ fans out: npm publish → starters bump → starters tag → landing bump →
 landing deploy. The human steps are:
 
 1. Confirm the release scope and blocking issues.
-2. Ensure every merged PR has a changelog-worthy note when it affects users, package behavior, public docs, or release mechanics.
+2. **Write the `CHANGELOG.md` entry for this release.** Per-PR `[Unreleased]` entries are not used (see `CONTRIBUTING.md § Changelog`). Aggregate the merged-since-last-tag commit log into Keep-a-Changelog buckets (`Added` / `Changed` / `Deprecated` / `Removed` / `Fixed` / `Security`), prefix package scope when relevant (`**`@aotter/mantle-runtime`**: ...`), cross-link the closing PR + issue. The entry lives under a new `## [vX.Y.Z] - YYYY-MM-DD` heading directly; no `[Unreleased]` placeholder. Useful command for the aggregation pass:
+
+   ```bash
+   git log --oneline --no-merges vPREV..HEAD -- ':!CHANGELOG.md' ':!pnpm-lock.yaml'
+   ```
+
 3. **If this release widens any SDK type** (new required field, new closed-enum entry, removed export, broader runtime contract), run the [cross-repo type-shape audit](#cross-repo-type-shape-changes) below BEFORE bumping. CI inside `mantle/` won't catch downstream literal breaks — only the fanout's validate gate will, after publish is irreversible.
 4. Run the full local gate from `develop`:
 
