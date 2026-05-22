@@ -6,35 +6,6 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 <!-- No [Unreleased] section. Entries are written at release time per CONTRIBUTING.md § Changelog and docs/release-process.md § Normal release playbook step 2. -->
 
-## [0.0.11-alpha.15] - 2026-05-20
-
-### Changed
-
-- **`@aotter/mantle-cloudflare`**: `GET /llms.txt` and `GET /:locale/llms.txt`
-  now live-compose on KV miss instead of 404'ing. Before: a freshly-
-  deployed worker that hadn't published any entry through
-  `HtmlPublishOrchestrator` had no KV entry for `llms:{locale}` and
-  returned 404 — an AI agent visiting the root URL got nothing. After:
-  KV miss → call `runtime.composeLlmsTxt` inline, return body to the
-  caller, write the cache via `c.executionCtx.waitUntil(...)` so the
-  request returns fast and subsequent requests hit the warm KV. The
-  cross-locale root `/llms.txt` now concatenates per-locale composer
-  output (sites whose content lives entirely in localized child
-  schemas previously got an effectively-empty document from the
-  `locale: null` path).
-
-### Why
-
-For pre-v0.1 starters, the publish pipeline writes `llms:{locale}` to
-KV only when an entry transitions through `RequestPublishUseCase`. A
-site seeded via direct SQL inserts (the operator-supplied `pnpm seed`
-flow) gets D1 rows but no KV cache for the aggregate endpoints, so
-the agent-facing `/llms.txt` 404'd until someone manually re-published
-every entry. The live-fallback closes that cold-start gap — the SDK
-now serves the URL "out of the box" the moment the worker is
-deployed, matching the `<picture>` / sitemap pattern (always
-available; KV is a perf cache, not a correctness gate).
-
 ## [0.0.11-alpha.14] - 2026-05-20
 
 ### Breaking
