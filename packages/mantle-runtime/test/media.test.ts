@@ -4,6 +4,7 @@ import type { MediaAssetRepository } from "../src/domain/port/MediaAssetReposito
 import {
   CommitMediaUploadUseCase,
   CreateMediaUploadUseCase,
+  UploadMediaVariantUseCase,
 } from "../src/usecase/media/index.js";
 import { InMemoryKv } from "./fakes/kv.js";
 import { InMemorySiteConfigRepository } from "./fakes/site-config.js";
@@ -13,6 +14,7 @@ const DEFAULT_PURPOSES = ["post-cover", "product-cover"] as const;
 class FakeMediaStorage implements MediaStorage {
   public createCalls: Parameters<MediaStorage["createUpload"]>[0][] = [];
   public commitCalls: Parameters<MediaStorage["commitUpload"]>[0][] = [];
+  public putVariantCalls: Parameters<MediaStorage["putVariantBytes"]>[0][] = [];
 
   async createUpload(args: Parameters<MediaStorage["createUpload"]>[0]) {
     this.createCalls.push(args);
@@ -55,6 +57,13 @@ class FakeMediaStorage implements MediaStorage {
 
   async deleteObject(): Promise<void> {
     /* noop */
+  }
+
+  async putVariantBytes(args: Parameters<MediaStorage["putVariantBytes"]>[0]) {
+    this.putVariantCalls.push(args);
+    return {
+      storageKey: `${args.purpose}/${args.uploadGroupId}/${args.role}`,
+    };
   }
 }
 
@@ -619,6 +628,141 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
       variants: [{ mimeType: "image/svg+xml", byteSize: 100, role: "primary" }],
     });
     expect(r.uploadGroupId).toBe("asset-1");
+  });
+});
+
+describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
+  async function seedPendingUpload(opts: {
+    storage: FakeMediaStorage;
+    kv: InMemoryKv;
+    site: InMemorySiteConfigRepository;
+    purpose?: string;
+    variants?: typeof THREE_VARIANTS;
+  }): Promise<string> {
+    const create = makeCreateUseCase({
+      storage: opts.storage,
+      kv: opts.kv,
+      site: opts.site,
+    });
+    const created = await create.execute({
+      filename: "x.png",
+      purpose: opts.purpose ?? "post-cover",
+      variants: opts.variants ?? THREE_VARIANTS,
+    });
+    return created.uploadGroupId;
+  }
+
+  it("returns MEDIA_UPLOAD_EXPIRED when the pending KV record is missing", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    await expect(
+      useCase.execute({
+        uploadGroupId: "never-created",
+        role: "primary",
+        mimeType: "image/jpeg",
+        bytes: new Uint8Array(100),
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_UPLOAD_EXPIRED" } });
+    expect(storage.putVariantCalls).toHaveLength(0);
+  });
+
+  it("writes bytes to storage when (role, mimeType) matches a declared variant", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const uploadGroupId = await seedPendingUpload({ storage, kv, site });
+
+    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const bytes = new Uint8Array(50_000);
+    const result = await useCase.execute({
+      uploadGroupId,
+      role: "primary",
+      mimeType: "image/jpeg",
+      bytes,
+    });
+    expect(result.byteSize).toBe(50_000);
+    expect(result.storageKey).toBe(`post-cover/${uploadGroupId}/primary`);
+    expect(storage.putVariantCalls).toHaveLength(1);
+    expect(storage.putVariantCalls[0]!.purpose).toBe("post-cover");
+    expect(storage.putVariantCalls[0]!.role).toBe("primary");
+    expect(storage.putVariantCalls[0]!.mimeType).toBe("image/jpeg");
+    expect(storage.putVariantCalls[0]!.filename).toBe("x.png");
+    expect(storage.putVariantCalls[0]!.bytes).toBe(bytes);
+  });
+
+  it("rejects when (role, mimeType) doesn't match any declared variant", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const uploadGroupId = await seedPendingUpload({ storage, kv, site });
+
+    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    await expect(
+      useCase.execute({
+        uploadGroupId,
+        // declared: primary=jpeg, alternate=avif/webp. primary=avif
+        // isn't in the declared set → reject.
+        role: "primary",
+        mimeType: "image/avif",
+        bytes: new Uint8Array(50_000),
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_MIME_REJECTED" } });
+    expect(storage.putVariantCalls).toHaveLength(0);
+  });
+
+  it("rejects a mimeType not declared for this purpose at all", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const uploadGroupId = await seedPendingUpload({ storage, kv, site });
+
+    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    await expect(
+      useCase.execute({
+        uploadGroupId,
+        role: "alternate",
+        mimeType: "image/gif", // never declared on post-cover
+        bytes: new Uint8Array(50_000),
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_MIME_REJECTED" } });
+    expect(storage.putVariantCalls).toHaveLength(0);
+  });
+
+  it("rejects when payload byteSize exceeds the declared maxBytes for that variant", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    // Custom purpose with a tiny per-mime maxBytes so a small
+    // payload trips the cap without needing to materialise a huge
+    // buffer in the test.
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "tiny",
+        required: ["image/jpeg"],
+        maxBytes: { "image/jpeg": 1_000 },
+      },
+    ]);
+    const uploadGroupId = await seedPendingUpload({
+      storage,
+      kv,
+      site,
+      purpose: "tiny",
+      variants: [
+        { mimeType: "image/jpeg", byteSize: 500, role: "primary" as const },
+      ],
+    });
+
+    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    await expect(
+      useCase.execute({
+        uploadGroupId,
+        role: "primary",
+        mimeType: "image/jpeg",
+        // 2,000 bytes > policy.maxBytes.image/jpeg (1,000)
+        bytes: new Uint8Array(2_000),
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANT_SIZE_EXCEEDED" } });
+    expect(storage.putVariantCalls).toHaveLength(0);
   });
 });
 
