@@ -69,9 +69,13 @@ updates:
     labels:
       - area:ci
       - dependencies
+    # github-actions ecosystem does NOT accept `semver-major-days` —
+    # GitHub's dependabot config validator rejects it. Only the
+    # `default-days` key is supported here. The npm block above uses
+    # the full pair (default + semver-major) since both keys are
+    # supported there.
     cooldown:
       default-days: 14
-      semver-major-days: 21
     groups:
       actions:
         patterns: ["*"]
