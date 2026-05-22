@@ -282,6 +282,48 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
     expect(result.uploadGroupId).toBeDefined();
   });
 
+  // Variant role is independently declared by the agent (see
+  // MediaMimeAccept.ts file header + SiteConfig.ts MediaPurposePolicy
+  // docstring). The use case enforces exactly one primary but does
+  // NOT bind primary to slot 0 — this is required for back-compat
+  // with alpha.14 fixtures like ["image/avif", "image/webp",
+  // "image/jpeg"] that ship jpeg as primary despite avif filling
+  // slot 0. Test guards against a future refactor silently tightening
+  // primary→slot-0.
+  it("accepts a primary variant whose mime is not in slot 0 (role independent of slot position)", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "product-cover",
+        // slot 0 = avif, slot 1 = webp, slot 2 = jpeg
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 300_000,
+          "image/webp": 400_000,
+          "image/jpeg": 500_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    const result = await useCase.execute({
+      filename: "photo.jpg",
+      purpose: "product-cover",
+      variants: [
+        // jpeg (slot 2) carries role: "primary" — slot 0 is avif but
+        // the primary role lives in slot 2. Use case must accept this.
+        { mimeType: "image/avif", byteSize: 50_000, role: "alternate" },
+        { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+        { mimeType: "image/jpeg", byteSize: 200_000, role: "primary" },
+      ],
+    });
+    expect(result.uploadGroupId).toBeDefined();
+    expect(result.capabilities).toHaveLength(3);
+    const primaries = result.capabilities.filter((c) => c.role === "primary");
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]!.mimeType).toBe("image/jpeg");
+  });
+
   it("rejects a third option that isn't in slot 0's accepted set", async () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();

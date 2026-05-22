@@ -9,16 +9,21 @@
  * Whitespace around commas and around full entries is tolerated; the
  * grammar mirrors the HTML `<input accept="...">` attribute editors
  * already know. Each entry yields a non-empty *acceptable mime set*
- * for one slot. Slots are ordered semantically: slot 0 is the
- * `role: "primary"` slot (`<img>` fallback); subsequent slots are
- * `role: "alternate"` (preferred via `<picture><source>`).
+ * for one slot. **Slot order is only used for per-slot mime coverage.
+ * Variant role (`primary` / `alternate`) is declared independently
+ * per variant by the agent; the use case enforces exactly one
+ * primary, but does not bind primary to slot 0.** This matters for
+ * back-compat: alpha.14 fixtures such as
+ * `["image/avif", "image/webp", "image/jpeg"]` declare avif at slot 0
+ * yet ship jpeg as the `<img>` fallback (`role: "primary"`).
  *
  * Per-asset, the agent picks ONE mime per slot from the slot's
- * acceptable set. Repeatable benefit: a `product-cover` purpose
- * declared as `["image/jpg,image/png", "webp", "avif"]` accepts a
- * transparent PNG primary (logos / icons) or an opaque JPEG primary
- * (photos) under the same purpose name — no per-purpose split, no
- * forced jpeg flatten that loses alpha.
+ * acceptable set and chooses which of those is the primary. Repeatable
+ * benefit: a `product-cover` purpose declared as
+ * `["image/jpg,image/png", "webp", "avif"]` accepts a transparent
+ * PNG primary (logos / icons) or an opaque JPEG primary (photos)
+ * under the same purpose name — no per-purpose split, no forced jpeg
+ * flatten that loses alpha.
  *
  * Validation:
  *   - Each entry must yield ≥1 mime after parsing.
@@ -77,9 +82,9 @@ export function parseMimeAccept(entry: string): readonly string[] {
 
 /**
  * Expand a policy's `required` into per-slot mime sets. Slot ordering
- * is preserved as the consumer wrote it. Role (primary / alternate /
- * fallback) is NOT bound to slot position — see the file header.
- * Returns a `[slot][mime]` matrix.
+ * is preserved as the consumer wrote it. Variant role (primary /
+ * alternate / fallback) is declared independently per variant — see
+ * the file header. Returns a `[slot][mime]` matrix.
  */
 export function expandPolicyRequired(
   required: readonly string[],

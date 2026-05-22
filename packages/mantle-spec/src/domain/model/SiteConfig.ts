@@ -76,7 +76,7 @@ export interface MediaPurposePolicy {
   /** Lowercase-slug identifier; matches `MEDIA_PURPOSE_SLUG_PATTERN`. */
   readonly name: string;
   /**
-   * Ordered list of role slots. Each entry uses the HTML
+   * Ordered list of acceptable mime slots. Each entry uses the HTML
    * `<input accept="...">` grammar:
    *
    *   - full mime:           `"image/jpeg"`, `"image/avif"`
@@ -84,10 +84,15 @@ export interface MediaPurposePolicy {
    *   - shorthand subtype:   `"webp"` → `"image/webp"`,
    *                          `"jpg"` → `"image/jpeg"`
    *
-   * Slot 0 is `role: "primary"` (the format `<img>` falls back to).
-   * Subsequent slots are `role: "alternate"` (preferred via
-   * `<picture><source>`). Per-asset, the agent picks ONE mime per
-   * slot from that slot's acceptable set — letting a single purpose
+   * Slot position does NOT determine variant role. Per-asset, the
+   * agent picks ONE mime per slot from that slot's acceptable set
+   * and independently declares exactly one supplied variant as
+   * `role: "primary"` (the format `<img>` falls back to); the rest
+   * are `role: "alternate"` (preferred via `<picture><source>`).
+   * This decoupling preserves back-compat with alpha.14 fixtures
+   * such as `["image/avif", "image/webp", "image/jpeg"]` that ship
+   * jpeg as primary despite avif occupying slot 0. The multi-mime
+   * slot form (e.g. `"image/jpg,image/png"`) lets a single purpose
    * accept either jpeg-primary (photos) or png-primary (logos /
    * transparent assets) without splitting into two purposes.
    *

@@ -127,10 +127,13 @@ function collectMediaPurposeIssues(
       });
       continue;
     }
-    // Variant → slot mapping is by mime (slot 0 → primary role; the
-    // rest → alternate role with mime steering each variant to its
-    // slot). Overlapping mime sets break the mapping — reject at
-    // policy time rather than fail per-upload.
+    // Variant → slot mapping is by mime: each supplied mime must
+    // appear in exactly one slot, so the mime alone determines which
+    // slot a variant fills. (Variant role — primary / alternate — is
+    // declared independently by the agent and is NOT bound to slot
+    // position; see MediaMimeAccept.ts file header.) Overlapping mime
+    // sets break the by-mime mapping — reject at policy time rather
+    // than fail per-upload.
     const seen = new Map<string, number>();
     const overlaps: string[] = [];
     slots.forEach((mimes, slotIdx) => {
