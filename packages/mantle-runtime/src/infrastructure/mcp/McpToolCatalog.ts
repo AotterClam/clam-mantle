@@ -1,5 +1,6 @@
 import {
   MANTLE_BIND_KEYWORD,
+  expandPolicyRequired,
   type MediaPurposePolicy,
   type SchemaManifest,
   type ViewManifest,
@@ -78,13 +79,22 @@ function buildCreateMediaUploadTool(
     mediaPurposes.length > 0
       ? "Purpose policies in this deployment:\n" +
         mediaPurposes
-          .map(
-            (p) =>
-              `  • ${p.name} — required mimes: ${p.required.join(", ")}; ` +
-              `maxBytes: ${Object.entries(p.maxBytes)
-                .map(([m, b]) => `${m}=${b}`)
-                .join(", ")}`,
-          )
+          .map((p) => {
+            const slots = expandPolicyRequired(p.required)
+              .map(
+                (mimes, i) =>
+                  `slot ${i}: ${
+                    mimes.length > 1
+                      ? `one of [${mimes.join(", ")}]`
+                      : mimes[0]
+                  }`,
+              )
+              .join("; ");
+            const caps = Object.entries(p.maxBytes)
+              .map(([m, b]) => `${m}=${b}`)
+              .join(", ");
+            return `  • ${p.name} — ${slots}; maxBytes: ${caps}`;
+          })
           .join("\n")
       : "";
 
@@ -92,11 +102,13 @@ function buildCreateMediaUploadTool(
     name: "create_media_upload",
     description:
       "Issue short-lived direct-upload capabilities for every variant of one logical media asset. " +
-      "Multi-variant by default (#272): one call yields N presigned PUTs (one per declared mime). " +
-      "Optimization runs agent-side via @aotter/mantle-media-tools; the Worker only verifies " +
-      "policy. After uploading every variant, call commit_media_upload with the returned " +
-      "uploadGroupId. Only registered when the runtime has a media storage adapter bound and a " +
-      "media.purposes taxonomy declared." +
+      "Multi-variant by default (#272): one call yields N presigned PUTs (one per declared slot). " +
+      "Per-asset, the agent picks ONE mime per slot from that slot's acceptable set (#282); a " +
+      "single purpose declared with slot 0 = `image/jpg,image/png` accepts either a jpeg primary " +
+      "(photos) or a png primary (logos / transparent assets). Optimization runs agent-side via " +
+      "@aotter/mantle-media-tools; the Worker only verifies policy. After uploading every variant, " +
+      "call commit_media_upload with the returned uploadGroupId. Only registered when the runtime " +
+      "has a media storage adapter bound and a media.purposes taxonomy declared." +
       (policySummary ? `\n\n${policySummary}` : ""),
     inputSchema: {
       type: "object",

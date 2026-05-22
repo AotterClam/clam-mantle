@@ -75,14 +75,34 @@ export interface SiteMediaConfig {
 export interface MediaPurposePolicy {
   /** Lowercase-slug identifier; matches `MEDIA_PURPOSE_SLUG_PATTERN`. */
   readonly name: string;
-  /** Mime types every upload for this purpose must include in its
-   *  variants manifest. Order is semantic — the first entry is the
-   *  conventional `role: "primary"` (the format `<img>` falls back to);
-   *  subsequent entries are `role: "alternate"` candidates the
-   *  `<picture>` element prefers. Non-empty. */
+  /**
+   * Ordered list of role slots. Each entry uses the HTML
+   * `<input accept="...">` grammar:
+   *
+   *   - full mime:           `"image/jpeg"`, `"image/avif"`
+   *   - comma-list of mimes: `"image/jpg,image/png"` (either is OK)
+   *   - shorthand subtype:   `"webp"` → `"image/webp"`,
+   *                          `"jpg"` → `"image/jpeg"`
+   *
+   * Slot 0 is `role: "primary"` (the format `<img>` falls back to).
+   * Subsequent slots are `role: "alternate"` (preferred via
+   * `<picture><source>`). Per-asset, the agent picks ONE mime per
+   * slot from that slot's acceptable set — letting a single purpose
+   * accept either jpeg-primary (photos) or png-primary (logos /
+   * transparent assets) without splitting into two purposes.
+   *
+   * Parse + expand via `parseMimeAccept` / `expandPolicyRequired`.
+   * Mime sets across slots MUST NOT overlap; `maxBytes` keys MUST
+   * cover every mime that appears in any expanded slot.
+   *
+   * See aotter/mantle#282 for the editor-uploads-transparent-PNG
+   * motivating case.
+   */
   readonly required: readonly string[];
-  /** Per-mime byte cap, keyed by mime type. MUST cover every mime in
-   *  `required`; mimes outside `required` are ignored. The use case
+  /** Per-mime byte cap, keyed by FULLY-EXPANDED mime type (e.g.
+   *  `"image/jpeg"`, not the shorthand `"jpg"`). MUST cover every
+   *  mime that appears in any slot of `required` after parsing.
+   *  Mimes outside the expanded set are ignored. The use case
    *  rejects with `MEDIA_VARIANT_SIZE_EXCEEDED` when a variant's
    *  declared `byteSize` exceeds its cap. */
   readonly maxBytes: Readonly<Record<string, number>>;

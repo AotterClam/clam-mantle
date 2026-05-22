@@ -1,4 +1,8 @@
-import { DiagnosticError, type MediaPurposePolicy } from "@aotter/mantle-spec";
+import {
+  DiagnosticError,
+  expandPolicyRequired,
+  type MediaPurposePolicy,
+} from "@aotter/mantle-spec";
 import type { Clock } from "../../domain/port/Clock.js";
 import type { IdGenerator } from "../../domain/port/IdGenerator.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
@@ -138,44 +142,73 @@ export class CreateMediaUploadUseCase {
     request: CreateMediaUploadRequest,
     policy: MediaPurposePolicy,
   ): void {
+    // Expand the `<input accept>`-style grammar (#282) into per-slot
+    // acceptable mime sets. The policy validator already rejected
+    // overlapping mime sets across slots + empty slots, so variant→slot
+    // mapping here is unambiguous: each supplied mime appears in
+    // exactly one slot. Role (primary vs alternate) stays free per
+    // variant — the agent picks which mime is primary, constrained
+    // only by the exactly-one-primary rule below.
+    const slots = expandPolicyRequired(policy.required);
+    const expandedSet = new Set<string>();
+    const mimeToSlot = new Map<string, number>();
+    slots.forEach((mimes, slotIdx) => {
+      for (const m of mimes) {
+        expandedSet.add(m);
+        mimeToSlot.set(m, slotIdx);
+      }
+    });
     const supplied = request.variants.map((v) => v.mimeType);
-    const missing = policy.required.filter((m) => !supplied.includes(m));
-    if (missing.length > 0) {
-      throw new DiagnosticError(
-        mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
-      );
-    }
-    // Closed set: the policy declares which mimes belong to this
-    // purpose. Extras (e.g. an `image/png` alongside the declared
-    // avif/webp/jpeg trio) would land without a per-mime byte cap
-    // and bypass the size gate entirely. Reject any supplied mime
-    // outside `policy.required`.
-    const allowed = new Set(policy.required);
-    const extras = request.variants.filter((v) => !allowed.has(v.mimeType));
+
+    // Closed set: any supplied mime outside the expanded acceptable
+    // set has no maxBytes coverage and no slot assignment. Reject.
+    const extras = request.variants.filter((v) => !expandedSet.has(v.mimeType));
     if (extras.length > 0) {
       throw new DiagnosticError(
-        mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
+        mediaVariantsIncompleteDiagnostic(
+          opPath, policy.name, policy.required, supplied,
+        ),
       );
     }
+
+    // Exactly one variant per slot — covers "missing slot" and
+    // "two variants for the same slot" (e.g. an extra `image/jpeg`
+    // when slot 0 = `image/jpg,image/png`: both jpg and png supplied
+    // would fill slot 0 twice and leave the png slot unfilled if you
+    // count by mime-set).
+    const filledSlots = new Set<number>();
+    for (const v of request.variants) {
+      const slotIdx = mimeToSlot.get(v.mimeType)!; // safe: extras rejected above
+      if (filledSlots.has(slotIdx)) {
+        throw new DiagnosticError(
+          mediaVariantsIncompleteDiagnostic(
+            opPath, policy.name, policy.required, supplied,
+          ),
+        );
+      }
+      filledSlots.add(slotIdx);
+    }
+    if (filledSlots.size !== slots.length) {
+      throw new DiagnosticError(
+        mediaVariantsIncompleteDiagnostic(
+          opPath, policy.name, policy.required, supplied,
+        ),
+      );
+    }
+
     // Exactly one primary. Storage key layout is `<group>/<role>.<ext>`,
     // so two primaries collide on the same R2 key + ambiguate which
-    // variant `<img>` falls back to. Same for any duplicated (mime, role)
-    // pair — two `image/jpeg` alternates would also collide on key.
+    // variant `<img>` falls back to. Two alternates with different
+    // mimes don't collide (different ext); two alternates with the
+    // same mime are impossible here because the mime-to-slot mapping
+    // would have caught the duplicate above.
     const primaries = request.variants.filter((v) => v.role === "primary");
     if (primaries.length !== 1) {
       throw new DiagnosticError(
-        mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
+        mediaVariantsIncompleteDiagnostic(
+          opPath, policy.name, policy.required, supplied,
+        ),
       );
-    }
-    const seen = new Set<string>();
-    for (const v of request.variants) {
-      const key = `${v.mimeType}/${v.role}`;
-      if (seen.has(key)) {
-        throw new DiagnosticError(
-          mediaVariantsIncompleteDiagnostic(opPath, policy.name, policy.required, supplied),
-        );
-      }
-      seen.add(key);
     }
   }
 
