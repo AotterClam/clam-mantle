@@ -35,4 +35,4 @@ Refs #
 - [ ] Base branch is `develop`.
 - [ ] Labels match `docs/labels.md`.
 - [ ] ADR / grammar / security gates are called out when relevant.
-- [ ] User-facing docs or changelog entries are updated when relevant.
+- [ ] User-facing docs are updated when relevant. (CHANGELOG entries are written at release time by the release author — see `CONTRIBUTING.md` § Changelog.)

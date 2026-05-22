@@ -4,6 +4,8 @@ All notable changes to AotterMantle are documented here.
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning once public v0.1.0 tags begin. Pre-v0.1.0 alpha releases may still change public APIs.
 
+<!-- No [Unreleased] section. Entries are written at release time per CONTRIBUTING.md § Changelog and docs/release-process.md § Normal release playbook step 2. -->
+
 ## [0.0.11-alpha.14] - 2026-05-20
 
 ### Breaking
@@ -270,7 +272,6 @@ First beta on the road to v0.1.0. Channel moves from `alpha` to `beta` — packa
 
 - Alpha rebuild packages and starters for the v0.1.0 development line.
 
-[Unreleased]: https://github.com/aotter/mantle/compare/v0.0.8-alpha...HEAD
 [0.0.8-alpha]: https://github.com/aotter/mantle/compare/v0.0.7-alpha...v0.0.8-alpha
 [0.0.7-alpha]: https://github.com/aotter/mantle/compare/v0.0.6-alpha...v0.0.7-alpha
 [0.0.6-alpha]: https://github.com/aotter/mantle/releases/tag/v0.0.6-alpha
