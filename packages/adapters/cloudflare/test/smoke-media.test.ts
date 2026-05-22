@@ -79,6 +79,12 @@ class FakeMediaStorage implements MediaStorage {
   async deleteObject() {
     /* noop */
   }
+
+  async putVariantBytes(args: Parameters<MediaStorage["putVariantBytes"]>[0]) {
+    return {
+      storageKey: `${args.purpose}/${args.uploadGroupId}/${args.role}`,
+    };
+  }
 }
 
 function manifests(): Manifest[] {

@@ -58,6 +58,7 @@ import {
 import {
   CommitMediaUploadUseCase,
   CreateMediaUploadUseCase,
+  UploadMediaVariantUseCase,
 } from "./usecase/media/index.js";
 import type { PublicPathResolver } from "./domain/service/PublicPathResolver.js";
 
@@ -165,6 +166,7 @@ export interface CmsRuntime {
   readonly media: {
     readonly storage: MediaStorage;
     readonly createUpload: CreateMediaUploadUseCase;
+    readonly uploadVariant: UploadMediaVariantUseCase;
     readonly commitUpload: CommitMediaUploadUseCase;
     resolve(id: string): Promise<MediaAsset | null>;
     resolveMany(ids: readonly string[]): Promise<ReadonlyMap<string, MediaAsset>>;
@@ -312,6 +314,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
           siteConfig,
           { allowSvg: args.mediaAllowSvg ?? false },
         ),
+        uploadVariant: new UploadMediaVariantUseCase(args.mediaStorage, args.kv, clock),
         commitUpload: new CommitMediaUploadUseCase(
           args.mediaStorage,
           args.kv,

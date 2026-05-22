@@ -94,6 +94,7 @@ export function createMcpApiHandler(
             media: mediaEnabled && runtime.media
               ? {
                   createUpload: runtime.media.createUpload,
+                  uploadVariant: runtime.media.uploadVariant,
                   commitUpload: runtime.media.commitUpload,
                   purposes: mediaPurposes,
                 }
