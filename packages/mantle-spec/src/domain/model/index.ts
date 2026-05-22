@@ -7,4 +7,5 @@ export * from "./ManifestGrammar.js";
 export * from "./Entry.js";
 export * from "./ContentState.js";
 export * from "./SiteConfig.js";
+export * from "./MediaMimeAccept.js";
 export * from "./Locale.js";

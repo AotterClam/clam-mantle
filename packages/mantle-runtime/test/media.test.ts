@@ -218,6 +218,144 @@ describe("CreateMediaUploadUseCase (#272 multi-variant)", () => {
     expect(storage.createCalls).toHaveLength(0);
   });
 
+  // #282 grammar: a single purpose can declare slot 0 as a comma-list
+  // of acceptable mimes (jpg OR png) so per-asset the agent ships
+  // whichever the source warrants. This is the load-bearing case for
+  // the "PNG-primary for transparent assets, JPEG-primary for photos
+  // under one purpose" motivation; SiteDefaultsValidator covers the
+  // policy parsing in mantle-spec's media-mime-accept.test.ts, this
+  // covers the use-case-level upload validation.
+  it("accepts png-primary for a slot declared as 'image/jpg,image/png'", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "product-cover",
+        required: ["image/jpg,image/png", "webp", "avif"],
+        maxBytes: {
+          "image/jpeg": 500_000,
+          "image/png": 600_000,
+          "image/webp": 400_000,
+          "image/avif": 300_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    const result = await useCase.execute({
+      filename: "logo.png",
+      purpose: "product-cover",
+      variants: [
+        { mimeType: "image/png", byteSize: 90_000, role: "primary" },
+        { mimeType: "image/webp", byteSize: 70_000, role: "alternate" },
+        { mimeType: "image/avif", byteSize: 50_000, role: "alternate" },
+      ],
+    });
+    expect(result.uploadGroupId).toBeDefined();
+    expect(result.capabilities).toHaveLength(3);
+  });
+
+  it("accepts jpeg-primary for the same slot 0 = 'image/jpg,image/png' policy", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "product-cover",
+        required: ["image/jpg,image/png", "webp", "avif"],
+        maxBytes: {
+          "image/jpeg": 500_000,
+          "image/png": 600_000,
+          "image/webp": 400_000,
+          "image/avif": 300_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    const result = await useCase.execute({
+      filename: "photo.jpg",
+      purpose: "product-cover",
+      variants: [
+        { mimeType: "image/jpeg", byteSize: 200_000, role: "primary" },
+        { mimeType: "image/webp", byteSize: 150_000, role: "alternate" },
+        { mimeType: "image/avif", byteSize: 100_000, role: "alternate" },
+      ],
+    });
+    expect(result.uploadGroupId).toBeDefined();
+  });
+
+  // Variant role is independently declared by the agent (see
+  // MediaMimeAccept.ts file header + SiteConfig.ts MediaPurposePolicy
+  // docstring). The use case enforces exactly one primary but does
+  // NOT bind primary to slot 0 — this is required for back-compat
+  // with alpha.14 fixtures like ["image/avif", "image/webp",
+  // "image/jpeg"] that ship jpeg as primary despite avif filling
+  // slot 0. Test guards against a future refactor silently tightening
+  // primary→slot-0.
+  it("accepts a primary variant whose mime is not in slot 0 (role independent of slot position)", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "product-cover",
+        // slot 0 = avif, slot 1 = webp, slot 2 = jpeg
+        required: ["image/avif", "image/webp", "image/jpeg"],
+        maxBytes: {
+          "image/avif": 300_000,
+          "image/webp": 400_000,
+          "image/jpeg": 500_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    const result = await useCase.execute({
+      filename: "photo.jpg",
+      purpose: "product-cover",
+      variants: [
+        // jpeg (slot 2) carries role: "primary" — slot 0 is avif but
+        // the primary role lives in slot 2. Use case must accept this.
+        { mimeType: "image/avif", byteSize: 50_000, role: "alternate" },
+        { mimeType: "image/webp", byteSize: 80_000, role: "alternate" },
+        { mimeType: "image/jpeg", byteSize: 200_000, role: "primary" },
+      ],
+    });
+    expect(result.uploadGroupId).toBeDefined();
+    expect(result.capabilities).toHaveLength(3);
+    const primaries = result.capabilities.filter((c) => c.role === "primary");
+    expect(primaries).toHaveLength(1);
+    expect(primaries[0]!.mimeType).toBe("image/jpeg");
+  });
+
+  it("rejects a third option that isn't in slot 0's accepted set", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository([
+      {
+        name: "product-cover",
+        required: ["image/jpg,image/png", "webp", "avif"],
+        maxBytes: {
+          "image/jpeg": 500_000,
+          "image/png": 600_000,
+          "image/webp": 400_000,
+          "image/avif": 300_000,
+        },
+      },
+    ]);
+    const useCase = makeCreateUseCase({ storage, kv, site });
+    await expect(
+      useCase.execute({
+        filename: "x.gif",
+        purpose: "product-cover",
+        variants: [
+          // gif isn't in slot 0's {jpeg, png} set, and isn't in any
+          // other slot either — extras get rejected.
+          { mimeType: "image/gif", byteSize: 90_000, role: "primary" },
+          { mimeType: "image/webp", byteSize: 70_000, role: "alternate" },
+          { mimeType: "image/avif", byteSize: 50_000, role: "alternate" },
+        ],
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_VARIANTS_INCOMPLETE" } });
+    expect(storage.createCalls).toHaveLength(0);
+  });
+
   it("rejects extra mime types outside the purpose's required set", async () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();

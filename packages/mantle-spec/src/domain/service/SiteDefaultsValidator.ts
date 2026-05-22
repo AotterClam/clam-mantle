@@ -3,6 +3,10 @@ import {
   type MediaPurposePolicy,
   type SiteDefaults,
 } from "../model/SiteConfig.js";
+import {
+  expandPolicyRequired,
+  parseMimeAccept,
+} from "../model/MediaMimeAccept.js";
 import { canonicalizeLocaleList } from "./LocaleCanonicalizer.js";
 
 /**
@@ -40,6 +44,8 @@ export interface MediaPurposeIssue {
   readonly reason:
     | "invalid-slug"
     | "empty-required"
+    | "empty-required-slot"
+    | "overlapping-slot-mimes"
     | "maxBytes-missing-mime"
     | "maxBytes-non-positive";
   readonly detail?: string;
@@ -56,7 +62,11 @@ export class InvalidMediaPurposesError extends Error {
               case "invalid-slug":
                 return `${tag} fails slug pattern ${MEDIA_PURPOSE_SLUG_PATTERN.source}`;
               case "empty-required":
-                return `${tag} declares no required mimes (need at least one)`;
+                return `${tag} declares no required slots (need at least one)`;
+              case "empty-required-slot":
+                return `${tag} has a required slot that parses to zero mimes: ${i.detail}`;
+              case "overlapping-slot-mimes":
+                return `${tag} has slots with overlapping mime sets (variant→slot mapping is ambiguous): ${i.detail}`;
               case "maxBytes-missing-mime":
                 return `${tag} maxBytes is missing entries: ${i.detail}`;
               case "maxBytes-non-positive":
@@ -102,7 +112,53 @@ function collectMediaPurposeIssues(
       out.push({ name: p.name, reason: "empty-required" });
       continue;
     }
-    const missing = p.required.filter((mime) => !(mime in p.maxBytes));
+    // Parse every slot under the `<input accept>` grammar (see
+    // MediaMimeAccept). Each slot must yield ≥1 mime; otherwise
+    // the agent has no acceptable mime to ship for that slot.
+    const slots = expandPolicyRequired(p.required);
+    const emptySlots = slots
+      .map((mimes, i) => ({ mimes, raw: p.required[i] }))
+      .filter((s) => s.mimes.length === 0);
+    if (emptySlots.length > 0) {
+      out.push({
+        name: p.name,
+        reason: "empty-required-slot",
+        detail: emptySlots.map((s) => `'${s.raw}'`).join(", "),
+      });
+      continue;
+    }
+    // Variant → slot mapping is by mime: each supplied mime must
+    // appear in exactly one slot, so the mime alone determines which
+    // slot a variant fills. (Variant role — primary / alternate — is
+    // declared independently by the agent and is NOT bound to slot
+    // position; see MediaMimeAccept.ts file header.) Overlapping mime
+    // sets break the by-mime mapping — reject at policy time rather
+    // than fail per-upload.
+    const seen = new Map<string, number>();
+    const overlaps: string[] = [];
+    slots.forEach((mimes, slotIdx) => {
+      for (const mime of mimes) {
+        if (seen.has(mime)) {
+          overlaps.push(
+            `'${mime}' in slots [${seen.get(mime)}, ${slotIdx}]`,
+          );
+        } else {
+          seen.set(mime, slotIdx);
+        }
+      }
+    });
+    if (overlaps.length > 0) {
+      out.push({
+        name: p.name,
+        reason: "overlapping-slot-mimes",
+        detail: overlaps.join(", "),
+      });
+      continue;
+    }
+    // maxBytes must cover every mime that COULD be shipped — the
+    // expanded set, not the literal `required[i]` strings.
+    const expandedMimes = Array.from(seen.keys());
+    const missing = expandedMimes.filter((mime) => !(mime in p.maxBytes));
     if (missing.length > 0) {
       out.push({
         name: p.name,
@@ -111,7 +167,7 @@ function collectMediaPurposeIssues(
       });
       continue;
     }
-    const nonPositive = p.required.filter(
+    const nonPositive = expandedMimes.filter(
       (mime) => !(typeof p.maxBytes[mime] === "number" && p.maxBytes[mime]! > 0),
     );
     if (nonPositive.length > 0) {
@@ -124,3 +180,8 @@ function collectMediaPurposeIssues(
   }
   return out;
 }
+
+// Re-export the accept-grammar parser at the validator level so
+// runtime consumers (CreateMediaUploadUseCase, MCP tool catalog)
+// can pull both validator + parser from one barrel.
+export { parseMimeAccept };
