@@ -74,8 +74,11 @@ export interface MediaStorage {
    *  so `commitUpload`'s HEAD-verify still resolves the right object
    *  regardless of which path the bytes arrived on.
    *
-   *  Adapters without a privileged write path MAY throw; the use
-   *  case surfaces the failure as a `MEDIA_NOT_CONFIGURED` diagnostic. */
+   *  Every adapter MUST implement this method (the interface is
+   *  required-shaped, not optional). Adapters without a privileged
+   *  write path implement it as a thrower — typically raising
+   *  `DiagnosticError(MEDIA_NOT_CONFIGURED)` so the use case surfaces
+   *  the failure with the expected diagnostic shape. */
   putVariantBytes(args: PutVariantBytesArgs): Promise<PutVariantBytesResult>;
 }
 

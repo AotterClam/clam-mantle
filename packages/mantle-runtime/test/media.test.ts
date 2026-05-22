@@ -655,7 +655,7 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
   it("returns MEDIA_UPLOAD_EXPIRED when the pending KV record is missing", async () => {
     const storage = new FakeMediaStorage();
     const kv = new InMemoryKv();
-    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const useCase = new UploadMediaVariantUseCase(storage, kv, fakeClock);
     await expect(
       useCase.execute({
         uploadGroupId: "never-created",
@@ -673,7 +673,7 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
     const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
     const uploadGroupId = await seedPendingUpload({ storage, kv, site });
 
-    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const useCase = new UploadMediaVariantUseCase(storage, kv, fakeClock);
     const bytes = new Uint8Array(50_000);
     const result = await useCase.execute({
       uploadGroupId,
@@ -697,7 +697,7 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
     const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
     const uploadGroupId = await seedPendingUpload({ storage, kv, site });
 
-    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const useCase = new UploadMediaVariantUseCase(storage, kv, fakeClock);
     await expect(
       useCase.execute({
         uploadGroupId,
@@ -717,7 +717,7 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
     const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
     const uploadGroupId = await seedPendingUpload({ storage, kv, site });
 
-    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const useCase = new UploadMediaVariantUseCase(storage, kv, fakeClock);
     await expect(
       useCase.execute({
         uploadGroupId,
@@ -726,6 +726,30 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
         bytes: new Uint8Array(50_000),
       }),
     ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_MIME_REJECTED" } });
+    expect(storage.putVariantCalls).toHaveLength(0);
+  });
+
+  it("returns MEDIA_UPLOAD_EXPIRED when the pending record's expiresAt is in the past", async () => {
+    const storage = new FakeMediaStorage();
+    const kv = new InMemoryKv();
+    const site = new InMemorySiteConfigRepository(DEFAULT_PURPOSES);
+    const uploadGroupId = await seedPendingUpload({ storage, kv, site });
+
+    // Advance the clock past the pending record's expiresAt. The
+    // record was minted at FROZEN_NOW + UPLOAD_URL_TTL_SECONDS * 1000;
+    // jump well past that boundary so the wall-clock check fires
+    // even though the KV record is still readable in this in-memory
+    // fake (which doesn't honor TTL).
+    const advancedClock = { now: () => FROZEN_NOW + 60 * 60 * 1000 };
+    const useCase = new UploadMediaVariantUseCase(storage, kv, advancedClock);
+    await expect(
+      useCase.execute({
+        uploadGroupId,
+        role: "primary",
+        mimeType: "image/jpeg",
+        bytes: new Uint8Array(100),
+      }),
+    ).rejects.toMatchObject({ diagnostic: { code: "MEDIA_UPLOAD_EXPIRED" } });
     expect(storage.putVariantCalls).toHaveLength(0);
   });
 
@@ -752,7 +776,7 @@ describe("UploadMediaVariantUseCase (#283 sandboxed-agent path)", () => {
       ],
     });
 
-    const useCase = new UploadMediaVariantUseCase(storage, kv);
+    const useCase = new UploadMediaVariantUseCase(storage, kv, fakeClock);
     await expect(
       useCase.execute({
         uploadGroupId,

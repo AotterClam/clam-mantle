@@ -1,4 +1,5 @@
 import { DiagnosticError } from "@aotter/mantle-spec";
+import type { Clock } from "../../domain/port/Clock.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
 import type {
   MediaStorage,
@@ -40,6 +41,7 @@ export class UploadMediaVariantUseCase {
   constructor(
     private readonly storage: MediaStorage,
     private readonly kv: KvCache,
+    private readonly clock: Clock,
   ) {}
 
   async execute(
@@ -55,6 +57,16 @@ export class UploadMediaVariantUseCase {
       );
     }
     const record = JSON.parse(raw) as PendingUploadRecord;
+
+    // Wall-clock expiry check. KV TTL covers the eventual-deletion
+    // case, but during the window between `expiresAt` and the TTL
+    // firing the record is still readable — reject explicitly so the
+    // agent can't ship variant bytes against a stale capability.
+    if (this.clock.now() >= record.expiresAt) {
+      throw new DiagnosticError(
+        mediaUploadExpiredDiagnostic(opPath, request.uploadGroupId),
+      );
+    }
 
     // Find the matching declared variant. The pending record's
     // variants[] is the source of truth for "what role + mime are

@@ -314,7 +314,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
           siteConfig,
           { allowSvg: args.mediaAllowSvg ?? false },
         ),
-        uploadVariant: new UploadMediaVariantUseCase(args.mediaStorage, args.kv),
+        uploadVariant: new UploadMediaVariantUseCase(args.mediaStorage, args.kv, clock),
         commitUpload: new CommitMediaUploadUseCase(
           args.mediaStorage,
           args.kv,
