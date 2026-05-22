@@ -128,9 +128,21 @@ export function mountPublicRoutes(
   // Literal root paths register BEFORE any param-catch-all routes —
   // Hono's trie matches `/llms.txt` against `/:locale` with
   // `:locale = "llms.txt"` if the literal route registers later.
-  app.get("/llms.txt", async () => {
+  //
+  // Live-fallback on KV miss: a first-visit AI agent (or a freshly-
+  // deployed worker that hasn't published anything yet) gets a
+  // composed body inline; the cache write rides ctx.waitUntil so the
+  // response stays fast and subsequent requests hit the warm KV.
+  app.get("/llms.txt", async (c) => {
     const runtime = await ref.get();
-    return readKvText(runtime.kv, llmsTxtKey(""), TEXT_PUBLIC);
+    const site = await runtime.siteConfig.load();
+    return readKvWithLiveFallback(
+      runtime.kv,
+      llmsTxtKey(""),
+      TEXT_PUBLIC,
+      () => composeRootLlmsTxt(runtime, site),
+      safeExecutionCtx(c),
+    );
   });
 
   app.get("/sitemap.xml", async (c) => {
@@ -170,7 +182,13 @@ export function mountPublicRoutes(
     const site = await runtime.siteConfig.load();
     const locale = canonicalLocaleParam(c.req.param("locale"), site);
     if (locale === null) return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
-    return readKvText(runtime.kv, llmsTxtKey(locale), TEXT_PUBLIC);
+    return readKvWithLiveFallback(
+      runtime.kv,
+      llmsTxtKey(locale),
+      TEXT_PUBLIC,
+      () => runtime.composeLlmsTxt.execute({ site, locale }),
+      safeExecutionCtx(c),
+    );
   });
 
   for (const route of options.collectionRoutes) {
@@ -338,6 +356,86 @@ async function readKvText(
     return new Response("not found", { status: 404, headers: TEXT_PUBLIC });
   }
   return new Response(body, { status: 200, headers });
+}
+
+/** Hono throws on `c.executionCtx` access when there is no
+ *  ExecutionContext (test harnesses, in-process `app.request`).
+ *  Wrap the read so callers can opt out of background write-back
+ *  silently — the read-through helper falls back to an inline `await`. */
+function safeExecutionCtx(c: Context): ExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * KV-cached read with a live-compose fallback. KV hit → return cached.
+ * KV miss → call `compose()` and return the body inline; the cache
+ * write rides `ctx.waitUntil` so the response stays fast and warms
+ * KV for subsequent requests. Used for `/llms.txt` + `/:locale/llms.txt`
+ * so a freshly-deployed worker (or one whose KV has been wiped) doesn't
+ * 404 at agents that visit before any entry has been published.
+ *
+ * `compose` is expected to never throw and never return empty — the
+ * SDK's `ComposeLlmsTxtUseCase` always returns at least a title +
+ * description header even when no entries are published. If callers
+ * pass a composer that can return empty / null, the empty string is
+ * still cached + returned; the route never 404s post-fallback.
+ *
+ * Without an `executionCtx` (tests, SSR fixtures), the write happens
+ * inline. Workers requests always carry one via Hono's `c.executionCtx`.
+ */
+async function readKvWithLiveFallback(
+  kv: KvCache,
+  key: string,
+  headers: Record<string, string>,
+  compose: () => Promise<string>,
+  executionCtx?: ExecutionContext,
+): Promise<Response> {
+  const cached = await kv.get(key);
+  if (cached !== null) {
+    return new Response(cached, { status: 200, headers });
+  }
+  const rendered = await compose();
+  const writeBack = kv.put(key, rendered);
+  if (executionCtx) {
+    executionCtx.waitUntil(writeBack);
+  } else {
+    await writeBack;
+  }
+  return new Response(rendered, { status: 200, headers });
+}
+
+/**
+ * Cross-locale aggregate body for `/llms.txt` (no `:locale` segment).
+ *
+ * `ComposeLlmsTxtUseCase.execute({ locale: null })` returns
+ * non-localized entries only — fine for sites with no `locales`
+ * declared, but emits an effectively empty document for sites whose
+ * content lives entirely in localized child schemas (the typical
+ * publication / intake / landing shape).
+ *
+ * For those sites, concatenate the per-locale composer outputs so an
+ * AI agent landing at the bare `/llms.txt` sees every published
+ * locale's URL table. The composer always emits a `Locale: <tag>`
+ * header in localized mode, so the sections self-separate without a
+ * custom delimiter.
+ */
+async function composeRootLlmsTxt(
+  runtime: CmsRuntime,
+  site: SiteConfig,
+): Promise<string> {
+  if (site.locales.length === 0) {
+    return runtime.composeLlmsTxt.execute({ site, locale: null });
+  }
+  const parts: string[] = [];
+  for (const locale of site.locales) {
+    const body = await runtime.composeLlmsTxt.execute({ site, locale });
+    if (body.trim()) parts.push(body);
+  }
+  return parts.length > 0 ? parts.join("\n---\n\n") : "";
 }
 
 async function readThroughCache(
