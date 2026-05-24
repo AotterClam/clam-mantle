@@ -1,5 +1,6 @@
 import type { ContentState, Entry, SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import type { MediaAssetRepository } from "../../domain/port/MediaAssetRepository.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import { readEntryBySlug } from "../../domain/service/io/PublishedEntries.js";
@@ -14,6 +15,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
 
 /** Default fallback: prefer drafts, fall back to published, then
  *  archived. Authors typically open `?preview=1` to see WIP. */
@@ -40,6 +42,7 @@ export class PreviewEntryUseCase {
     private readonly paths: PublicPathResolver | null,
     private readonly composeSeo: SeoComposer,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
+    private readonly mediaAssets: MediaAssetRepository | null = null,
   ) {}
 
   async execute(request: PreviewEntryRequest): Promise<string | null> {
@@ -61,10 +64,12 @@ export class PreviewEntryUseCase {
     // published-parent invariant at publish time.
     const entry = await joinParentIfTranslation(this.db, this.schemas, raw);
     const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, request.site);
+    const mediaAssets = await resolveMediaAssetsForEntries(this.mediaAssets, [entry]);
     const html = renderEntryHtml({
       entry,
       site: request.site,
       templates: this.templates,
+      mediaAssets,
       seo,
     });
     if (html === null) return null;

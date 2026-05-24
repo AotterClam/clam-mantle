@@ -1,10 +1,12 @@
 import type { SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import type { MediaAssetRepository } from "../../domain/port/MediaAssetRepository.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import { readPublishedEntries } from "../../domain/service/io/PublishedEntries.js";
 import { joinParentForList } from "../../domain/service/io/JoinedEntryReader.js";
 import { renderListHtml } from "../../domain/service/HtmlRenderer.js";
 import type { RenderListLiveRequest } from "../dto/render/RenderListLiveRequest.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
 
 /**
  * Render a collection's list page from current DB state. Sibling to
@@ -22,6 +24,7 @@ export class RenderListLiveUseCase {
     private readonly db: DatabaseDriver,
     private readonly templates: TemplateRegistry,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
+    private readonly mediaAssets: MediaAssetRepository | null = null,
   ) {}
 
   async execute(request: RenderListLiveRequest): Promise<string | null> {
@@ -32,12 +35,14 @@ export class RenderListLiveUseCase {
     const entries = await joinParentForList(this.db, this.schemas, raw, {
       parentStatus: "published",
     });
+    const mediaAssets = await resolveMediaAssetsForEntries(this.mediaAssets, entries);
     return renderListHtml({
       collection: request.collection,
       locale: request.locale,
       entries,
       site: request.site,
       templates: this.templates,
+      mediaAssets,
     });
   }
 }

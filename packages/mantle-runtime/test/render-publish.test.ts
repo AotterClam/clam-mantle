@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { HtmlPublishOrchestrator } from "../src/infrastructure/render/HtmlPublishOrchestrator.js";
 import { ComposeEntrySeoMetaUseCase } from "../src/usecase/render/ComposeEntrySeoMetaUseCase.js";
 import { ComposeLlmsTxtUseCase } from "../src/usecase/render/ComposeLlmsTxtUseCase.js";
+import { RenderEntryLiveUseCase } from "../src/usecase/render/RenderEntryLiveUseCase.js";
 import {
   entryHtmlKey,
   entryMarkdownKey,
@@ -9,6 +10,8 @@ import {
   llmsTxtKey,
 } from "../src/domain/service/PublishKeys.js";
 import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
+import type { MediaAssetRepository } from "../src/domain/port/MediaAssetRepository.js";
+import type { MediaAsset } from "../src/domain/port/MediaStorage.js";
 import { InMemoryDatabase } from "./fakes/database.js";
 import { InMemoryKv } from "./fakes/kv.js";
 import type { SiteConfig } from "@aotter/mantle-spec";
@@ -39,6 +42,41 @@ function seedEntry(
 }
 
 describe("HtmlPublishOrchestrator", () => {
+  it("threads resolved media assets into live entry templates", async () => {
+    const db = new InMemoryDatabase();
+    seedEntry(db, {
+      id: "p1",
+      data: { title: "Hi", slug: "hi", locale: "en", coverAssetId: "cover" },
+    });
+    const templates = new TemplateRegistry();
+    let renderedAssets: ReadonlyMap<string, MediaAsset> | undefined;
+    templates.registerEntryTemplate("posts", (ctx) => {
+      renderedAssets = ctx.mediaAssets;
+      return `<h1>${ctx.mediaAssets?.get("cover")?.id ?? "missing"}</h1>`;
+    });
+    const repo = new MemoryMediaAssets([asset("cover")]);
+
+    const usecase = new RenderEntryLiveUseCase(
+      db,
+      templates,
+      null,
+      { execute: async () => ({ title: "", description: "" }) },
+      new Map(),
+      repo,
+    );
+
+    const html = await usecase.execute({
+      collection: "posts",
+      slug: "hi",
+      locale: "en",
+      site,
+    });
+
+    expect(html).toContain("<h1>cover</h1>");
+    expect(renderedAssets?.get("cover")?.id).toBe("cover");
+    expect(repo.lookups).toEqual([["cover"]]);
+  });
+
   it("writes entry HTML, .md, list HTML, and llms.txt to KV", async () => {
     const db = new InMemoryDatabase();
     const kv = new InMemoryKv();
@@ -110,3 +148,49 @@ describe("HtmlPublishOrchestrator", () => {
     expect(snap.get(llmsTxtKey(""))).not.toContain("Hi");
   });
 });
+
+function asset(id: string): MediaAsset {
+  return {
+    id,
+    purpose: "post.cover",
+    variants: [
+      {
+        role: "primary",
+        mimeType: "image/jpeg",
+        objectKey: `${id}.jpg`,
+        publicUrl: `https://example.com/${id}.jpg`,
+        byteSize: 1,
+        width: 1200,
+        height: 800,
+      },
+    ],
+    createdAt: 1,
+  };
+}
+
+class MemoryMediaAssets implements MediaAssetRepository {
+  readonly lookups: string[][] = [];
+  private readonly assets: ReadonlyMap<string, MediaAsset>;
+
+  constructor(assets: readonly MediaAsset[] = []) {
+    this.assets = new Map(assets.map((item) => [item.id, item]));
+  }
+
+  async findById(id: string): Promise<MediaAsset | null> {
+    return this.assets.get(id) ?? null;
+  }
+
+  async findManyByIds(ids: readonly string[]): Promise<ReadonlyMap<string, MediaAsset>> {
+    this.lookups.push([...ids]);
+    const out = new Map<string, MediaAsset>();
+    for (const id of ids) {
+      const found = this.assets.get(id);
+      if (found) out.set(id, found);
+    }
+    return out;
+  }
+
+  async save(): Promise<void> {}
+
+  async delete(): Promise<void> {}
+}
