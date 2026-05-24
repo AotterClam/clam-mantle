@@ -6,6 +6,45 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 <!-- No [Unreleased] section. Entries are written at release time per CONTRIBUTING.md § Changelog and docs/release-process.md § Normal release playbook step 2. -->
 
+## [0.0.11-alpha.15] - 2026-05-24
+
+### Added
+
+- **`@aotter/mantle-runtime`**: render contexts now receive a resolved
+  `mediaAssets?: ReadonlyMap<string, MediaAsset>` for entry, list,
+  live, preview, and publish paths. The resolver scans entry data for
+  `*AssetId`, nested `assetId`, and `*AssetIds` references, batches
+  them through `MediaAssetRepository.findManyByIds`, and threads the
+  result into consumer templates so starters can emit `<picture>`
+  without manually calling `runtime.media.resolveMany`.
+- **`@aotter/mantle-runtime`**: MCP media upload flow now includes
+  `upload_media_variant`, covering sandboxed-agent uploads where the
+  agent requests the upload group first and then PUTs variant bytes
+  through the runtime-managed path.
+- **`@aotter/mantle-runtime`**: `/llms.txt` and `/:locale/llms.txt`
+  have a live-compose fallback, closing the cold-start gap before the
+  first publish writes derived cache entries.
+
+### Changed
+
+- **`@aotter/mantle-spec`**: `MediaPurposePolicy.required` accepts an
+  `<input accept>`-style grammar, including shorthand image subtypes
+  and comma-separated alternatives per required slot. Variant role
+  remains independent of slot order.
+- **repo**: shared third-party dependency versions now live in the
+  pnpm catalog so workspace package manifests do not drift.
+- **repo metadata**: package homepages now point at
+  `https://mantle.tools/`.
+
+### Fixed
+
+- **release**: `release.yml` now authenticates npmjs explicitly before
+  publishing, skips already-published npmjs/GitHub Packages artifacts
+  on rerun, mirrors GitHub Packages before dispatching starters, and
+  treats an existing GitHub release as an idempotent success. This
+  reduces partial-release recovery work after transient registry or
+  Actions failures.
+
 ## [0.0.11-alpha.14] - 2026-05-20
 
 ### Breaking
