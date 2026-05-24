@@ -1,6 +1,6 @@
 import type { Entry } from "@aotter/mantle-spec";
-import type { MediaAssetRepository } from "../port/MediaAssetRepository.js";
-import type { MediaAsset } from "../port/MediaStorage.js";
+import type { MediaAssetRepository } from "../../port/MediaAssetRepository.js";
+import type { MediaAsset } from "../../port/MediaStorage.js";
 
 /**
  * Extract media asset references from entry data by convention.

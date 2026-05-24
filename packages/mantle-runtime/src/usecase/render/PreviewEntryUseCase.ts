@@ -15,7 +15,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
-import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/io/MediaAssetReferences.js";
 
 /** Default fallback: prefer drafts, fall back to published, then
  *  archived. Authors typically open `?preview=1` to see WIP. */

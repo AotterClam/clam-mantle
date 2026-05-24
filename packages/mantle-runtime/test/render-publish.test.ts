@@ -152,16 +152,13 @@ describe("HtmlPublishOrchestrator", () => {
 function asset(id: string): MediaAsset {
   return {
     id,
-    purpose: "post.cover",
     variants: [
       {
         role: "primary",
         mimeType: "image/jpeg",
-        objectKey: `${id}.jpg`,
+        storageKey: `${id}.jpg`,
         publicUrl: `https://example.com/${id}.jpg`,
         byteSize: 1,
-        width: 1200,
-        height: 800,
       },
     ],
     createdAt: 1,

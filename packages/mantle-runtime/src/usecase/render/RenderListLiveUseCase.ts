@@ -6,7 +6,7 @@ import { readPublishedEntries } from "../../domain/service/io/PublishedEntries.j
 import { joinParentForList } from "../../domain/service/io/JoinedEntryReader.js";
 import { renderListHtml } from "../../domain/service/HtmlRenderer.js";
 import type { RenderListLiveRequest } from "../dto/render/RenderListLiveRequest.js";
-import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/io/MediaAssetReferences.js";
 
 /**
  * Render a collection's list page from current DB state. Sibling to
