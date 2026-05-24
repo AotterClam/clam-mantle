@@ -285,8 +285,24 @@ export function buildSocialProviders(
   // signature, so we build through a plain map and cast once at the
   // return. The runtime shape matches Better Auth's expectations.
   const out: Record<string, Record<string, unknown>> = {};
+  // Duplicate-provider guard: catch the case where two `social`
+  // methods declare the same `provider` id. Better Auth would
+  // silently keep the latter (Record overwrite); for SDK adopters —
+  // and especially for the upcoming feature-overlay path where a
+  // feature can contribute auth methods into the same starter's
+  // `methods[]` array — that silent overwrite is a footgun. Throw at
+  // construction with a clear message so the conflict surfaces
+  // before the first sign-in.
+  const seenProviders = new Set<SocialProviderId>();
   for (const method of methods) {
     if (method.kind !== "social") continue;
+    if (seenProviders.has(method.provider)) {
+      throw new Error(
+        `createAuth: duplicate social provider '${method.provider}' registered. ` +
+          `Each provider must appear at most once in methods[]; remove the redundant entry or pick a different provider.`,
+      );
+    }
+    seenProviders.add(method.provider);
     if (method.extras) {
       for (const key of Object.keys(method.extras)) {
         if (SOCIAL_EXTRAS_RESERVED_KEYS.has(key)) {

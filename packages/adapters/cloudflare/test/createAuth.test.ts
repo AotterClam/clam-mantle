@@ -329,6 +329,29 @@ describe("buildSocialProviders", () => {
     );
     expect(Object.keys(out)).toHaveLength(0);
   });
+
+  it("throws when the same social provider is registered twice", () => {
+    // Without the guard, Better Auth would silently keep the second
+    // entry (Record assignment overwrites). With overlay-driven
+    // feature contributions joining a starter's `methods[]` array, a
+    // duplicate is easy to introduce and very hard to debug from a
+    // failing sign-in alone.
+    expect(() =>
+      buildSocialProviders([
+        { kind: "social", provider: "github", clientId: "a", clientSecret: "a" },
+        { kind: "social", provider: "github", clientId: "b", clientSecret: "b" },
+      ]),
+    ).toThrow(/duplicate social provider.*github/i);
+  });
+
+  it("throws for duplicate non-github providers too", () => {
+    expect(() =>
+      buildSocialProviders([
+        { kind: "social", provider: "google", clientId: "a", clientSecret: "a" },
+        { kind: "social", provider: "google", clientId: "b", clientSecret: "b" },
+      ]),
+    ).toThrow(/duplicate social provider.*google/i);
+  });
 });
 
 describe("createAuth — boot invariants", () => {
