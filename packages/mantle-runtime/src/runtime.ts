@@ -257,6 +257,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
   const publicPathResolver = args.publicPathResolver ?? null;
   const composeEntrySeoMeta = new ComposeEntrySeoMetaUseCase(args.db);
   const composeLlmsTxt = new ComposeLlmsTxtUseCase(args.db);
+  const mediaAssets = new DatabaseMediaAssetRepository(args.db);
   const publishOrchestrator = new HtmlPublishOrchestrator(
     args.db,
     args.kv,
@@ -264,6 +265,7 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     composeEntrySeoMeta,
     composeLlmsTxt,
     schemasByName,
+    mediaAssets,
   );
 
   // Content / view / boot use cases. They see `entries` only as the
@@ -291,18 +293,19 @@ export function createCmsRuntime(args: CreateCmsRuntimeArgs): CmsRuntime {
     publicPathResolver,
     composeEntrySeoMeta,
     schemasByName,
+    mediaAssets,
   );
-  const renderListLive = new RenderListLiveUseCase(args.db, templates, schemasByName);
+  const renderListLive = new RenderListLiveUseCase(args.db, templates, schemasByName, mediaAssets);
   const previewEntry = new PreviewEntryUseCase(
     args.db,
     templates,
     publicPathResolver,
     composeEntrySeoMeta,
     schemasByName,
+    mediaAssets,
   );
   const validateBoot = new ValidateBootUseCase();
 
-  const mediaAssets = new DatabaseMediaAssetRepository(args.db);
   const media = args.mediaStorage
     ? {
         storage: args.mediaStorage,

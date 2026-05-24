@@ -5,6 +5,7 @@ import type {
   TemplateRegistry,
 } from "../model/TemplateRegistry.js";
 import type { SeoMeta } from "../model/SeoMeta.js";
+import type { MediaAsset } from "../port/MediaStorage.js";
 
 /**
  * Pure render functions over the consumer-supplied template registry.
@@ -27,6 +28,7 @@ export interface RenderEntryArgs {
   /** Defaults to `<!doctype html>`. Pipelines that want the
    *  upper-case `<!DOCTYPE html>\n` shape pass it explicitly. */
   readonly doctype?: string;
+  readonly mediaAssets?: ReadonlyMap<string, MediaAsset>;
   /** Optional pre-composed SEO/AEO block. Threaded into the
    *  `EntryContext.seo` field so templates can emit `<SeoTags
    *  seo={seo}/>` inside `<head>`. Renderers that skip composition
@@ -43,7 +45,12 @@ export function renderEntryHtml(args: RenderEntryArgs): string | null {
   if (!tpl) return null;
   return (
     (args.doctype ?? DEFAULT_DOCTYPE) +
-    tpl({ entry: args.entry, site: args.site, seo: args.seo })
+    tpl({
+      entry: args.entry,
+      site: args.site,
+      mediaAssets: args.mediaAssets,
+      seo: args.seo,
+    })
   );
 }
 
@@ -54,6 +61,7 @@ export interface RenderListArgs {
   readonly site: SiteConfig;
   readonly templates: TemplateRegistry;
   readonly doctype?: string;
+  readonly mediaAssets?: ReadonlyMap<string, MediaAsset>;
   readonly seo?: SeoMeta;
 }
 
@@ -69,6 +77,7 @@ export function renderListHtml(args: RenderListArgs): string | null {
       locale: args.locale,
       entries: args.entries,
       site: args.site,
+      mediaAssets: args.mediaAssets,
       seo: args.seo,
     })
   );

@@ -8,6 +8,7 @@ import {
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
 import type { KvCache } from "../../domain/port/KvCache.js";
+import type { MediaAssetRepository } from "../../domain/port/MediaAssetRepository.js";
 import type {
   PublishEntryRequest,
   PublishOrchestrator,
@@ -36,6 +37,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
 
 /**
  * Structural contract of the llms.txt composer the orchestrator
@@ -73,6 +75,7 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     private readonly composeSeo: SeoComposer,
     private readonly composeLlmsTxt: LlmsTxtComposer,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
+    private readonly mediaAssets: MediaAssetRepository | null = null,
   ) {}
 
   async publish(request: PublishEntryRequest): Promise<void> {
@@ -137,7 +140,8 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     doctype: string,
   ): Promise<void> {
     const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, site);
-    const html = renderEntryHtml({ entry, site, templates, doctype, seo });
+    const mediaAssets = await resolveMediaAssetsForEntries(this.mediaAssets, [entry]);
+    const html = renderEntryHtml({ entry, site, templates, doctype, mediaAssets, seo });
     if (html !== null) {
       await this.kv.put(entryHtmlKey(entry), html);
     }
@@ -158,6 +162,7 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
     const entries = await joinParentForList(this.db, this.schemas, raw, {
       parentStatus: "published",
     });
+    const mediaAssets = await resolveMediaAssetsForEntries(this.mediaAssets, entries);
     const html = renderListHtml({
       collection,
       locale: locale ?? "",
@@ -165,6 +170,7 @@ export class HtmlPublishOrchestrator implements PublishOrchestrator {
       site,
       templates,
       doctype,
+      mediaAssets,
     });
     if (html !== null) {
       await this.kv.put(listHtmlKey(collection, locale ?? ""), html);

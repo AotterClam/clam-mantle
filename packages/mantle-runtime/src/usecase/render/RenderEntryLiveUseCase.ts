@@ -1,5 +1,6 @@
 import type { SchemaManifest } from "@aotter/mantle-spec";
 import type { DatabaseDriver } from "../../domain/port/DatabaseDriver.js";
+import type { MediaAssetRepository } from "../../domain/port/MediaAssetRepository.js";
 import type { TemplateRegistry } from "../../domain/model/TemplateRegistry.js";
 import type { PublicPathResolver } from "../../domain/service/PublicPathResolver.js";
 import { readEntryBySlug } from "../../domain/service/io/PublishedEntries.js";
@@ -10,6 +11,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
 
 /**
  * Render a single entry from current DB state. Used by adapter live-
@@ -37,6 +39,7 @@ export class RenderEntryLiveUseCase {
     private readonly paths: PublicPathResolver | null,
     private readonly composeSeo: SeoComposer,
     private readonly schemas: ReadonlyMap<string, SchemaManifest>,
+    private readonly mediaAssets: MediaAssetRepository | null = null,
   ) {}
 
   async execute(request: RenderEntryLiveRequest): Promise<string | null> {
@@ -52,10 +55,12 @@ export class RenderEntryLiveUseCase {
       parentStatus: status,
     });
     const seo = await composeSeoIfPathed(this.composeSeo, this.paths, entry, request.site);
+    const mediaAssets = await resolveMediaAssetsForEntries(this.mediaAssets, [entry]);
     return renderEntryHtml({
       entry,
       site: request.site,
       templates: this.templates,
+      mediaAssets,
       seo,
     });
   }

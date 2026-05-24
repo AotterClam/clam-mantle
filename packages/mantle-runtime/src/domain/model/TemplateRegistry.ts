@@ -1,5 +1,6 @@
 import type { Entry, SiteConfig } from "@aotter/mantle-spec";
 import type { SeoMeta } from "./SeoMeta.js";
+import type { MediaAsset } from "../port/MediaStorage.js";
 
 /**
  * Render-pipeline types + consumer-supplied template registry.
@@ -26,6 +27,7 @@ import type { SeoMeta } from "./SeoMeta.js";
 export interface EntryContext {
   readonly entry: Entry;
   readonly site: SiteConfig;
+  readonly mediaAssets?: ReadonlyMap<string, MediaAsset>;
   readonly seo?: SeoMeta;
 }
 
@@ -34,6 +36,7 @@ export interface ListContext {
   readonly locale: string;
   readonly entries: readonly Entry[];
   readonly site: SiteConfig;
+  readonly mediaAssets?: ReadonlyMap<string, MediaAsset>;
   readonly seo?: SeoMeta;
 }
 
