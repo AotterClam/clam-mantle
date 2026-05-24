@@ -37,7 +37,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
-import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/io/MediaAssetReferences.js";
 
 /**
  * Structural contract of the llms.txt composer the orchestrator

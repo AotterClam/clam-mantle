@@ -11,7 +11,7 @@ import {
   composeSeoIfPathed,
   type SeoComposer,
 } from "../../domain/service/EntrySeoSupport.js";
-import { resolveMediaAssetsForEntries } from "../../domain/service/MediaAssetReferences.js";
+import { resolveMediaAssetsForEntries } from "../../domain/service/io/MediaAssetReferences.js";
 
 /**
  * Render a single entry from current DB state. Used by adapter live-

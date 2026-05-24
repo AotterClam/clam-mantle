@@ -5,7 +5,7 @@ import type { MediaAsset } from "../src/domain/port/MediaStorage.js";
 import {
   collectMediaAssetIds,
   resolveMediaAssetsForEntries,
-} from "../src/domain/service/MediaAssetReferences.js";
+} from "../src/domain/service/io/MediaAssetReferences.js";
 
 describe("MediaAssetReferences", () => {
   it("collects nested *AssetId and *AssetIds values without duplicates", () => {
@@ -56,16 +56,13 @@ function entry(data: Record<string, unknown>): Entry {
 function asset(id: string): MediaAsset {
   return {
     id,
-    purpose: "post.cover",
     variants: [
       {
         role: "primary",
         mimeType: "image/jpeg",
-        objectKey: `${id}.jpg`,
+        storageKey: `${id}.jpg`,
         publicUrl: `https://example.com/${id}.jpg`,
         byteSize: 1,
-        width: 1200,
-        height: 800,
       },
     ],
     createdAt: 1,
