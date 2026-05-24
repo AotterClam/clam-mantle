@@ -3,14 +3,15 @@
 # Triggered by pushing a `v*` tag. Does:
 #
 #   1. Build + test (gate — bad tag never publishes)
-#   2. Write the tag's version into every public package.json
+#   2. Verify the tag's version matches every public package.json
 #   3. Pack every public SDK package
 #   4. Publish to npmjs with npm dist-tag inferred from the prerelease
 #      suffix (see § "npm tag inference" below)
-#   5. Create a GitHub release with auto-generated notes
-#   6. Dispatch `aotter/mantle-starters` with the new SDK version
+#   5. Verify npmjs metadata propagated
+#   6. Mirror the same package tarballs to GitHub Packages
+#   7. Create a GitHub release with auto-generated notes
+#   8. Dispatch `aotter/mantle-starters` with the new SDK version
 #      so its `bump-from-sdk.yml` workflow opens a downstream bump PR
-#   7. Mirror the same package tarballs to GitHub Packages
 #
 # Steps 2-3 of the fanout (starters bump → tag → landing bump → deploy)
 # live in the downstream repos' workflows; see the issue body for the
@@ -161,6 +162,17 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not set; refusing to start a partial release."
+            exit 1
+          fi
+          NPMJS_NPMRC="$PWD/.npmrc.npmjs"
+          {
+            echo "registry=https://registry.npmjs.org/"
+            echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}"
+            echo "always-auth=true"
+          } > "$NPMJS_NPMRC"
+          npm whoami --userconfig "$NPMJS_NPMRC" --registry https://registry.npmjs.org >/dev/null
           VERSION="${{ steps.ver.outputs.version }}"
           PUBLISH_TAG="${{ steps.ver.outputs.npm_tag }}"
           # Pre-v0.1 policy: npm latest follows the most user-useful
@@ -169,14 +181,26 @@ jobs:
           if [[ "$VERSION" == 0.0.* && "$PUBLISH_TAG" != "latest" ]]; then
             PUBLISH_TAG=latest
           fi
-          for tgz in \
-            ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-runtime-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-$VERSION.tgz"
-          do
+
+          declare -a PACKAGES=(
+            "@aotter/mantle-spec:.release-tarballs/aotter-mantle-spec-$VERSION.tgz"
+            "@aotter/mantle-admin-ui:.release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz"
+            "@aotter/mantle-runtime:.release-tarballs/aotter-mantle-runtime-$VERSION.tgz"
+            "@aotter/mantle-cloudflare:.release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz"
+            "@aotter/mantle:.release-tarballs/aotter-mantle-$VERSION.tgz"
+          )
+
+          for item in "${PACKAGES[@]}"; do
+            pkg="${item%%:*}"
+            tgz="${item#*:}"
+            if npm view "$pkg@$VERSION" version \
+              --userconfig "$NPMJS_NPMRC" \
+              --registry https://registry.npmjs.org >/dev/null 2>&1; then
+              echo "$pkg@$VERSION already exists on npmjs; skipping publish"
+              continue
+            fi
             npm publish "$tgz" \
+              --userconfig "$NPMJS_NPMRC" \
               --registry https://registry.npmjs.org \
               --tag "$PUBLISH_TAG" \
               --access public
@@ -190,7 +214,9 @@ jobs:
               @aotter/mantle-cloudflare \
               @aotter/mantle
             do
-              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" --registry https://registry.npmjs.org
+              npm dist-tag add "$p@$VERSION" "${{ steps.ver.outputs.npm_tag }}" \
+                --userconfig "$NPMJS_NPMRC" \
+                --registry https://registry.npmjs.org
             done
           fi
 
@@ -214,36 +240,6 @@ jobs:
           echo "::error::npm metadata did not become ready or @aotter/mantle@$VERSION readme stayed empty"
           exit 1
 
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Mark prereleases so GitHub UI / consumers can filter.
-          PRERELEASE_FLAG=""
-          if [[ "${{ steps.ver.outputs.npm_tag }}" != "latest" ]]; then
-            PRERELEASE_FLAG="--prerelease"
-          fi
-          gh release create "${{ github.ref_name }}" \
-            --generate-notes \
-            --title "${{ github.ref_name }}" \
-            $PRERELEASE_FLAG
-
-      - name: Dispatch starters bump-from-sdk
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_FANOUT_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::warning::RELEASE_FANOUT_TOKEN not set — starters bump skipped. SDK is published; set the secret and re-dispatch via the Actions UI to continue the fanout."
-            exit 0
-          fi
-          gh api "repos/${{ github.repository_owner }}/mantle-starters/dispatches" \
-            -f event_type=sdk-published \
-            -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
-            -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"
-          echo "Dispatched mantle-starters bump-from-sdk for ${{ steps.ver.outputs.version }}"
-
       - name: Mirror to GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -262,13 +258,23 @@ jobs:
           fi
           mkdir -p .github-package-tarballs
 
-          for tgz in \
-            ".release-tarballs/aotter-mantle-spec-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-runtime-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz" \
-            ".release-tarballs/aotter-mantle-$VERSION.tgz"
-          do
+          declare -a PACKAGES=(
+            "@aotter/mantle-spec:.release-tarballs/aotter-mantle-spec-$VERSION.tgz"
+            "@aotter/mantle-admin-ui:.release-tarballs/aotter-mantle-admin-ui-$VERSION.tgz"
+            "@aotter/mantle-runtime:.release-tarballs/aotter-mantle-runtime-$VERSION.tgz"
+            "@aotter/mantle-cloudflare:.release-tarballs/aotter-mantle-cloudflare-$VERSION.tgz"
+            "@aotter/mantle:.release-tarballs/aotter-mantle-$VERSION.tgz"
+          )
+
+          for item in "${PACKAGES[@]}"; do
+            pkg="${item%%:*}"
+            tgz="${item#*:}"
+            if npm view "$pkg@$VERSION" version \
+              --userconfig "$GPR_NPMRC" \
+              --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+              echo "$pkg@$VERSION already exists on GitHub Packages; skipping publish"
+              continue
+            fi
             work="$(mktemp -d)"
             tar -xzf "$tgz" -C "$work"
             node -e "const fs=require('node:fs'); const path=process.argv[1]; const pkg=JSON.parse(fs.readFileSync(path,'utf8')); pkg.publishConfig={...(pkg.publishConfig||{}), registry:'https://npm.pkg.github.com'}; fs.writeFileSync(path, JSON.stringify(pkg,null,2)+'\n');" "$work/package/package.json"
@@ -298,3 +304,37 @@ jobs:
                 --registry https://npm.pkg.github.com
             done
           fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Mark prereleases so GitHub UI / consumers can filter.
+          PRERELEASE_FLAG=""
+          if [[ "${{ steps.ver.outputs.npm_tag }}" != "latest" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "GitHub release ${{ github.ref_name }} already exists; skipping create."
+          else
+            gh release create "${{ github.ref_name }}" \
+              --generate-notes \
+              --title "${{ github.ref_name }}" \
+              $PRERELEASE_FLAG
+          fi
+
+      - name: Dispatch starters bump-from-sdk
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_FANOUT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::RELEASE_FANOUT_TOKEN not set — starters bump skipped. SDK is published to npmjs and GitHub Packages; set the secret and re-dispatch via the Actions UI to continue the fanout."
+            exit 0
+          fi
+          gh api "repos/${{ github.repository_owner }}/mantle-starters/dispatches" \
+            -f event_type=sdk-published \
+            -F "client_payload[sdk_version]=${{ steps.ver.outputs.version }}" \
+            -F "client_payload[npm_tag]=${{ steps.ver.outputs.npm_tag }}"
+          echo "Dispatched mantle-starters bump-from-sdk for ${{ steps.ver.outputs.version }}"
