@@ -143,7 +143,8 @@ The audit takes ~30 seconds and rules out the most common fanout failure. Do it 
 3. Add whatever source-code fixes satisfy the new SDK shape.
 4. Commit subject MUST be `release: bump @aotter/mantle* to vX.Y.Z` (starters) or `release: bump @aotter/mantle to vX.Y.Z` (landing) — `tag-and-dispatch-landing.yml` filters on this in starters; landing has no equivalent filter but the convention keeps history consistent.
 5. Open PR base=`main` (starters and landing), CI passes now that lockfile + source are in sync, rebase-merge.
-6. **Don't** re-fire `bump-from-sdk.yml` afterwards — it'll error with `No changes after bump — was the SDK version the same as current?` because your fast-path PR already did the bump. The workflow's only purpose was to produce the same end state your PR did.
+6. **Immediately open a `chore: backport main→develop` PR** (same repo, base=`develop`, head=`main`). The fast-path commit lives on `main` only — leaving it there silently shifts `main` ahead of `develop` in the touched files. The next `bump-from-sdk.yml` (which opens its release PR from develop→main) then collides on those exact files. alpha.15 hit this in mantle-starters: 13 file conflicts because alpha.14-era #272 follow-ups had been fix-forwarded to main without back-merging. Auto-merge the backport PR; no review gate needed since main is authoritative.
+7. **Don't** re-fire `bump-from-sdk.yml` afterwards — it'll error with `No changes after bump — was the SDK version the same as current?` because your fast-path PR already did the bump. The workflow's only purpose was to produce the same end state your PR did.
 
 ### Re-spin release for a downstream-content-only fix
 
