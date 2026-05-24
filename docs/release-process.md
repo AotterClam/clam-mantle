@@ -89,7 +89,7 @@ landing deploy. The human steps are:
    pnpm run check
    ```
 
-5. **Pre-v0.1 alpha shortcut**: cut the release directly from `develop` — open a release PR with base=`develop` titled `release: publish alpha.N as pre-v1 latest`, merge with a merge commit, tag the develop merge commit, push the tag. Skip steps 6–8. `main` updates less frequently than alphas; promotion happens when an alpha graduates to beta/stable. (Per practice since alpha.7; see [§ Pre-v0.1 alpha cadence](#pre-v01-alpha-cadence) below.)
+5. **Pre-v0.1 alpha shortcut**: cut the SDK release directly from `develop` — open a release PR with base=`develop` titled `release: publish alpha.N as pre-v1 latest`, merge with a merge commit, tag the develop merge commit, push the tag. Skip steps 6–8. `mantle/main` updates less frequently than alphas; promotion happens when an alpha graduates to beta/stable. Downstream fanout still promotes `mantle-starters/develop` into `mantle-starters/main` for each alpha so the starter tarball and landing deploy roll forward. (Per practice since alpha.7; see [§ Pre-v0.1 alpha cadence](#pre-v01-alpha-cadence) below.)
 6. **Stable / beta / RC**: open a release PR base=`main`, head=`develop`. The PR title MUST contain the literal substring `release: bump @aotter/mantle* to vX.Y.Z` — that exact phrase is the trigger contract for `mantle-starters/.github/workflows/tag-and-dispatch-landing.yml`'s tag job. Anything else and the landing chain skips tagging.
 7. Review the diff for accidental unreleased work.
 8. Merge with a merge commit.
@@ -105,9 +105,9 @@ landing deploy. The human steps are:
 
 ### Pre-v0.1 alpha cadence
 
-Through 2026-05-19 (alpha.7, alpha.8, alpha.9), every alpha bump tagged directly from `develop` — no `develop → main` promotion. Codex hand-tagged the develop merge commit; `release.yml` doesn't care which branch the tag points at. `main` updates intentionally lag the alpha cadence so the canonical "released" pointer doesn't churn daily.
+Through 2026-05-19 (alpha.7, alpha.8, alpha.9), every SDK alpha bump tagged directly from `develop` — no `mantle/develop → mantle/main` promotion. Codex hand-tagged the develop merge commit; `release.yml` doesn't care which branch the tag points at. `mantle/main` updates intentionally lag the alpha cadence so the canonical SDK "released" pointer doesn't churn daily.
 
-This drops steps 6–9 from the playbook above for pre-v0.1 alphas — the PR base stays `develop`, merge with a merge commit, tag the develop merge commit. The release fanout still fires on the tag push because `release.yml` is keyed on `v*` tags, not branch.
+This drops steps 6–9 from the SDK playbook above for pre-v0.1 alphas — the PR base stays `develop`, merge with a merge commit, tag the develop merge commit. The release fanout still fires on the tag push because `release.yml` is keyed on `v*` tags, not branch. The downstream starters fanout opens its release PR against `mantle-starters/main`, using the default-branch `develop` checkout as the head, so starter content and landing can keep auto-publishing per alpha.
 
 Once v0.1.0 ships, switch to the full `develop → main → tag` flow per the steps above.
 
@@ -142,9 +142,8 @@ The audit takes ~30 seconds and rules out the most common fanout failure. Do it 
 2. Replicate what the bump workflow would have done — bump every `@aotter/mantle*` dep + own `version` in package.json files, refresh lockfile via `pnpm install --no-frozen-lockfile`, update `sources.json.version` (starters only).
 3. Add whatever source-code fixes satisfy the new SDK shape.
 4. Commit subject MUST be `release: bump @aotter/mantle* to vX.Y.Z` (starters) or `release: bump @aotter/mantle to vX.Y.Z` (landing) — `tag-and-dispatch-landing.yml` filters on this in starters; landing has no equivalent filter but the convention keeps history consistent.
-5. Open PR base=`develop` (starters) or base=`main` (landing), CI passes now that lockfile + source are in sync, rebase-merge.
+5. Open PR base=`main` (starters and landing), CI passes now that lockfile + source are in sync, rebase-merge.
 6. **Don't** re-fire `bump-from-sdk.yml` afterwards — it'll error with `No changes after bump — was the SDK version the same as current?` because your fast-path PR already did the bump. The workflow's only purpose was to produce the same end state your PR did.
-7. If develop→main promote is part of the flow (post-v0.1), reuse the literal `release: bump...` subject from step 4 as the promote PR title so the landing tag job fires.
 
 ### Re-spin release for a downstream-content-only fix
 
@@ -166,8 +165,8 @@ mantle: git push tag v0.0.11-alpha.4
       │
       ▼
 release.yml: pnpm install → build → test (gate) → verify package.json
-             versions match the tag → pnpm -r publish (with --tag
-             inferred from prerelease suffix) → GitHub release →
+             versions match the tag → pack tarballs → publish/verify
+             npmjs → mirror GitHub Packages → GitHub release →
              repository_dispatch
              to mantle-starters
                    │
@@ -540,14 +539,15 @@ Use hotfixes only for released `main` defects.
 - [ ] `pnpm run check` passed or failures are documented and accepted.
 - [ ] Package versions and tag name match.
 - [ ] GitHub release notes link the relevant issues and ADRs.
-- [ ] Publish used `pnpm publish` (not `npm publish`) — verify no
-      `workspace:*` leaked into published `dependencies` via the check
-      script in the "Alpha publish command" section.
+- [ ] Automated `release.yml` published packed tarballs to npmjs and
+      mirrored them to GitHub Packages before dispatching downstream
+      fanout. If publishing manually, verify no `workspace:*` leaked
+      into published `dependencies` via the check script in the
+      "Alpha publish command" section.
 - [ ] Cross-repo rename? Pre-flight grep for substring false-positives
       ran (see "Cross-cutting rename playbook"); infra-config diff
       explicitly reviewed; consumer-repo lockfiles refreshed after the
       SDK publish lands.
-- [ ] If promoting `develop → main` (post-v0.1, or first-stable), the promote PR title contains the literal substring `release: bump @aotter/mantle* to vX.Y.Z` so `tag-and-dispatch-landing.yml`'s tag job fires.
 - [ ] Smoke-tested live downstream URL (e.g. `the Mantle landing page`)
       after consumer-repo deploys — CI green is not enough when infra
       config (wrangler.toml `name`, D1 / KV / DO bindings) shifted.
