@@ -219,8 +219,8 @@ export function buildSocialProviders(
     if (method.kind !== "social") continue;
     if (seenProviders.has(method.provider)) {
       throw new Error(
-        `createAuth: duplicate social provider '${method.provider}' registered. ` +
-          `Each provider must appear at most once in methods[]; remove the redundant entry or pick a different provider.`,
+        `createAuth: social provider '${method.provider}' is registered more than once; ` +
+          `each provider can have only one methods[] entry. Remove the redundant entry or pick a different provider.`,
       );
     }
     seenProviders.add(method.provider);

@@ -341,7 +341,7 @@ describe("buildSocialProviders", () => {
         { kind: "social", provider: "github", clientId: "a", clientSecret: "a" },
         { kind: "social", provider: "github", clientId: "b", clientSecret: "b" },
       ]),
-    ).toThrow(/duplicate social provider.*github/i);
+    ).toThrow(/'github'.*registered more than once/i);
   });
 
   it("throws for duplicate non-github providers too", () => {
@@ -350,7 +350,7 @@ describe("buildSocialProviders", () => {
         { kind: "social", provider: "google", clientId: "a", clientSecret: "a" },
         { kind: "social", provider: "google", clientId: "b", clientSecret: "b" },
       ]),
-    ).toThrow(/duplicate social provider.*google/i);
+    ).toThrow(/'google'.*registered more than once/i);
   });
 });
 
