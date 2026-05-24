@@ -203,9 +203,16 @@ export interface SessionConfig {
  * Email-verification policy forwarded to Better Auth's
  * `emailVerification`. Decoupled from `email-otp` / `magic-link`
  * methods — this controls the verification-token flow that fires
- * separately (e.g. `sendOnSignUp` mails a verify link when a new
- * user is created via any method). All optional; omitted keys use
- * Better Auth's defaults.
+ * separately when Better Auth has a `sendVerificationEmail` callback
+ * configured. All optional; omitted keys use Better Auth's defaults.
+ *
+ * **`sendOnSignUp` only delivers mail when a `sendVerificationEmail`
+ * callback is wired into Better Auth.** This config does NOT expose
+ * that callback — adopters who flip `sendOnSignUp: true` without
+ * providing a sender will see the flag set in Better Auth but no
+ * email leaves the worker. Wiring the callback is a follow-up SDK
+ * surface; for now the flag is useful for the
+ * `autoSignInAfterVerification` knob and forward-compat.
  */
 export interface EmailVerificationConfig {
   readonly sendOnSignUp?: boolean;
