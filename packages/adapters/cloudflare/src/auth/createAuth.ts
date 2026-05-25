@@ -744,6 +744,20 @@ export type AuthMethodInfo =
   | { readonly kind: "magic-link" }
   | { readonly kind: "social"; readonly provider: SocialProviderId };
 
+/**
+ * Linked-account row as exposed to consumers. Mirrors the BA `account`
+ * table's identity columns; OAuth tokens and other secret-shaped
+ * columns are intentionally excluded — callers should never need them
+ * to render a "signed in via <provider>" list.
+ */
+export interface LinkedAccountInfo {
+  readonly id: string;
+  readonly providerId: string;
+  readonly accountId: string;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
 // Better Auth's full inferred type pulls plugin internals
 // (`AdminOptions`) that aren't re-exported, so emitting a .d.ts that
 // names that type fails (TS4058). The structural facade keeps the
@@ -771,6 +785,24 @@ export interface Auth {
    *  them. `social` methods carry the upstream `provider` id for
    *  per-provider rendering. */
   readonly methods: ReadonlyArray<AuthMethodInfo>;
+  /** List a user's linked social/credential accounts. Ordered by
+   *  `createdAt` ascending so the UI can render "linked since" in a
+   *  stable order across reloads. Read-only — uses the underlying D1
+   *  binding directly, no Better Auth API call. */
+  readonly listLinkedAccounts: (
+    userId: string,
+  ) => Promise<readonly LinkedAccountInfo[]>;
+  /** Unlink a single account by `(userId, providerId)`. Returns true if
+   *  a row was deleted, false if no matching account existed. Does NOT
+   *  guard against unlinking the user's only sign-in method — the
+   *  caller knows their auth method mix and decides whether the
+   *  resulting state is sign-in-able. The runtime can't, because
+   *  email-OTP / magic-link sign-ins do not write to the `account`
+   *  table at all, so "rows left" is not a reliable indicator. */
+  readonly unlinkAccount: (
+    userId: string,
+    providerId: string,
+  ) => Promise<boolean>;
 }
 
 export function createAuth(config: CreateAuthConfig): Auth {
@@ -793,5 +825,33 @@ export function createAuth(config: CreateAuthConfig): Auth {
         ? { kind: "social", provider: m.provider }
         : { kind: m.kind },
     ),
+    listLinkedAccounts: async (userId) => {
+      const result = await config.database
+        .prepare(
+          "SELECT id, providerId, accountId, createdAt, updatedAt FROM account WHERE userId = ? ORDER BY createdAt ASC, id ASC",
+        )
+        .bind(userId)
+        .all<{
+          id: string;
+          providerId: string;
+          accountId: string;
+          createdAt: string;
+          updatedAt: string;
+        }>();
+      return (result.results ?? []).map((row) => ({
+        id: row.id,
+        providerId: row.providerId,
+        accountId: row.accountId,
+        createdAt: new Date(row.createdAt),
+        updatedAt: new Date(row.updatedAt),
+      }));
+    },
+    unlinkAccount: async (userId, providerId) => {
+      const result = await config.database
+        .prepare("DELETE FROM account WHERE userId = ? AND providerId = ?")
+        .bind(userId, providerId)
+        .run();
+      return (result.meta?.changes ?? 0) > 0;
+    },
   };
 }
