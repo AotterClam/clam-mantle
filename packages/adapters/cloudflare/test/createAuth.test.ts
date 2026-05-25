@@ -580,3 +580,144 @@ describe("AuthMethodConfig — type narrowing smoke", () => {
     }
   });
 });
+
+// --- listLinkedAccounts / unlinkAccount ---
+
+interface FakeDbBehaviour {
+  readonly allResults?: ReadonlyArray<Record<string, unknown>>;
+  readonly runChanges?: number;
+  readonly onPrepare?: (sql: string) => void;
+  readonly onBind?: (args: ReadonlyArray<unknown>) => void;
+}
+
+function fakeDbWith(behaviour: FakeDbBehaviour): D1Database {
+  const stmt = {
+    bind: (...args: unknown[]) => {
+      behaviour.onBind?.(args);
+      return stmt;
+    },
+    all: async () => ({
+      results: behaviour.allResults ?? [],
+      success: true,
+      meta: {},
+    }),
+    run: async () => ({
+      success: true,
+      meta: { changes: behaviour.runChanges ?? 0 },
+    }),
+    first: async () => null,
+  };
+  return {
+    prepare: (sql: string) => {
+      behaviour.onPrepare?.(sql);
+      return stmt;
+    },
+    exec: async () => ({ count: 0, duration: 0 }),
+    batch: async () => [],
+  } as unknown as D1Database;
+}
+
+describe("Auth.listLinkedAccounts", () => {
+  it("maps D1 rows to LinkedAccountInfo and converts timestamps to Date", async () => {
+    const auth = createAuth(
+      baseConfig({
+        database: fakeDbWith({
+          allResults: [
+            {
+              id: "acc-1",
+              providerId: "github",
+              accountId: "gh-12345",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-02T03:04:05.000Z",
+            },
+            {
+              id: "acc-2",
+              providerId: "google",
+              accountId: "g-67890",
+              createdAt: "2026-01-03T00:00:00.000Z",
+              updatedAt: "2026-01-04T00:00:00.000Z",
+            },
+          ],
+        }),
+      }),
+    );
+    const rows = await auth.listLinkedAccounts("user-1");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      id: "acc-1",
+      providerId: "github",
+      accountId: "gh-12345",
+    });
+    expect(rows[0]?.createdAt).toBeInstanceOf(Date);
+    expect(rows[0]?.createdAt.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    expect(rows[1]?.providerId).toBe("google");
+  });
+
+  it("returns an empty array when the user has no linked accounts", async () => {
+    const auth = createAuth(
+      baseConfig({ database: fakeDbWith({ allResults: [] }) }),
+    );
+    expect(await auth.listLinkedAccounts("user-1")).toEqual([]);
+  });
+
+  it("binds userId into the query", async () => {
+    let captured: unknown = null;
+    const auth = createAuth(
+      baseConfig({
+        database: fakeDbWith({
+          allResults: [],
+          onBind: (args) => {
+            captured = args;
+          },
+        }),
+      }),
+    );
+    await auth.listLinkedAccounts("user-xyz");
+    // The most recent bind() call is for the listLinkedAccounts SELECT.
+    expect(captured).toEqual(["user-xyz"]);
+  });
+});
+
+describe("Auth.unlinkAccount", () => {
+  it("returns true when a row was deleted", async () => {
+    const auth = createAuth(
+      baseConfig({ database: fakeDbWith({ runChanges: 1 }) }),
+    );
+    expect(await auth.unlinkAccount("user-1", "github")).toBe(true);
+  });
+
+  it("returns false when no row matched", async () => {
+    const auth = createAuth(
+      baseConfig({ database: fakeDbWith({ runChanges: 0 }) }),
+    );
+    expect(await auth.unlinkAccount("user-1", "github")).toBe(false);
+  });
+
+  it("binds (userId, providerId) in that order", async () => {
+    let captured: unknown = null;
+    const auth = createAuth(
+      baseConfig({
+        database: fakeDbWith({
+          runChanges: 1,
+          onBind: (args) => {
+            captured = args;
+          },
+        }),
+      }),
+    );
+    await auth.unlinkAccount("user-7", "google");
+    expect(captured).toEqual(["user-7", "google"]);
+  });
+
+  it("does not block unlinking the last social — caller policy decides", async () => {
+    // The runtime can't tell whether `email-otp` / `magic-link` are
+    // registered methods, so unlinking the only credential row is
+    // allowed at this layer. Documented in the Auth.unlinkAccount
+    // JSDoc; this test pins the choice so a future "safety" guard
+    // doesn't silently reverse it without a doc update.
+    const auth = createAuth(
+      baseConfig({ database: fakeDbWith({ runChanges: 1 }) }),
+    );
+    expect(await auth.unlinkAccount("user-1", "github")).toBe(true);
+  });
+});
