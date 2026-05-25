@@ -363,13 +363,36 @@ async function handleHttpTrigger(
   // `id`). Body fields fill in non-path inputs only.
   const input = { ...body, ...params };
 
-  const ctx: HandlerContext = await buildHandlerContext(req, auth, waitUntil);
+  const triggerPathPrefix = `${req.method} ${triggerPath}`;
+  const ctx = await buildCallerContext(req, auth, waitUntil);
+
+  // Mirror the View handler's 401-vs-403 discipline (see
+  // `handleViewRequest`). An auth-gated Procedure called with no
+  // session is UNAUTHENTICATED (401); a session whose role fails the
+  // predicate is AUTH_DENIED (403). InvokeProcedureUseCase collapses
+  // both into AUTH_DENIED if we pass `{ user: null, staff: null }`
+  // as ctx, so we pre-check here.
+  if (procedure.spec.requires?.auth && !ctx) {
+    return jsonResponse(401, {
+      ok: false,
+      diagnostic: runtimeDiagnostic({
+        code: "UNAUTHENTICATED",
+        severity: "error",
+        path: triggerPathPrefix,
+        expected: "authenticated session",
+        message: `Procedure '${procName}' requires authentication.`,
+      }),
+    });
+  }
+
+  const wu = waitUntil ? { waitUntil } : {};
+  const invokeCtx: HandlerContext = ctx ?? { user: null, staff: null, env: {}, ...wu };
 
   const result = await runtime.invokeProcedure.execute({
     procedure,
     input,
-    ctx,
-    pathPrefix: `${req.method} ${triggerPath}`,
+    ctx: invokeCtx,
+    pathPrefix: triggerPathPrefix,
   });
 
   if (result.ok) {
@@ -402,7 +425,7 @@ async function handleViewRequest(
   //   (2) the UNAUTHENTICATED branch in ExecuteViewUseCase only fires
   //       when ctx is undefined, so passing a guest ctx for no-session
   //       would collapse 401 and 403 into the same AUTH_DENIED.
-  const ctx = await buildViewCtx(req, auth, waitUntil);
+  const ctx = await buildCallerContext(req, auth, waitUntil);
   if (view.spec.requires?.auth) {
     if (!ctx) {
       return jsonResponse(401, {
@@ -463,13 +486,24 @@ async function handleViewRequest(
 }
 
 /**
- * Resolve caller identity for a View request from the Better Auth
- * cookie session. Returns `undefined` when there is no session at all
- * so callers can distinguish 401 (no session) from 403 (session but
- * wrong role) — `ExecuteViewUseCase` produces `UNAUTHENTICATED` for
- * `ctx: undefined` and `AUTH_DENIED` for a ctx whose predicates fail.
+ * Resolve caller identity for a View or HTTP-Trigger request from the
+ * Better Auth cookie session. Returns `undefined` when there is no
+ * session so callers can distinguish 401 (no session) from 403
+ * (session but wrong role) — `ExecuteViewUseCase` and the
+ * `handleHttpTrigger` pre-check both rely on this signal.
+ *
+ * Used by both `handleViewRequest` and `handleHttpTrigger` so the
+ * two HTTP surfaces resolve identity identically.
+ *
+ * Note: this resolves cookie sessions only. OAuth bearer tokens
+ * (issued by `createOAuthProvider` for MCP callers) are NOT verified
+ * here — bearer-authenticated identity belongs on the MCP surface,
+ * not the HTTP Trigger surface, so a bearer-only caller hitting an
+ * auth-gated Trigger will land at the 401 branch in
+ * `handleHttpTrigger`. Procedures that need to be agent-callable
+ * should be reached via `/mcp` or `/mcp/staff` (see #281).
  */
-async function buildViewCtx(
+async function buildCallerContext(
   req: Request,
   auth: Auth,
   waitUntil: ((p: Promise<unknown>) => void) | undefined,
@@ -502,20 +536,6 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
   } catch {
     return {};
   }
-}
-
-async function buildHandlerContext(
-  _req: Request,
-  _auth: Auth,
-  waitUntil: ((p: Promise<unknown>) => void) | undefined,
-): Promise<HandlerContext> {
-  const wu = waitUntil ? { waitUntil } : {};
-  // HTTP Triggers run on `defaultHandler` (Hono), which the OAuth lib
-  // does NOT route through token verification. Bearer-authenticated
-  // identity is only available on apiHandlers registered with
-  // `createOAuthProvider`. Triggers that need identity should migrate
-  // to an MCP tool, or read it from the caller frontend layer.
-  return { user: null, staff: null, env: {}, ...wu };
 }
 
 function openApiToHono(path: string): string {
