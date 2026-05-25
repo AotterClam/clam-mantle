@@ -137,14 +137,14 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
       mediaFields: mediaFieldsForCollection(s, schemas),
     }));
 
-  type AdminGateOk = Extract<AdminGate, { kind: "ok" }>;
+  type StaffGateOk = Extract<StaffGate, { kind: "ok" }>;
   const guarded = (
     method: "get" | "post",
     path: string,
-    body: (c: Context, gate: AdminGateOk) => Response | Promise<Response>,
+    body: (c: Context, gate: StaffGateOk) => Response | Promise<Response>,
   ): void => {
     app.on(method.toUpperCase(), path, async (c) => {
-      const gate = await readAdminGate(c, auth);
+      const gate = await readStaffGate(c, auth);
       if (gate.kind === "unauth") return adminUnauthenticated(c, path);
       if (gate.kind === "forbidden") return adminNotStaff(c, path, gate.login);
       return body(c, gate);
@@ -311,7 +311,7 @@ function mountAdminBetterAuth(app: Hono, ref: CmsRuntimeRef, auth: Auth): void {
   });
 }
 
-type AdminGate =
+type StaffGate =
   | { kind: "unauth" }
   | { kind: "forbidden"; login: string | null }
   | {
@@ -321,7 +321,7 @@ type AdminGate =
       role: StaffRole;
     };
 
-async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
+async function readStaffGate(c: Context, auth: Auth): Promise<StaffGate> {
   const session = await auth.getSession(c.req.raw);
   if (!session) return { kind: "unauth" };
   const role = session.user.role ?? null;

@@ -177,7 +177,7 @@ describe("mountPublicRoutes read-through cache", () => {
 
   it("preview returns 403 for a non-staff session", async () => {
     // stubAuth has getUserRole → null; staffAuth("contributor") still
-    // qualifies as admin, so build a custom auth that returns no role.
+    // qualifies as staff, so build a custom auth that returns no role.
     const customerAuth: Auth = {
       handler: async () => new Response(null, { status: 404 }),
       getSession: async () => ({

@@ -32,7 +32,7 @@ export interface CreateMcpApiHandlerOptions {
  * The OAuthProvider lib verifies the bearer token, decrypts grant
  * props, and sets `ctx.props` BEFORE calling this handler. We read
  * `ctx.props.{userId, role}` (stashed at consent time by
- * `mountAuthorize`) and gate staff surfaces on the D1 admin role.
+ * `mountAuthorize`) and gate staff surfaces on the D1 staff role.
  *
  * Note: OAuth scope distinction (`mcp:read` vs `mcp:staff`) used to
  * differentiate surfaces here. Removed because claude.ai's MCP client
