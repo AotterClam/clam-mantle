@@ -370,6 +370,24 @@ spec:
     );
   });
 
+  it("rejects Trigger.source.kind: 'mcp' mixed with lifecycle keys (schema/on/errorPolicy)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: mixedLifecycle }
+spec:
+  source:
+    kind: mcp
+    surface: staff
+    schema: posts
+    on: [before_create]
+  target: { procedure: bar }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.message).join("\n")).toMatch(
+      /schema,on,errorPolicy.*are invalid when source.kind is 'mcp'/,
+    );
+  });
+
   it("rejects Trigger.source.kind: 'mcp' mixed with http keys (method/path)", () => {
     const yaml = `apiVersion: cms.mantle.aotter.net/v1
 kind: Trigger

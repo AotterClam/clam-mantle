@@ -467,6 +467,86 @@ describe("McpJsonRpcDispatcher", () => {
     expect(inner.diagnostic?.code).toBe("AUTH_DENIED");
   });
 
+  it("Procedure-MCP trigger does not shadow public-surface View routing when names don't match (#281)", async () => {
+    // Procedures are checked first on every surface, but a non-match
+    // must fall through to the existing routing — View tool calls
+    // should still dispatch to executeView with procedures
+    // configured.
+    const procedure = makeProcedure({ name: "restock-sku" });
+    const dispatcher = new McpJsonRpcDispatcher(
+      {
+        ...minimalUseCases(),
+        executeView: undefined,
+        invokeProcedure: new InvokeProcedureUseCase(new InMemoryHandlerRegistry()),
+      },
+      [postsSchema()],
+      {
+        surface: "public",
+        views: [recentPostsView()],
+        procedures: [procedure],
+      },
+    );
+    const res = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", { name: "query_view_recent_posts", arguments: {} }),
+      { userId: "u1" },
+    );
+    const body = (await res.json()) as { error?: { code: number } };
+    // executeView is unset, so the call ends in UNKNOWN_TOOL — but
+    // the important signal is that the procedure check did NOT
+    // short-circuit it as "unknown procedure". The dispatcher must
+    // fall through to the View branch.
+    expect(body.error?.code).toBe(-32601);
+  });
+
+  it("Procedure-MCP trigger on public surface still enforces requires.auth.all: ctx.staff (#281)", async () => {
+    // A Procedure surfaced as public-MCP but auth-gated on ctx.staff
+    // can still be invoked by a staff bearer (and is denied for
+    // bearer-only callers). This pins the contract that surface
+    // discriminates DISCOVERY, not auth — auth always evaluates the
+    // McpAuthContext via the use case.
+    const procedure = makeProcedure({
+      name: "lookup-price",
+      authPredicates: [{ "ctx.staff": ["owner"] }],
+    });
+    const registry = new InMemoryHandlerRegistry();
+    let calls = 0;
+    registry.register("echoHandler", () => {
+      calls++;
+      return { ok: true };
+    });
+    const dispatcher = new McpJsonRpcDispatcher(
+      { ...minimalUseCases(), invokeProcedure: new InvokeProcedureUseCase(registry) },
+      [],
+      { surface: "public", procedures: [procedure] },
+    );
+
+    // Bearer without staff: denied.
+    const deniedRes = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", { name: "lookup_price", arguments: { msg: "x" } }),
+      { userId: "u1", staff: null },
+    );
+    const denied = (await deniedRes.json()) as { result: { content: { text: string }[] } };
+    const deniedInner = JSON.parse(denied.result.content[0]!.text) as {
+      ok: boolean;
+      diagnostic?: { code: string };
+    };
+    expect(deniedInner.diagnostic?.code).toBe("AUTH_DENIED");
+    expect(calls).toBe(0);
+
+    // Bearer with staff: allowed (handler runs).
+    const allowedRes = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", { name: "lookup_price", arguments: { msg: "x" } }, 2),
+      { userId: "u1", staff: { userId: "u1", role: "owner" } },
+    );
+    const allowed = (await allowedRes.json()) as { result: { content: { text: string }[] } };
+    const allowedInner = JSON.parse(allowed.result.content[0]!.text) as {
+      ok: boolean;
+      data?: unknown;
+    };
+    expect(allowedInner.ok).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   it("Procedure tool name uses kebab→snake mangling (#281)", async () => {
     const procedure = makeProcedure({ name: "snapshot-inventory" });
     const dispatcher = new McpJsonRpcDispatcher(
