@@ -330,12 +330,15 @@ export interface TriggerManifestSpec {
   readonly target: { readonly procedure: string };
 }
 
-/** v0.1.0 ships `http` only. `lifecycle` is v0.1.x-committed (reserved
- *  for the editorial / hooks design pass, see ADR-0001 § "What's DRAFT")
- *  and currently rejected by the parser with code LIFECYCLE_NOT_IN_V010.
- *  The genuinely speculative source kinds (`mcp`, `cron`, `queue`) are
- *  rejected with the generic DRAFT_KEY_USED. */
-export type TriggerSource = HttpTriggerSource | LifecycleTriggerSource;
+/** v0.1.0 ships `http`, `lifecycle`, and `mcp`. `cron` / `queue` stay
+ *  DRAFT and are rejected by the parser with DRAFT_KEY_USED. `mcp`
+ *  was promoted from DRAFT in alpha.16 (#281): it lets a Procedure
+ *  expose itself as a tool on `/mcp/staff` or `/mcp` without a
+ *  parallel hand-wired HTTP handler. */
+export type TriggerSource =
+  | HttpTriggerSource
+  | LifecycleTriggerSource
+  | McpTriggerSource;
 
 export interface HttpTriggerSource {
   readonly kind: "http";
@@ -372,6 +375,21 @@ export interface LifecycleTriggerSource {
   /** Override the per-phase default. before_* defaults to "abort";
    *  after_* defaults to "continue". */
   readonly errorPolicy?: HookErrorPolicy;
+}
+
+/** Surfaces an MCP-source Trigger can be bound to. `staff` ⇒
+ *  `/mcp/staff` (bearer + role gate); `public` ⇒ `/mcp` (bearer only).
+ *  The procedure's own `requires.auth` still gates the call —
+ *  surface determines visibility in `tools/list`. */
+export const MCP_TRIGGER_SURFACES = ["staff", "public"] as const;
+export type McpTriggerSurface = (typeof MCP_TRIGGER_SURFACES)[number];
+
+export interface McpTriggerSource {
+  readonly kind: "mcp";
+  /** Which MCP surface this Procedure is callable from. The
+   *  Procedure's `requires.auth` continues to evaluate against the
+   *  authenticated caller — surface only controls discovery. */
+  readonly surface: McpTriggerSurface;
 }
 
 /** v0.1 HTTP methods that may carry a body. GET is intentionally absent

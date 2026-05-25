@@ -3,6 +3,7 @@ import {
   redactForWire,
   type ContentState,
   type MediaPurposePolicy,
+  type ProcedureManifest,
   type SchemaManifest,
   type StaffRole,
   type ViewManifest,
@@ -25,6 +26,7 @@ import {
 } from "../../usecase/media/index.js";
 import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
 import { ExecuteViewUseCase } from "../../usecase/view/index.js";
+import { InvokeProcedureUseCase } from "../../usecase/procedure/InvokeProcedureUseCase.js";
 import {
   CREATE_DRAFT_PREFIX,
   QUERY_VIEW_PREFIX,
@@ -64,6 +66,11 @@ export interface McpUseCases {
   readonly archive: ArchiveUseCase;
   readonly deleteEntry: DeleteEntryUseCase;
   readonly executeView?: ExecuteViewUseCase;
+  /** Optional. When set together with `options.procedures`, MCP
+   *  Triggers (#281) route through here. The dispatcher evaluates the
+   *  Procedure's `requires.auth` against the McpAuthContext before
+   *  invoking. */
+  readonly invokeProcedure?: InvokeProcedureUseCase;
   /** Optional. When set, `create_media_upload`, `upload_media_variant`,
    *  and `commit_media_upload` appear in the catalog and route here.
    *  `purposes` is the declared taxonomy (#272 shape — name +
@@ -86,6 +93,8 @@ export class McpJsonRpcDispatcher {
    *  collection name. */
   private readonly schemaBySegment: ReadonlyMap<string, string>;
   private readonly viewBySegment: ReadonlyMap<string, ViewManifest>;
+  /** tool-name → Procedure manifest, for MCP triggers (#281). */
+  private readonly procedureByToolName: ReadonlyMap<string, ProcedureManifest>;
 
   constructor(
     private readonly useCases: McpUseCases,
@@ -93,6 +102,10 @@ export class McpJsonRpcDispatcher {
     private readonly options: {
       readonly surface?: McpToolSurface;
       readonly views?: ReadonlyArray<ViewManifest>;
+      /** Procedures exposed on this MCP surface via
+       *  `Trigger.source.kind: "mcp"` (#281). Adapter pre-filters
+       *  by surface; dispatcher trusts the slice. */
+      readonly procedures?: ReadonlyArray<ProcedureManifest>;
     } = {},
   ) {
     this.catalog = buildMcpToolCatalog(schemas, {
@@ -100,6 +113,7 @@ export class McpJsonRpcDispatcher {
       mediaEnabled: useCases.media !== undefined,
       mediaPurposes: useCases.media?.purposes,
       views: options.views,
+      procedures: options.procedures,
     });
     this.catalogWireJson = `{"tools":${JSON.stringify(this.catalog)}}`;
     const map = new Map<string, string>();
@@ -108,6 +122,11 @@ export class McpJsonRpcDispatcher {
     const views = new Map<string, ViewManifest>();
     for (const v of options.views ?? []) views.set(mcpToolNameSegment(v.metadata.name), v);
     this.viewBySegment = views;
+    const procs = new Map<string, ProcedureManifest>();
+    for (const p of options.procedures ?? []) {
+      procs.set(mcpToolNameSegment(p.metadata.name), p);
+    }
+    this.procedureByToolName = procs;
   }
 
   async dispatch(req: Request, auth: McpAuthContext): Promise<Response> {
@@ -184,6 +203,29 @@ export class McpJsonRpcDispatcher {
     args: Record<string, unknown>,
     auth: McpAuthContext,
   ): Promise<unknown | typeof UNKNOWN_TOOL | typeof MISSING_ARG> {
+    // Procedure-derived MCP tools (#281). Check first on every
+    // surface — a Procedure's tool name lives in the same namespace
+    // as the per-collection / per-view tools, and the catalog
+    // collision check runs at boot so we don't have to disambiguate
+    // here.
+    const procedure = this.procedureByToolName.get(name);
+    if (procedure) {
+      if (!this.useCases.invokeProcedure) return UNKNOWN_TOOL;
+      const procCtx = {
+        user: { id: auth.userId },
+        staff: auth.staff
+          ? { id: auth.staff.userId, role: auth.staff.role }
+          : null,
+        env: {},
+      };
+      return this.useCases.invokeProcedure.execute({
+        procedure,
+        input: args,
+        ctx: procCtx,
+        pathPrefix: `MCP ${name}`,
+      });
+    }
+
     if ((this.options.surface ?? "staff") === "public") {
       const viewSegment = extractCollectionSegment(name, QUERY_VIEW_PREFIX);
       if (!viewSegment) return UNKNOWN_TOOL;

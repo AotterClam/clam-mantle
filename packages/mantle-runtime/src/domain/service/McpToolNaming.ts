@@ -11,3 +11,38 @@
 export function mcpToolNameSegment(collection: string): string {
   return collection.toLowerCase().replace(/-/g, "_");
 }
+
+/**
+ * Built-in MCP tool names registered by the dispatcher regardless of
+ * manifests. A Procedure exposed via `Trigger.source.kind: "mcp"`
+ * (#281) MUST NOT mangle to any of these names — the dispatcher
+ * routes by tool name and a collision would shadow the built-in.
+ *
+ * Mirror of the `name` fields in `McpToolCatalog.GENERIC_TOOLS` plus
+ * the three media tool names. Lives here so the boot validator can
+ * reference them without an infrastructure→usecase import.
+ */
+export const RESERVED_MCP_GENERIC_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "list_entries",
+  "get_entry",
+  "request_publish",
+  "unpublish_entry",
+  "archive_entry",
+  "delete_entry",
+  "create_media_upload",
+  "upload_media_variant",
+  "commit_media_upload",
+]);
+
+/**
+ * Prefixes the catalog factory uses for Schema- / View-derived tools.
+ * A Procedure tool name that starts with any of these would shadow
+ * (or be shadowed by) a Schema's create/update tool or a View's
+ * query tool, so boot rejects the manifest set with
+ * `MCP_TOOL_NAME_COLLISION`.
+ */
+export const RESERVED_MCP_TOOL_PREFIXES: readonly string[] = [
+  "create_draft_",
+  "update_draft_",
+  "query_view_",
+];

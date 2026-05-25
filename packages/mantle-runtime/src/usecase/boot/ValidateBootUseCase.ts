@@ -9,7 +9,11 @@ import {
   type TriggerManifest,
 } from "@aotter/mantle-spec";
 import type { HandlerRegistry } from "../../domain/port/HandlerRegistry.js";
-import { mcpToolNameSegment } from "../../domain/service/McpToolNaming.js";
+import {
+  mcpToolNameSegment,
+  RESERVED_MCP_GENERIC_TOOL_NAMES,
+  RESERVED_MCP_TOOL_PREFIXES,
+} from "../../domain/service/McpToolNaming.js";
 
 /**
  * `ValidateBootUseCase` — Loop 3 of the SDK authoring contract (see
@@ -135,7 +139,9 @@ export class ValidateBootUseCase {
     //    emission lowercases + kebab→snake the Schema name; two
     //    Schemas that mangle to the same suffix would silently
     //    overwrite each other in `tools/list`.
-    diagnostics.push(...checkMcpToolNameCollisions(partitioned.schemas));
+    diagnostics.push(
+      ...checkMcpToolNameCollisions(partitioned.schemas, partitioned.procedures),
+    );
 
     // 5. Locale + translates cross-Schema invariants.
     diagnostics.push(
@@ -206,32 +212,86 @@ function checkHttpRoutePrefix(triggers: readonly TriggerManifest[]): Diagnostic[
   return out;
 }
 
-function checkMcpToolNameCollisions(schemas: readonly SchemaManifest[]): Diagnostic[] {
-  const seen = new Map<string, string>();
+interface ToolNameOwner {
+  readonly kind: "Schema" | "Procedure";
+  readonly name: string;
+}
+
+function checkMcpToolNameCollisions(
+  schemas: readonly SchemaManifest[],
+  procedures: readonly ProcedureManifest[],
+): Diagnostic[] {
+  const seen = new Map<string, ToolNameOwner>();
   const out: Diagnostic[] = [];
   for (const s of schemas) {
     const segment = mcpToolNameSegment(s.metadata.name);
     const prior = seen.get(segment);
-    if (prior && prior !== s.metadata.name) {
+    if (prior && !sameOwner(prior, "Schema", s.metadata.name)) {
       out.push(
         bootDiagnostic({
           code: "MCP_TOOL_NAME_COLLISION",
           severity: "error",
           path: `manifest:Schema/${s.metadata.name}#/metadata/name`,
           value: segment,
-          expected: `Schema name unique after kebab→snake mangling (collides with '${prior}')`,
+          expected: `Schema name unique after kebab→snake mangling (collides with '${prior.name}')`,
           message:
             `Schema '${s.metadata.name}' mangles to MCP tool suffix '${segment}', ` +
-            `which already comes from Schema '${prior}'. Rename one of the Schemas ` +
-            `(e.g. avoid mixing '${prior}' and '${s.metadata.name}') so per-collection ` +
+            `which already comes from Schema '${prior.name}'. Rename one of the Schemas ` +
+            `(e.g. avoid mixing '${prior.name}' and '${s.metadata.name}') so per-collection ` +
             `MCP tool emission stays unambiguous.`,
         }),
       );
     } else if (!prior) {
-      seen.set(segment, s.metadata.name);
+      seen.set(segment, { kind: "Schema", name: s.metadata.name });
     }
   }
+  // Procedure tool names (#281) share the catalog namespace. Reject
+  // anything that collides with a generic tool, a reserved
+  // create_draft_/update_draft_/query_view_ prefix, a schema-mangled
+  // segment, or another procedure. We don't gate by whether the
+  // Procedure has an `mcp` Trigger today — names must stay portable
+  // so an adopter can add the Trigger later without renaming.
+  for (const p of procedures) {
+    const name = mcpToolNameSegment(p.metadata.name);
+    let conflict: string | null = null;
+    if (RESERVED_MCP_GENERIC_TOOL_NAMES.has(name)) {
+      conflict = `built-in MCP tool '${name}'`;
+    } else if (RESERVED_MCP_TOOL_PREFIXES.some((pfx) => name.startsWith(pfx))) {
+      const prefix = RESERVED_MCP_TOOL_PREFIXES.find((pfx) => name.startsWith(pfx));
+      conflict = `reserved tool-name prefix '${prefix}' (used by Schema / View tools)`;
+    } else {
+      const prior = seen.get(name);
+      if (prior && !sameOwner(prior, "Procedure", p.metadata.name)) {
+        conflict = `${prior.kind} '${prior.name}'`;
+      }
+    }
+    if (conflict) {
+      out.push(
+        bootDiagnostic({
+          code: "MCP_TOOL_NAME_COLLISION",
+          severity: "error",
+          path: `manifest:Procedure/${p.metadata.name}#/metadata/name`,
+          value: name,
+          expected: `Procedure name unique after kebab→snake mangling (collides with ${conflict})`,
+          message:
+            `Procedure '${p.metadata.name}' mangles to MCP tool name '${name}', ` +
+            `which collides with ${conflict}. Rename the Procedure so its MCP tool ` +
+            `name does not shadow the existing tool surface.`,
+        }),
+      );
+      continue;
+    }
+    seen.set(name, { kind: "Procedure", name: p.metadata.name });
+  }
   return out;
+}
+
+function sameOwner(
+  prior: ToolNameOwner,
+  candidateKind: "Schema" | "Procedure",
+  candidateName: string,
+): boolean {
+  return prior.kind === candidateKind && prior.name === candidateName;
 }
 
 /**
