@@ -13,11 +13,13 @@ import {
   UnpublishUseCase,
   UpdateDraftUseCase,
 } from "../src/usecase/content/index.js";
+import { InvokeProcedureUseCase } from "../src/usecase/procedure/InvokeProcedureUseCase.js";
+import { InMemoryHandlerRegistry } from "../src/domain/port/HandlerRegistry.js";
 import type { Clock } from "../src/domain/port/Clock.js";
 import type { IdGenerator } from "../src/domain/port/IdGenerator.js";
 import { TemplateRegistry } from "../src/domain/model/TemplateRegistry.js";
 import { InMemoryEntryRepository } from "./fakes/in-memory-store.js";
-import { postsSchema, recentPostsView } from "./fakes/manifests.js";
+import { makeProcedure, postsSchema, recentPostsView } from "./fakes/manifests.js";
 
 interface Harness {
   store: InMemoryEntryRepository;
@@ -71,6 +73,47 @@ function buildHarness(schemas = [postsSchema()]): Harness {
     dispatcher: new McpJsonRpcDispatcher(useCases, schemas),
     publishCalls,
     unpublishCalls,
+  };
+}
+
+/**
+ * Build a stripped-down McpUseCases for tests that only exercise the
+ * procedure-dispatch / public-surface paths (#281). The CRUD use cases
+ * are present (the McpUseCases interface requires them) but the
+ * tests never reach them.
+ */
+function minimalUseCases(): McpUseCases {
+  const store = new InMemoryEntryRepository();
+  const schemasByName = new Map([["posts", postsSchema()]]);
+  const clock: Clock = { now: () => 0 };
+  const idgen: IdGenerator = { next: () => "x" };
+  const templates = new TemplateRegistry();
+  const effects = {
+    templates,
+    siteConfig: {
+      load: async () => ({
+        title: "T",
+        brand: "T",
+        description: "",
+        origin: "https://example.com",
+        locales: ["en"],
+        canonicalLocale: "en",
+      }),
+    },
+    publishOrchestrator: {
+      publish: async () => {},
+      unpublish: async () => {},
+    },
+  };
+  return {
+    listEntries: new ListEntriesUseCase(store, schemasByName),
+    getEntry: new GetEntryUseCase(store),
+    createDraft: new CreateDraftUseCase(store, schemasByName, clock, idgen),
+    updateDraft: new UpdateDraftUseCase(store, schemasByName, clock),
+    requestPublish: new RequestPublishUseCase(store, schemasByName, clock, effects),
+    unpublish: new UnpublishUseCase(store, schemasByName, clock, effects),
+    archive: new ArchiveUseCase(store, schemasByName, clock, effects),
+    deleteEntry: new DeleteEntryUseCase(store),
   };
 }
 
@@ -329,6 +372,115 @@ describe("McpJsonRpcDispatcher", () => {
     );
     const body = (await res.json()) as { error: { code: number } };
     expect(body.error.code).toBe(-32601);
+  });
+
+  it("Procedure-MCP trigger: tool appears in tools/list and tools/call invokes the Procedure (#281)", async () => {
+    const procedure = makeProcedure({ name: "restock-sku" });
+    const registry = new InMemoryHandlerRegistry();
+    const calls: Array<{ msg: string; userId: string | undefined; role: string | null }> = [];
+    registry.register("echoHandler", (input, ctx) => {
+      calls.push({ msg: (input as { msg: string }).msg, userId: ctx.user?.id, role: ctx.staff?.role ?? null });
+      return { ok: true };
+    });
+    const invokeProcedure = new InvokeProcedureUseCase(registry);
+    const dispatcher = new McpJsonRpcDispatcher(
+      { ...minimalUseCases(), invokeProcedure },
+      [],
+      { surface: "staff", procedures: [procedure] },
+    );
+    const list = (await (
+      await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" })
+    ).json()) as { result: { tools: { name: string }[] } };
+    const names = list.result.tools.map((t) => t.name);
+    expect(names).toContain("restock_sku");
+
+    const callRes = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", { name: "restock_sku", arguments: { msg: "hi" } }),
+      { userId: "u1", staff: { userId: "u1", role: "owner" } },
+    );
+    const body = (await callRes.json()) as {
+      result?: { content: { text: string }[] };
+      error?: unknown;
+    };
+    expect(body.error).toBeUndefined();
+    expect(body.result).toBeDefined();
+    const inner = JSON.parse(body.result!.content[0]!.text) as {
+      ok: boolean;
+      data?: { ok: boolean };
+    };
+    expect(inner.ok).toBe(true);
+    expect(calls).toEqual([{ msg: "hi", userId: "u1", role: "owner" }]);
+  });
+
+  it("Procedure-MCP trigger on public surface: tool appears alongside Views, not staff tools (#281)", async () => {
+    const procedure = makeProcedure({ name: "lookup-price" });
+    const registry = new InMemoryHandlerRegistry();
+    registry.register("echoHandler", () => ({ ok: true }));
+    const invokeProcedure = new InvokeProcedureUseCase(registry);
+    const dispatcher = new McpJsonRpcDispatcher(
+      { ...minimalUseCases(), invokeProcedure },
+      [postsSchema()],
+      {
+        surface: "public",
+        views: [recentPostsView()],
+        procedures: [procedure],
+      },
+    );
+    const list = (await (
+      await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" })
+    ).json()) as { result: { tools: { name: string }[] } };
+    const names = list.result.tools.map((t) => t.name);
+    expect(names).toContain("lookup_price");
+    expect(names).toContain("query_view_recent_posts");
+    expect(names).not.toContain("create_draft_posts");
+    expect(names).not.toContain("list_entries");
+  });
+
+  it("Procedure-MCP trigger: requires.auth.all enforces the predicate, returning AUTH_DENIED for missing staff (#281)", async () => {
+    const procedure = makeProcedure({
+      name: "restock-sku",
+      authPredicates: [{ "ctx.staff": ["owner"] }],
+    });
+    const registry = new InMemoryHandlerRegistry();
+    registry.register("echoHandler", () => ({ ok: true }));
+    const dispatcher = new McpJsonRpcDispatcher(
+      { ...minimalUseCases(), invokeProcedure: new InvokeProcedureUseCase(registry) },
+      [],
+      { surface: "staff", procedures: [procedure] },
+    );
+    // Bearer authenticated but no staff role: invokeProcedure returns
+    // AUTH_DENIED, which the dispatcher wraps in the JSON-RPC result
+    // (not as a -32000 error — the use case's `{ok: false}` IS the
+    // payload, same shape as builtin op denials).
+    const res = await dispatcher.dispatch(
+      jsonRpcReq("tools/call", { name: "restock_sku", arguments: { msg: "x" } }),
+      { userId: "u1", staff: null },
+    );
+    const body = (await res.json()) as {
+      result?: { content: { text: string }[] };
+    };
+    const inner = JSON.parse(body.result!.content[0]!.text) as {
+      ok: boolean;
+      diagnostic?: { code: string };
+    };
+    expect(inner.ok).toBe(false);
+    expect(inner.diagnostic?.code).toBe("AUTH_DENIED");
+  });
+
+  it("Procedure tool name uses kebab→snake mangling (#281)", async () => {
+    const procedure = makeProcedure({ name: "snapshot-inventory" });
+    const dispatcher = new McpJsonRpcDispatcher(
+      {
+        ...minimalUseCases(),
+        invokeProcedure: new InvokeProcedureUseCase(new InMemoryHandlerRegistry()),
+      },
+      [],
+      { surface: "staff", procedures: [procedure] },
+    );
+    const list = (await (
+      await dispatcher.dispatch(jsonRpcReq("tools/list"), { userId: "u1" })
+    ).json()) as { result: { tools: { name: string }[] } };
+    expect(list.result.tools.map((t) => t.name)).toContain("snapshot_inventory");
   });
 
   it("rejects non-POST methods", async () => {

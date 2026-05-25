@@ -133,6 +133,22 @@ export function makeLifecycleTrigger(opts: {
   };
 }
 
+export function makeMcpTrigger(opts: {
+  readonly name?: string;
+  readonly procedure: string;
+  readonly surface?: "staff" | "public";
+}): TriggerManifest {
+  return {
+    apiVersion: "cms.mantle.aotter.net/v1",
+    kind: "Trigger",
+    metadata: { name: opts.name ?? `${opts.procedure}-mcp` },
+    spec: {
+      source: { kind: "mcp", surface: opts.surface ?? "staff" },
+      target: { procedure: opts.procedure },
+    },
+  };
+}
+
 export function makeBuiltinProcedure(opts: {
   readonly name?: string;
   readonly schema?: string;

@@ -8,6 +8,7 @@ import {
   API_VERSION,
   BUILTIN_OPS,
   LIFECYCLE_HOOKS,
+  MCP_TRIGGER_SURFACES,
   STAFF_ROLES,
   VIEW_PARAMS_RESERVED,
   isParamRef,
@@ -71,9 +72,12 @@ const KNOWN_KINDS: ReadonlySet<ManifestKind> = new Set([
   "Trigger",
 ]);
 
-const V01_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set(["http", "lifecycle"]);
-const DRAFT_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set([
+const V01_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set([
+  "http",
+  "lifecycle",
   "mcp",
+]);
+const DRAFT_TRIGGER_SOURCE_KINDS: ReadonlySet<string> = new Set([
   "cron",
   "queue",
 ]);
@@ -89,6 +93,7 @@ const V01_HANDLER_KINDS: ReadonlySet<string> = new Set(["ref", "builtin"]);
 const V01_BUILTIN_OPS: ReadonlySet<BuiltinOp> = new Set(BUILTIN_OPS);
 const V01_LIFECYCLE_HOOKS: ReadonlySet<LifecycleHook> = new Set(LIFECYCLE_HOOKS);
 const V01_HOOK_ERROR_POLICIES: ReadonlySet<string> = new Set(["abort", "continue"]);
+const V01_MCP_TRIGGER_SURFACES: ReadonlySet<string> = new Set(MCP_TRIGGER_SURFACES);
 const DRAFT_FILTER_OPS: ReadonlySet<string> = new Set(["contains", "not", "in", "like"]);
 const V01_LIFECYCLE_MODES: ReadonlySet<string> = new Set(["simple", "editorial"]);
 
@@ -757,6 +762,31 @@ function validateLifecycleSource(source: Record<string, unknown>, idx: number): 
   }
 }
 
+function validateMcpSource(source: Record<string, unknown>, idx: number): void {
+  const surface = source["surface"];
+  if (typeof surface !== "string" || !V01_MCP_TRIGGER_SURFACES.has(surface)) {
+    throw new ManifestParseError(
+      `Trigger.spec.source.surface must be one of ${[...V01_MCP_TRIGGER_SURFACES].join(", ")}; got ${JSON.stringify(surface)}`,
+      idx,
+      "/spec/source/surface",
+    );
+  }
+  if ("method" in source || "path" in source) {
+    throw new ManifestParseError(
+      "Trigger.spec.source.{method,path} are invalid when source.kind is 'mcp' (those keys belong to source.kind: 'http')",
+      idx,
+      "/spec/source",
+    );
+  }
+  if ("schema" in source || "on" in source || "errorPolicy" in source) {
+    throw new ManifestParseError(
+      "Trigger.spec.source.{schema,on,errorPolicy} are invalid when source.kind is 'mcp' (those keys belong to source.kind: 'lifecycle')",
+      idx,
+      "/spec/source",
+    );
+  }
+}
+
 function validateTriggerSpec(m: TriggerManifest, idx: number): TriggerManifest {
   const s = m.spec as unknown as Record<string, unknown>;
   const source = s["source"] as Record<string, unknown> | undefined;
@@ -788,6 +818,7 @@ function validateTriggerSpec(m: TriggerManifest, idx: number): TriggerManifest {
   }
   if (sourceKind === "http") validateHttpSource(source, idx);
   else if (sourceKind === "lifecycle") validateLifecycleSource(source, idx);
+  else if (sourceKind === "mcp") validateMcpSource(source, idx);
   const target = s["target"] as Record<string, unknown> | undefined;
   if (!target || typeof target["procedure"] !== "string") {
     throw new ManifestParseError("Trigger.spec.target.procedure is required (string)", idx, "/spec/target/procedure");

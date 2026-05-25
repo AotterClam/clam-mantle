@@ -1,7 +1,9 @@
 import {
   MANTLE_BIND_KEYWORD,
   expandPolicyRequired,
+  type JsonSchema,
   type MediaPurposePolicy,
+  type ProcedureManifest,
   type SchemaManifest,
   type ViewManifest,
 } from "@aotter/mantle-spec";
@@ -291,6 +293,11 @@ export interface BuildMcpToolCatalogOpts {
    *  surface exposes only read-only View queries for v0.1. */
   readonly surface?: McpToolSurface;
   readonly views?: ReadonlyArray<ViewManifest>;
+  /** Procedures exposed on this MCP surface via `Trigger.source.kind: "mcp"`
+   *  (#281). The adapter pre-filters Triggers by surface and passes the
+   *  matching Procedures here. The catalog factory does NOT re-filter
+   *  by surface — caller is authoritative. */
+  readonly procedures?: ReadonlyArray<ProcedureManifest>;
 }
 
 export function buildMcpToolCatalog(
@@ -298,8 +305,9 @@ export function buildMcpToolCatalog(
   opts: BuildMcpToolCatalogOpts = {},
 ): readonly McpToolDefinition[] {
   const surface = opts.surface ?? "staff";
+  const procedureTools = (opts.procedures ?? []).map(buildProcedureTool);
   if (surface === "public") {
-    return (opts.views ?? []).map(buildQueryViewTool);
+    return [...(opts.views ?? []).map(buildQueryViewTool), ...procedureTools];
   }
   const out: McpToolDefinition[] = [...GENERIC_TOOLS];
   if (opts.mediaEnabled) out.push(...buildMediaTools(opts.mediaPurposes ?? []));
@@ -307,6 +315,7 @@ export function buildMcpToolCatalog(
     out.push(buildCreateTool(s));
     out.push(buildUpdateTool(s));
   }
+  out.push(...procedureTools);
   return out;
 }
 
@@ -358,6 +367,30 @@ function buildUpdateTool(schema: SchemaManifest): McpToolDefinition {
     name: `${UPDATE_DRAFT_PREFIX}${mcpToolNameSegment(schema.metadata.name)}`,
     description: describeUpdateTool(schema),
     inputSchema,
+  };
+}
+
+/**
+ * Per-Procedure MCP tool factory (#281). The Procedure's `input`
+ * JSON Schema becomes the tool's `inputSchema` verbatim; the
+ * description comes from `input.description` when set, otherwise a
+ * generic stub naming the Procedure. `output` is not surfaced — MCP
+ * clients infer the response shape from the `tools/call` result.
+ *
+ * Naming: the tool name is the Procedure's metadata name mangled
+ * through `mcpToolNameSegment` (lowercase + `-`→`_`). Boot validates
+ * that the mangled name does not collide with generic tools, media
+ * tools, or per-schema authoring tools.
+ */
+function buildProcedureTool(procedure: ProcedureManifest): McpToolDefinition {
+  const input: JsonSchema = procedure.spec.input;
+  const description =
+    input.description ??
+    `Invoke Procedure '${procedure.metadata.name}'. Input shape declared by the manifest.`;
+  return {
+    name: mcpToolNameSegment(procedure.metadata.name),
+    description,
+    inputSchema: input as Record<string, unknown>,
   };
 }
 

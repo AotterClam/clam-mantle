@@ -84,6 +84,62 @@ describe("ValidateBootUseCase", () => {
     expect(codes).toContain("TRIGGER_PATH_INVALID");
   });
 
+  it("fails with MCP_TOOL_NAME_COLLISION when a Procedure mangles to a built-in MCP tool (#281)", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("echoHandler", () => ({ ok: true }));
+    // Procedure named "list-entries" mangles to "list_entries", which
+    // is a built-in MCP tool. Reject at boot — without this gate the
+    // dispatcher's name lookup would silently route to the procedure
+    // and shadow the built-in.
+    const result = new ValidateBootUseCase().execute({
+      manifests: [makeProcedure({ name: "list-entries" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const collision = result.diagnostics.find((d) => d.code === "MCP_TOOL_NAME_COLLISION");
+    expect(collision).toBeDefined();
+    expect(collision?.message).toMatch(/built-in MCP tool/);
+  });
+
+  it("fails with MCP_TOOL_NAME_COLLISION when a Procedure starts with a reserved tool-name prefix (#281)", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("echoHandler", () => ({ ok: true }));
+    const result = new ValidateBootUseCase().execute({
+      manifests: [makeProcedure({ name: "create-draft-shenanigan" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const collision = result.diagnostics.find((d) => d.code === "MCP_TOOL_NAME_COLLISION");
+    expect(collision).toBeDefined();
+    expect(collision?.message).toMatch(/reserved tool-name prefix/);
+  });
+
+  it("fails with MCP_TOOL_NAME_COLLISION when a Procedure mangles to an existing Schema's tool segment (#281)", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("echoHandler", () => ({ ok: true }));
+    const result = new ValidateBootUseCase().execute({
+      manifests: [postsSchema(), makeProcedure({ name: "posts" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const collision = result.diagnostics.find((d) => d.code === "MCP_TOOL_NAME_COLLISION");
+    expect(collision).toBeDefined();
+    expect(collision?.message).toMatch(/Schema 'posts'/);
+  });
+
+  it("passes when Procedure name is unique and outside the reserved namespace (#281)", () => {
+    const reg = new InMemoryHandlerRegistry();
+    reg.register("echoHandler", () => ({ ok: true }));
+    const result = new ValidateBootUseCase().execute({
+      manifests: [postsSchema(), makeProcedure({ name: "restock-sku" })],
+      registry: reg,
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("assert() throws BootValidationError on failure", () => {
     const reg = new InMemoryHandlerRegistry();
     expect(() =>

@@ -306,6 +306,88 @@ spec:
     expect(messages).toMatch(/abort.*after_/);
   });
 
+  it("accepts Trigger.source.kind: 'mcp' with surface: staff (#281 promotion)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: restockSkuMcp }
+spec:
+  source:
+    kind: mcp
+    surface: staff
+  target: { procedure: restockSku }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.manifests).toHaveLength(1);
+    const trig = result.manifests[0] as TriggerManifest;
+    expect(trig.spec.source.kind).toBe("mcp");
+    if (trig.spec.source.kind === "mcp") {
+      expect(trig.spec.source.surface).toBe("staff");
+    }
+  });
+
+  it("accepts Trigger.source.kind: 'mcp' with surface: public", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: lookupPriceMcp }
+spec:
+  source:
+    kind: mcp
+    surface: public
+  target: { procedure: lookupPrice }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("rejects Trigger.source.kind: 'mcp' without a surface", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: bareMcp }
+spec:
+  source: { kind: mcp }
+  target: { procedure: somewhere }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.message).join("\n")).toMatch(
+      /surface must be one of/,
+    );
+  });
+
+  it("rejects Trigger.source.kind: 'mcp' with an unknown surface", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: wrongSurface }
+spec:
+  source:
+    kind: mcp
+    surface: admin
+  target: { procedure: x }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.message).join("\n")).toMatch(
+      /surface must be one of/,
+    );
+  });
+
+  it("rejects Trigger.source.kind: 'mcp' mixed with http keys (method/path)", () => {
+    const yaml = `apiVersion: cms.mantle.aotter.net/v1
+kind: Trigger
+metadata: { name: mixedKeys }
+spec:
+  source:
+    kind: mcp
+    surface: staff
+    method: POST
+    path: /api/foo
+  target: { procedure: bar }
+`;
+    const result = parseManifests(yaml);
+    expect(result.diagnostics.map((d) => d.message).join("\n")).toMatch(
+      /method,path.*are invalid when source.kind is 'mcp'/,
+    );
+  });
+
   it("rejects errorPolicy: 'abort' when an after_* hook is mixed with before_* hooks", () => {
     // Regression: the prior guard used `.every(after_*)`, so a mixed
     // list of before + after with abort silently passed even though

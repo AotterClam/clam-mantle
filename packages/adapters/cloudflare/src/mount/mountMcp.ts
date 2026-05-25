@@ -1,5 +1,10 @@
 import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
-import type { StaffRole, ViewManifest } from "@aotter/mantle-spec";
+import type {
+  ProcedureManifest,
+  StaffRole,
+  TriggerManifest,
+  ViewManifest,
+} from "@aotter/mantle-spec";
 import { STAFF_ROLE_SET } from "../auth/createAuth.js";
 import type { OAuthApiProps } from "../oauth/mountOAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
@@ -91,6 +96,7 @@ export function createMcpApiHandler(
             archive: runtime.archive,
             deleteEntry: runtime.deleteEntry,
             executeView: runtime.executeView,
+            invokeProcedure: runtime.invokeProcedure,
             media: mediaEnabled && runtime.media
               ? {
                   createUpload: runtime.media.createUpload,
@@ -104,6 +110,7 @@ export function createMcpApiHandler(
           {
             surface,
             views: ref.manifests.filter((m): m is ViewManifest => m.kind === "View"),
+            procedures: collectMcpProcedures(runtime.triggers, runtime.proceduresByName, surface),
           },
         );
         cached = { mediaPurposesKey, dispatcher };
@@ -127,4 +134,27 @@ function forbidden(): Response {
       "access-control-expose-headers": "WWW-Authenticate",
     },
   });
+}
+
+/**
+ * Collect Procedures bound to MCP Triggers on the given surface (#281).
+ * The Trigger declares `source: { kind: "mcp", surface: "<staff|public>" }`;
+ * we resolve `target.procedure` against the runtime's procedure map
+ * and return only the matches. Triggers pointing at unknown procedures
+ * are silently dropped here — boot validation already rejects those
+ * with TRIGGER_TARGET_PROCEDURE_UNKNOWN before we get this far.
+ */
+function collectMcpProcedures(
+  triggers: readonly TriggerManifest[],
+  proceduresByName: ReadonlyMap<string, ProcedureManifest>,
+  surface: "staff" | "public",
+): readonly ProcedureManifest[] {
+  const out: ProcedureManifest[] = [];
+  for (const t of triggers) {
+    if (t.spec.source.kind !== "mcp") continue;
+    if (t.spec.source.surface !== surface) continue;
+    const p = proceduresByName.get(t.spec.target.procedure);
+    if (p) out.push(p);
+  }
+  return out;
 }

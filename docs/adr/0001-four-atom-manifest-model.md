@@ -335,8 +335,9 @@ forces it.
 - Procedure: `requires.auth.{any | all}` with disjunction;
   `owns:`, `contains:`, `withinMinutes:`, `requires.window`,
   `requires.quota`, `errors`, `retry`
-- Trigger: `source.kind: {mcp, cron, queue}`,
+- Trigger: `source.kind: {cron, queue}`,
   `target.project`, `atomicity`
+  (`source.kind: mcp` was promoted in alpha.16 — #281)
 - Cross-cutting: `ctx.system`, `$.*` placeholder namespace,
   `staffBypass:`
 
