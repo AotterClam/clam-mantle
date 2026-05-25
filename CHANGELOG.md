@@ -6,6 +6,37 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 <!-- No [Unreleased] section. Entries are written at release time per CONTRIBUTING.md § Changelog and docs/release-process.md § Normal release playbook step 2. -->
 
+## [0.0.11-alpha.16] - 2026-05-25
+
+### Added
+
+- **`@aotter/mantle-spec`**: `Trigger.source.kind: "mcp"` is promoted
+  from DRAFT to v0.1 (#281). A Trigger may now declare
+  `source: { kind: "mcp", surface: "staff" | "public" }` to expose
+  its target Procedure as a tool on the matching MCP endpoint. The
+  Procedure's own `requires.auth` continues to gate the call; the
+  surface only controls discovery in `tools/list`. ADR-0001 updated.
+- **`@aotter/mantle-runtime`**: per-Procedure MCP tools land in
+  `McpJsonRpcDispatcher` for both surfaces. The dispatcher accepts an
+  `invokeProcedure` use case and a procedure list, routes tool calls
+  by mangled tool name, and plumbs the bearer-derived McpAuthContext
+  into `ctx.{user,staff}` so `requires.auth.all` fires the same way
+  HTTP Triggers do (#281). `ValidateBootUseCase` extends
+  `MCP_TOOL_NAME_COLLISION` to flag Procedures whose mangled name
+  collides with built-in tools, reserved `create_draft_` /
+  `update_draft_` / `query_view_` prefixes, or an existing Schema's
+  segment.
+
+### Fixed
+
+- **`@aotter/mantle-cloudflare`**: HTTP Trigger ctx now populates
+  `user` and `staff` from the Better Auth cookie session instead of
+  hardcoded `null`. Any Procedure declaring
+  `requires.auth.all: [{ "ctx.staff": [<role>] }]` is now reachable
+  over HTTP for staff callers; bearer-only callers still belong on
+  the MCP surface (#299, #281). `handleHttpTrigger` mirrors
+  `handleViewRequest`'s 401-vs-403 discipline.
+
 ## [0.0.11-alpha.15] - 2026-05-24
 
 ### Added
