@@ -494,6 +494,14 @@ async function handleViewRequest(
  *
  * Used by both `handleViewRequest` and `handleHttpTrigger` so the
  * two HTTP surfaces resolve identity identically.
+ *
+ * Note: this resolves cookie sessions only. OAuth bearer tokens
+ * (issued by `createOAuthProvider` for MCP callers) are NOT verified
+ * here — bearer-authenticated identity belongs on the MCP surface,
+ * not the HTTP Trigger surface, so a bearer-only caller hitting an
+ * auth-gated Trigger will land at the 401 branch in
+ * `handleHttpTrigger`. Procedures that need to be agent-callable
+ * should be reached via `/mcp` or `/mcp/staff` (see #281).
  */
 async function buildCallerContext(
   req: Request,

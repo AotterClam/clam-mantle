@@ -141,6 +141,64 @@ describe("mountServerEndpoints: HTTP Trigger ctx plumbing (#299)", () => {
     expect(body.data).toEqual({ ok: true });
   });
 
+  it("allows a signed-in customer through `ctx.user` predicate (no staff required)", async () => {
+    // `requires.auth.all: ["ctx.user"]` means "any signed-in user".
+    // A customer session (role: null) should pass, distinguishing
+    // ctx.user (signed-in) from ctx.staff (signed-in + role).
+    const userOnlyManifests: Manifest[] = [
+      {
+        apiVersion,
+        kind: "Procedure",
+        metadata: { name: "user-only-op" },
+        spec: {
+          input: { type: "object" },
+          output: { type: "object" },
+          handler: { kind: "ref", ref: "userOnlyOp" },
+          requires: { auth: { all: ["ctx.user"] } },
+        },
+      },
+      {
+        apiVersion,
+        kind: "Trigger",
+        metadata: { name: "user-only-http" },
+        spec: {
+          source: { kind: "http", method: "POST", path: "/api/user-only" },
+          target: { procedure: "user-only-op" },
+        },
+      },
+    ];
+    const ref = createCmsRef({
+      manifests: userOnlyManifests,
+      handlers: { userOnlyOp: () => ({ ok: true }) },
+      bindings: {
+        db: new InMemoryDatabase(),
+        kv: new InMemoryKv(),
+        assets: new StubAssetServer(),
+      },
+      auth: authFake({ role: null }),
+    });
+    const app = new Hono();
+    mountServerEndpoints(app, ref);
+    const res = await app.request("/api/user-only", { method: "POST" });
+    expect(res.status).toBe(200);
+  });
+
+  it("bearer-token-only caller (no cookie) hits the 401 branch — bearer auth is the MCP surface, not HTTP Trigger", async () => {
+    // `buildCallerContext` resolves cookie sessions only. A request
+    // with `Authorization: Bearer …` and no cookie should NOT silently
+    // be treated as authenticated by the HTTP Trigger handler. The
+    // stub auth's `getSession` returns null for any request without a
+    // valid cookie, which is what we exercise here.
+    const app = buildApp(authFake(null));
+    const res = await app.request("/api/staff-only", {
+      method: "POST",
+      headers: { authorization: "Bearer some-token" },
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { diagnostic?: { code: string } };
+    expect(body.diagnostic?.code).toBe("UNAUTHENTICATED");
+  });
+
   it("falls back to a guest ctx (no 401) when Procedure has no requires.auth", async () => {
     // Procedures without requires.auth must remain reachable
     // anonymously — the 401 pre-check only fires when the manifest
