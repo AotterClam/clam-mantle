@@ -470,13 +470,20 @@ describe("McpJsonRpcDispatcher", () => {
   it("Procedure-MCP trigger does not shadow public-surface View routing when names don't match (#281)", async () => {
     // Procedures are checked first on every surface, but a non-match
     // must fall through to the existing routing — View tool calls
-    // should still dispatch to executeView with procedures
-    // configured.
+    // must still dispatch to executeView even when procedures are
+    // configured on the dispatcher.
     const procedure = makeProcedure({ name: "restock-sku" });
+    const executeViewCalls: Array<{ pathPrefix?: string }> = [];
+    const fakeExecuteView = {
+      execute: async (req: { pathPrefix?: string }) => {
+        executeViewCalls.push({ pathPrefix: req.pathPrefix });
+        return { ok: true, result: { rows: [], page: 1, show: 25, hasMore: false } };
+      },
+    } as unknown as McpUseCases["executeView"];
     const dispatcher = new McpJsonRpcDispatcher(
       {
         ...minimalUseCases(),
-        executeView: undefined,
+        executeView: fakeExecuteView,
         invokeProcedure: new InvokeProcedureUseCase(new InMemoryHandlerRegistry()),
       },
       [postsSchema()],
@@ -490,12 +497,21 @@ describe("McpJsonRpcDispatcher", () => {
       jsonRpcReq("tools/call", { name: "query_view_recent_posts", arguments: {} }),
       { userId: "u1" },
     );
-    const body = (await res.json()) as { error?: { code: number } };
-    // executeView is unset, so the call ends in UNKNOWN_TOOL — but
-    // the important signal is that the procedure check did NOT
-    // short-circuit it as "unknown procedure". The dispatcher must
-    // fall through to the View branch.
-    expect(body.error?.code).toBe(-32601);
+    const body = (await res.json()) as {
+      result?: { content: { text: string }[] };
+      error?: unknown;
+    };
+    expect(body.error).toBeUndefined();
+    // executeView must have been invoked — proves the procedure-first
+    // check correctly fell through instead of short-circuiting as
+    // UNKNOWN_TOOL.
+    expect(executeViewCalls).toHaveLength(1);
+    expect(executeViewCalls[0]?.pathPrefix).toMatch(/^MCP query_view_recent_posts$/);
+    const inner = JSON.parse(body.result!.content[0]!.text) as {
+      ok: boolean;
+      result?: { rows: unknown[] };
+    };
+    expect(inner.ok).toBe(true);
   });
 
   it("Procedure-MCP trigger on public surface still enforces requires.auth.all: ctx.staff (#281)", async () => {
