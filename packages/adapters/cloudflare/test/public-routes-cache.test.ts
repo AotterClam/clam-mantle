@@ -200,9 +200,9 @@ describe("mountPublicRoutes read-through cache", () => {
     expect(res.status).toBe(200);
   });
 
-  it("preview returns 403 when getUserRole returns a non-admin role string", async () => {
+  it("preview returns 403 when getUserRole returns a non-staff role string", async () => {
     // Defends against future extension where getUserRole might return
-    // a custom role (e.g. "viewer") not in ADMIN_ROLE_SET.
+    // a custom role (e.g. "viewer") not in STAFF_ROLE_SET.
     const oddRoleAuth: Auth = {
       handler: async () => new Response(null, { status: 404 }),
       getSession: async () => ({

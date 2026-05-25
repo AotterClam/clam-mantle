@@ -14,7 +14,7 @@ import {
   type KvCache,
 } from "@aotter/mantle-runtime";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
-import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
+import { STAFF_ROLE_SET } from "../auth/createAuth.js";
 
 /**
  * `mountPublicRoutes` — mounts the SDK-managed public surface on the
@@ -340,7 +340,7 @@ async function assertStaffSession(
   const session = await ref.auth.getSession(req);
   if (!session) return new Response("unauthorized", { status: 401 });
   const role = await ref.auth.getUserRole(session.user.id);
-  if (!role || !ADMIN_ROLE_SET.has(role)) {
+  if (!role || !STAFF_ROLE_SET.has(role)) {
     return new Response("forbidden", { status: 403 });
   }
   return null;

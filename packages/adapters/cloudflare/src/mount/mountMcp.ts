@@ -1,6 +1,6 @@
 import { McpJsonRpcDispatcher } from "@aotter/mantle-runtime";
 import type { StaffRole, ViewManifest } from "@aotter/mantle-spec";
-import { ADMIN_ROLE_SET } from "../auth/createAuth.js";
+import { STAFF_ROLE_SET } from "../auth/createAuth.js";
 import type { OAuthApiProps } from "../oauth/mountOAuth.js";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
 
@@ -59,7 +59,7 @@ export function createMcpApiHandler(
       const props = (ctx as unknown as { props?: OAuthApiProps }).props;
       if (!props?.userId) return forbidden();
       const role = props.role;
-      if (surface === "staff" && (!role || !ADMIN_ROLE_SET.has(role))) {
+      if (surface === "staff" && (!role || !STAFF_ROLE_SET.has(role))) {
         return forbidden();
       }
       const runtime = await ref.get();
@@ -111,7 +111,7 @@ export function createMcpApiHandler(
       }
       return cached.dispatcher.dispatch(request, {
         userId: props.userId,
-        staff: role && ADMIN_ROLE_SET.has(role)
+        staff: role && STAFF_ROLE_SET.has(role)
           ? { userId: props.userId, role: role as StaffRole }
           : null,
       });

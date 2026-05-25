@@ -3,10 +3,15 @@ import { admin, emailOTP, magicLink } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { defaultStatements } from "better-auth/plugins/admin/access";
 import type { EmailSender } from "@aotter/mantle-runtime";
+import { STAFF_ROLES, type StaffRole } from "@aotter/mantle-spec";
 
-export const ADMIN_ROLES = ["contributor", "editor", "owner"] as const;
-export type AdminRole = (typeof ADMIN_ROLES)[number];
-export const ADMIN_ROLE_SET: ReadonlySet<string> = new Set(ADMIN_ROLES);
+export { STAFF_ROLES, type StaffRole };
+/**
+ * Set lookup for "is this role string a staff role?" — handlers/MCP
+ * gating reach for this every request, so the Set form is worth the
+ * one-time allocation over `STAFF_ROLES.includes(x)`.
+ */
+export const STAFF_ROLE_SET: ReadonlySet<string> = new Set(STAFF_ROLES);
 
 /**
  * Provider id for the `kind: "social"` method. Mirrors Better Auth's
@@ -456,7 +461,7 @@ function buildAuth(config: CreateAuthConfig) {
   const sdkPlugins = [
     admin({
       defaultRole: "user",
-      adminRoles: [...ADMIN_ROLES],
+      adminRoles: [...STAFF_ROLES],
       ac,
       roles: {
         owner: ownerAc,
@@ -516,24 +521,24 @@ function buildAuth(config: CreateAuthConfig) {
     if (!shouldPromoteToOwner(bootstrap, u)) return;
 
     // Atomic check-then-promote: the `NOT EXISTS` is a GLOBAL guard —
-    // it asks "does any user already hold an admin role?". The whole
+    // it asks "does any user already hold a staff role?". The whole
     // statement runs as one D1 op, so two concurrent first signups
-    // can't both win: the loser's UPDATE finds an admin in the
+    // can't both win: the loser's UPDATE finds a staff user in the
     // subquery and silently writes zero rows.
-    const placeholders = ADMIN_ROLES.map(() => "?").join(",");
+    const placeholders = STAFF_ROLES.map(() => "?").join(",");
     const result = await config.database
       .prepare(
         `UPDATE user SET role = ? WHERE id = ? AND NOT EXISTS (SELECT 1 FROM user WHERE role IN (${placeholders}))`,
       )
-      .bind("owner", u.id, ...ADMIN_ROLES)
+      .bind("owner", u.id, ...STAFF_ROLES)
       .run();
     if ((result.meta?.changes ?? 0) === 0) {
       // Operator-visible signal that the rule matched but a prior
-      // admin already exists — otherwise the silent no-op makes a
+      // staff user already exists — otherwise the silent no-op makes a
       // misconfigured bootstrap rule indistinguishable from a working
       // first-promotion.
       console.warn(
-        `[bootstrap] user ${u.id} matched bootstrapOwner rule but promotion was blocked — an admin user already exists.`,
+        `[bootstrap] user ${u.id} matched bootstrapOwner rule but promotion was blocked — a staff user already exists.`,
       );
     }
   };

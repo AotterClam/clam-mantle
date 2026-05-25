@@ -21,7 +21,7 @@ import {
 } from "@aotter/mantle-runtime";
 import { indexHtml } from "@aotter/mantle-admin-ui";
 import type { CmsRuntimeRef } from "./bootRuntimeOnce.js";
-import { ADMIN_ROLE_SET, type AdminRole, type Auth } from "../auth/createAuth.js";
+import { STAFF_ROLE_SET, type StaffRole, type Auth } from "../auth/createAuth.js";
 import { AOTTER_FAVICON_SVG } from "../assets/aotterFavicon.js";
 
 const [PAGE_PARAM, SHOW_PARAM] = VIEW_PARAMS_RESERVED;
@@ -318,7 +318,7 @@ type AdminGate =
       kind: "ok";
       userId: string;
       login: string | null;
-      role: AdminRole;
+      role: StaffRole;
     };
 
 async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
@@ -326,14 +326,14 @@ async function readAdminGate(c: Context, auth: Auth): Promise<AdminGate> {
   if (!session) return { kind: "unauth" };
   const role = session.user.role ?? null;
   const login = session.user.githubLogin ?? null;
-  if (!role || !ADMIN_ROLE_SET.has(role)) {
+  if (!role || !STAFF_ROLE_SET.has(role)) {
     return { kind: "forbidden", login };
   }
   return {
     kind: "ok",
     userId: session.user.id,
     login,
-    role: role as AdminRole,
+    role: role as StaffRole,
   };
 }
 
@@ -478,8 +478,8 @@ async function buildViewCtx(
   if (!session) return undefined;
   const wu = waitUntil ? { waitUntil } : {};
   const role = await auth.getUserRole(session.user.id);
-  const staff = role && ADMIN_ROLE_SET.has(role)
-    ? { id: session.user.id, role: role as AdminRole }
+  const staff = role && STAFF_ROLE_SET.has(role)
+    ? { id: session.user.id, role: role as StaffRole }
     : null;
   return { user: { id: session.user.id }, staff, env: {}, ...wu };
 }
