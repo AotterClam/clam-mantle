@@ -58,8 +58,8 @@ export function checkLocaleAndTranslates(input: CrossSchemaCheckInput): Diagnost
           severity: "error",
           path: "site_config/locales",
           value: invalid,
-          expected: "BCP 47 locale tags (e.g. 'en' or 'zh-TW', case-insensitive)",
-          message: `site_config.locales contains invalid entries: ${invalid.map((s) => `'${s}'`).join(", ")}. Fix via the Settings page or DB directly.`,
+          expected: "Mantle v0.1 locale tags (e.g. 'en' or 'zh-TW', case-insensitive; script subtags are unsupported)",
+          message: `site_config.locales contains invalid entries: ${invalid.map((s) => `'${s}'`).join(", ")}. Use language plus optional 2-letter region (for example 'zh-TW', not 'zh-Hant') and fix via the Settings page or DB directly.`,
         }),
       );
     }

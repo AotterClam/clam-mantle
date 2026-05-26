@@ -164,10 +164,18 @@ requiring the operator to do it manually.
 
 ### Canonicalization
 
-BCP 47 canonical form is **language case-folded, region uppercased**:
-`en-US`, `zh-TW`, `pt-BR`. The runtime accepts any case on input
-(`en-us`, `EN-US`, `en-US` all match) but stores and compares
-canonically.
+Mantle v0.1 accepts a narrow locale subset: **2/3-letter language,
+optionally followed by a 2-letter region**. Canonical form is language
+case-folded, region uppercased: `en-US`, `zh-TW`, `pt-BR`. The runtime
+accepts any case on input (`en-us`, `EN-US`, `en-US` all match) but
+stores and compares canonically.
+
+Script subtags are intentionally out of scope for v0.1 even though they
+are valid BCP 47. Do not configure `zh-Hant`, `zh-Hans`, `sr-Latn`, or
+`sr-Cyrl`; use the region form instead (`zh-TW` for Traditional
+Chinese, `zh-CN` for Simplified Chinese, and the relevant region tag for
+other languages). Widening to full BCP 47 requires URL routing,
+locale-negotiation, and matching semantics to grow together.
 
 - The URL-form locale (e.g. on a `/zh-tw/posts/...` path) is lowercased
   for cosmetics; the canonical storage form is `zh-TW`. Render-side
@@ -408,9 +416,10 @@ intent:
 When configuring a new consumer:
 
 1. If the site has any locales, declare them in
-   `CmsConfig.siteDefaults.locales` in the canonical BCP 47 form
-   (`'en'`, `'zh-TW'`, never `'en-US'` if you mean `'en'`). The boot
-   check rejects malformed tags synchronously.
+   `CmsConfig.siteDefaults.locales` in Mantle's canonical locale form
+   (`'en'`, `'zh-TW'`, never `'en-US'` if you mean `'en'`; never
+   `'zh-Hant'` if you mean Traditional Chinese — use `'zh-TW'`). The
+   boot check rejects malformed or unsupported tags synchronously.
 2. If the site has no locales, omit `siteDefaults.locales` entirely.
    The whole subsystem stays off.
 3. Don't write `site_config` rows manually for the seed —

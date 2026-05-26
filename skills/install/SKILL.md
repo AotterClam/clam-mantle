@@ -101,7 +101,7 @@ Audience scope drives the locale choice and feeds Mantle. Ask the user explicitl
 - Domestic audience → propose monolingual in the audience's primary language. Confirm.
 - International audience → propose bilingual, canonical = the user's working language, secondary = the audience's language. Confirm.
 - Ambiguous (mixed signals, user not sure) → ask once: monolingual `<primary>` or bilingual `<primary>+<secondary>`?
-- Use BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags — write `zh-TW` not `zh-Hant`, and bare-language or `<lang>-<2-letter-region>` for everything else.
+- Use Mantle's v0.1 locale subset: BCP 47 language + optional 2-letter region. The runtime canonicalizer rejects script subtags even though they are valid BCP 47 — map Traditional Chinese / `zh-Hant` to `zh-TW`, Simplified Chinese / `zh-Hans` to `zh-CN`, and otherwise use bare-language or `<lang>-<2-letter-region>`.
 
 **Description + summary — different roles, both agent-synthesized in the user's language.**
 

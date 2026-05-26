@@ -68,6 +68,14 @@ describe("toCanonicalLocale", () => {
     // concern.
   });
 
+  it("rejects script subtags in Mantle v0.1", () => {
+    expect(() => toCanonicalLocale("zh-Hant")).toThrow(InvalidLocaleError);
+    expect(() => toCanonicalLocale("zh-Hans")).toThrow(InvalidLocaleError);
+    expect(() => toCanonicalLocale("sr-Latn")).toThrow(InvalidLocaleError);
+    expect(() => toCanonicalLocale("sr-Cyrl")).toThrow(InvalidLocaleError);
+    expect(() => toCanonicalLocale("zh-Hant-HK")).toThrow(InvalidLocaleError);
+  });
+
   it("InvalidLocaleError carries the original input in its message", () => {
     try {
       toCanonicalLocale("garbage");
