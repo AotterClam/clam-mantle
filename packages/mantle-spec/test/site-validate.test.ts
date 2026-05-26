@@ -24,6 +24,19 @@ describe("assertSiteDefaultsCanonical (boot-time fail-fast)", () => {
     ).toThrow(InvalidSiteDefaultsError);
   });
 
+  it("explains script-subtag rejection with region-tag alternatives", () => {
+    try {
+      assertSiteDefaultsCanonical({ locales: ["zh-Hant", "zh-Hans"] });
+      throw new Error("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(InvalidSiteDefaultsError);
+      expect((e as Error).message).toContain("valid BCP 47");
+      expect((e as Error).message).toContain("unsupported in Mantle v0.1");
+      expect((e as Error).message).toContain("zh-TW");
+      expect((e as Error).message).toContain("zh-CN");
+    }
+  });
+
   it("InvalidSiteDefaultsError carries the invalid list", () => {
     try {
       assertSiteDefaultsCanonical({ locales: ["english", "zh-TW", ""] });

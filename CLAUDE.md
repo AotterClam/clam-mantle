@@ -14,7 +14,7 @@ Concretely, when designing or reviewing a change, ask:
 - **Did this make the agent's job harder?** Adding a new manifest key with subtle semantics, a new closed-enum member that's "almost but not quite" like the others, or a runtime behavior that varies by undocumented context — all symptoms of the runtime offloading work onto the author.
 - **Can a non-coder safely benefit from this change?** Vibe-coders won't read source code. They paste a URL into Claude Code and trust the agent. If a misuse of the SDK silently corrupts production data instead of surfacing as a `pre-deploy` diagnostic, you've broken the safety promise.
 
-Hard problems live in the runtime. Examples in this repo: schema validation (zod-translated from JSON Schema; Workers-CSP-safe by construction), locale canonicalization (BCP 47 enforced at every layer), OAuth (DCR-compliant out of the box), KV cache invalidation, and entry-writer chokepoint enforcement. Authors never see those — they see the manifest YAML.
+Hard problems live in the runtime. Examples in this repo: schema validation (zod-translated from JSON Schema; Workers-CSP-safe by construction), locale canonicalization (Mantle v0.1 accepts language + optional region, rejecting script subtags such as `zh-Hant` with explicit guidance), OAuth (DCR-compliant out of the box), KV cache invalidation, and entry-writer chokepoint enforcement. Authors never see those — they see the manifest YAML.
 
 This is the lens for every architectural decision in this codebase.
 

@@ -7,7 +7,10 @@ import {
   expandPolicyRequired,
   parseMimeAccept,
 } from "../model/MediaMimeAccept.js";
-import { canonicalizeLocaleList } from "./LocaleCanonicalizer.js";
+import {
+  canonicalizeLocaleList,
+  containsScriptSubtagLocale,
+} from "./LocaleCanonicalizer.js";
 
 /**
  * Synchronous fail-fast for `siteDefaults`. Throws
@@ -27,12 +30,16 @@ import { canonicalizeLocaleList } from "./LocaleCanonicalizer.js";
  */
 export class InvalidSiteDefaultsError extends Error {
   constructor(public readonly invalidLocales: ReadonlyArray<string>) {
+    const hasScriptSubtag = containsScriptSubtagLocale(invalidLocales);
     super(
-      `Invalid BCP 47 locale tag(s) in CmsConfig.siteDefaults.locales: ` +
+      `Invalid Mantle locale tag(s) in CmsConfig.siteDefaults.locales: ` +
         invalidLocales.map((s) => `'${s}'`).join(", ") +
-        `. Use BCP 47 form like 'en' or 'zh-TW' — the canonicalizer ` +
+        `. Use Mantle v0.1 locale form like 'en' or 'zh-TW' — the canonicalizer ` +
         `accepts mixed case ('zh-tw' / 'ZH_TW'), but the structure must ` +
         `be a 2/3-letter language plus optional 2-letter region. ` +
+        (hasScriptSubtag
+          ? `Script subtags such as 'zh-Hant', 'zh-Hans', 'sr-Latn', or 'sr-Cyrl' are valid BCP 47 but intentionally unsupported in Mantle v0.1; use region tags such as 'zh-TW' for Traditional Chinese or 'zh-CN' for Simplified Chinese. `
+          : "") +
         `See ADR-0010 / cms-spec's canonicalizeLocaleList.`,
     );
     this.name = "InvalidSiteDefaultsError";
